@@ -7,3 +7,5 @@ When we're finished we will call out to Rust via NAPI synchronously in that file
 
 This is obviously incredibly complex work, The only way the "WHOLE" is what we want is if all the "PARTS" are 1:1; Which means we'll need to rigorously test all the parts as we go
 
+In order to do this correctly, it's probably best if we replicate their folder/file structure of what we have to port from JS -> Rust identically as well. That way it's very easy to compare old/new source and spot differences in logic (which should never occur)
+

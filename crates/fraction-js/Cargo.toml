@@ -1,0 +1,7 @@
+[package]
+name = "fraction-js"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of fraction.js@4.2.0"

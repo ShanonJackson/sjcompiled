@@ -1,0 +1,43 @@
+[workspace]
+resolver = "2"
+members = [
+    "postcss-core",
+    "postcss-selector-parser",
+    "postcss-value-parser",
+    "postcss-values-parser",
+    "fraction-js",
+    "colord",
+    "cssnano-utils",
+    "caniuse-db",
+    "caniuse-api",
+    "browserslist-shim",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+indexmap = "2"
+regex = "1"
+once_cell = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+oxc_browserslist = "0.30"
+
+postcss-core = { path = "postcss-core" }
+postcss-selector-parser = { path = "postcss-selector-parser" }
+postcss-value-parser = { path = "postcss-value-parser" }
+postcss-values-parser = { path = "postcss-values-parser" }
+fraction-js = { path = "fraction-js" }
+colord = { path = "colord" }
+cssnano-utils = { path = "cssnano-utils" }
+caniuse-db = { path = "caniuse-db" }
+caniuse-api = { path = "caniuse-api" }
+browserslist-shim = { path = "browserslist-shim" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
