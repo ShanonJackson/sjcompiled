@@ -1,0 +1,4 @@
+color: red;
+a { color: blue; }
+@media (max-width: 200px) { b { color: green; } }
+/* trailing comment */

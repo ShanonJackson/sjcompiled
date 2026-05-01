@@ -9,3 +9,5 @@
 
 pub mod css_property;
 pub mod css_affix_interpolation;
+pub mod style_ordering;
+pub mod sort_pseudo_selectors;

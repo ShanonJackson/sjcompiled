@@ -30,9 +30,99 @@ pub mod text_decoration;
 pub mod utils;
 pub mod types;
 
-use postcss_core::Root;
+use postcss_core::container::{walk_decls_mut, Mutation};
+use postcss_core::{Node, NodeKind, PluginError, PluginResult, Root};
 
-/// `expandShorthands()` factory — entry point for the plugin. Phase 4e.
-pub fn expand_shorthands(_root: &mut Root) {
-    unimplemented!("Phase 4e — port plugins/expand-shorthands/index.ts");
+use self::types::{ConversionFunction, Longform};
+use self::utils::value_is_not_safe_to_expand;
+
+/// `expandShorthands()` factory upstream. Walks every Declaration in
+/// the tree; if the prop matches one of the supported shorthands and
+/// the value is "safe to expand" (no `var(...)`), the decl is replaced
+/// with N longform decls.
+///
+/// Returns an error only if a conversion function returns `None` — but
+/// in this port every conversion function returns `Vec<Longform>` (no
+/// `Option`), so this never fires. We keep the `PluginResult` signature
+/// for API consistency with the rest of the plugin family.
+pub fn expand_shorthands(root: &mut Root) -> PluginResult {
+    let mut error: Option<PluginError> = None;
+    walk_decls_mut(&mut root.root, &mut |node, _ctx| {
+        if error.is_some() {
+            return Mutation::Keep;
+        }
+        let prop = match &node.kind {
+            NodeKind::Declaration(d) => d.prop.clone(),
+            _ => return Mutation::Keep,
+        };
+
+        // Dispatch on prop name. Anything not in the table → no-op.
+        let expand: ConversionFunction = match prop.as_str() {
+            // Fully-expanded properties.
+            "margin" => margin::margin,
+            "padding" => padding::padding,
+            "place-content" => place_content::place_content,
+            "place-items" => place_items::place_items,
+            "place-self" => place_self::place_self,
+            "overflow" => overflow::overflow,
+            "flex" => flex::flex,
+            "flex-flow" => flex_flow::flex_flow,
+            "outline" => outline::outline,
+            "text-decoration" => text_decoration::text_decoration,
+            // Partially-expanded.
+            "background" => background::background,
+            _ => return Mutation::Keep,
+        };
+
+        let decl_value = match &node.kind {
+            NodeKind::Declaration(d) => d.value.clone(),
+            _ => return Mutation::Keep,
+        };
+        let value_root = postcss_values_parser::parse(&decl_value);
+
+        // Bail if any top-level value node is `var(...)` — output isn't
+        // determinable so we leave the decl alone.
+        if value_root.nodes.iter().any(value_is_not_safe_to_expand) {
+            return Mutation::Keep;
+        }
+
+        let longforms: Vec<Longform> = expand(&value_root);
+
+        // Early-exit when the expansion returned a single no-op
+        // Longform (`prop: undefined`) — leave decl unchanged.
+        if longforms.len() == 1 && longforms[0].prop.is_none() {
+            return Mutation::Keep;
+        }
+
+        // Build new decl nodes by cloning `node` and overriding prop+value.
+        let new_decls: Vec<Node> = longforms
+            .into_iter()
+            .filter_map(|lf| {
+                let mut clone = node.clone();
+                if let NodeKind::Declaration(d) = &mut clone.kind {
+                    if let Some(p) = lf.prop {
+                        d.prop = p;
+                    }
+                    d.value = lf.value;
+                    // Drop the cached raw value so the stringifier
+                    // re-emits the new value rather than the original
+                    // bytes. Mirrors upstream `decl.clone({ ...val })`
+                    // which carries raws.value but the stringifier's
+                    // `rawValue` check `raw.value === value` fails when
+                    // value changed.
+                    clone.raws.value = None;
+                    Some(clone)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Mutation::ReplaceMany(new_decls)
+    });
+
+    match error {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
 }

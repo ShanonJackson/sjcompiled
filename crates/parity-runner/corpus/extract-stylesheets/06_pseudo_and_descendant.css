@@ -1,0 +1,2 @@
+a:hover { color: red; }
+a > b + c { color: blue; }

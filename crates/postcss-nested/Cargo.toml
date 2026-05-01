@@ -1,0 +1,11 @@
+[package]
+name = "postcss-nested"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of postcss-nested@5.0.6 — pinned per crates/PARITY_VERSIONS.md."
+
+[dependencies]
+postcss-core = { workspace = true }
+postcss-selector-parser = { workspace = true }

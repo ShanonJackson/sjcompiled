@@ -15,6 +15,28 @@ members = [
     "css",
     "sjcompiled-utils",
     "parity-runner",
+
+    # Phase 5 — direct pipeline plugins (transformCss + sort entry points).
+    "postcss-nested",
+    "postcss-normalize-whitespace",
+    "postcss-discard-duplicates",
+
+    # Phase 6 — cssnano-preset-default sub-plugins (14 + orchestrator).
+    "cssnano-postcss-discard-comments",
+    "cssnano-postcss-normalize-string",
+    "cssnano-postcss-normalize-positions",
+    "cssnano-postcss-normalize-timing-functions",
+    "cssnano-postcss-normalize-url",
+    "cssnano-postcss-normalize-unicode",
+    "cssnano-postcss-minify-selectors",
+    "cssnano-postcss-minify-params",
+    "cssnano-postcss-minify-gradients",
+    "cssnano-postcss-ordered-values",
+    "cssnano-postcss-reduce-initial",
+    "cssnano-postcss-convert-values",
+    "cssnano-postcss-colormin",
+    "postcss-calc",
+    "cssnano-preset-default",
 ]
 
 [workspace.package]
@@ -45,3 +67,22 @@ compiled-css = { path = "compiled-css" }
 css = { path = "css" }
 sjcompiled-utils = { path = "sjcompiled-utils" }
 parity-runner = { path = "parity-runner" }
+
+postcss-nested = { path = "postcss-nested" }
+postcss-normalize-whitespace = { path = "postcss-normalize-whitespace" }
+postcss-discard-duplicates = { path = "postcss-discard-duplicates" }
+cssnano-postcss-discard-comments = { path = "cssnano-postcss-discard-comments" }
+cssnano-postcss-normalize-string = { path = "cssnano-postcss-normalize-string" }
+cssnano-postcss-normalize-positions = { path = "cssnano-postcss-normalize-positions" }
+cssnano-postcss-normalize-timing-functions = { path = "cssnano-postcss-normalize-timing-functions" }
+cssnano-postcss-normalize-url = { path = "cssnano-postcss-normalize-url" }
+cssnano-postcss-normalize-unicode = { path = "cssnano-postcss-normalize-unicode" }
+cssnano-postcss-minify-selectors = { path = "cssnano-postcss-minify-selectors" }
+cssnano-postcss-minify-params = { path = "cssnano-postcss-minify-params" }
+cssnano-postcss-minify-gradients = { path = "cssnano-postcss-minify-gradients" }
+cssnano-postcss-ordered-values = { path = "cssnano-postcss-ordered-values" }
+cssnano-postcss-reduce-initial = { path = "cssnano-postcss-reduce-initial" }
+cssnano-postcss-convert-values = { path = "cssnano-postcss-convert-values" }
+cssnano-postcss-colormin = { path = "cssnano-postcss-colormin" }
+postcss-calc = { path = "postcss-calc" }
+cssnano-preset-default = { path = "cssnano-preset-default" }

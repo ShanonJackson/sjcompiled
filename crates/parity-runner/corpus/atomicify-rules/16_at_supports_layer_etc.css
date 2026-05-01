@@ -1,0 +1,19 @@
+@container (width > 300px) {
+  h2 { color: red; }
+}
+
+@-moz-document url-prefix() {
+  color: blue;
+}
+
+@layer state {
+  background-color: brown;
+}
+
+@supports selector(h2 > p) {
+  color: pink;
+}
+
+@starting-style {
+  color: green;
+}

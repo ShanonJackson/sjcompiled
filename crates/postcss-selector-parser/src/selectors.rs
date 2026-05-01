@@ -36,7 +36,9 @@ fn write_node(node: &Node, out: &mut String) {
             if !any_subtree_mutated(node) {
                 if let Some(raw) = &node.raw_value { out.push_str(raw); return; }
             }
+            out.push_str(&node.spaces.before);
             for child in &node.nodes { write_node(child, out); }
+            out.push_str(&node.spaces.after);
         }
         NodeKind::ClassName => {
             out.push_str(&node.spaces.before);
@@ -62,9 +64,21 @@ fn write_node(node: &Node, out: &mut String) {
         }
         NodeKind::Pseudo => {
             out.push_str(&node.spaces.before);
-            // `value` already includes the `:` or `::` prefix and any
-            // inline `(args)` body the parser captured.
+            // `value` carries the `:foo` / `::foo` prefix only. Parens
+            // are rebuilt from `nodes` (parsed inner Selectors) so plugin
+            // mutations to the inner subtree flow through to output.
+            // Bare `,` join matches upstream `pseudo.js::toString`'s
+            // `this.map(String).join(',')`. Whitespace between selectors
+            // lives on each child Selector's first child as `spaces.before`.
             out.push_str(&node.value);
+            if !node.nodes.is_empty() {
+                out.push('(');
+                for (i, child) in node.nodes.iter().enumerate() {
+                    if i > 0 { out.push(','); }
+                    write_node(child, out);
+                }
+                out.push(')');
+            }
             out.push_str(&node.spaces.after);
         }
         NodeKind::Attribute => {

@@ -1,0 +1,11 @@
+[package]
+name = "cssnano-postcss-normalize-positions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of postcss-normalize-positions@5.1.1."
+
+[dependencies]
+postcss-core = { workspace = true }
+postcss-value-parser = { workspace = true }

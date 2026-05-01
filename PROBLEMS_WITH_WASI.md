@@ -1,0 +1,3 @@
+- Resolver can't be supported, Even as bridge it would be async very difficult to support. (need to build migration guide)
+- WASI cannot read files outside cwd so if you're in ./jira and a files physical location we need to read when we walk dependecny tree is outside ./jira it can't be read.
+- WASI instance is torn down between transforms 

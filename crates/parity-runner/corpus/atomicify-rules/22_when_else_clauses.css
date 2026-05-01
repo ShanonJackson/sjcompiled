@@ -1,0 +1,9 @@
+@when font-tech(color-COLRv1) and font-tech(variations) {
+  @font-face { font-family: test; src: url(test.woff2); }
+}
+@else font-tech(color-SVG) {
+  @font-face { font-family: test; src: url(test2.woff2); }
+}
+@else {
+  @font-face { font-family: test; src: url(test3.woff2); }
+}

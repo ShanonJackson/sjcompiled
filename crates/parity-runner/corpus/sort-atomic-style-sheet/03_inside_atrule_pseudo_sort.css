@@ -1,0 +1,12 @@
+@media (max-width: 400px) {
+  :active { color: red; }
+  :focus { color: pink; }
+  ::disabled { display: block; }
+  :hover { color: green; }
+  :focus-visible { color: white; }
+  :visited { color: black; }
+  :link { color: yellow; }
+  :focus-within { color: grey; }
+  display: block;
+  color: red;
+}

@@ -1,0 +1,11 @@
+[package]
+name = "cssnano-postcss-minify-selectors"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of postcss-minify-selectors@5.2.1."
+
+[dependencies]
+postcss-core = { workspace = true }
+postcss-selector-parser = { workspace = true }

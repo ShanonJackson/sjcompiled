@@ -1,0 +1,8 @@
+@media (max-width: 100px) {
+  :hover {
+    display: block;
+  }
+  :active {
+    display: inline;
+  }
+}

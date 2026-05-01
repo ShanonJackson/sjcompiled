@@ -1,0 +1,4 @@
+@media (min-width:300px){.a{color:red}}
+@media (min-width:600px){.b{color:blue}}
+@media (min-width:300px){.c{color:green}}
+@media (min-width:600px){.d{color:yellow}}

@@ -1,0 +1,16 @@
+@media (max-width: 400px) {
+  @supports (display: grid) {
+    :active { color: red; }
+    :hover { color: green; }
+  }
+
+  @supports (display: table-cell) {
+    :visited { color: black; }
+    :link { color: yellow; }
+
+    @media (max-width: 700px) {
+      :focus { color: black; }
+      :link { color: yellow; }
+    }
+  }
+}

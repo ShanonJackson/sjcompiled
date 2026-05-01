@@ -1,0 +1,11 @@
+[package]
+name = "postcss-calc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of postcss-calc@8.2.4 — calc() expression evaluator."
+
+[dependencies]
+postcss-core = { workspace = true }
+postcss-value-parser = { workspace = true }

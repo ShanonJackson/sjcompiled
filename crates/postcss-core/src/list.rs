@@ -1,7 +1,9 @@
 //! Port of `postcss/lib/list.js`.
 
 /// `list.split(string, separators, last)` — upstream allows multiple separator
-/// chars and respects parenthesis/quote nesting.
+/// chars and respects parenthesis/quote nesting. Pushed values are
+/// `String.prototype.trim()`-equivalent (matches upstream which does
+/// `array.push(current.trim())` on each segment).
 pub fn split(input: &str, separators: &[char], last: bool) -> Vec<String> {
     let mut array: Vec<String> = Vec::new();
     let mut current = String::new();
@@ -29,13 +31,17 @@ pub fn split(input: &str, separators: &[char], last: bool) -> Vec<String> {
             split_now = true;
         }
         if split_now {
-            if !current.is_empty() { array.push(std::mem::take(&mut current)); }
+            if !current.is_empty() {
+                array.push(std::mem::take(&mut current).trim().to_string());
+            }
             split_now = false;
         } else {
             current.push(ch);
         }
     }
-    if last || !current.is_empty() { array.push(current); }
+    if last || !current.is_empty() {
+        array.push(current.trim().to_string());
+    }
     array
 }
 
@@ -46,4 +52,38 @@ pub fn space(input: &str) -> Vec<String> {
 
 pub fn comma(input: &str) -> Vec<String> {
     split(input, &[','], true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn comma_trims_each() {
+        assert_eq!(comma(".a, .b, .c"), vec![".a", ".b", ".c"]);
+        assert_eq!(comma(".a,.b"), vec![".a", ".b"]);
+        assert_eq!(comma(".a,\n.b"), vec![".a", ".b"]);
+    }
+
+    #[test]
+    fn comma_respects_parens() {
+        assert_eq!(comma(":is(.a, .b), .c"), vec![":is(.a, .b)", ".c"]);
+    }
+
+    #[test]
+    fn comma_respects_quotes() {
+        assert_eq!(comma(r#"[data-x=","]"#), vec![r#"[data-x=","]"#]);
+    }
+
+    #[test]
+    fn comma_empty_input() {
+        // last=true on `comma`, so an empty trailing segment IS pushed.
+        assert_eq!(comma(""), vec![""]);
+    }
+
+    #[test]
+    fn space_does_not_emit_trailing_empty() {
+        // last=false on `space`, so no trailing empty.
+        assert_eq!(space("a b c"), vec!["a", "b", "c"]);
+    }
 }

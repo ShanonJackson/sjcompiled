@@ -74,9 +74,18 @@ impl Parser {
                 i += 1;
             } else if tok.kind == t::word {
                 let word = self.text(tok);
-                let mut node = parse_word(&word);
-                apply_pending_space(&mut node, pending_space.take(), true);
-                selector.nodes.push(node);
+                // A single `word` token can encode a compound selector
+                // (`.foo.bar`, `tag.x#id`, `#id.x`). Split it into a
+                // sequence of typed Nodes — matches upstream
+                // `parser.js::class()` / `id()` / `tag()` flow which emits
+                // one ClassName/Identifier/Tag per leading sigil.
+                let mut split = parse_word_compound(&word);
+                if let Some(first) = split.first_mut() {
+                    apply_pending_space(first, pending_space.take(), true);
+                }
+                for n in split {
+                    selector.nodes.push(n);
+                }
                 i += 1;
             } else if tok.kind == t::asterisk {
                 let mut node = Node {
@@ -136,7 +145,6 @@ impl Parser {
                     if let Some(end) = close {
                         let inner_start = if j + 1 < tokens.len() { tokens[j + 1].start_pos } else { tokens[j].end_pos };
                         let inner_end = tokens[end].start_pos;
-                        let inner_text = self.input[inner_start..inner_end].to_string();
                         let inner_groups = split_top_level_groups(&tokens[j + 1..end]);
                         for (s, e) in inner_groups {
                             let absolute_slice: Vec<Token> = tokens[j + 1 + s..j + 1 + e].to_vec();
@@ -148,9 +156,11 @@ impl Parser {
                             self.build_selector_children(&absolute_slice, &mut child_sel);
                             nodes.push(child_sel);
                         }
-                        value.push('(');
-                        value.push_str(&inner_text);
-                        value.push(')');
+                        // `value` keeps the prefix only (`:not`, `::before`,
+                        // `:nth-child`). The parens are rebuilt from
+                        // `nodes` at stringify time so plugin mutations
+                        // to inner selectors flow through to output. See
+                        // `selectors::stringify` (Pseudo branch).
                         j = end + 1;
                     }
                 }
@@ -219,36 +229,72 @@ impl Parser {
     }
 }
 
-/// `.foo` / `#foo` / tag classification of a word token.
-fn parse_word(word: &str) -> Node {
-    if let Some(name) = word.strip_prefix('.') {
-        Node {
-            kind: NodeKind::ClassName,
-            value: name.to_string(),
-            raw_value: None,
-            nodes: Vec::new(),
-            spaces: Spaces::default(),
-            attribute: None,
-        }
-    } else if let Some(name) = word.strip_prefix('#') {
-        Node {
-            kind: NodeKind::Identifier,
-            value: name.to_string(),
-            raw_value: None,
-            nodes: Vec::new(),
-            spaces: Spaces::default(),
-            attribute: None,
-        }
-    } else {
-        Node {
-            kind: NodeKind::Tag,
-            value: word.to_string(),
-            raw_value: None,
-            nodes: Vec::new(),
-            spaces: Spaces::default(),
-            attribute: None,
-        }
+/// Split a single `word` token into the sequence of typed nodes it
+/// encodes. CSS allows compound selectors with no separator between
+/// parts: `.foo.bar` is two classes, `div.foo` is tag + class,
+/// `#id.x` is id + class, `.x#id` is class + id. The tokenizer treats
+/// `.` and `#` as part of a word, so we split here.
+fn parse_word_compound(word: &str) -> Vec<Node> {
+    let mut nodes = Vec::new();
+    let bytes = word.as_bytes();
+    let mut i = 0usize;
+    let len = bytes.len();
+    if len == 0 {
+        return nodes;
     }
+    // Optional leading tag (no `.`/`#` prefix). Stops at the first sigil.
+    if bytes[0] != b'.' && bytes[0] != b'#' {
+        let mut end = 0usize;
+        while end < len && bytes[end] != b'.' && bytes[end] != b'#' {
+            end += 1;
+        }
+        nodes.push(Node {
+            kind: NodeKind::Tag,
+            value: word[0..end].to_string(),
+            raw_value: None,
+            nodes: Vec::new(),
+            spaces: Spaces::default(),
+            attribute: None,
+        });
+        i = end;
+    }
+    while i < len {
+        let sigil = bytes[i];
+        debug_assert!(sigil == b'.' || sigil == b'#');
+        let name_start = i + 1;
+        let mut end = name_start;
+        // Honor backslash-escapes: `\.` inside the name doesn't terminate.
+        // CSS-escaped class/id names like `._foo\:bar` keep the escaped
+        // chars. We're conservative here: a `\` escapes the next byte
+        // (postcss-selector-parser's `consumeEscape` handles hex escapes
+        // too, but for the splitting purposes a single-byte skip suffices
+        // because the tokenizer already absorbed the full escape).
+        while end < len {
+            if bytes[end] == b'\\' && end + 1 < len {
+                end += 2;
+                continue;
+            }
+            if bytes[end] == b'.' || bytes[end] == b'#' {
+                break;
+            }
+            end += 1;
+        }
+        let kind = match sigil {
+            b'.' => NodeKind::ClassName,
+            b'#' => NodeKind::Identifier,
+            _ => unreachable!(),
+        };
+        nodes.push(Node {
+            kind,
+            value: word[name_start..end].to_string(),
+            raw_value: None,
+            nodes: Vec::new(),
+            spaces: Spaces::default(),
+            attribute: None,
+        });
+        i = end;
+    }
+    nodes
 }
 
 fn apply_pending_space(node: &mut Node, pending: Option<String>, before: bool) {

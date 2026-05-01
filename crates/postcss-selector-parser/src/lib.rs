@@ -27,7 +27,10 @@ pub mod processor;
 
 pub use parser::Parser;
 pub use processor::{Processor, ProcessorOptions};
-pub use nodes::{AttributePayload, Node, NodeKind};
+pub use nodes::{
+    walk_attributes, walk_classes, walk_each, walk_pseudos,
+    AttributePayload, Node, NodeKind,
+};
 pub use selectors::stringify;
 
 #[cfg(test)]

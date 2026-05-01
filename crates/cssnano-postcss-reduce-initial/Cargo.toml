@@ -1,0 +1,12 @@
+[package]
+name = "cssnano-postcss-reduce-initial"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of postcss-reduce-initial@5.1.2."
+
+[dependencies]
+postcss-core = { workspace = true }
+browserslist-shim = { workspace = true }
+caniuse-api = { workspace = true }

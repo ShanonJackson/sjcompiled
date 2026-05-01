@@ -11,6 +11,8 @@ postcss-core = { workspace = true }
 postcss-selector-parser = { workspace = true }
 postcss-value-parser = { workspace = true }
 postcss-values-parser = { workspace = true }
+sjcompiled-utils = { workspace = true }
+colord = { workspace = true }
 indexmap = { workspace = true }
 once_cell = { workspace = true }
 regex = { workspace = true }

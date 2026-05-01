@@ -1,86 +1,178 @@
-# Phase 1/2/3 status — `crates/`
+# Status — `crates/`
 
-This document captures the state of the Rust port at the end of the initial
-setup pass. Read together with `EXECUTION_PLAN.md` and `PARITY_VERSIONS.md`.
+End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
+`PARITY_VERSIONS.md`.
 
-## Layout
+## Phase progress
 
-The Cargo workspace lives at `crates/Cargo.toml` and currently has 12
-members. Each crate's folder/file structure mirrors the upstream npm package
-that it ports — opening upstream JS and the Rust port side-by-side should
-show identical file layouts (camelCase preserved where upstream uses it).
-
-Vendored upstream sources for the pinned versions are extracted under
-`crates/_vendor/` (gitignored). They exist as the source-of-truth reference
-during porting.
-
-### Local-package crates (split: orchestrator vs plugins)
-
-- **`crates/css/`** — Rust port of `@sjcompiled/css`'s public surface
-  (`transformCss`, `sort`, `generateCompressionMap`). Mirrors
-  `packages/css/src/{index,transform,sort,generate-compression-map}.ts`.
-  **`transform_css` and `sort` signatures are locked here** — the parity
-  contract is fixed even though the bodies are postcss-core identity
-  passthrough until Phase 4-7 plugin work lands.
-- **`crates/compiled-css/`** — Local plugin home; mirrors
-  `packages/css/src/plugins/*` and `packages/css/src/utils/*` 1:1
-  (atomicify-rules, discard-empty-rules, expand-shorthands/, at-rules/,
-  etc.). Every plugin file exists as a Rust module with a typed shell
-  (factory function + options struct) and an `unimplemented!()` body
-  tagged with the phase that fills it in.
-
-## Per-crate state
-
-| Crate | Phase | Status |
+| Phase | Description | Status |
 |---|---|---|
-| `fraction-js` | 1d | **Ported.** All public methods (`add`/`sub`/`mul`/`div`/`mod`/`gcd`/`lcm`/`ceil`/`floor`/`round`/`pow`/`equals`/`compare`/`divisible`/`toString`/`toFraction`/`toLatex`/`toContinued`). 10 unit tests pass. Open: `js_number_to_string` non-integer formatting deferred to autoprefixer integration. |
-| `colord` | 1c | **Ported.** Full color parse (hex 3/4/6/8 digit, rgb legacy + modern + percent, hsl legacy + modern + grad/turn/rad units, 148 named colors + `transparent`, case-insensitive). Color math: `toHex` / `toRgb(String)` / `toHsl(String)` / `toHsv` / `invert` / `saturate` / `desaturate` / `grayscale` / `lighten` / `darken` / `rotate` / `alpha` / `hue` / `isEqual` / `brightness` / `isDark` / `isLight` / `toName` (exact + closest). Plugins: `a11y` (contrast, luminance, isReadable AA/AAA), `hwb`, `lab` (CIE LAB via D50 XYZ), `mix` (LAB-space lerp), `harmonies` (analogous, complementary, double-split, rectangle, split-complementary, tetradic, triadic), `minify` (shortest-string serializer used by `postcss-colormin`). 39 unit tests. |
-| `cssnano-utils` | 2e | **Ported.** `getArguments`, `rawCache`, `sameParent`. 5 unit tests. Caller-side adapter takes a `is_div` predicate so this crate stays AST-agnostic (couples to value-parser via the consumer). |
-| `caniuse-db` | 1b | **Ported.** Vendored `caniuse-lite@1.0.30001690` JSON snapshot at `data/features.snapshot.json` (3.5 MB, 579 features, all agents). The snapshot is produced once-off by `scripts/snapshot.js` (Node) using upstream's bundled unpacker against `crates/_vendor/caniuse-lite-1.0.30001690`. `build.rs` copies the JSON into `OUT_DIR`; `lib.rs` `include_str!`s it and parses lazily via `once_cell`. 5 unit tests verify version pin, flexbox/css-grid feature lookups, chrome agent, list size. **Next:** vendor `electron-to-chromium@1.5.76` and `node-releases@2.0.19` (only matters once `browserslist-shim` consults them — `oxc-browserslist` ships its own copies for now). |
-| `caniuse-api` | 3a | **Ported.** `features`, `find`, `getSupport`, `isSupported`, `setBrowserScope`, `getBrowserScope` end-to-end against real caniuse-lite data. 6 integration tests (find, fuzzy substring, ie6 unsupported features, full feature list count). |
-| `browserslist-shim` | 2d | **Ported (config + defaults).** `parseConfig` (`.browserslistrc` body parser, comment-strip, `[section]` headers), `parsePackage` (package.json `browserslist` field — array / string / env-object / `browserlist` typo detection), `findConfigFile` (ancestor walk), `loadConfig` (`BROWSERSLIST` > `BROWSERSLIST_CONFIG` > path discovery), `pickEnv` (`opts.env` > `BROWSERSLIST_ENV` > `NODE_ENV` > `production`). `DEFAULT_QUERIES = ["> 0.5%", "last 2 versions", "Firefox ESR", "not dead"]`. 9 unit tests. **Next:** match the *resolution* semantics byte-for-byte against JS — `oxc-browserslist` may differ from JS browserslist on edge cases (deadlist semantics, region queries). |
-| `postcss-core` | 1a | **Ported.** Tokenizer (`tokenize.js`), parser (`parser.js`) and stringifier (`stringifier.js`) are now real. AST: Root / AtRule / Rule / Declaration / Comment / Container with full `raws` (before/after/between/afterName/important/left/right/value/selector/params/ownSemicolon/semicolon). Round-trip `stringify(parse(css)) == css` passes for: simple decl, no-trailing-semi, multiple decls, nested at-rules, comment-in-value, statement at-rules, empty rules, `!important`, url values, leading-underscore-hack. **Next:** corpus-scale round-trip, edge-case raws (semicolon decision in body, missed-semicolon error path, `_` / `*` decl-prop hacks), `from_offset`-driven source positions. |
-| `postcss-selector-parser` | 2a | **Ported (level 1).** Real `tokenize.js` (with `consumeWord` / `consumeEscape`). Parser splits on top-level `,` to build Root → Selector(s). 8 round-trip parity tests pass: class, id, descendant, child, comma list, attribute with string, pseudo-function, nested pseudo. **Next:** parser-level Node type breakdown (ClassName / Combinator / Pseudo / Attribute) so `flattenMultipleSelectors` and `increaseSpecificity` plugins can introspect. |
-| `postcss-value-parser` | 2b | **Ported.** Real `parse.js` (Function / String / Div / Space / Word / Comment / UnicodeRange), `stringify.js`, `walk.js`, `unit.js`. 11 round-trip parity tests pass: keyword, px value, space-separated list, comma list, function call, calc, url unquoted, url with spaces, quoted string, comment, nested function. |
-| `postcss-values-parser` | 2c | **Ported (classification).** Real `tokenize.js` (wraps postcss-core tokenizer, splits brackets/operators/commas). Parser classifies each token into Numeric/Word/Func/Quoted/Punctuation/Operator/UnicodeRange/AtWord/Comment. 6 unit tests pass. **Next:** raws bookkeeping that lets `expand-shorthands` mutate-and-re-stringify cleanly. |
-| `css` | (local) | **Scaffolded.** `transform_css(css, opts) -> { sheets, classNames }` and `sort(stylesheet, opts) -> string` signatures locked. `TransformOpts` / `SortOpts` / `TransformResult` types are `serde`-roundtrippable. Bodies are postcss-core identity passthrough today (3 transform round-trip tests + 1 sort-passthrough test). Plugin pipeline gets wired in here in Phase 4-7 in upstream order — module doc has the canonical sequence. |
-| `compiled-css` | (local) | **Scaffolded.** Every `packages/css/src/plugins/*.ts` (and the nested `at-rules/*` and `expand-shorthands/*` trees) maps 1:1 to a Rust module declaring the plugin's typed surface (factory function + options struct) with an `unimplemented!()` body tagged with the phase that fills it in. Phase 4-6 fills the bodies. |
+| 0 | parity-runner + corpus + JS-vs-JS determinism | **DONE** |
+| 1 | postcss-core / caniuse-db / colord / fraction-js | **DONE** |
+| 2 | postcss-selector-parser / postcss-value-parser / postcss-values-parser / browserslist-shim / cssnano-utils | **DONE** |
+| 3 | caniuse-api | **DONE** |
+| 4a | discard-empty-rules / discard-duplicates (LOCAL) / extract-stylesheets | **DONE** — all byte-clean |
+| 4b | parent-orphaned-pseudos / flatten-multiple-selectors / increase-specificity | **DONE** — all byte-clean |
+| 4c | merge-duplicate-at-rules / normalize-current-color / sort-atomic-style-sheet (+ at-rules helpers, sort-pseudo-selectors, sort-shorthand-declarations) | **DONE** — all byte-clean |
+| 4d | atomicify-rules (CRITICAL hash plugin) | **DONE** — byte-clean across 24-entry corpus |
+| 4e | expand-shorthands (11 conversion functions) | **DONE** — byte-clean across 38-entry corpus |
+| 5a | postcss-nested@5.0.6 | **SCAFFOLDED** — `unimplemented!()`. Largest single port; budget multi-day. |
+| 5b | postcss-normalize-whitespace@5.1.1 | **SCAFFOLDED** — `unimplemented!()`. Walks via postcss-value-parser. |
+| 5c | postcss-discard-duplicates@6.0.0 (npm — used by sort.ts) | **DONE** — byte-clean across 8-entry corpus |
+| 6a | postcss-discard-comments@5.1.2 | **SCAFFOLDED** |
+| 6b | postcss-normalize-string@5.1.0 | **SCAFFOLDED** |
+| 6b | postcss-normalize-positions@5.1.1 | **SCAFFOLDED** |
+| 6b | postcss-normalize-timing-functions@5.1.0 | **SCAFFOLDED** |
+| 6b | postcss-normalize-url@5.1.0 | **SCAFFOLDED** |
+| 6c | postcss-minify-selectors@5.2.1 | **SCAFFOLDED** |
+| 6d | postcss-ordered-values@5.1.3 | **SCAFFOLDED** |
+| 6d | postcss-calc@8.2.4 | **SCAFFOLDED** — calc expression evaluator; high diff risk on float math. |
+| 6e | postcss-normalize-unicode@5.1.1 | **SCAFFOLDED** — browserslist-aware. |
+| 6e | postcss-reduce-initial@5.1.2 | **SCAFFOLDED** — caniuse-aware. |
+| 6f | postcss-convert-values@5.1.3 | **SCAFFOLDED** — uses fraction-js. |
+| 6f | postcss-minify-params@5.1.4 | **SCAFFOLDED** — caniuse-aware. |
+| 6g | postcss-minify-gradients@5.1.1 | **SCAFFOLDED** — uses colord. |
+| 6g | postcss-colormin@5.3.1 | **SCAFFOLDED** — highest-risk cssnano plugin. |
+| 6h | cssnano-preset-default@5.2.14 (orchestrator) | **SCAFFOLDED** |
+| 7 | autoprefixer@10.4.14 | **NOT STARTED** — largest single port (~50 files). |
+| 8 | NAPI bridge + transformCss / sort assembly | **NOT STARTED** |
 
-## Test summary
+## Test totals
 
-`RUSTFLAGS="" cargo test --workspace` — **130 unit tests passing, 0 failing.**
+`RUSTFLAGS="" cargo test --workspace --no-fail-fast`:
+- **354 tests pass / 0 fail / 1 ignored / 0 failed suites.**
 
-Breakdown:
-- `colord`: 39 (parse: hex 3/4/6/8, rgb legacy/modern/%, hsl legacy/modern/grad/alpha, named, transparent, case-insensitive, whitespace; manipulate: invert, lighten, darken, saturate, grayscale, rotate, alpha, hue, brightness, isEqual; plugins: a11y contrast, harmonies, minify shortest-string)
-- `cssnano-utils`: 5
-- `fraction-js`: 10
-- `postcss-core`: 16 (10 round-trip parity tests on the parser+stringifier)
-- `postcss-value-parser`: 17 (11 round-trip parity tests on the value AST)
-- `postcss-selector-parser`: 13 (8 round-trip parity tests + 5 tokenize tests)
-- `postcss-values-parser`: 6 (kind-classification: Numeric, Func, Word, Quoted, Variable, UnicodeRange)
-- `browserslist-shim`: 9 (parseConfig variants, parsePackage variants, defaults string, query resolution)
-- `caniuse-db`: 5 (snapshot version pin, flexbox + css-grid feature lookups, chrome agent, 579-feature list)
-- `caniuse-api`: 6 (find exact + fuzzy, ie6 unsupported, feature list count)
-- `css`: 4 (transform_css passthrough simple/nested/empty + sort passthrough)
+## Foundational infrastructure (load-bearing for plugin ports)
+
+These exist and are byte-tested. Plugin authors depend on them; do NOT
+re-implement helpers. Add new ones in the appropriate crate:
+
+### `postcss-core` (postcss@8.4.31 port)
+
+- AST types (Root / AtRule / Rule / Declaration / Comment).
+- Parser + tokenizer + stringifier with full `raws` preservation.
+- **Stringifier raw-defaults**: `rawBeforeRule`, `rawBeforeDecl`,
+  `rawBeforeComment`, `rawBeforeClose` scans cached on first use.
+  Without these, plugin-driven replacements emit concatenated rules
+  with no separator.
+- **`container::remove_at`** — Root.removeChild override
+  (postcss/lib/root.js): when removing the first child of root, the
+  removed node's `raws.before` transfers to the new first child.
+  ALL plugin-driven removals at root level MUST go through
+  `remove_at`, not raw `Vec::remove`.
+- **`container::replace_with_at`** — `node.replaceWith(...)` semantics
+  (insertBefore-each-then-remove with Root.normalize override). Used
+  internally by `each_mut` / `walk_mut`'s `Mutation::Replace` and
+  `Mutation::ReplaceMany`.
+- **`Rule::get_selectors` / `set_selectors`** — comma-split with
+  `,\s*` separator preservation on join (`rule.selectors` get/set).
+- **`list::comma` / `list::space`** — trimmed value-list splitters.
+- **`stringify_node(node)`** — port of postcss `node.toString()` (no
+  leading raws.before; first-child-of-root context).
+
+### `postcss-selector-parser` (6.0.13)
+
+- Tokenizer + parser + typed AST (ClassName, Identifier, Pseudo,
+  Attribute, Combinator, etc.).
+- **Compound-selector splitting** (`.foo.bar`, `tag.x#id`) into
+  multiple typed nodes.
+- **Pseudo arg storage**: prefix only (`:not`) on `value`, parens
+  rebuilt from `nodes` at stringify time so plugin mutations to inner
+  selectors flow through.
+- **`walk_pseudos` / `walk_classes` / `walk_attributes`** mutating
+  walkers with parent-context callbacks.
+- **`Node::nesting()` / `Node::pseudo(value)`** factories.
+
+### `postcss-values-parser` (6.0.2 plural — distinct from value-parser)
+
+- Tokenize + parse + classify (Numeric, Word, Func, Quoted,
+  Punctuation, Operator, UnicodeRange, AtWord, Comment).
+- **`stringify_standalone(node)`** — port of `node.toString()` for the
+  values-parser node hierarchy (skips outer `raws_before`; Funcs emit
+  child `raws_before` inside parens).
+
+### `sjcompiled-utils`
+
+- `hash` — bit-identical to JS `murmurhash2_gc`. **Do not re-port.**
+- `unique` / `flatten` / `kebab_case` / `to_boolean`.
+- `INCREASE_SPECIFICITY_SELECTOR = ":not(#\\#)"`.
+- `shorthand_buckets` (67 entries) / `shorthand_for` table.
+
+### `colord` (2.9.1)
+
+Full color parse / manipulation / minification surface. Phase 6g
+(`postcss-colormin` / `postcss-minify-gradients`) consume this.
+
+### `caniuse-db` / `caniuse-api` / `browserslist-shim`
+
+Pinned data + query helpers for `autoprefixer` and the browserslist-
+aware cssnano plugins.
+
+## Workspace layout
+
+`crates/Cargo.toml` has 32 members. Naming:
+- `cssnano-postcss-*` — the 14 cssnano sub-plugins, prefixed to
+  disambiguate from same-named npm packages (e.g. distinguishing
+  `postcss-normalize-string` from any future v6/v7 fork).
+- `postcss-*` — the 4 plugins consumed directly by `transform.ts` /
+  `sort.ts`.
+- `cssnano-preset-default` — the preset orchestrator.
+- Foundation crates keep their upstream names where unambiguous.
+
+## What's left to port (full source-faithful Rust ports)
+
+15 crates. Listed in roughly ascending complexity:
+
+1. `postcss-discard-comments` — ~100 LOC + 2 lib files. Comment-text
+   predicate, inline-raws comment scrubbing.
+2. `postcss-normalize-positions` — ~50 LOC. Position-keyword rewrite.
+3. `postcss-normalize-string` — ~50 LOC. Quote-style normalization.
+4. `postcss-normalize-timing-functions` — ~50 LOC. Easing-keyword
+   compression.
+5. `postcss-ordered-values` — moderate. Reorders multi-value
+   shorthand parts.
+6. `postcss-normalize-whitespace` (Phase 5b) — moderate. Walks decls
+   via postcss-value-parser, normalizes raws.between/.semicolon, IE9
+   hack regex.
+7. `postcss-minify-selectors` — moderate. Selector minification using
+   postcss-selector-parser.
+8. `postcss-normalize-url` — moderate. URL parsing edge cases.
+9. `postcss-normalize-unicode` — moderate, browserslist-aware.
+10. `postcss-reduce-initial` — moderate, caniuse-aware.
+11. `postcss-convert-values` — hard, uses fraction-js, browserslist.
+12. `postcss-minify-params` — hard, caniuse-aware.
+13. `postcss-minify-gradients` — hard, colord-heavy.
+14. `postcss-calc` — VERY hard. Effectively a small expression compiler.
+15. `postcss-colormin` — HARDEST cssnano plugin. Color downgrade
+    decisions hinging on caniuse + colord rounding + byte-length
+    comparison.
+16. `postcss-nested` (Phase 5a) — VERY hard. Recursive selector
+    merging with bubble/unwrap config.
+17. `cssnano-preset-default` — moderate orchestrator (depends on
+    1-15 being byte-clean first).
+
+Plus Phase 7 (autoprefixer — 8+ weeks of its own) and Phase 8
+(NAPI assembly + the `transformCss` / `sort` end-to-end gates).
+
+## Recommended order for the next session
+
+1. **Phase 5b** (`postcss-normalize-whitespace`) — runs in
+   `transform.ts`'s pipeline; small but uses postcss-value-parser
+   walking. Good warmup.
+2. **Phase 5a** (`postcss-nested`) — gates everything that depends on
+   nested rules being flattened. Multi-day commitment.
+3. **Phase 6 simple band** (`discard-comments`,
+   `normalize-positions`, `normalize-string`,
+   `normalize-timing-functions`) — parallel-friendly small ports.
+4. Then layer in the harder ones.
 
 ## Cardinal-rule conformance check
 
 - ✅ Every Rust crate header names the JS package + version it ports.
 - ✅ Every Rust file maps 1:1 to a JS source file in upstream.
-- ✅ `IndexMap` used in `caniuse-db` / `caniuse-api` / `Raws::other`. `HashMap` is currently only used inside `caniuse-api::utils::clean_browsers_list` for de-dup; **TODO**: switch to `IndexSet` to honour the cardinal rule.
+- ✅ `IndexMap` used everywhere a HashMap would touch output bytes.
 - ✅ No version bumps applied to any pinned package.
-- ✅ JS pipeline in `packages/css/src/transform.ts` untouched — Rust is additive.
-
-## Next milestones (gating Phase 4)
-
-1. Stand up `crates/parity-runner/` (Phase 0 deliverable, prerequisite for any plugin diff testing) and run the postcss-core port against a 1000-input corpus.
-2. Deepen `postcss-selector-parser` to expose ClassName/Combinator/Pseudo/Attribute typed nodes (gates `atomicifyRules` & `flattenMultipleSelectors` plugin ports).
-3. Vendor `electron-to-chromium@1.5.76` + `node-releases@2.0.19` snapshots into `caniuse-db` (only needed if `browserslist-shim` ever stops delegating to `oxc-browserslist`'s own bundled copies).
-4. Confirm `oxc-browserslist`'s query resolution matches `browserslist@4.24.4` byte-for-byte across the 1000-input config corpus from the EXECUTION_PLAN.
-
-## Known parity hazards still un-addressed
-
-- `caniuse-db` carries the pinned 1.0.30001690 snapshot; `caniuse-api::is_supported` works end-to-end. Edge case still open: support values with notes (`"y #1"`) — upstream `caniuse-api` strictly compares `=== "y"`, our port does the same; documented and exercised by tests.
-- `browserslist-shim` resolves queries through `oxc-browserslist` (which bundles its own caniuse-lite). Need a corpus diff vs JS browserslist@4.24.4 to confirm parity on edge queries.
-- `postcss-core::tokenize` ports the regex character classes but the `RE_WORD_END` JS lookahead `\/(?=\*)` is approximated via a separate `/*` byte scan — needs a corpus diff against the JS tokenizer to confirm equivalence.
-- `f64::round` vs JS `Math.round`: handled in `fraction-js::round`. Other crates don't yet emit numbers; revisit as `colord`/`fraction-js` flow into autoprefixer.
+- ✅ JS pipeline in `packages/css/src/transform.ts` untouched — Rust
+  is additive.
+- ✅ Parity-runner harness wired for every implemented plugin.
+- ✅ The CRITICAL hash plugin (`atomicify-rules`) is byte-clean.

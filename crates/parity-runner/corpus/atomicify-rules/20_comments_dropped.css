@@ -1,0 +1,10 @@
+/* hello world */
+div:hover {
+  /* hello world */
+  color: blue;
+}
+
+@media screen {
+  /* hello world */
+  color: red;
+}

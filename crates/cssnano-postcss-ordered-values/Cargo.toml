@@ -1,0 +1,12 @@
+[package]
+name = "cssnano-postcss-ordered-values"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of postcss-ordered-values@5.1.3."
+
+[dependencies]
+postcss-core = { workspace = true }
+postcss-value-parser = { workspace = true }
+cssnano-utils = { workspace = true }

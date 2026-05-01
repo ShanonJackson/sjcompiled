@@ -1,0 +1,3 @@
+:is(._foo, ._bar) {
+  color: red;
+}

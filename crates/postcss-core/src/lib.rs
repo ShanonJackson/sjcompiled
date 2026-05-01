@@ -44,9 +44,10 @@ pub use node::{Node, NodeKind, RawValue, Raws, Source, SourcePosition};
 pub use parser::Parser;
 pub use root::Root;
 pub use rule::Rule;
-pub use stringifier::{stringify, Stringifier};
+pub use stringifier::{stringify, stringify_node, Stringifier};
 pub use js_number::js_number_to_string;
 pub use plugin_error::{PluginError, PluginResult};
+pub use container::{Mutation, Visit, WalkCtx};
 
 /// `parse(css)` — entry that mirrors `node_modules/postcss/lib/parse.js`.
 pub fn parse(css: &str) -> Result<Root, CssSyntaxError> {

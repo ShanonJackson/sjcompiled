@@ -1,0 +1,5 @@
+.a { outline-width: 1px; }
+.b { border-top: 1px solid; }
+.c { all: unset; }
+.d { border: none; }
+.e { border-color: red; }

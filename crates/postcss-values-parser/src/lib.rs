@@ -29,7 +29,7 @@ pub mod values_stringifier;
 pub mod nodes;
 
 pub use values_parser::ValuesParser;
-pub use values_stringifier::ValuesStringifier;
+pub use values_stringifier::{stringify_standalone, ValuesStringifier};
 pub use nodes::{Node, NodeKind, Root};
 
 /// Mirrors upstream `parse(css, options)` entry point.

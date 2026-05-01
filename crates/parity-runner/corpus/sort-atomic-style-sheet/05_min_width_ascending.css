@@ -1,0 +1,3 @@
+@media (min-width: 600px) { .a { color: red; } }
+@media (min-width: 200px) { .b { color: blue; } }
+@media (min-width: 400px) { .c { color: green; } }

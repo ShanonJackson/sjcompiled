@@ -1,0 +1,4 @@
+color: red;
+.a:hover { color: red; }
+@media (min-width: 100px) { .b { color: blue; } }
+display: block;

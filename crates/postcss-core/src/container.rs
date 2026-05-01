@@ -190,17 +190,143 @@ pub fn insert_after(parent: &mut Node, index: usize, children: Vec<Node>) {
 }
 
 /// `removeChild(child)` upstream — by index.
+///
+/// Mirrors the Root-specific override in `postcss/lib/root.js::removeChild`:
+/// when removing the **first** child of a `Root` and at least one sibling
+/// remains, the removed node's `raws.before` is transferred onto the new
+/// first child. This is *the* reason `postcss.parse(input).toString()`
+/// after a first-child removal strips the original leading whitespace —
+/// upstream calls it the "Hack for first rule in CSS" (see
+/// `stringifier.js`'s `raw()` and the round-trip semantics depend on it).
+///
+/// The `ignore` flag in upstream Root.removeChild only fires from
+/// internal `normalize()` shuffles during `prepend` — plugin-driven
+/// removals always run through the transfer branch.
 pub fn remove_at(parent: &mut Node, index: usize) -> Option<Node> {
+    if matches!(parent.kind, NodeKind::Root(_)) && index == 0 {
+        if let Some(nodes) = parent.nodes() {
+            if nodes.len() > 1 {
+                let donor = nodes[0].raws.before.clone();
+                // Borrow again mutably to write — the read above already dropped.
+                if let Some(nm) = parent.nodes_mut() {
+                    nm[1].raws.before = donor;
+                }
+            }
+        }
+    }
     parent.nodes_mut().and_then(|nodes| {
         if index < nodes.len() { Some(nodes.remove(index)) } else { None }
     })
 }
 
-/// `child.replaceWith(newChild)` upstream — by parent + index.
+/// `child.replaceWith(newChild)` upstream — in-place swap by parent + index.
+///
+/// Use [`replace_with_at`] instead when faithfully porting a postcss
+/// plugin's `node.replaceWith(...)` call: the plugin-facing semantics
+/// of `replaceWith` are insertBefore-each-then-remove, which fires
+/// Root's `normalize` and `removeChild` overrides (raws-transfer
+/// between sample/new and removed/new-first-child). Plain `replace_at`
+/// skips both overrides — fine for internal swaps where the new node
+/// already carries the correct raws.
 pub fn replace_at(parent: &mut Node, index: usize, replacement: Node) -> Option<Node> {
     parent.nodes_mut().and_then(|nodes| {
         if index < nodes.len() { Some(std::mem::replace(&mut nodes[index], replacement)) } else { None }
     })
+}
+
+/// `child.replaceWith(...newNodes)` upstream — full `Container.insertBefore`
+/// dance + `remove`, including the Root-specific overrides in
+/// `postcss/lib/root.js::normalize` (sample/new raws-transfer on
+/// prepend / non-prepend).
+///
+/// Use this for plugin-driven replacements where the upstream
+/// `node.replaceWith(...)` call should reproduce its byte-for-byte
+/// raws-transfer behavior. `each_mut` / `walk_mut` route their
+/// `Mutation::Replace` and `Mutation::ReplaceMany` cases through this.
+pub fn replace_with_at(parent: &mut Node, index: usize, new_nodes: Vec<Node>) {
+    if new_nodes.is_empty() {
+        // No replacements — just remove the original. Equivalent to
+        // upstream's `replaceWith()` with zero arguments which falls
+        // through the loop without `foundSelf` and ends in `this.remove()`.
+        remove_at(parent, index);
+        return;
+    }
+    let n = new_nodes.len();
+    for (i, new_node) in new_nodes.into_iter().enumerate() {
+        // After each insertBefore the original shifts forward by 1, so
+        // the existing-node index advances with the loop counter.
+        let exist_index = index + i;
+        insert_before_with_normalize(parent, exist_index, new_node);
+    }
+    // Original is now at index + n. Remove via remove_at so the
+    // Root.removeChild override fires when the original was first.
+    remove_at(parent, index + n);
+}
+
+/// `Container.insertBefore(exist, add)` + `Root.normalize` override —
+/// inserts `add` immediately before `parent.nodes[exist_index]`,
+/// applying `super.normalize`'s raws-transfer (when `add.raws.before`
+/// is undefined and the sample's is defined, copy with non-whitespace
+/// stripped) and Root's prepend / non-prepend override.
+///
+/// Mirrors the byte-exact upstream behavior of:
+///   - `node.replaceWith(new)` — calls insertBefore.
+///   - `node.before(new)` — calls insertBefore via `Node.before`.
+///   - direct `parent.insertBefore(exist, new)` calls.
+pub fn insert_before_with_normalize(parent: &mut Node, exist_index: usize, mut add: Node) {
+    let parent_is_root = matches!(parent.kind, NodeKind::Root(_));
+    let is_prepend = exist_index == 0;
+
+    // Step 1: super.normalize semantics — if add.raws.before is
+    // undefined and the sample's is defined, copy with non-whitespace
+    // stripped. Mirrors postcss/lib/container.js::normalize.
+    if add.raws.before.is_none() {
+        if let Some(nodes) = parent.nodes() {
+            if let Some(sample) = nodes.get(exist_index) {
+                if let Some(sb) = &sample.raws.before {
+                    add.raws.before = Some(strip_non_whitespace(sb));
+                }
+            }
+        }
+    }
+
+    // Step 2: Root.normalize override (postcss/lib/root.js::normalize).
+    if parent_is_root {
+        if is_prepend {
+            // sample.raws.before = nodes[1].raws.before (or delete if
+            // nodes.length <= 1).
+            let nodes_len = parent.nodes().map(|n| n.len()).unwrap_or(0);
+            if nodes_len > 1 {
+                let donor = parent.nodes().unwrap()[1].raws.before.clone();
+                parent.nodes_mut().unwrap()[exist_index].raws.before = donor;
+            } else if nodes_len == 1 {
+                parent.nodes_mut().unwrap()[exist_index].raws.before = None;
+            }
+            // No change to add.raws.before in the prepend branch.
+        } else {
+            // exist_index > 0, so this.first !== sample. Override
+            // add.raws.before with the sample's, regardless of whether
+            // it was previously defined. This is the path that drops
+            // an explicit raws.before='' set by a plugin in favor of
+            // the original node's raws.before.
+            let sample_before = parent.nodes().unwrap()[exist_index].raws.before.clone();
+            add.raws.before = sample_before;
+        }
+    }
+
+    // Step 3: splice add at exist_index. Cursor for the original
+    // existing node moves to exist_index + 1.
+    if let Some(nodes) = parent.nodes_mut() {
+        nodes.insert(exist_index, add);
+    }
+}
+
+/// JS `value.replace(/\S/g, '')` — strips every non-whitespace character.
+/// Used by `super.normalize` when copying raws.before from sample.
+fn strip_non_whitespace(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_whitespace() || *c == '\u{FEFF}')
+        .collect()
 }
 
 /// `removeAll()` upstream.
@@ -242,13 +368,16 @@ pub fn each_mut<F: FnMut(&mut Node, WalkCtx) -> Mutation>(parent: &mut Node, mut
             Mutation::Keep => { i += 1; }
             Mutation::Remove => { remove_at(parent, i); }
             Mutation::Replace(new_node) => {
-                replace_at(parent, i, new_node);
+                // Route through replace_with_at so plugin-driven
+                // replacements inherit upstream's `replaceWith` raws
+                // transfer (Root.normalize + Root.removeChild). Same
+                // shape as upstream `node.replaceWith(newNode)`.
+                replace_with_at(parent, i, vec![new_node]);
                 i += 1;
             }
             Mutation::ReplaceMany(new_nodes) => {
                 let len = new_nodes.len();
-                remove_at(parent, i);
-                insert_before(parent, i, new_nodes);
+                replace_with_at(parent, i, new_nodes);
                 i += len;
             }
             Mutation::InsertBefore(prefix) => {
@@ -292,7 +421,9 @@ pub fn walk_mut<F: FnMut(&mut Node, WalkCtx) -> Mutation>(parent: &mut Node, f: 
             Mutation::Keep => { /* descend below, then i += 1 */ }
             Mutation::Remove => { remove_at(parent, i); continue; }
             Mutation::Replace(new_node) => {
-                replace_at(parent, i, new_node);
+                // Route through replace_with_at so the Root.normalize
+                // raws-transfer matches upstream `node.replaceWith(new)`.
+                replace_with_at(parent, i, vec![new_node]);
                 // Re-descend into the replacement.
                 let nodes = parent.nodes_mut().unwrap();
                 walk_mut(&mut nodes[i], f);
@@ -301,8 +432,7 @@ pub fn walk_mut<F: FnMut(&mut Node, WalkCtx) -> Mutation>(parent: &mut Node, f: 
             }
             Mutation::ReplaceMany(new_nodes) => {
                 let len = new_nodes.len();
-                remove_at(parent, i);
-                insert_before(parent, i, new_nodes);
+                replace_with_at(parent, i, new_nodes);
                 let end = i + len;
                 let mut j = i;
                 while j < end {

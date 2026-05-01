@@ -1,0 +1,3 @@
+@supports (display: grid) { .a { color: red; } }
+@media (min-width: 100px) { .b { color: blue; } }
+@layer base { .c { color: green; } }

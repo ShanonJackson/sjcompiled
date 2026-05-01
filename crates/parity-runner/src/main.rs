@@ -38,6 +38,17 @@ fn main() -> ExitCode {
     let stage = match stage_name.as_str() {
         "postcss-core-roundtrip" => Stage::PostcssCoreRoundtrip,
         "discard-empty-rules" => Stage::DiscardEmptyRules,
+        "discard-duplicates" => Stage::DiscardDuplicates,
+        "extract-stylesheets" => Stage::ExtractStylesheets,
+        "parent-orphaned-pseudos" => Stage::ParentOrphanedPseudos,
+        "flatten-multiple-selectors" => Stage::FlattenMultipleSelectors,
+        "increase-specificity" => Stage::IncreaseSpecificity,
+        "merge-duplicate-at-rules" => Stage::MergeDuplicateAtRules,
+        "normalize-current-color" => Stage::NormalizeCurrentColor,
+        "sort-atomic-style-sheet" => Stage::SortAtomicStyleSheet,
+        "atomicify-rules" => Stage::AtomicifyRules,
+        "expand-shorthands" => Stage::ExpandShorthands,
+        "npm-postcss-discard-duplicates" => Stage::NpmPostcssDiscardDuplicates,
         s => {
             eprintln!("unknown stage: {s}");
             return ExitCode::from(2);

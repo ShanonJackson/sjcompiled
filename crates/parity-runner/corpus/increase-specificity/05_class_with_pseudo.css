@@ -1,0 +1,7 @@
+._foo:hover {
+  color: red;
+}
+
+._baz::before {
+  content: "bar";
+}

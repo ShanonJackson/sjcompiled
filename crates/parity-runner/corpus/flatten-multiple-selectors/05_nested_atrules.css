@@ -1,0 +1,7 @@
+@media (max-width: 768px) {
+  @supports (margin-bottom: 1rem) {
+    div, span, li {
+      color: red;
+    }
+  }
+}

@@ -1,0 +1,5 @@
+@media (max-width: 400px) { .a { color: red; } }
+@media (min-width: 200px) { .b { color: blue; } }
+@media (max-width: 200px) { .c { color: green; } }
+@media (min-width: 400px) { .d { color: yellow; } }
+@media (max-width: 600px) { .e { color: purple; } }
