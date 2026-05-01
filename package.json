@@ -1,0 +1,27 @@
+{
+  "name": "sjcompiled",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc --build packages/tsconfig.json",
+    "test": "bun test smoke/",
+    "smoke": "bun test smoke/",
+    "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.10",
+    "@babel/plugin-syntax-jsx": "^7.25.9",
+    "@sjcompiled/babel-plugin": "workspace:*",
+    "@sjcompiled/babel-plugin-strip-runtime": "workspace:*",
+    "@sjcompiled/css": "workspace:*",
+    "@sjcompiled/utils": "workspace:*",
+    "@types/babel__core": "^7.20.5",
+    "@types/bun": "^1.1.13",
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.3"
+  }
+}

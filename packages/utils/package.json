@@ -1,0 +1,24 @@
+{
+  "name": "@sjcompiled/utils",
+  "version": "0.0.1",
+  "description": "Shared utilities for the sjcompiled toolchain.",
+  "license": "Apache-2.0",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc --build tsconfig.json"
+  },
+  "dependencies": {
+    "convert-source-map": "^2.0.0",
+    "source-map": "^0.7.4"
+  },
+  "devDependencies": {
+    "@babel/traverse": "^7.26.10",
+    "@types/convert-source-map": "^1.5.2"
+  }
+}

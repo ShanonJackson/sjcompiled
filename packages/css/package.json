@@ -1,0 +1,32 @@
+{
+  "name": "@sjcompiled/css",
+  "version": "0.0.1",
+  "description": "Atomic CSS transform layer for the sjcompiled toolchain.",
+  "license": "Apache-2.0",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc --build tsconfig.json"
+  },
+  "dependencies": {
+    "@sjcompiled/utils": "workspace:*",
+    "autoprefixer": "^10.4.14",
+    "cssnano-preset-default": "^5.2.14",
+    "postcss": "^8.4.31",
+    "postcss-discard-duplicates": "^6.0.0",
+    "postcss-nested": "^5.0.6",
+    "postcss-normalize-whitespace": "^5.1.1",
+    "postcss-selector-parser": "^6.0.13",
+    "postcss-values-parser": "^6.0.2"
+  },
+  "devDependencies": {
+    "@types/autoprefixer": "^10.2.0",
+    "@types/cssnano": "^5.0.0",
+    "outdent": "^0.8.0"
+  }
+}

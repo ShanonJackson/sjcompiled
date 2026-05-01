@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "utils/tsconfig.json" },
+    { "path": "css/tsconfig.json" },
+    { "path": "babel-plugin/tsconfig.json" },
+    { "path": "babel-plugin-strip-runtime/tsconfig.json" }
+  ]
+}
