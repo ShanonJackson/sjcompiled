@@ -1,0 +1,3 @@
+@media (max-width: 400px) and (min-width: 10px) {
+  a { color: red; }
+}

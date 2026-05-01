@@ -1,0 +1,2 @@
+a::before { content: "hello \"world\""; }
+a::after  { content: 'a\'b'; }

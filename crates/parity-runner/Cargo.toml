@@ -1,0 +1,17 @@
+[package]
+name = "parity-runner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Differential harness — runs JS and Rust plugin pipelines on a corpus and asserts byte-equality."
+
+[[bin]]
+name = "parity-runner"
+path = "src/main.rs"
+
+[dependencies]
+postcss-core = { workspace = true }
+compiled-css = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

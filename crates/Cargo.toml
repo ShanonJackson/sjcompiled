@@ -11,6 +11,10 @@ members = [
     "caniuse-db",
     "caniuse-api",
     "browserslist-shim",
+    "compiled-css",
+    "css",
+    "sjcompiled-utils",
+    "parity-runner",
 ]
 
 [workspace.package]
@@ -20,12 +24,12 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
-indexmap = "2"
+indexmap = { version = "2", features = ["serde"] }
 regex = "1"
 once_cell = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-oxc_browserslist = "0.30"
+oxc-browserslist = "3"
 
 postcss-core = { path = "postcss-core" }
 postcss-selector-parser = { path = "postcss-selector-parser" }
@@ -37,7 +41,7 @@ cssnano-utils = { path = "cssnano-utils" }
 caniuse-db = { path = "caniuse-db" }
 caniuse-api = { path = "caniuse-api" }
 browserslist-shim = { path = "browserslist-shim" }
-
-[profile.release]
-lto = "thin"
-codegen-units = 1
+compiled-css = { path = "compiled-css" }
+css = { path = "css" }
+sjcompiled-utils = { path = "sjcompiled-utils" }
+parity-runner = { path = "parity-runner" }

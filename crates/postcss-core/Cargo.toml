@@ -1,0 +1,12 @@
+[package]
+name = "postcss-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of postcss@8.4.31"
+
+[dependencies]
+indexmap = { workspace = true }
+once_cell = { workspace = true }
+regex = { workspace = true }

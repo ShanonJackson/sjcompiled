@@ -1,0 +1,5 @@
+:root {
+  --my-color: #ff0000;
+  --gradient: linear-gradient(0deg, #fff, #000);
+}
+a { color: var(--my-color); }

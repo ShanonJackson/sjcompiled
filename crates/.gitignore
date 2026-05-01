@@ -1,3 +1,7 @@
 target/
 _vendor/
 **/Cargo.lock.bak
+# The caniuse-db snapshot is checked in (it's the parity contract per
+# PARITY_VERSIONS.md Anomaly #3) — but the Node modules pulled into
+# scripts/ for snapshot generation are not.
+caniuse-db/scripts/node_modules/

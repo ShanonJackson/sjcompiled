@@ -1,0 +1,4 @@
+a:hover { color: red; }
+a:focus, a:active { color: blue; }
+a::before { content: ""; }
+:not(.x) > .y + .z ~ .w { color: green; }

@@ -1,0 +1,12 @@
+[package]
+name = "sjcompiled-utils"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Rust port of @sjcompiled/utils — packages/utils/src/*.ts"
+
+[dependencies]
+indexmap = { workspace = true }
+once_cell = { workspace = true }
+regex = { workspace = true }

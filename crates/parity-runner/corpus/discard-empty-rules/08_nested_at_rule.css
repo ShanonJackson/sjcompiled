@@ -1,0 +1,4 @@
+@media (max-width: 100px) {
+  a { color: undefined; }
+  b { color: red; }
+}

@@ -1,0 +1,16 @@
+[package]
+name = "browserslist-shim"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "browserslist@4.24.4 config + defaults shim around oxc_browserslist"
+
+[dependencies]
+caniuse-db = { workspace = true }
+oxc-browserslist = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+once_cell = { workspace = true }
+regex = { workspace = true }

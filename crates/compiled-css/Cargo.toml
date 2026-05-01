@@ -1,0 +1,16 @@
+[package]
+name = "compiled-css"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Local @sjcompiled/css plugins (atomicifyRules, discardEmptyRules, etc.) ported 1:1 from packages/css/src/plugins/"
+
+[dependencies]
+postcss-core = { workspace = true }
+postcss-selector-parser = { workspace = true }
+postcss-value-parser = { workspace = true }
+postcss-values-parser = { workspace = true }
+indexmap = { workspace = true }
+once_cell = { workspace = true }
+regex = { workspace = true }

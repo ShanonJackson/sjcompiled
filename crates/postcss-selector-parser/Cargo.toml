@@ -1,0 +1,11 @@
+[package]
+name = "postcss-selector-parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of postcss-selector-parser@6.0.13"
+
+[dependencies]
+indexmap = { workspace = true }
+once_cell = { workspace = true }

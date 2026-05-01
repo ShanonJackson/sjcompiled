@@ -1,0 +1,10 @@
+[package]
+name = "cssnano-utils"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of cssnano-utils@3.1.0"
+
+[dependencies]
+postcss-core = { workspace = true }

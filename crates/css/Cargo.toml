@@ -1,0 +1,21 @@
+[package]
+name = "css"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Rust port of @sjcompiled/css orchestrators (transformCss + sort) — packages/css/src/{transform,sort}.ts"
+
+[dependencies]
+postcss-core = { workspace = true }
+postcss-selector-parser = { workspace = true }
+postcss-value-parser = { workspace = true }
+postcss-values-parser = { workspace = true }
+# `postcss-nested@5.0.6`, `postcss-normalize-whitespace@5.1.1`,
+# `postcss-discard-duplicates@6.0.0`, `autoprefixer@10.4.14`,
+# `cssnano-preset-default@5.2.14`: NOT yet declared as path-deps because the
+# crates haven't been created. Phase 5/6/7 will add them; transform.rs and
+# sort.rs will pick them up via workspace deps at that point.
+compiled-css = { workspace = true }
+indexmap = { workspace = true }
+serde = { workspace = true }

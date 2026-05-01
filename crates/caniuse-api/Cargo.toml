@@ -1,0 +1,13 @@
+[package]
+name = "caniuse-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Byte-for-byte Rust port of caniuse-api@3.0.0"
+
+[dependencies]
+caniuse-db = { workspace = true }
+browserslist-shim = { workspace = true }
+indexmap = { workspace = true }
+once_cell = { workspace = true }

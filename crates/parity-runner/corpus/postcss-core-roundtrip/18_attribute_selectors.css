@@ -1,0 +1,3 @@
+[data-test="value"] { color: red; }
+[lang|="en"] { color: blue; }
+input[type=checkbox]:checked { color: green; }
