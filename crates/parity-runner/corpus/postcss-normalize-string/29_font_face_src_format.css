@@ -1,0 +1,6 @@
+@font-face {
+  font-family: 'Inter';
+  src: url('a.woff2') format('woff2'),
+       url("b.woff") format("woff"),
+       local('LocalName');
+}

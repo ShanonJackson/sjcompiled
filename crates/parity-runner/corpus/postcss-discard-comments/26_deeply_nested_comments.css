@@ -1,0 +1,11 @@
+@supports (display: grid) {
+  /* drop */
+  @media (min-width: 100px) {
+    /*! keep */
+    @container (min-width: 50px) {
+      .foo /* drop */ .bar {
+        color /* between */: red /* val */ blue;
+      }
+    }
+  }
+}

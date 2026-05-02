@@ -1,0 +1,3 @@
+a { content: 'foo' !important; }
+b { content: "bar" !important; }
+c { font-family: 'Inter', sans-serif !important; }

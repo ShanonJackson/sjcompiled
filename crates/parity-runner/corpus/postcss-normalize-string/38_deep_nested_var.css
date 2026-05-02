@@ -1,0 +1,3 @@
+a { content: var(--a, var(--b, var(--c, 'deep'))); }
+b { font-family: var(--brand, var(--fallback, 'Inter'), "Helvetica"); }
+c { background: linear-gradient(var(--start, url('a.png')), var(--end, url("b.png"))); }

@@ -459,11 +459,39 @@ Cleanup is a future cosmetic task — no parity impact.
 - Acknowledged-but-not-ported: `Func.params` (consumers reconstruct
   via `stringify_standalone`), unbalanced-bracket throw recovery,
   optional `interpolation` feature path.
+- **Third pass (same session)** closed two more latent classification
+  drifts: (1) `Word.testEscaped` ported — `\41` / `\red` /
+  `Times\ New\ Roman` style escape-prefixed identifiers now classify
+  as Word via `Word::test_word()`, which composes
+  `testEscaped || testHex || testVariable` in upstream order BEFORE
+  Numeric/UnicodeRange checks. (2) `Comment.tokenizeNext` for
+  value=="//" — when the parser's Word arm sees a literal `//`,
+  consume tokens to the next `\n` and emit a single inline Comment.
+  Empirically verified-as-handled (third pass): `tokenizeInline`
+  for words containing `//` mid-value (`tokenize.rs` pre-splits on
+  `/`); `tokenizeBrackets` (dead code in JS — wrapping expands
+  Brackets tokens before parser); `tokenizeCommas` (`tokenize.rs`
+  already splits comma-bearing words). 3 more corpus entries added.
+- **Fourth pass (same session)** closed three more contract / edge
+  drifts: (1) `Comment` predicate split — `Comment::test_inline_word`
+  mirrors upstream `inlineRegex.test()` (contains `//` anywhere);
+  pre-existing `starts_with("//")` path selector renamed to
+  `is_inline_marker` (old name kept as `#[deprecated]` alias). The
+  `VKind::Comment` parser branch uses `is_inline_marker`. (2) Numeric
+  edge cases re-verified — added regression tests for trailing-dot
+  value (`5.`), signed leading-dot, exponent + unit, hyphen-identifier
+  rejection, and dash-prefixed unit (`5-MyUnit`). (3) Func nested-paren
+  round-trip — regression tests for `calc(var(--x))`, `calc((1+2)*3)`,
+  `var(--a, calc(50% - var(--gap)))`,
+  `linear-gradient(to right, var(--s, red), var(--e, blue))`,
+  `rgb(calc(255 - 1), 0, 0)`. Stack-based paren tracking matches
+  upstream `Func.fromTokens` recursion for valid input. 2 more corpus
+  entries added.
 - Final verification gates: `cargo test --workspace --no-fail-fast`
-  all green (71 tests in `postcss-values-parser` after both passes,
-  was 15); `parity-runner expand-shorthands` 44/44 byte-clean;
-  `parity-runner postcss-core-roundtrip` 37/37 byte-clean; both NAPI
-  verifiers 12/12; determinism on `expand-shorthands` (44/44).
+  all green (91 tests in `postcss-values-parser` after four passes,
+  was 15); `parity-runner expand-shorthands` 45/45 byte-clean;
+  `parity-runner postcss-core-roundtrip` 41/41 byte-clean; both NAPI
+  verifiers 12/12; determinism on `expand-shorthands` (45/45).
 - Full audit document at
   `crates/_vendor/POSTCSS_VALUES_PARSER_6.0.2_REAUDIT.md`.
 
@@ -538,32 +566,78 @@ Cleanup is a future cosmetic task — no parity impact.
 **postcss-normalize-string 5.1.0 re-audit landed (2026-05-02):**
 - Pin is `5.1.0` in BOTH `REFERENCE_LOCK_FILE/yarn.lock` and AFM
   resolution — no version drift. Re-audit was for **port-quality**
-  drift only; this plugin touches every quoted string value in the
-  AFM corpus, so a latent gap would surface widely.
-- Walked the single upstream source file
-  `node_modules/.bun/postcss-normalize-string@5.1.0+*/src/index.js`
-  (320 lines) against `crates/cssnano-postcss-normalize-string/src/lib.rs`
-  branch-by-branch. **No semantic divergence found.** One micro-stylistic
-  deviation tightened: `change_wrapping_quotes` now reads `node.quote`
-  freshly between its two `if`s (was a `cur_quote` snapshot). Logically
-  equivalent in all valid inputs (the second `if`'s precondition is
-  unsatisfiable post-flip because the first `if` requires the opposite
-  escape-count to be zero) — change is verbatim-tighten only.
-- Three new regression tests added (`change_wrapping_quotes_post_flip_second_if_inert`,
+  drift; this plugin touches every quoted string value in the AFM
+  corpus, so a latent gap would surface widely.
+- **One real drift fixed.** `process_node` was unconditionally clearing
+  `node.raws.{selector,value,params}` after writing — but the
+  postcss-core stringifier already does the JS-equivalent
+  `raws.X.value == node.X ? raws.X.raw : node.X` comparison, and JS
+  upstream just assigns. Result of the drift: any selector / decl /
+  atrule whose source contained a comment or trailing whitespace
+  captured into `raws.X.raw` lost those source bytes on no-op
+  normalization. Surfaced by adversarial fixture
+  `28_raws_preserved_on_noop.css` (JS preserved trailing
+  `/* comment */`, Rust dropped it). **Fixed:** removed the three
+  `node.raws.* = None` lines.
+- One micro-stylistic deviation tightened: `change_wrapping_quotes`
+  now reads `node.quote` freshly between its two `if`s (was a
+  `cur_quote` snapshot). Logically equivalent in all valid inputs but
+  matches upstream verbatim.
+- Four new regression tests added (`change_wrapping_quotes_post_flip_second_if_inert`,
   `backslash_followed_by_non_special_falls_through`,
-  `cache_key_collision_resistant_with_pipe_in_value`) — crate now 10
-  tests, all green.
-- Twelve adversarial corpus entries added (`16..27`) covering: BACKSLASH
-  fall-through, consecutive escapes, mixed-whitespace runs, `|`-in-value
-  cache keys, single-class escape rewrap (both directions), nested
-  function strings, `@supports`/`@media` params, attribute-selector
-  quotes, empty strings inside functions, sibling string nodes, and
-  Unicode (Latin-1, CJK, astral-plane emoji) bodies.
+  `cache_key_collision_resistant_with_pipe_in_value`,
+  `preserves_raws_on_noop_normalization`) — crate now 11 tests, all green.
+- Thirteen adversarial corpus entries added (`16..28`) covering:
+  BACKSLASH fall-through, consecutive escapes, mixed-whitespace runs,
+  `|`-in-value cache keys, single-class escape rewrap (both directions),
+  nested function strings, `@supports`/`@media` params, attr-selector
+  quotes, empty strings inside functions, sibling string nodes,
+  Unicode (Latin-1, CJK, astral-plane emoji) bodies, and
+  raws-comment-after-value/atrule/selector preservation.
 - Verification gates rerun: `cargo test --workspace --no-fail-fast` all
-  green; `parity-runner postcss-normalize-string` 27/27 byte-clean
-  (15 existing + 12 new); determinism 27/27; both NAPI verifiers 12/12.
+  green; `parity-runner postcss-normalize-string` 28/28 byte-clean
+  (15 existing + 13 new); determinism 28/28; both NAPI verifiers 12/12.
 - Full audit document at
   `crates/_vendor/POSTCSS_NORMALIZE_STRING_5.1.0_REAUDIT.md`.
+
+**fraction.js 4.2.0 re-audit landed (2026-05-02):**
+- Pin is `4.2.0` in BOTH `REFERENCE_LOCK_FILE/yarn.lock` and AFM
+  resolution — no version drift. Re-audit was for **port-quality** drift
+  in the existing `crates/fraction-js/` port. Two consumers today
+  (`crates/autoprefixer/src/resolution.rs` and the scaffolded
+  `crates/cssnano-postcss-convert-values`); neither is wired into a
+  parity-runner stage yet, so latent gaps would only surface once those
+  stages land.
+- Walked the single 891-line upstream `fraction.js` source side-by-side
+  with `crates/fraction-js/src/fraction.rs`. **Six real divergences
+  fixed:** (1) `gcd(NaN, NaN)` infinite loop — JS `!a` is true for both
+  `0` and `NaN`; Rust only checked `0.0`, so `Fraction::new(f64::NAN)`
+  hung. (2) Str-branch sign tracker not chain-assigned — upstream
+  `s = /* void */ n = ...` parses as `s = (n = ...)`, collapsing the
+  sign to the just-computed numerator; without it, `Fraction::new("-0")`
+  emitted `{s:-1, n:0, d:1}` and `toString()` returned `"-0"` while JS
+  returned `"0"`. (3) `b[a+2]` / `b[a+4]` index panics on truncated
+  fraction strings (`"1/"`, `"1:"`, `"1 1/"`); JS reads `undefined` and
+  throws InvalidParameter via `assign(undefined, ...)`. (4) `b[a]` index
+  panic in the decimal else-if for lone-sign input `"-"` / `"+"`. (5)
+  `toString(0)` returned `"0"` instead of `"0.(3)"` for `1/3` — JS
+  `dec || 15` collapses `0` to default. (6) `simplify` method was
+  missing entirely (used by `postcss-convert-values@5.1.3` for
+  percentage rounding); ported verbatim including the `eps || 0.001`
+  truthiness fallback. Also mirrored JS regex `.`'s line-terminator
+  skipping in `match_digits_or_char`.
+- Eleven regression tests added inside `crates/fraction-js/src/fraction.rs`
+  citing the upstream lines they cover. Total: 21 tests (was 10), all
+  green. No corpus entries added — no parity-runner stage exercises
+  fraction-js today; when the autoprefixer / convert-values stages are
+  wired up, adversarial CSS inputs covering these paths should be added
+  to those corpora.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast` all
+  green (no regressions across the workspace); `parity-runner
+  postcss-core-roundtrip` 37/37 byte-clean; both NAPI verifiers 12/12;
+  determinism on `postcss-core-roundtrip` (37/37).
+- Full audit document at
+  `crates/_vendor/FRACTION_JS_4.2.0_REAUDIT.md`.
 
 ## postcss version pin: `8.4.31` → `8.5.6` (no code changes)
 

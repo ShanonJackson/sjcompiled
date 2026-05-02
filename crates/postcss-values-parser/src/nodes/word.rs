@@ -18,6 +18,14 @@ pub struct Word {
 //   const hexRegex = /^#(.+)/;
 static HEX_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^#(.+)").unwrap());
 
+// 1:1 with upstream `Word.js:18`:
+//   const escapeRegex = /^\\(.+)/;
+// Backslash followed by 1+ chars classifies as a Word (CSS identifier
+// escape, e.g. `\41` for `A`). The JS `testEscaped` ALSO accepts
+// `value === '\\'` when the next token is non-whitespace, hence the
+// `next` argument.
+static ESCAPE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\\(.+)").unwrap());
+
 // 1:1 with upstream `Word.js:20`:
 //   const colorRegex = /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 static COLOR_HEX_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -46,6 +54,30 @@ impl Word {
 
     /// Mirror upstream `testHex` — `^#(.+)`.
     pub fn test_hex(value: &str) -> bool { HEX_REGEX.is_match(value) }
+
+    /// Mirror upstream `Word.testEscaped` (`Word.js:44-52`):
+    ///   type==='word' && (escapeRegex.test(value) ||
+    ///     (value === '\\' && next && !/^\s+$/.test(next[1])))
+    /// Caller passes `next_value` for the bare-backslash branch.
+    pub fn test_escaped(value: &str, next_value: Option<&str>) -> bool {
+        if ESCAPE_REGEX.is_match(value) { return true; }
+        if value == "\\" {
+            if let Some(next) = next_value {
+                if !next.is_empty() && !next.chars().all(char::is_whitespace) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Mirror upstream `Word.testWord` (`Word.js:68-72`):
+    ///   testEscaped(tokens) || testHex(token) || testVariable(token, parser)
+    pub fn test_word(value: &str, next_value: Option<&str>) -> bool {
+        Word::test_escaped(value, next_value)
+            || Word::test_hex(value)
+            || Word::is_variable_name(value)
+    }
 
     /// Mirror upstream:
     ///   `colorRegex.test(value) || colorNames.includes(value.toLowerCase())`
@@ -106,4 +138,12 @@ mod tests {
     #[test] fn url_with_space_no() { assert!(!Word::test_url("http://exa mple.com")); }
     #[test] fn url_no_protocol_no() { assert!(!Word::test_url("example.com")); }
     #[test] fn url_triple_slash_no() { assert!(!Word::test_url("http:///foo")); }
+
+    // testEscaped — backslash-prefixed identifiers
+    #[test] fn escaped_hex_id() { assert!(Word::test_escaped(r"\41", None)); }
+    #[test] fn escaped_letter() { assert!(Word::test_escaped(r"\A", None)); }
+    #[test] fn bare_backslash_with_next() { assert!(Word::test_escaped(r"\", Some("X"))); }
+    #[test] fn bare_backslash_with_space_next() { assert!(!Word::test_escaped(r"\", Some(" "))); }
+    #[test] fn bare_backslash_no_next() { assert!(!Word::test_escaped(r"\", None)); }
+    #[test] fn unrelated_no_match() { assert!(!Word::test_escaped("abc", None)); }
 }

@@ -1,0 +1,6 @@
+@media/*! kept */(min-width: 100px) {
+  a { color: red; }
+}
+@supports/*! kept2 */ (display: grid) {
+  b { color: blue; }
+}

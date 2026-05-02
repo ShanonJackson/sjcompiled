@@ -1,0 +1,4 @@
+a {
+  color: red ! /* drop */ important;
+  background: blue !/* drop1 *//* drop2 */important;
+}

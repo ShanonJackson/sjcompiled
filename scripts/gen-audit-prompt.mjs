@@ -715,7 +715,9 @@ listed below. Every changed code path needs at least one input that
 exercises it. File naming: \`corpus/<stage>/NN_<short_label>.css\`.
 Pick \`NN\` numbers that don't collide with existing entries.`;
 
-    return `${header(`Audit & Port: \`${name}\` ${cfg.was} → ${cfg.now}`)}${bannerBlock}
+    const crate = crateBasename(cfg.rustCrate);
+    const titleSuffix = crate === name ? '' : ` → \`${crate}\``;
+    return `${header(`Audit & Port: \`${name}\` ${cfg.was} → ${cfg.now}${titleSuffix}`)}${crateMappingNote(name, cfg.rustCrate)}${bannerBlock}
 ${backgroundBoilerplate()}
 
 ## Specific to \`${name}\`
@@ -756,7 +758,9 @@ function noDriftReauditPrompt(name, cfg) {
     const ownerFilesList = cfg.ownerFiles.map((f) => `\`${f}\``).join(', ');
     const subdirHint = cfg.sourceSubdir ? `\`${cfg.sourceSubdir}\` subdirectory of` : 'root of';
 
-    return `${header(`Re-audit: \`${name}@${cfg.version}\` (no drift)`)}
+    const crate = crateBasename(cfg.rustCrate);
+    const titleSuffix = crate === name ? '' : ` → \`${crate}\``;
+    return `${header(`Re-audit: \`${name}@${cfg.version}\` (no drift)${titleSuffix}`)}${crateMappingNote(name, cfg.rustCrate)}
 ${backgroundBoilerplate()}
 
 ## Specific to \`${name}\`
@@ -949,6 +953,31 @@ function fileSafeName(name) {
     return name.replace(/\//g, '__');
 }
 
+// Extract the Rust crate basename from a `rustCrate` path like
+// `crates/cssnano-postcss-discard-comments/` → `cssnano-postcss-discard-comments`.
+// Used in titles/filenames so the dispatched agent (and the human picking
+// which prompt to dispatch) can find the crate by name without reading the
+// body. The npm package name often differs from the crate name — the
+// cssnano sub-plugins are the obvious case.
+function crateBasename(rustCratePath) {
+    const trimmed = rustCratePath.replace(/\/+$/, '');
+    const parts = trimmed.split('/');
+    // For paths like `crates/compiled-css/src/plugins/`, return
+    // `compiled-css` (the crate root, not the sub-path).
+    const cratesIdx = parts.indexOf('crates');
+    if (cratesIdx >= 0 && parts[cratesIdx + 1]) return parts[cratesIdx + 1];
+    return parts[parts.length - 1];
+}
+
+// Render a "this prompt targets crate X" header for prompts where the
+// npm package name differs from the Rust crate name. No-op when they match
+// (so we don't add visual noise to the obvious cases).
+function crateMappingNote(name, rustCrate) {
+    const crate = crateBasename(rustCrate);
+    if (crate === name) return '';
+    return `\n> **Crate mapping:** the npm package \`${name}\` is ported as the Rust crate \`${crate}\` (under \`${rustCrate}\`). The crate name diverges from the npm name on purpose — see PARITY_VERSIONS.md for the convention. **All file/path references in the rest of this prompt point at \`${crate}\`, not at a hypothetical \`${name}\` crate.**\n`;
+}
+
 // Verify every package's `rustCrate` path actually exists relative to the
 // repo root. Catches drift between this registry and the workspace.
 // Returns an array of `{ name, path, problem }` entries for any mismatch.
@@ -995,12 +1024,14 @@ function main() {
     if (args[0] === '--list') {
         for (const name of Object.keys(PACKAGES)) {
             const cfg = PACKAGES[name];
+            const crate = cfg.rustCrate ? crateBasename(cfg.rustCrate) : '?';
+            const crateTag = crate === name ? '' : `  →  crate: ${crate}`;
             const tag = cfg.kind === 'version-drift'
                 ? `${cfg.was} → ${cfg.now}`
                 : cfg.kind === 'no-drift-reaudit'
                     ? `@${cfg.version} (no drift, re-audit)`
                     : `(local plugins re-audit)`;
-            process.stdout.write(`${name.padEnd(40)}  ${tag}\n`);
+            process.stdout.write(`${name.padEnd(40)}  ${tag.padEnd(36)}${crateTag}\n`);
         }
         process.exit(0);
     }
@@ -1025,9 +1056,36 @@ function main() {
         }
         const outDir = resolve(SCRIPT_DIR, 'audit-prompts');
         mkdirSync(outDir, { recursive: true });
+
+        // Multiple registry entries can target the same Rust crate
+        // (`caniuse-lite`, `electron-to-chromium`, `node-releases` all map
+        // to `crates/caniuse-db/`). In that case the crate name alone
+        // would collide on disk, so we count crate occurrences first and
+        // append the package name when there's contention.
+        const crateCounts = {};
+        for (const name of Object.keys(PACKAGES)) {
+            const crate = PACKAGES[name].rustCrate
+                ? crateBasename(PACKAGES[name].rustCrate)
+                : name;
+            crateCounts[crate] = (crateCounts[crate] || 0) + 1;
+        }
+
         const written = [];
         for (const name of Object.keys(PACKAGES)) {
-            const file = resolve(outDir, `audit-${fileSafeName(name)}.md`);
+            // Filename uses the Rust crate basename so the audit-prompts
+            // directory listing is searchable from the crate side. For
+            // packages where the npm name and crate name diverge (cssnano
+            // sub-plugins, fraction.js → fraction-js, postcss → postcss-core,
+            // etc.) the npm name is encoded into the prompt title and intro,
+            // not the filename. When N>1 packages share a crate, append the
+            // npm name to disambiguate.
+            const crate = PACKAGES[name].rustCrate
+                ? crateBasename(PACKAGES[name].rustCrate)
+                : name;
+            const stem = crateCounts[crate] > 1
+                ? `${crate}--${fileSafeName(name)}`
+                : fileSafeName(crate);
+            const file = resolve(outDir, `audit-${stem}.md`);
             const prompt = generatePrompt(name);
             writeFileSync(file, prompt);
             written.push({ file, bytes: prompt.length });

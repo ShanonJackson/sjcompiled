@@ -180,7 +180,11 @@ impl ValuesParser {
                     idx += 1;
                 }
                 VKind::Comment => {
-                    let inline = Comment::test_inline(&tok.value);
+                    // Path selector for tokens already classified as Comment by
+                    // postcss-core. Always starts with `/*` in practice (postcss-core
+                    // never emits an inline-comment kind), so this branch is
+                    // defensive — see `Comment::is_inline_marker` doc.
+                    let inline = Comment::is_inline_marker(&tok.value);
                     let body = if inline {
                         // `// rest`
                         tok.value.trim_start_matches("//").to_string()
@@ -193,11 +197,42 @@ impl ValuesParser {
                     idx += 1;
                 }
                 VKind::Word => {
-                    // Word can become: Func (followed by `(`), Numeric, UnicodeRange,
-                    // Operator (single-char from the 10-element OPERATOR_CHARS_FULL),
+                    // Word can become: Func (followed by `(`), Comment (line comment
+                    // `//...`), Numeric, UnicodeRange, Operator (10-char list),
                     // or Word.
                     let v = &tok.value;
-                    let next_is_open_paren = tokens.get(idx + 1).map(|t| t.kind == VKind::OpenParen).unwrap_or(false);
+                    let next_tok = tokens.get(idx + 1);
+                    let next_is_open_paren = next_tok.map(|t| t.kind == VKind::OpenParen).unwrap_or(false);
+                    let next_value: Option<&str> = next_tok.map(|t| t.value.as_str());
+
+                    // Upstream `unknownWord` step 2: when a word's value is exactly
+                    // `//`, collect tokens to next newline as a single inline Comment.
+                    // Mirrors `Comment.tokenizeNext`. In practice the wrapped tokenizer
+                    // splits `//` on the `/` chars so this rarely fires from a fresh
+                    // word — but it does fire when an upstream pass back-pushes a
+                    // raw `//` word.
+                    if v == "//" {
+                        let mut text = String::new();
+                        let mut consumed = 0;
+                        loop {
+                            match tokens.get(idx + 1 + consumed) {
+                                Some(t) if !t.value.contains('\n') => {
+                                    text.push_str(&t.value);
+                                    consumed += 1;
+                                }
+                                _ => break,
+                            }
+                        }
+                        push_into(&mut stack_root, make_node(NodeKind::Comment(Comment {
+                            common: common_for(tok),
+                            text,
+                            inline: true,
+                            ..Default::default()
+                        }), tok, &mut spaces_before));
+                        idx += 1 + consumed;
+                        continue;
+                    }
+
                     // Upstream `Func.fromTokens` rejects names not matching either
                     // `reFunctions` (CSS function whitelist with optional vendor
                     // prefix) or `^[a-zA-Z\-\.]+$`. Invalid names fall through and
@@ -216,6 +251,26 @@ impl ValuesParser {
                         idx += 2; // skip the word + the `(`
                         continue;
                     }
+
+                    // Upstream `unknownWord` step 5: `testWord` (escaped / hex / variable)
+                    // is checked BEFORE Numeric/UnicodeRange. An escape-prefixed value
+                    // like `\41` becomes Word, never Numeric.
+                    if Word::test_word(v, next_value) {
+                        let is_var = Word::is_variable_name(v);
+                        let is_hex = Word::test_hex(v);
+                        let is_color = Word::test_color(v);
+                        let is_url = Word::test_url(v);
+                        push_into(&mut stack_root, make_node(NodeKind::Word(Word {
+                            common: common_for(tok),
+                            is_variable: is_var,
+                            is_hex,
+                            is_color,
+                            is_url,
+                        }), tok, &mut spaces_before));
+                        idx += 1;
+                        continue;
+                    }
+
                     if Numeric::test(v) {
                         let (num, unit) = Numeric::split(v).unwrap_or((v.clone(), String::new()));
                         let mut common = common_for(tok);
@@ -228,20 +283,12 @@ impl ValuesParser {
                             common: common_for(tok),
                         }), tok, &mut spaces_before));
                     } else if OPERATOR_CHARS_FULL.iter().any(|op| *op == v.as_str()) {
-                        // Upstream `unknownWord` step 8: classify single-char (and
-                        // 2-char `<=` / `>=`) words against `Operator.chars`. Tokens
-                        // with these literal values arrive here when the wrapped
-                        // tokenizer didn't retag them (i.e. when the word value
-                        // came from a multi-char split rather than a bare op).
                         push_into(&mut stack_root, make_node(NodeKind::Operator(Operator {
                             common: common_for(tok),
                         }), tok, &mut spaces_before));
                     } else {
                         // Mirror upstream `Word.js:33-42`: set is_variable / is_hex /
-                        // is_color / is_url at construction time. `is_color` covers
-                        // both hex-color form and the 148 CSS named colors;
-                        // `is_url` mirrors the `is-url-superb` predicate (with the
-                        // protocol-relative `//` → `http://` swap upstream applies).
+                        // is_color / is_url at construction time.
                         let is_var = Word::is_variable_name(v);
                         let is_hex = Word::test_hex(v);
                         let is_color = Word::test_color(v);

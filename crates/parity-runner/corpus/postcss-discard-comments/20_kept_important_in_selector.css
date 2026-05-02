@@ -1,0 +1,2 @@
+.foo /*! keep */ .bar { color: red; }
+.alpha /*! a */ , /*! b */ .beta { color: blue; }

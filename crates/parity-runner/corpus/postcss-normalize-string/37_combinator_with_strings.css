@@ -1,0 +1,3 @@
+[data-a='1'] > [data-b='2'] { color: red; }
+[data-x="a"] + [data-y='b'] ~ [data-z="c"] { color: blue; }
+.foo[data-x='1'][data-y="2"]::before { content: 'pseudo'; }

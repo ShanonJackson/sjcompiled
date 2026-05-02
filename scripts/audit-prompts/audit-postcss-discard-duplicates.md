@@ -1,4 +1,4 @@
-# Re-audit: `postcss-normalize-url@5.1.0` (no drift)
+# Re-audit: `postcss-discard-duplicates@6.0.0` (no drift)
 
 
 ## Background — why this exists
@@ -23,28 +23,28 @@ low; the cost of a missed semantic change is a silent hash divergence
 in production that is effectively impossible to debug.
 
 
-## Specific to `postcss-normalize-url`
+## Specific to `postcss-discard-duplicates`
 
-`postcss-normalize-url@5.1.0` is **NOT** drifted between the
+`postcss-discard-duplicates@6.0.0` is **NOT** drifted between the
 REFERENCE_LOCK_FILE and AFM resolution — both pin the same version.
 This audit exists because the original port may have introduced
 mistakes that the existing 20-stage parity corpus doesn't catch.
 The risk model: "we ported imperfectly to begin with," not "version
 changed under us."
 
-Walks every Decl value and `@namespace` AtRule params; rewrites the inner of `url(...)` calls. Absolute/protocol-relative URLs pass through `normalize-url@6.1.0`. Relative paths pass through `path.posix.normalize`. The 5 postcss-side overrides hold (`normalizeProtocol`/`sortQueryParameters`/`stripHash`/`stripWWW`/`stripTextFragment` all `false`).
+Distinct from the LOCAL `discard-duplicates` plugin in `crates/compiled-css/src/plugins/discard_duplicates.rs`. This is the npm v6 used by `sort.ts`. Different code, different ports.
 
 ## Source locations
 
-- **AFM-pinned source (5.1.0)**: `node_modules/.bun/postcss-normalize-url@5.1.0/node_modules/postcss-normalize-url/`
-- **Rust port**: `crates/cssnano-postcss-normalize-url/`
-- **Headline files** (in the `src/` subdirectory of the package): `*.js`
+- **AFM-pinned source (6.0.0)**: `node_modules/.bun/postcss-discard-duplicates@6.0.0/node_modules/postcss-discard-duplicates/`
+- **Rust port**: `crates/postcss-discard-duplicates/`
+- **Headline files** (in the `src/` subdirectory of the package): `index.js`
 
 ## Your task
 
 ### 1. Full source-tree walk
 
-Walk every file in `node_modules/.bun/postcss-normalize-url@5.1.0/node_modules/postcss-normalize-url/src/`.
+Walk every file in `node_modules/.bun/postcss-discard-duplicates@6.0.0/node_modules/postcss-discard-duplicates/src/`.
 For each file, locate the corresponding Rust port and verify line-by-line
 that:
 
@@ -88,14 +88,15 @@ RUSTFLAGS="" cargo build --manifest-path crates/parity-runner/Cargo.toml
 RUSTFLAGS="" cargo test --manifest-path crates/Cargo.toml --workspace --no-fail-fast
 
 # Parity gates — ALL must remain byte-clean (JS-vs-Rust).
-crates/target/debug/parity-runner --stage postcss-normalize-url --corpus crates/parity-runner/corpus/postcss-normalize-url
+crates/target/debug/parity-runner --stage npm-postcss-discard-duplicates --corpus crates/parity-runner/corpus/npm-postcss-discard-duplicates
+crates/target/debug/parity-runner --stage sort --corpus crates/parity-runner/corpus/sort
 
 # NAPI sort + engine flag verifiers — must stay 12/12.
 bun run packages/css/scripts/verify-napi-sort.mjs
 bun run packages/css/scripts/verify-engine-flag.mjs
 
 # Determinism on at least one stage you touched (JS-vs-JS oracle stability).
-crates/target/debug/parity-runner --stage postcss-normalize-url --corpus crates/parity-runner/corpus/postcss-normalize-url --determinism
+crates/target/debug/parity-runner --stage npm-postcss-discard-duplicates --corpus crates/parity-runner/corpus/npm-postcss-discard-duplicates --determinism
 ```
 
 If `cargo build` complains about `lto cannot be used for proc-macro`,
@@ -106,7 +107,7 @@ workaround.
 
 ## Report
 
-Write a concise audit document at `crates/_vendor/POSTCSS_NORMALIZE_URL_5.1.0_REAUDIT.md` containing:
+Write a concise audit document at `crates/_vendor/POSTCSS_DISCARD_DUPLICATES_6.0.0_REAUDIT.md` containing:
 
 - A table of every file in the package source with a column for
   "cosmetic / non-cosmetic / no diff" and a one-line explanation per

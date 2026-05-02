@@ -1,4 +1,6 @@
-# Re-audit: `postcss-values-parser@6.0.2` (no drift)
+# Re-audit: `postcss-discard-comments@5.1.2` (no drift) → `cssnano-postcss-discard-comments`
+
+> **Crate mapping:** the npm package `postcss-discard-comments` is ported as the Rust crate `cssnano-postcss-discard-comments` (under `crates/cssnano-postcss-discard-comments/`). The crate name diverges from the npm name on purpose — see PARITY_VERSIONS.md for the convention. **All file/path references in the rest of this prompt point at `cssnano-postcss-discard-comments`, not at a hypothetical `postcss-discard-comments` crate.**
 
 
 ## Background — why this exists
@@ -23,28 +25,28 @@ low; the cost of a missed semantic change is a silent hash divergence
 in production that is effectively impossible to debug.
 
 
-## Specific to `postcss-values-parser`
+## Specific to `postcss-discard-comments`
 
-`postcss-values-parser@6.0.2` is **NOT** drifted between the
+`postcss-discard-comments@5.1.2` is **NOT** drifted between the
 REFERENCE_LOCK_FILE and AFM resolution — both pin the same version.
 This audit exists because the original port may have introduced
 mistakes that the existing 20-stage parity corpus doesn't catch.
 The risk model: "we ported imperfectly to begin with," not "version
 changed under us."
 
-PLURAL — distinct from `postcss-value-parser` (singular, 4.2.0). Different AST node types: `Numeric`, `Word`, `Func`. Used exclusively by `packages/css/src/plugins/expand-shorthands/*.ts`. Confirm round-trip identity over a value corpus.
+Default keeps `/*!` important comments, drops the rest. Confirm the default removal predicate matches.
 
 ## Source locations
 
-- **AFM-pinned source (6.0.2)**: `node_modules/.bun/postcss-values-parser@6.0.2/node_modules/postcss-values-parser/`
-- **Rust port**: `crates/postcss-values-parser/`
-- **Headline files** (in the root of the package): `lib/`
+- **AFM-pinned source (5.1.2)**: `node_modules/.bun/postcss-discard-comments@5.1.2/node_modules/postcss-discard-comments/`
+- **Rust port**: `crates/cssnano-postcss-discard-comments/`
+- **Headline files** (in the `src/` subdirectory of the package): `*.js`
 
 ## Your task
 
 ### 1. Full source-tree walk
 
-Walk every file in `node_modules/.bun/postcss-values-parser@6.0.2/node_modules/postcss-values-parser/`.
+Walk every file in `node_modules/.bun/postcss-discard-comments@5.1.2/node_modules/postcss-discard-comments/src/`.
 For each file, locate the corresponding Rust port and verify line-by-line
 that:
 
@@ -88,15 +90,14 @@ RUSTFLAGS="" cargo build --manifest-path crates/parity-runner/Cargo.toml
 RUSTFLAGS="" cargo test --manifest-path crates/Cargo.toml --workspace --no-fail-fast
 
 # Parity gates — ALL must remain byte-clean (JS-vs-Rust).
-crates/target/debug/parity-runner --stage expand-shorthands --corpus crates/parity-runner/corpus/expand-shorthands
-crates/target/debug/parity-runner --stage postcss-core-roundtrip --corpus crates/parity-runner/corpus/postcss-core-roundtrip
+crates/target/debug/parity-runner --stage postcss-discard-comments --corpus crates/parity-runner/corpus/postcss-discard-comments
 
 # NAPI sort + engine flag verifiers — must stay 12/12.
 bun run packages/css/scripts/verify-napi-sort.mjs
 bun run packages/css/scripts/verify-engine-flag.mjs
 
 # Determinism on at least one stage you touched (JS-vs-JS oracle stability).
-crates/target/debug/parity-runner --stage expand-shorthands --corpus crates/parity-runner/corpus/expand-shorthands --determinism
+crates/target/debug/parity-runner --stage postcss-discard-comments --corpus crates/parity-runner/corpus/postcss-discard-comments --determinism
 ```
 
 If `cargo build` complains about `lto cannot be used for proc-macro`,
@@ -107,7 +108,7 @@ workaround.
 
 ## Report
 
-Write a concise audit document at `crates/_vendor/POSTCSS_VALUES_PARSER_6.0.2_REAUDIT.md` containing:
+Write a concise audit document at `crates/_vendor/POSTCSS_DISCARD_COMMENTS_5.1.2_REAUDIT.md` containing:
 
 - A table of every file in the package source with a column for
   "cosmetic / non-cosmetic / no diff" and a one-line explanation per

@@ -1,0 +1,5 @@
+a { content: "foo" /* trailing */; }
+b { content: /* leading */ "bar"; }
+c { content: "baz"   ; }
+@media (min-width: 100px) /* mq comment */ { d { color: red; } }
+[data-x="x"] /* sel comment */ { color: blue; }

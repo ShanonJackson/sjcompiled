@@ -1,4 +1,6 @@
-# Re-audit: `fraction.js@4.2.0` (no drift)
+# Re-audit: `postcss-normalize-positions@5.1.1` (no drift) → `cssnano-postcss-normalize-positions`
+
+> **Crate mapping:** the npm package `postcss-normalize-positions` is ported as the Rust crate `cssnano-postcss-normalize-positions` (under `crates/cssnano-postcss-normalize-positions/`). The crate name diverges from the npm name on purpose — see PARITY_VERSIONS.md for the convention. **All file/path references in the rest of this prompt point at `cssnano-postcss-normalize-positions`, not at a hypothetical `postcss-normalize-positions` crate.**
 
 
 ## Background — why this exists
@@ -23,28 +25,28 @@ low; the cost of a missed semantic change is a silent hash divergence
 in production that is effectively impossible to debug.
 
 
-## Specific to `fraction.js`
+## Specific to `postcss-normalize-positions`
 
-`fraction.js@4.2.0` is **NOT** drifted between the
+`postcss-normalize-positions@5.1.1` is **NOT** drifted between the
 REFERENCE_LOCK_FILE and AFM resolution — both pin the same version.
 This audit exists because the original port may have introduced
 mistakes that the existing 20-stage parity corpus doesn't catch.
 The risk model: "we ported imperfectly to begin with," not "version
 changed under us."
 
-Used in autoprefixer's grid math AND `postcss-convert-values`. Output of these depends on stringified fraction outputs — byte parity matters. Audit `add`, `sub`, `mul`, `div`, `toString`, `toFraction` against test vectors.
+Rewrites `background-position` and `*-perspective-origin` keyword pairs (left/top → 0 0, etc.). No options.
 
 ## Source locations
 
-- **AFM-pinned source (4.2.0)**: `node_modules/.bun/fraction.js@4.2.0/node_modules/fraction.js/`
-- **Rust port**: `crates/fraction-js/`
-- **Headline files** (in the root of the package): `fraction.js`
+- **AFM-pinned source (5.1.1)**: `node_modules/.bun/postcss-normalize-positions@5.1.1/node_modules/postcss-normalize-positions/`
+- **Rust port**: `crates/cssnano-postcss-normalize-positions/`
+- **Headline files** (in the `src/` subdirectory of the package): `*.js`
 
 ## Your task
 
 ### 1. Full source-tree walk
 
-Walk every file in `node_modules/.bun/fraction.js@4.2.0/node_modules/fraction.js/`.
+Walk every file in `node_modules/.bun/postcss-normalize-positions@5.1.1/node_modules/postcss-normalize-positions/src/`.
 For each file, locate the corresponding Rust port and verify line-by-line
 that:
 
@@ -88,14 +90,14 @@ RUSTFLAGS="" cargo build --manifest-path crates/parity-runner/Cargo.toml
 RUSTFLAGS="" cargo test --manifest-path crates/Cargo.toml --workspace --no-fail-fast
 
 # Parity gates — ALL must remain byte-clean (JS-vs-Rust).
-crates/target/debug/parity-runner --stage postcss-core-roundtrip --corpus crates/parity-runner/corpus/postcss-core-roundtrip
+crates/target/debug/parity-runner --stage postcss-normalize-positions --corpus crates/parity-runner/corpus/postcss-normalize-positions
 
 # NAPI sort + engine flag verifiers — must stay 12/12.
 bun run packages/css/scripts/verify-napi-sort.mjs
 bun run packages/css/scripts/verify-engine-flag.mjs
 
 # Determinism on at least one stage you touched (JS-vs-JS oracle stability).
-crates/target/debug/parity-runner --stage postcss-core-roundtrip --corpus crates/parity-runner/corpus/postcss-core-roundtrip --determinism
+crates/target/debug/parity-runner --stage postcss-normalize-positions --corpus crates/parity-runner/corpus/postcss-normalize-positions --determinism
 ```
 
 If `cargo build` complains about `lto cannot be used for proc-macro`,
@@ -106,7 +108,7 @@ workaround.
 
 ## Report
 
-Write a concise audit document at `crates/_vendor/FRACTION_JS_4.2.0_REAUDIT.md` containing:
+Write a concise audit document at `crates/_vendor/POSTCSS_NORMALIZE_POSITIONS_5.1.1_REAUDIT.md` containing:
 
 - A table of every file in the package source with a column for
   "cosmetic / non-cosmetic / no diff" and a one-line explanation per

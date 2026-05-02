@@ -1,0 +1,2 @@
+.foo/* drop */.bar { color: red; }
+.alpha/* drop *//* drop2 */.beta { color: blue; }

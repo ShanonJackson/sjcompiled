@@ -1,0 +1,8 @@
+a {
+  --signed-leading-dot: +.5em;
+  --negative-leading-dot: -.5em;
+  --exponent-with-unit: 1.5e-3px;
+  --capital-exponent: 2E10px;
+  --trailing-dot: 5.;
+  --dash-prefixed-unit: 5-MyUnit;
+}

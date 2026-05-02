@@ -1,0 +1,6 @@
+:root {
+  --label: 'click me';
+  --quote: "hello";
+  --multi: 'a' "b" 'c';
+  --content: 'has \'escape\'';
+}

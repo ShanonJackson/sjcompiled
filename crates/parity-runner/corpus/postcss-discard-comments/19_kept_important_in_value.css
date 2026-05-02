@@ -1,0 +1,4 @@
+a {
+  color: red /*! KEEP */ blue;
+  background: /*! header */ url(foo.png) /*! footer */;
+}

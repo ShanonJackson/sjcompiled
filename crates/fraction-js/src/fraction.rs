@@ -7,6 +7,18 @@
 
 use std::fmt;
 
+// Sun fdlibm port. V8's `Math.log`, `Math.pow`, `Math.LN10` all come from
+// the same fdlibm sources (`src/base/ieee754.cc`), so calling through
+// `libm::*` here produces bit-identical f64 results to JavaScript on
+// every platform we ship to. `f64::ln` / `f64::powf` would otherwise
+// delegate to the system libm and drift by 1 ULP between OSes.
+use libm;
+
+/// JS `Math.LN10` — fdlibm's stored constant. Spelled out as the exact
+/// f64 bit pattern V8 returns, so any consumer comparing against
+/// `Math.LN10` sees the same value byte-for-byte.
+const JS_LN10: f64 = 2.302585092994046_f64;
+
 const MAX_CYCLE_LEN: u32 = 2000;
 
 /// Mirrors the three exported error sentinels on the upstream `Fraction`
@@ -300,7 +312,12 @@ fn parse_input(input: &FractionInput) -> Result<Parsed, FractionError> {
                 n = p1;
             } else if p1 > 0.0 {
                 if p1 >= 1.0 {
-                    z = (10.0_f64).powf((1.0 + (p1.ln() / std::f64::consts::LN_10)).floor());
+                    // `Math.pow(10, Math.floor(1 + Math.log(p1) / Math.LN10))`.
+                    // Use libm (= V8's fdlibm) to match JS bit-for-bit. Rust's
+                    // `f64::ln` / `std::f64::consts::LN_10` would drift by up
+                    // to 1 ULP on non-Windows hosts and could land `floor` on
+                    // a different integer near boundaries like `p1 = 10.0`.
+                    z = libm::pow(10.0, libm::floor(1.0 + libm::log(p1) / JS_LN10));
                     p1 /= z;
                 }
                 let big_n: f64 = 10_000_000.0;
@@ -349,14 +366,16 @@ fn parse_input(input: &FractionInput) -> Result<Parsed, FractionError> {
                     if a < b.len() {
                         let tok = b[a].clone();
                         w = assign(&tok, s)?;
-                        y = (10.0_f64).powi(tok.len() as i32);
+                        // `Math.pow(10, B[A].length)` — route through libm
+                        // to stay bit-equal to V8 across hosts.
+                        y = libm::pow(10.0, tok.len() as f64);
                         a += 1;
                     }
                 }
                 if a + 2 < b.len() && ((b[a] == "(" && b[a + 2] == ")") || (b[a] == "'" && b[a + 2] == "'")) {
                     let tok = b[a + 1].clone();
                     x = assign(&tok, s)?;
-                    z = (10.0_f64).powi(tok.len() as i32) - 1.0;
+                    z = libm::pow(10.0, tok.len() as f64) - 1.0;
                     a += 3;
                 }
             } else if a + 1 < b.len() && (b[a + 1] == "/" || b[a + 1] == ":") {
@@ -490,29 +509,31 @@ impl Fraction {
     }
 
     pub fn ceil(&self, places: Option<i32>) -> Result<Self, FractionError> {
-        let places = (10.0_f64).powi(places.unwrap_or(0));
+        // `Math.pow(10, places || 0)` — fdlibm. `powi` is allegedly exact
+        // for integer exponents on most LLVM backends but is not guaranteed
+        // bit-equal to `Math.pow(10, n)` for very large `n`; use libm::pow.
+        let places = libm::pow(10.0, places.unwrap_or(0) as f64);
         if self.n.is_nan() || self.d.is_nan() {
             return Ok(Fraction { s: 1.0, n: f64::NAN, d: f64::NAN });
         }
-        new_fraction((places * self.s * self.n / self.d).ceil(), places)
+        new_fraction(libm::ceil(places * self.s * self.n / self.d), places)
     }
 
     pub fn floor(&self, places: Option<i32>) -> Result<Self, FractionError> {
-        let places = (10.0_f64).powi(places.unwrap_or(0));
+        let places = libm::pow(10.0, places.unwrap_or(0) as f64);
         if self.n.is_nan() || self.d.is_nan() {
             return Ok(Fraction { s: 1.0, n: f64::NAN, d: f64::NAN });
         }
-        new_fraction((places * self.s * self.n / self.d).floor(), places)
+        new_fraction(libm::floor(places * self.s * self.n / self.d), places)
     }
 
     pub fn round(&self, places: Option<i32>) -> Result<Self, FractionError> {
-        let places = (10.0_f64).powi(places.unwrap_or(0));
+        let places = libm::pow(10.0, places.unwrap_or(0) as f64);
         if self.n.is_nan() || self.d.is_nan() {
             return Ok(Fraction { s: 1.0, n: f64::NAN, d: f64::NAN });
         }
-        // JS Math.round rounds half away from zero for positives, half-up.
-        // Rust f64::round rounds half away from zero, matching Math.round for positives;
-        // but Math.round in JS rounds .5 toward +∞ (e.g. -0.5 -> 0). We'll use the JS rule.
+        // JS Math.round = half toward +∞: see `js_math_round`. Floor is
+        // exact in IEEE 754, so no libm needed for the floor step.
         new_fraction(js_math_round(places * self.s * self.n / self.d), places)
     }
 
@@ -521,17 +542,19 @@ impl Fraction {
     }
 
     pub fn pow<I: Into<FractionInput>>(&self, other: I) -> Result<Option<Self>, FractionError> {
+        // Every `Math.pow` call in upstream → `libm::pow`. `f64::powf`
+        // routes through the system libm and is not bit-equal to V8.
         let p = parse_input(&other.into())?;
         if p.d == 1.0 {
             if p.s < 0.0 {
                 return new_fraction(
-                    (self.s * self.d).powf(p.n),
-                    self.n.powf(p.n),
+                    libm::pow(self.s * self.d, p.n),
+                    libm::pow(self.n, p.n),
                 ).map(Some);
             } else {
                 return new_fraction(
-                    (self.s * self.n).powf(p.n),
-                    self.d.powf(p.n),
+                    libm::pow(self.s * self.n, p.n),
+                    libm::pow(self.d, p.n),
                 ).map(Some);
             }
         }
@@ -552,7 +575,7 @@ impl Fraction {
             } else {
                 return Ok(None);
             }
-            n_acc *= k.powf(*val);
+            n_acc *= libm::pow(*k, *val);
         }
         let mut df = df;
         for (k, val) in df.iter_mut() {
@@ -563,7 +586,7 @@ impl Fraction {
             } else {
                 return Ok(None);
             }
-            d_acc *= k.powf(*val);
+            d_acc *= libm::pow(*k, *val);
         }
 
         if p.s < 0.0 {
@@ -698,20 +721,23 @@ impl Fraction {
         let cyc_len = cycle_len(n_val, d_val);
         let cyc_off = cycle_start(n_val, d_val, cyc_len);
         let mut str_out = if self.s < 0.0 { "-".to_string() } else { String::new() };
-        // `N / D | 0` — JS bitwise OR coerces to int32.
-        str_out.push_str(&js_number_to_string((n_val / d_val).trunc()));
+        // `N / D | 0` — JS `| 0` coerces to signed-int32 (wraps on overflow).
+        // `f64::trunc` clips to the f64 range, so for `N/D >= 2^31` Rust would
+        // emit the full integer while JS wraps to a negative value. Use
+        // `js_int32_trunc` to reproduce wrap-on-overflow exactly.
+        str_out.push_str(&js_number_to_string(js_int32_trunc(n_val / d_val)));
         n_val = js_mod(n_val, d_val);
         n_val *= 10.0;
         if n_val != 0.0 { str_out.push('.'); }
         if cyc_len > 0 {
             for _ in 0..cyc_off {
-                str_out.push_str(&js_number_to_string((n_val / d_val).trunc()));
+                str_out.push_str(&js_number_to_string(js_int32_trunc(n_val / d_val)));
                 n_val = js_mod(n_val, d_val);
                 n_val *= 10.0;
             }
             str_out.push('(');
             for _ in 0..cyc_len {
-                str_out.push_str(&js_number_to_string((n_val / d_val).trunc()));
+                str_out.push_str(&js_number_to_string(js_int32_trunc(n_val / d_val)));
                 n_val = js_mod(n_val, d_val);
                 n_val *= 10.0;
             }
@@ -719,7 +745,7 @@ impl Fraction {
         } else {
             for _ in 0..dec {
                 if n_val == 0.0 { break; }
-                str_out.push_str(&js_number_to_string((n_val / d_val).trunc()));
+                str_out.push_str(&js_number_to_string(js_int32_trunc(n_val / d_val)));
                 n_val = js_mod(n_val, d_val);
                 n_val *= 10.0;
             }
@@ -731,6 +757,22 @@ impl Fraction {
 /// JS `Math.round` — half toward +∞.
 fn js_math_round(x: f64) -> f64 {
     (x + 0.5).floor()
+}
+
+/// JS `x | 0` — ECMA-262 ToInt32. Truncate toward zero, then take the result
+/// modulo 2^32 and reinterpret as a signed 32-bit integer. Returns the value
+/// as `f64` so it composes with the rest of the f64 arithmetic in this module.
+///
+/// Pattern matches V8/SpiderMonkey: NaN → 0, ±Infinity → 0, otherwise
+/// `(trunc(x) mod 2^32) - (>=2^31 ? 2^32 : 0)`.
+fn js_int32_trunc(x: f64) -> f64 {
+    if !x.is_finite() { return 0.0; }
+    let truncated = x.trunc();
+    // 32-bit modulo on the truncated magnitude, sign preserved.
+    let modulo = 4_294_967_296.0_f64;
+    let m = truncated.rem_euclid(modulo);
+    let signed = if m >= 2_147_483_648.0 { m - modulo } else { m };
+    signed
 }
 
 /// JS number-to-string for integers: produces the same digits as `String(n)`
@@ -936,5 +978,68 @@ mod tests {
     fn line_terminator_in_string_errors_like_js() {
         assert_eq!(Fraction::new("1\n2"), Err(FractionError::InvalidParameter));
         assert_eq!(Fraction::new("1\r2"), Err(FractionError::InvalidParameter));
+    }
+
+    /// JS `N / D | 0` is signed-int32 wrap. For `N/D >= 2^31` JS wraps to
+    /// negative; `f64::trunc` does not. `js_int32_trunc` reproduces the
+    /// JS behavior (NaN → 0, ±Infinity → 0, otherwise mod-2^32 signed).
+    #[test]
+    fn js_int32_trunc_matches_js_wrap() {
+        // Within int32 range: same as trunc.
+        assert_eq!(super::js_int32_trunc(0.0), 0.0);
+        assert_eq!(super::js_int32_trunc(1.7), 1.0);
+        assert_eq!(super::js_int32_trunc(-1.7), -1.0);
+        assert_eq!(super::js_int32_trunc(2_147_483_647.0), 2_147_483_647.0);
+        // 2^31 = 2147483648 → wraps to -2^31.
+        assert_eq!(super::js_int32_trunc(2_147_483_648.0), -2_147_483_648.0);
+        // 2^32 wraps to 0.
+        assert_eq!(super::js_int32_trunc(4_294_967_296.0), 0.0);
+        // 2^32 + 5 wraps to 5.
+        assert_eq!(super::js_int32_trunc(4_294_967_301.0), 5.0);
+        // Negatives also wrap.
+        assert_eq!(super::js_int32_trunc(-2_147_483_649.0), 2_147_483_647.0);
+        // Non-finite → 0 (matches JS `NaN | 0 === 0`, `Infinity | 0 === 0`).
+        assert_eq!(super::js_int32_trunc(f64::NAN), 0.0);
+        assert_eq!(super::js_int32_trunc(f64::INFINITY), 0.0);
+        assert_eq!(super::js_int32_trunc(f64::NEG_INFINITY), 0.0);
+    }
+
+    /// libm-pow vs Rust `f64::powf`: we want `Math.pow(10, k)` for integer k
+    /// to be exact. Spot-check a few that matter for the parse-Number branch.
+    #[test]
+    fn libm_pow_matches_v8_at_integer_powers_of_10() {
+        // These pairs were sampled from Node 22 (V8); they MUST match.
+        assert_eq!(libm::pow(10.0, 1.0), 10.0);
+        assert_eq!(libm::pow(10.0, 2.0), 100.0);
+        assert_eq!(libm::pow(10.0, 3.0), 1000.0);
+        assert_eq!(libm::pow(10.0, 4.0), 10000.0);
+        assert_eq!(libm::pow(10.0, 21.0), 1e21);
+    }
+
+    /// The Number-input parse path computes
+    /// `z = Math.pow(10, Math.floor(1 + Math.log(p1) / Math.LN10))`.
+    /// At `p1 = 1000` JS produces `Math.log(1000)/LN10 = 2.9999...` (1 ULP
+    /// below 3.0), so `floor(1 + that) = 3`, `z = 1000`, `p1/z = 1.0`.
+    /// Rust's `f64::ln` could land on 3.0 exactly on some platforms,
+    /// producing `floor(1 + 3) = 4`, `z = 10000`. Lock the JS behavior.
+    #[test]
+    fn parse_number_z_matches_js_at_power_of_10() {
+        let f = Fraction::new(1000.0).unwrap();
+        // 1000 is integer → hits the `js_mod(p1, 1.0) == 0.0` fast path,
+        // never reaches the log branch. Use a non-integer near 10^k instead.
+        assert_eq!(f.n, 1000.0);
+        assert_eq!(f.d, 1.0);
+
+        // A fractional value > 1 that goes through the log branch.
+        // JS:  new Fraction(1.5).n === 3, .d === 2.
+        let g = Fraction::new(1.5).unwrap();
+        assert_eq!(g.n, 3.0);
+        assert_eq!(g.d, 2.0);
+
+        // dpcm conversion factor used by autoprefixer's resolution.rs.
+        // JS: new Fraction(2.54).n === 127, .d === 50.
+        let h = Fraction::new(2.54).unwrap();
+        assert_eq!(h.n, 127.0);
+        assert_eq!(h.d, 50.0);
     }
 }

@@ -226,6 +226,77 @@ mod tests {
         } else { panic!("vendor-prefixed func must be Func"); }
     }
 
+    /// Drift fix: `Word.testEscaped` (`Word.js:44-52`) — backslash-prefixed
+    /// values classify as Word, NEVER Numeric/UnicodeRange. The check runs
+    /// before Numeric in `unknownWord`'s test order.
+    #[test]
+    fn escaped_identifier_is_word_not_numeric() {
+        // `\41` — CSS hex escape. Without testEscaped, my Numeric regex
+        // could be tempted to interpret this; the escape branch wins first.
+        let root = parse(r"\41");
+        let any_numeric = root.nodes.iter().any(|n| matches!(n.kind, NodeKind::Numeric(_)));
+        assert!(!any_numeric, r"`\41` must classify as Word, not Numeric");
+        assert!(root.nodes.iter().any(|n| matches!(n.kind, NodeKind::Word(_))));
+    }
+
+    /// Drift fix: when a word's value is exactly `//`, upstream
+    /// `Comment.tokenizeNext` consumes tokens to the next newline as a
+    /// single inline Comment. Round-trip should preserve the input bytes.
+    #[test]
+    fn double_slash_inline_comment_round_trips() {
+        // The Rust tokenizer splits `//` on the `/` chars before the parser
+        // sees a `//` Word value, so this exercises the resilience of the
+        // path more than the path itself; the assertion is that no panic
+        // and round-trip is byte-clean for typical inputs.
+        let root = parse("a // b");
+        let s = stringify(&root);
+        assert_eq!(s, "a // b");
+    }
+
+    /// Drift verification (#3): nested function calls must round-trip
+    /// byte-clean and produce a Func-with-Func-child AST shape.
+    /// Mirrors upstream `Func.fromTokens` recursive-paren accumulation.
+    #[test]
+    fn nested_calc_var_round_trips() {
+        let inputs = [
+            "calc(var(--x))",
+            "calc((1+2)*3)",
+            "var(--a, calc(1px + 2px))",
+            "rgb(calc(255 - 1), 0, 0)",
+            "linear-gradient(to right, var(--start, red), var(--end, blue))",
+        ];
+        for input in inputs {
+            let root = parse(input);
+            let s = stringify(&root);
+            assert_eq!(s, input, "nested-paren round-trip mismatch for {:?}", input);
+        }
+    }
+
+    /// Drift verification (#1): `5.` (trailing-dot value) keeps the dot
+    /// on the value, NOT the unit. Round-trip preserves the input bytes.
+    #[test]
+    fn trailing_dot_numeric_round_trips() {
+        let inputs = ["5.", "5.em", ".5em", "+.5em", "-1.5e-3px", "2E10px"];
+        for input in inputs {
+            let root = parse(input);
+            let s = stringify(&root);
+            assert_eq!(s, input, "trailing-dot numeric mismatch for {:?}", input);
+        }
+    }
+
+    /// Drift verification (#2): `Comment::test_inline_word` matches
+    /// upstream contract (contains `//` anywhere); `is_inline_marker`
+    /// is the path selector (starts with `//`). The two must NOT be
+    /// conflated — used in different contexts.
+    #[test]
+    fn comment_predicates_have_distinct_semantics() {
+        use crate::nodes::comment::Comment;
+        // Contract predicate fires on embedded markers.
+        assert!(Comment::test_inline_word("xyz//abc"));
+        // Path-selector does not.
+        assert!(!Comment::is_inline_marker("xyz//abc"));
+    }
+
     /// Drift fix: `Word.is_hex` uses `/^#(.+)/` — bare `"#"` must NOT
     /// classify as is_hex (old port used `starts_with('#')`).
     #[test]

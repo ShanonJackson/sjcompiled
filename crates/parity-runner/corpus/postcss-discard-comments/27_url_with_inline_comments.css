@@ -1,0 +1,4 @@
+a {
+  background: url(/* drop */ foo.png /* drop */);
+  border-image: url(bar.png) /* drop */ 30 fill;
+}

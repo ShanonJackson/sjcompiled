@@ -128,14 +128,25 @@ fn reduce(node: &mut VNode, _i: usize) -> Option<bool> {
     }
 
     if lower == "cubic-bezier" {
-        // Even-indexed children (0, 2, 4, 6) are the numeric values; odd
-        // indices are `,` Div tokens.
+        // Mirrors upstream `index.js:82-86`:
+        //   const values = node.nodes
+        //     .filter((list, index) => index % 2 === 0)
+        //     .map(getValue);
+        // JS `getValue` is `parseFloat(node.value)`, which returns `NaN`
+        // for unparseable values — and crucially `map` PRESERVES the NaN
+        // entry, so `values.length` reflects the count of even-indexed
+        // children, not the count of successfully parsed numbers.
+        // A `filter_map` that drops `None`s would diverge: e.g.
+        // `cubic-bezier(0.25, 0.1, 0.25, 1, abc)` has 5 even-indexed
+        // children, JS gives `[0.25, 0.1, 0.25, 1, NaN]` (length 5,
+        // bails); a filter_map would yield `[0.25, 0.1, 0.25, 1]`
+        // (length 4, spuriously substitutes `ease`).
         let values: Vec<f64> = node
             .nodes
             .iter()
             .enumerate()
             .filter(|(i, _)| i % 2 == 0)
-            .filter_map(|(_, n)| js_parse_float(&n.value))
+            .map(|(_, n)| js_parse_float(&n.value).unwrap_or(f64::NAN))
             .collect();
 
         if values.len() != 4 {
@@ -185,16 +196,23 @@ pub fn postcss_normalize_timing_functions(root: &mut Root) -> PluginResult {
             return Mutation::Keep;
         }
 
+        // Mirrors upstream `index.js:124-138` exactly: a plain field
+        // assignment (`decl.value = ...`), NOT a raws-clearing op.
+        // The postcss-core stringifier (`raw_value_str`) already mirrors
+        // JS `lib/stringifier.js#rawValue`'s `raws.value.value === node.value
+        // ? raws.value.raw : node.value` comparison, so the raws cache
+        // is invalidated automatically when transform actually changes
+        // the value, and preserved (correctly) when transform is a no-op.
+        // Clearing raws here would lose source bytes (e.g. trailing
+        // comments captured into `raws.value.raw`) on no-op transforms.
         let value = decl.value.clone();
         if let Some(cached) = cache.get(&value).cloned() {
             decl.value = cached;
-            node.raws.value = None;
             return Mutation::Keep;
         }
 
         let result = transform(&value);
         decl.value = result.clone();
-        node.raws.value = None;
         cache.insert(value, result);
         Mutation::Keep
     });

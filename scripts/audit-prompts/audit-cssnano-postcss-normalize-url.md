@@ -1,4 +1,6 @@
-# Re-audit: `postcss-normalize-positions@5.1.1` (no drift)
+# Re-audit: `postcss-normalize-url@5.1.0` (no drift) → `cssnano-postcss-normalize-url`
+
+> **Crate mapping:** the npm package `postcss-normalize-url` is ported as the Rust crate `cssnano-postcss-normalize-url` (under `crates/cssnano-postcss-normalize-url/`). The crate name diverges from the npm name on purpose — see PARITY_VERSIONS.md for the convention. **All file/path references in the rest of this prompt point at `cssnano-postcss-normalize-url`, not at a hypothetical `postcss-normalize-url` crate.**
 
 
 ## Background — why this exists
@@ -23,28 +25,28 @@ low; the cost of a missed semantic change is a silent hash divergence
 in production that is effectively impossible to debug.
 
 
-## Specific to `postcss-normalize-positions`
+## Specific to `postcss-normalize-url`
 
-`postcss-normalize-positions@5.1.1` is **NOT** drifted between the
+`postcss-normalize-url@5.1.0` is **NOT** drifted between the
 REFERENCE_LOCK_FILE and AFM resolution — both pin the same version.
 This audit exists because the original port may have introduced
 mistakes that the existing 20-stage parity corpus doesn't catch.
 The risk model: "we ported imperfectly to begin with," not "version
 changed under us."
 
-Rewrites `background-position` and `*-perspective-origin` keyword pairs (left/top → 0 0, etc.). No options.
+Walks every Decl value and `@namespace` AtRule params; rewrites the inner of `url(...)` calls. Absolute/protocol-relative URLs pass through `normalize-url@6.1.0`. Relative paths pass through `path.posix.normalize`. The 5 postcss-side overrides hold (`normalizeProtocol`/`sortQueryParameters`/`stripHash`/`stripWWW`/`stripTextFragment` all `false`).
 
 ## Source locations
 
-- **AFM-pinned source (5.1.1)**: `node_modules/.bun/postcss-normalize-positions@5.1.1/node_modules/postcss-normalize-positions/`
-- **Rust port**: `crates/cssnano-postcss-normalize-positions/`
+- **AFM-pinned source (5.1.0)**: `node_modules/.bun/postcss-normalize-url@5.1.0/node_modules/postcss-normalize-url/`
+- **Rust port**: `crates/cssnano-postcss-normalize-url/`
 - **Headline files** (in the `src/` subdirectory of the package): `*.js`
 
 ## Your task
 
 ### 1. Full source-tree walk
 
-Walk every file in `node_modules/.bun/postcss-normalize-positions@5.1.1/node_modules/postcss-normalize-positions/src/`.
+Walk every file in `node_modules/.bun/postcss-normalize-url@5.1.0/node_modules/postcss-normalize-url/src/`.
 For each file, locate the corresponding Rust port and verify line-by-line
 that:
 
@@ -88,14 +90,14 @@ RUSTFLAGS="" cargo build --manifest-path crates/parity-runner/Cargo.toml
 RUSTFLAGS="" cargo test --manifest-path crates/Cargo.toml --workspace --no-fail-fast
 
 # Parity gates — ALL must remain byte-clean (JS-vs-Rust).
-crates/target/debug/parity-runner --stage postcss-normalize-positions --corpus crates/parity-runner/corpus/postcss-normalize-positions
+crates/target/debug/parity-runner --stage postcss-normalize-url --corpus crates/parity-runner/corpus/postcss-normalize-url
 
 # NAPI sort + engine flag verifiers — must stay 12/12.
 bun run packages/css/scripts/verify-napi-sort.mjs
 bun run packages/css/scripts/verify-engine-flag.mjs
 
 # Determinism on at least one stage you touched (JS-vs-JS oracle stability).
-crates/target/debug/parity-runner --stage postcss-normalize-positions --corpus crates/parity-runner/corpus/postcss-normalize-positions --determinism
+crates/target/debug/parity-runner --stage postcss-normalize-url --corpus crates/parity-runner/corpus/postcss-normalize-url --determinism
 ```
 
 If `cargo build` complains about `lto cannot be used for proc-macro`,
@@ -106,7 +108,7 @@ workaround.
 
 ## Report
 
-Write a concise audit document at `crates/_vendor/POSTCSS_NORMALIZE_POSITIONS_5.1.1_REAUDIT.md` containing:
+Write a concise audit document at `crates/_vendor/POSTCSS_NORMALIZE_URL_5.1.0_REAUDIT.md` containing:
 
 - A table of every file in the package source with a column for
   "cosmetic / non-cosmetic / no diff" and a one-line explanation per

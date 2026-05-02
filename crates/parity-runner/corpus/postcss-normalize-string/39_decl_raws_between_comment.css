@@ -1,0 +1,3 @@
+a { content   :   /* between */   'foo'; }
+b { content/* tight */: 'bar'; }
+c { content : 'baz' ; }

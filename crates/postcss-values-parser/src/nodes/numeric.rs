@@ -68,4 +68,50 @@ mod tests {
         assert_eq!(v, ".5");
         assert_eq!(u, "em");
     }
+
+    // Signed leading-dot value: upstream allows `+.5` and `-.5`.
+    #[test] fn signed_leading_dot() {
+        let (v, u) = Numeric::split("+.5em").unwrap();
+        assert_eq!(v, "+.5");
+        assert_eq!(u, "em");
+        let (v, u) = Numeric::split("-.5em").unwrap();
+        assert_eq!(v, "-.5");
+        assert_eq!(u, "em");
+    }
+
+    // Exponent + unit: number greedy through exponent, then unit.
+    #[test] fn exponent_with_unit() {
+        let (v, u) = Numeric::split("1.5e-3px").unwrap();
+        assert_eq!(v, "1.5e-3");
+        assert_eq!(u, "px");
+    }
+
+    // Capital-E exponent.
+    #[test] fn exponent_capital() {
+        let (v, u) = Numeric::split("2E10px").unwrap();
+        assert_eq!(v, "2E10");
+        assert_eq!(u, "px");
+    }
+
+    // Bare dot must NOT match.
+    #[test] fn bare_dot_no_match() { assert!(!Numeric::test(".")); }
+
+    // Bare sign must NOT match.
+    #[test] fn bare_sign_no_match() {
+        assert!(!Numeric::test("+"));
+        assert!(!Numeric::test("-"));
+    }
+
+    // Hyphenated identifier prefix: `-1px` is a Numeric, but `-foo` is NOT
+    // (no digit). Critical for distinguishing flex-shrink negatives from
+    // CSS variables / vendor identifiers.
+    #[test] fn hyphen_id_no_match() { assert!(!Numeric::test("-foo")); }
+
+    // Custom dash-prefixed unit (`-MyUnit`) IS allowed by the unit pattern's
+    // optional leading `-?`. Edge case from the upstream regex.
+    #[test] fn dash_prefixed_unit() {
+        let (v, u) = Numeric::split("5-MyUnit").unwrap();
+        assert_eq!(v, "5");
+        assert_eq!(u, "-MyUnit");
+    }
 }

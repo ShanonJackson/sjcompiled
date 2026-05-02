@@ -1,0 +1,4 @@
+a { width: calc(var(--x) + 10px); }
+b { padding: calc((1px + 2px) * 3); }
+c { margin: var(--a, calc(50% - var(--gap))); }
+d { background: linear-gradient(to right, var(--start, red), var(--end, blue)); }

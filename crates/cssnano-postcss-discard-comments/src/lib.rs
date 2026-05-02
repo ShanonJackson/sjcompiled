@@ -196,15 +196,25 @@ fn process_node(
     replacer_cache: &mut IndexMap<String, String>,
 ) -> Mutation {
     // 1) Comment node — early removal path.
+    //
+    // Upstream `index.js` lines 73-77:
+    //   if (node.type === 'comment' && remover.canRemove(node.text)) {
+    //     node.remove();
+    //     return;
+    //   }
+    //
+    // The `return` sits INSIDE the `if`. When `canRemove` returns
+    // `false`/`undefined` (kept-comment path), upstream falls through to
+    // the `raws.between` check below. Postcss core never produces a
+    // `raws.between` on comment nodes in practice, but we mirror the
+    // control flow exactly so that any future drift in postcss-core's
+    // raws population can't silently cause a hash divergence here.
     if let NodeKind::Comment(c) = &node.kind {
         let body_for_can_remove = c.text.clone();
         if let Some(true) = remover.can_remove(&body_for_can_remove) {
             return Mutation::Remove;
         }
-        // Comment kept — fall through to raws.between handling? Upstream
-        // has no `raws.between` on comments, but the early `return`
-        // means kept-comments skip the rest entirely. Match that.
-        return Mutation::Keep;
+        // Fall through — upstream has no early return for kept comments.
     }
 
     // 2) raws.between — applies to decl/rule/atrule. Upstream check is

@@ -1,0 +1,13 @@
+._a { content: 'x'; }
+._b { content: 'x'; }
+._c { content: 'x'; }
+._d { content: 'x'; }
+._e { content: 'x'; }
+._f { content: 'y'; }
+._g { content: 'y'; }
+._h { content: 'foo bar'; }
+._i { content: 'foo bar'; }
+._j::before { content: 'before'; }
+._k::after { content: 'before'; }
+._l[data-state='active'] { color: red; }
+._m[data-state='active'] { color: blue; }

@@ -324,22 +324,27 @@ fn walk_tree(parent: &mut Node, pq: PreferredQuote, cache: &mut IndexMap<String,
 }
 
 fn process_node(node: &mut Node, pq: PreferredQuote, cache: &mut IndexMap<String, String>) {
+    // Mirrors upstream `OnceExit(css)` in `src/index.js:298-313`: a plain
+    // field assignment, NOT a raws-clearing op. The postcss stringifier
+    // (JS `lib/stringifier.js#rawValue` and our `postcss-core::stringifier::raw_value_str`)
+    // already compares `raws.{prop}.value === node.{prop}` and emits the
+    // cached `raw` form only when they match — which is the correct
+    // behavior when `minify` returns an unchanged value (e.g. for any
+    // selector/decl/atrule whose source contains comments or trailing
+    // whitespace captured into raws). Clearing raws here would lose
+    // those source bytes on no-op normalization, diverging from JS.
     match &mut node.kind {
         NodeKind::Rule(r) => {
             let new_sel = minify(&r.selector, cache, pq);
             r.selector = new_sel;
-            // Drop cached raws.selector so the stringifier emits the new value.
-            node.raws.selector = None;
         }
         NodeKind::Declaration(d) => {
             let new_val = minify(&d.value, cache, pq);
             d.value = new_val;
-            node.raws.value = None;
         }
         NodeKind::AtRule(a) => {
             let new_params = minify(&a.params, cache, pq);
             a.params = new_params;
-            node.raws.params = None;
         }
         _ => {}
     }
@@ -416,6 +421,21 @@ mod tests {
         // node and stringifies unchanged.
         let out = run("a { content: \"\\g\"; }");
         assert!(out.contains("\"\\g\""), "got: {out:?}");
+    }
+
+    #[test]
+    fn preserves_raws_on_noop_normalization() {
+        // Regression for the raws-clearing drift. Source has a trailing
+        // comment after the value; postcss-core captures it into
+        // `raws.value.raw`. Normalize-string is a no-op (string is
+        // already double-quoted), so `raws.value.value == node.value`
+        // and the stringifier should emit the raw form (with comment).
+        // Prior code cleared raws → comment was lost.
+        let out = run("a { content: \"foo\" /* trailing */; }");
+        assert!(
+            out.contains("/* trailing */"),
+            "trailing comment must survive no-op normalization; got: {out:?}"
+        );
     }
 
     #[test]

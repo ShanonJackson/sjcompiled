@@ -1,0 +1,3 @@
+a { content: 'foo' /* mid */ 'bar'; }
+b { font-family: 'A' /* x */, 'B' /* y */, sans-serif; }
+c { content: /* leading */ "x" /* trailing */; }

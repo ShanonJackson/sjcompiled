@@ -1,4 +1,6 @@
-# Re-audit: `postcss-normalize-timing-functions@5.1.0` (no drift)
+# Re-audit: `postcss-normalize-timing-functions@5.1.0` (no drift) → `cssnano-postcss-normalize-timing-functions`
+
+> **Crate mapping:** the npm package `postcss-normalize-timing-functions` is ported as the Rust crate `cssnano-postcss-normalize-timing-functions` (under `crates/cssnano-postcss-normalize-timing-functions/`). The crate name diverges from the npm name on purpose — see PARITY_VERSIONS.md for the convention. **All file/path references in the rest of this prompt point at `cssnano-postcss-normalize-timing-functions`, not at a hypothetical `postcss-normalize-timing-functions` crate.**
 
 
 ## Background — why this exists
