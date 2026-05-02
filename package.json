@@ -15,6 +15,7 @@
   "devDependencies": {
     "@babel/core": "^7.26.10",
     "@babel/plugin-syntax-jsx": "^7.25.9",
+    "@babel/preset-react": "^7.28.5",
     "@sjcompiled/babel-plugin": "workspace:*",
     "@sjcompiled/babel-plugin-strip-runtime": "workspace:*",
     "@sjcompiled/css": "workspace:*",
@@ -23,6 +24,7 @@
     "@types/babel__core": "^7.20.5",
     "@types/bun": "^1.1.13",
     "@types/node": "^22.7.0",
+    "prettier": "2.8.8",
     "typescript": "^5.6.3"
   },
   "//": "Parity-contract pins. See REFERENCE_LOCK_FILE/yarn.lock and crates/PARITY_VERSIONS.md. Every value below is the EXACT version the Rust ports target. Without these overrides, bun's caret ranges silently float past the pins (we observed postcss-discard-duplicates@6.0.0 -> 6.0.3, postcss@8.4.31 -> 8.5.13, postcss-selector-parser@6.0.13 -> 6.1.2, autoprefixer@10.4.14 -> 10.5.0). Do NOT bump any value here without a hash-rotation plan.",

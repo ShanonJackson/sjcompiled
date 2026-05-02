@@ -49,6 +49,7 @@ fn main() -> ExitCode {
         "atomicify-rules" => Stage::AtomicifyRules,
         "expand-shorthands" => Stage::ExpandShorthands,
         "npm-postcss-discard-duplicates" => Stage::NpmPostcssDiscardDuplicates,
+        "postcss-nested" => Stage::PostcssNested,
         "postcss-normalize-whitespace" => Stage::PostcssNormalizeWhitespace,
         "postcss-discard-comments" => Stage::PostcssDiscardComments,
         "postcss-normalize-string" => Stage::PostcssNormalizeString,

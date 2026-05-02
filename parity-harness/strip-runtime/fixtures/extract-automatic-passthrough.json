@@ -1,0 +1,10 @@
+{
+  "name": "extract-automatic-passthrough",
+  "description": "Pre-baked input with no CC/CS wrappers. Strip-runtime is a no-op. Validates the harness's no-drift case — both Babel and SWC strip-runtime should leave this identical.",
+  "opts": {
+    "run": "extract",
+    "runtime": "automatic"
+  },
+  "source": "import { jsx as _jsx } from 'react/jsx-runtime';\nconst Component = () => _jsx('div', { children: 'hello world' });\n",
+  "preBaked": "import { jsx as _jsx } from 'react/jsx-runtime';\nconst Component = () => _jsx('div', { children: 'hello world' });\n"
+}

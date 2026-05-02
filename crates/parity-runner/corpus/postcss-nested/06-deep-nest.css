@@ -1,0 +1,9 @@
+.a {
+  color: red;
+  .b {
+    font-size: 1px;
+    .c {
+      background: blue;
+    }
+  }
+}

@@ -40,6 +40,9 @@ const PROBE_SCRATCH_ROOT = join(REPO_ROOT, 'node_modules/.cache/sjcompiled-swc-p
 //   - Host's own fs operations still use the absolute path (the host is
 //     not sandboxed).
 function toWasiPath(absolutePath: string): string {
+  // Per plugins/READ_WRITE.md and SWC's wasmer backend source: the host
+  // cwd is mounted at the virtual path `/cwd`. Plugin must use that
+  // exact prefix; both `/<...>` and bare relative paths fail.
   const cwd = process.cwd().replace(/\\/g, '/');
   const abs = absolutePath.replace(/\\/g, '/');
   if (!abs.toLowerCase().startsWith(cwd.toLowerCase())) {
@@ -47,9 +50,8 @@ function toWasiPath(absolutePath: string): string {
       `Cannot translate ${absolutePath} to WASI path: not under cwd ${process.cwd()}`
     );
   }
-  // Slice off the cwd prefix; ensure the remainder starts with `/`.
-  const rel = abs.slice(cwd.length);
-  return rel.startsWith('/') ? rel : '/' + rel;
+  const rel = abs.slice(cwd.length).replace(/^\/+/, '');
+  return rel ? `/cwd/${rel}` : '/cwd';
 }
 
 beforeAll(() => {

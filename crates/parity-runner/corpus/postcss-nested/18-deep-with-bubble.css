@@ -1,0 +1,9 @@
+.a {
+  color: red;
+  .b {
+    font-size: 1px;
+    @media (max-width: 100px) {
+      .c { background: blue; }
+    }
+  }
+}

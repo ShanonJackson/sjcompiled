@@ -1,0 +1,2 @@
+a { background: url("http://www.example.com/foo.png"); }
+b { background: url("http://www.www.example.com/foo.png"); }

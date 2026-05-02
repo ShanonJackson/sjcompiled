@@ -1,0 +1,2 @@
+a { background: /* comment */ url(/foo.png); }
+b { background: url(/bar.png) /* trailing */; }

@@ -1,0 +1,7 @@
+.a {
+  color: red;
+  @font-face {
+    font-family: 'X';
+    src: url('x.woff');
+  }
+}

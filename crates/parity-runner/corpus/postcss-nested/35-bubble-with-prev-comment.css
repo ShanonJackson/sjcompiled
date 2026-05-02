@@ -1,0 +1,7 @@
+.a {
+  color: red;
+  /* before media */
+  @media (max-width: 100px) {
+    color: blue;
+  }
+}

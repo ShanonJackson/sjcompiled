@@ -299,7 +299,7 @@ fn ends_with_scheme(s: &str) -> bool {
     }
     // Walk backwards from before the `:` collecting `[a-z\d+\-.]` chars,
     // then require the run to start with `[a-z]` and be 1..=50 + 1 chars.
-    let mut end = bytes.len() - 1; // index of `:`
+    let end = bytes.len() - 1; // index of `:`
     if end == 0 {
         return false;
     }

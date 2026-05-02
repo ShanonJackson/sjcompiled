@@ -16,14 +16,14 @@ End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 | 4c | merge-duplicate-at-rules / normalize-current-color / sort-atomic-style-sheet (+ at-rules helpers, sort-pseudo-selectors, sort-shorthand-declarations) | **DONE** — all byte-clean |
 | 4d | atomicify-rules (CRITICAL hash plugin) | **DONE** — byte-clean across 24-entry corpus |
 | 4e | expand-shorthands (11 conversion functions) | **DONE** — byte-clean across 38-entry corpus |
-| 5a | postcss-nested@5.0.6 | **SCAFFOLDED** — `unimplemented!()`. Largest single port; budget multi-day. |
+| 5a | postcss-nested@5.0.6 | **DONE** — byte-clean across 38-entry corpus, deterministic JS oracle |
 | 5b | postcss-normalize-whitespace@5.1.1 | **DONE** — byte-clean across 22-entry corpus, deterministic JS oracle |
 | 5c | postcss-discard-duplicates@6.0.0 (npm — used by sort.ts) | **DONE** — byte-clean across 8-entry corpus |
 | 6a | postcss-discard-comments@5.1.2 | **DONE** — byte-clean across 15-entry corpus, deterministic JS oracle |
 | 6b | postcss-normalize-string@5.1.0 | **DONE** — byte-clean across 15-entry corpus, deterministic JS oracle |
 | 6b | postcss-normalize-positions@5.1.1 | **DONE** — byte-clean across 20-entry corpus, deterministic JS oracle |
 | 6b | postcss-normalize-timing-functions@5.1.0 | **DONE** — byte-clean across 21-entry corpus, deterministic JS oracle |
-| 6b | postcss-normalize-url@5.1.0 | **SCAFFOLDED** |
+| 6b | postcss-normalize-url@5.1.0 | **DONE** — byte-clean across 60-entry corpus, deterministic JS oracle |
 | 6c | postcss-minify-selectors@5.2.1 | **SCAFFOLDED** |
 | 6d | postcss-ordered-values@5.1.3 | **SCAFFOLDED** |
 | 6d | postcss-calc@8.2.4 | **SCAFFOLDED** — calc expression evaluator; high diff risk on float math. |
@@ -41,12 +41,14 @@ End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 ## Test totals
 
 `RUSTFLAGS="" cargo test --workspace --no-fail-fast`:
-- **425 tests pass / 0 fail / 1 ignored / 0 failed suites.**
+- **462 tests pass / 0 fail / 1 ignored / 0 failed suites.**
   (12 from Phase 5b `postcss-normalize-whitespace`,
   12 from Phase 6a `postcss-discard-comments`,
   7 from Phase 6b `postcss-normalize-string`,
   12 from Phase 6b `postcss-normalize-positions`,
-  15 from Phase 6b `postcss-normalize-timing-functions`.)
+  15 from Phase 6b `postcss-normalize-timing-functions`,
+  33 from Phase 6b `postcss-normalize-url`,
+  4 from Phase 5a `postcss-nested`.)
 
 ## Phase 8a ship — `sort()` end-to-end byte-clean through NAPI
 
@@ -352,26 +354,25 @@ darwin-arm64 once `transformCss` is byte-clean.
 
 ## What's left to port (full source-faithful Rust ports)
 
-10 crates. Listed in roughly ascending complexity:
+9 crates. Listed in roughly ascending complexity:
 
 1. `postcss-ordered-values` — moderate. Reorders multi-value
    shorthand parts.
 2. `postcss-minify-selectors` — moderate. Selector minification using
    postcss-selector-parser.
-3. `postcss-normalize-url` — moderate. URL parsing edge cases.
-4. `postcss-normalize-unicode` — moderate, browserslist-aware.
-5. `postcss-reduce-initial` — moderate, caniuse-aware.
-6. `postcss-convert-values` — hard, uses fraction-js, browserslist.
-7. `postcss-minify-params` — hard, caniuse-aware.
-8. `postcss-minify-gradients` — hard, colord-heavy.
-9. `postcss-calc` — VERY hard. Effectively a small expression compiler.
-10. `postcss-colormin` — HARDEST cssnano plugin. Color downgrade
-    decisions hinging on caniuse + colord rounding + byte-length
-    comparison.
-11. `postcss-nested` (Phase 5a) — VERY hard. Recursive selector
+3. `postcss-normalize-unicode` — moderate, browserslist-aware.
+4. `postcss-reduce-initial` — moderate, caniuse-aware.
+5. `postcss-convert-values` — hard, uses fraction-js, browserslist.
+6. `postcss-minify-params` — hard, caniuse-aware.
+7. `postcss-minify-gradients` — hard, colord-heavy.
+8. `postcss-calc` — VERY hard. Effectively a small expression compiler.
+9. `postcss-colormin` — HARDEST cssnano plugin. Color downgrade
+   decisions hinging on caniuse + colord rounding + byte-length
+   comparison.
+10. `postcss-nested` (Phase 5a) — VERY hard. Recursive selector
     merging with bubble/unwrap config.
-12. `cssnano-preset-default` — moderate orchestrator (depends on
-    1-10 being byte-clean first).
+11. `cssnano-preset-default` — moderate orchestrator (depends on
+    1-9 being byte-clean first).
 
 Plus Phase 7 (autoprefixer — 8+ weeks of its own) and Phase 8
 (NAPI assembly + the `transformCss` / `sort` end-to-end gates).
@@ -386,11 +387,10 @@ cardinal-rule guidance remains: **a session must take a unit from 0%
 across agent handoffs.
 
 The Phase 6b "simple band" (discard-comments, normalize-string,
-normalize-positions, normalize-timing-functions) is **fully byte-clean**.
-The remaining cssnano work is moderate-to-hard.
+normalize-positions, normalize-timing-functions, normalize-url) is **fully
+byte-clean**. The remaining cssnano work is moderate-to-hard.
 
 1. **Phase 6 moderate band** — pick one of:
-   - `normalize-url@5.1.0` (URL parsing edge cases; ~150 LOC).
    - `minify-selectors@5.2.1` (uses postcss-selector-parser; moderate).
    - `ordered-values@5.1.3` (multi-value reordering; moderate).
    Finish one before starting the next.
@@ -407,6 +407,170 @@ The remaining cssnano work is moderate-to-hard.
    are byte-clean.
 8. **Phase 8b** — `transformCss` NAPI export + `transform.ts` engine
    flag, mirroring the Phase 8a pattern below.
+
+## Phase 5a ship — `postcss-nested@5.0.6` byte-clean
+
+The largest single pre-autoprefixer plugin port. Recursive selector
+merging with `bubble`/`unwrap`/`at-root` semantics — runs inside
+`transform.ts:48-61` and is on the hashing path for every nested rule
+in every consumer. Now byte-clean.
+
+### What landed this session
+
+1. `crates/_vendor/postcss-nested-5.0.6/` — vendored upstream source
+   (215 LOC `index.js` + LICENSE/README/package.json/index.d.ts).
+2. `crates/postcss-nested/src/lib.rs` — full port. Single source file
+   maps 1:1. Public surface: `postcss_nested(root, opts)` +
+   `PostcssNestedOpts { bubble, unwrap, preserve_empty }`. Module-level
+   helpers mirror upstream functions verbatim (`atrule_names`,
+   `parse_selector`, `replace_nesting`, `selectors_of`,
+   `build_wrapper_rule`, `atrule_childs`, `clone_rule_with_empty_nodes`,
+   `insert_after_with_normalize`, `is_comment`, `visit_rule`,
+   `walk_container`).
+3. `crates/parity-runner/Cargo.toml` — added `postcss-nested` workspace
+   dep so the stage handler can call into it.
+4. `crates/parity-runner/src/stages.rs` — `Stage::PostcssNested`
+   variant + handler with the production `bubble`/`unwrap` opts from
+   `transform.ts:48-61` baked in (so the parity gate validates the
+   exact configuration that ships).
+5. `crates/parity-runner/src/main.rs` — CLI mapping for
+   `postcss-nested`.
+6. `packages/css/scripts/parity-bridge.mjs` — JS-side stage that runs
+   `postcss([postcssNested({bubble, unwrap})]).process(css)` against
+   the pinned 5.0.6 oracle, with the matching opts.
+7. `crates/parity-runner/corpus/postcss-nested/` — 38 fixtures
+   covering: blank, no-nesting, simple nest, `&` substitution,
+   comma-list parent + comma-list child, deep nest (3-4 levels),
+   bubble (`@media`/`@supports`/`@container`/`@starting-style`/`@layer`
+   bubble-list), unwrap (`@keyframes`/`@font-face`/`@page` + vendor
+   `@-webkit-keyframes`), `@at-root` (with and without params),
+   comments interleaved between sibling rules, decls before AND after
+   nested rules (split-decls), mixed decl/rule/decl shape, deep nest
+   inside bubble at-rule, top-level rule with no decls + only nested,
+   pseudo-nested (`:hover`/`::before`), `& + &`/`& ~ &`,
+   `&--modifier` BEM-style suffix joining, `&:not(...)` pseudo-arg,
+   `.b &` (descendant + nesting) for the spaces-transfer fix,
+   tag-and-amp (`section { &.x; & > x }`), attribute selectors
+   (`[type="text"]`), bubble + trailing decls, realistic atomic CSS
+   with multiple `&` patterns inside `@media`.
+8. Bug-for-bug fidelity replicated: `parse(str, rule)`'s "Missed
+   semicolon" branch (when parse fails AND `str` contains `:`),
+   `atruleNames` strip-`@` normalization, `bubble`/`unwrap`/`at-root`
+   ordering of the at-rule sub-branches inside the visitor, the
+   "dump pending declarations at top of EVERY at-rule sub-branch"
+   detail (including the `copy_declarations` fall-through), the
+   `replace`-recurses-only-into-nodes-with-children quirk, and the
+   `if (j.length)` skip-empty-selector guard.
+
+### Verification gates run
+
+| Gate                                                                   | Status |
+|------------------------------------------------------------------------|--------|
+| `cargo test -p postcss-nested`                                         | 4/4 pass |
+| `cargo test --workspace --no-fail-fast`                                | 462/462 pass |
+| `parity-runner --stage postcss-nested --corpus ...`                    | 38/38 byte-clean |
+| `parity-runner --stage postcss-nested ... --determinism`               | 38/38 deterministic |
+| `parity-runner --stage sort --corpus crates/parity-runner/corpus/sort` | 12/12 (no regression) |
+| `parity-runner --stage merge-duplicate-at-rules ...`                   | 7/7 (no regression) |
+| `parity-runner --stage atomicify-rules ...`                            | 24/24 (no regression) |
+| `parity-runner --stage expand-shorthands ...`                          | 38/38 (no regression) |
+| `parity-runner --stage postcss-normalize-whitespace ...`               | 22/22 (no regression) |
+
+### Walker design — single forward pass, no re-walk
+
+Upstream's `Rule(rule, { Rule })` visitor is invoked on every Rule
+discovered in document order, and re-visits Rules promoted to siblings
+during the walk. The Rust port does NOT need a postcss-style re-walk
+because postcss-nested's promotion always moves children OUT of the
+rule (never back in). After visiting a rule, its remaining children
+(decls and comments only — no rules) need no further processing.
+
+The walker is a recursive `walk_container` that:
+
+1. Iterates `parent.nodes` by index forward.
+2. For each Rule encountered: invokes `visit_rule`, which removes the
+   rule from its parent, processes its children, then re-inserts the
+   rule plus any promoted siblings at the same position. The cursor
+   advances 1 each iteration; promoted siblings end up at `i+1`,
+   `i+2`, ... and are visited on subsequent iterations.
+3. AtRules with bodies are recursed INTO (rules can be nested inside
+   `@media`-style bubble at-rules — e.g. `.a { @media x { .b {} } }`
+   ends up as `@media x { .a .b {} }` after `.a`'s visitor, and the
+   walker descends into `@media` to visit `.a .b`).
+4. Other node kinds skipped.
+
+### `raws` defaults — handled by postcss-core stringifier
+
+Fresh wrapper Rules created by `pickDeclarations` (and the at-root
+params-wrapper branch) carry NO explicit `raws`. The postcss-core
+stringifier derives `raws.between` (via `rawBeforeOpen` scanner),
+`raws.semicolon` (via `rawSemicolon` scanner), and `raws.after` (via
+`rawBeforeClose` scanner) from the surrounding tree at stringify time
+— mirroring `postcss/lib/stringifier.js::raw`. This matches what JS
+upstream emits for `new Rule({ selector, nodes: [] })` byte-for-byte.
+
+(Earlier in this session those scanners weren't implemented and this
+plugin hard-coded the inherited values. After the postcss-core fixes
+landed — `rawSemicolon`, `rawBeforeOpen`, `rawColon`, plus the
+`insert_before_with_normalize` Root-prepend strip-step guard — the
+hard-coded values were stripped. All 21 parity stages remain
+byte-clean and 465/465 workspace tests pass with no plugin-side
+workarounds in this crate.)
+
+### Postcss-selector-parser quirk — descendant-combinator emission
+
+Upstream JS `postcss-selector-parser@6.0.13` emits an explicit
+`Combinator{value: " "}` node for descendant whitespace combinators
+(see `dist/parser.js::combinator` lines 480-568). The Rust port at
+`crates/postcss-selector-parser/src/parser.rs` does NOT — it stores
+descendant whitespace as the next node's `spaces.before`. This is a
+parser-side divergence from upstream. To preserve byte-clean output
+for `.b & { ... }`-style inputs, `replace_nesting` transfers the
+Nesting's `spaces` onto the replacement node before splicing. In JS
+this transfer isn't needed because the Combinator sits BETWEEN the
+preceding selector and the Nesting; in our Rust port the space is
+fused onto the Nesting itself, so it must be moved with the
+replacement. **Filed as a postcss-selector-parser bug** — when that
+bug is fixed, `replace_nesting`'s `new_node.spaces = nesting_spaces`
+line should be removed (it'll become a double-space).
+
+### Lessons from Phase 5a — apply to every future port
+
+- **Postcss `rawCache` defaults are load-bearing.** Any plugin that
+  creates fresh nodes (Rule/AtRule/Decl/Comment) inherits styling via
+  `rawCache` walks at stringify time. Our `postcss-core` stringifier
+  implements `rawBefore{Rule,Decl,Comment,Close}` but is missing
+  `rawSemicolon` and the `rawBeforeOpen` (`rule.raws.between`)
+  fallback. Plugins must work around this by inheriting from a
+  same-styled source node. **Future fix in `postcss-core`:** add the
+  two scanners + default lookups; then plugin-side workarounds become
+  redundant.
+- **Postcss-selector-parser doesn't emit descendant Combinators.**
+  See the section above. Plugins that mutate selector ASTs around
+  Nesting/Combinator nodes need to be aware of the
+  spaces-on-next-node convention. Document this in any new
+  selector-parser-touching plugin.
+- **`atruleChilds(rule, child, false)` does NOT remove children from
+  `child.nodes`.** Upstream JS pushes references into a local
+  `children` list that's only consumed when `bubbling=true`. Our
+  initial port removed unconditionally and broke unwrap (`@font-face`
+  body went missing). Mirror upstream: only remove when `bubbling`.
+- **Borrow-checker pattern: take-rule-out-of-parent.** Postcss visitors
+  conceptually mutate `rule` AND `rule.parent` simultaneously. In Rust
+  the ergonomic move is `parent.nodes_mut().unwrap().remove(rule_index)`
+  to take ownership, then mutate `rule` and accumulate "promoted
+  siblings" in a local Vec, then re-insert `rule` at `rule_index` and
+  chain-insert promoted via `insert_after_with_normalize`. Avoids all
+  borrow conflicts; matches upstream behavior including the
+  Root.removeChild raws-transfer if `rule` is ultimately removed.
+- **JS `child.prev()` / `pickComment` interaction with the iterator.**
+  The JS iterator decrements when nodes are removed during the walk;
+  combined with `pickComment` (which removes the prev-sibling comment
+  before the current node) and `after.after(child)` (which removes
+  the current node), the iterator lands on what was originally
+  `index + 1`. In Rust the equivalent is "don't increment `i` when
+  the current node was moved out (with optional pickComment of
+  `nodes[i - 1]`)" — see `visit_rule` rule and at-rule branches.
 
 ## Phase 5b ship — `postcss-normalize-whitespace@5.1.1` byte-clean
 
@@ -638,6 +802,109 @@ timing functions to keyword equivalents:
 | `parity-runner --stage postcss-normalize-positions ...`                         | 20/20 (no regression) |
 | `parity-runner --stage postcss-normalize-string ...`                            | 15/15 (no regression) |
 | `parity-runner --stage sort --corpus crates/parity-runner/corpus/sort`          | 12/12 (no regression) |
+
+## Phase 6b ship — `postcss-normalize-url@5.1.0` byte-clean
+
+cssnano sub-plugin. Walks every Decl value and `@namespace` AtRule params;
+rewrites `url(...)` calls. Absolute / protocol-relative URLs route through
+`normalize-url@6.1.0` (vendored — WHATWG URL canonicalization, default-port
+strip, `utm_*` query removal, etc.). Relative paths route through Node's
+`path.normalize` (host-OS dependent — see "Lessons from Phase 6b normalize-url"
+below). `data:`/`*-extension:/` short-circuit conversion.
+
+The 5 postcss-side overrides on top of normalize-url's defaults:
+`normalizeProtocol` / `sortQueryParameters` / `stripHash` / `stripWWW` /
+`stripTextFragment` all `false`.
+
+### What landed this session
+
+1. `crates/cssnano-postcss-normalize-url/src/lib.rs` — main port of
+   `node_modules/postcss-normalize-url@5.1.0/src/index.js`. Single source
+   file maps 1:1.
+2. `crates/cssnano-postcss-normalize-url/src/normalize_url.rs` — vendored
+   port of `node_modules/normalize-url@6.1.0/index.js`. The `normalize-url`
+   npm package is a single-consumer dep (only `postcss-normalize-url`
+   uses it on our hashing path) so it lives inside this crate as a sibling
+   module rather than a single-consumer crate. WHATWG URL parsing
+   delegates to the Rust `url@2.5` crate (also WHATWG-compliant).
+3. `crates/cssnano-postcss-normalize-url/src/path.rs` — vendored subset of
+   Node `lib/path.js` (`path.posix.normalize` plus a Win32 wrapper). The
+   `\` → `/` separator unification on Windows replicates upstream
+   `path.win32.normalize(...).replace(/\\/g, '/')` for inputs without
+   drive letters / UNC prefixes (which upstream's `WINDOWS_PATH_REGEX`
+   filters out before convert() runs).
+4. `Cargo.toml` — added `url@2`, `percent-encoding@2`, plus the standard
+   `indexmap`/`regex`/`once_cell` workspace deps.
+5. Stage + bridge wiring: `Stage::PostcssNormalizeUrl`,
+   `parity-bridge.mjs` import, root `package.json` `overrides` pin
+   (`postcss-normalize-url: 5.1.0`), `packages/css/package.json` devDep.
+6. 60-fixture corpus covering: blank, no-url decls, unquoted/quoted
+   relative paths, root-relative, absolute http/https, default-port
+   strip (`:80`/`:443`), `utm_*` query strip, data URIs (svg+xml,
+   base64, default mime/charset), `chrome-extension:`/`moz-extension:`
+   short-circuit, empty `url()`, `..` collapse in relative + absolute
+   paths, `@namespace url(...)` rewrite (single + multi-quoted),
+   protocol-relative (`//cdn`), spaces in quoted URLs, escaped newline
+   inside string, escaped quote inside string (Win32 `\` → `/` path),
+   parens in quoted URLs, multiple `url()` per decl, `url()` inside
+   `@media`/`@keyframes`/`@supports`, uppercase `URL`/`DATA:`/
+   `MOZ-EXTENSION://`, single quotes, percent-encoded path,
+   text-fragment (`#:~:text=...`) — kept since stripTextFragment=false,
+   `www.` host — kept since stripWWW=false, hash-only fragments,
+   `?`-only query, comment-in-value neighbors, no-protocol/no-quotes
+   (`url(example.com/path)`), realistic atomic CSS combo.
+
+### Verification gates run
+
+| Gate                                                                            | Status |
+|---------------------------------------------------------------------------------|--------|
+| `cargo test -p cssnano-postcss-normalize-url`                                   | 33/33 pass |
+| `cargo test --workspace --no-fail-fast` (excl. `compiled-css-napi`)             | 458/458 pass |
+| `parity-runner --stage postcss-normalize-url --corpus ...`                      | 60/60 byte-clean |
+| `parity-runner --stage postcss-normalize-url ... --determinism`                 | 60/60 deterministic |
+| `parity-runner --stage postcss-normalize-timing-functions ...`                  | 21/21 (no regression) |
+| `parity-runner --stage postcss-normalize-positions ...`                         | 20/20 (no regression) |
+| `parity-runner --stage postcss-normalize-string ...`                            | 15/15 (no regression) |
+| `parity-runner --stage postcss-discard-comments ...`                            | 15/15 (no regression) |
+| `parity-runner --stage postcss-normalize-whitespace ...`                        | 22/22 (no regression) |
+| `parity-runner --stage sort --corpus crates/parity-runner/corpus/sort`          | 12/12 (no regression) |
+
+### Lessons from Phase 6b `normalize-url` — apply to every future port
+
+- **Upstream "moderate" is misleading when transitive deps matter.** The
+  upstream JS file is ~150 LOC. But it pulls in `normalize-url@6.1.0`
+  (~220 LOC + WHATWG URL parser) AND Node `path.normalize`. Real port
+  size: ~3 source files, ~750 LOC total. **Always audit transitive deps
+  before declaring "moderate".**
+- **`require('path')` is OS-dependent.** `path.normalize('foo\\"bar.png')`
+  on Windows returns a `\`-replaced output that the upstream then
+  forward-slash-converts. POSIX returns the input unchanged. Replicating
+  bug-for-bug means the Rust port also splits via `cfg(windows)`. Same
+  CSS input → different bytes on Linux vs Windows. The user's monorepo
+  builds on Linux, so production hashes are POSIX-shaped; the Windows
+  build is for dev parity testing only. **Document host-OS dependencies
+  prominently** because they propagate to consumer hashes.
+- **Rust `url@2.5` ≈ JS `new URL(...)` for our inputs.** Both implement
+  WHATWG URL canonicalization. For 60 corpus entries spanning realistic
+  CSS URL inputs, byte-equal serialization. Edge cases with unusual
+  schemes or invalid characters MAY differ — corpus coverage is the
+  only safety net. Add new fixtures for any URL pattern the consuming
+  monorepo produces.
+- **`Lazy<Regex>` for ALL upstream regexes — including ones that look
+  trivial.** The escape-chars regex `/([\s\(\)"'])/g` is hot path; a
+  per-call `Regex::new` would re-compile per `url()`. Caching via
+  `once_cell::Lazy` is mandatory for performance, but also clarifies
+  the regex source location for byte-parity audits.
+- **Lookbehind/lookahead patterns require manual emulation.** Rust
+  `regex` rejects `(?<!...)` and `(?!...)`. The `collapse_path_slashes`
+  function and the `^(?!(?:\w+:)?\/\/)|^\/\/` protocol-prepend regex
+  are both hand-implemented. Cover these explicitly in unit tests.
+- **`url::Url::set_query(None)` vs `set_query(Some(""))` matter.** The
+  former drops the `?` entirely; the latter keeps it. Upstream's
+  `searchParams` mutations can leave a trailing `?` when all params are
+  filtered. Match upstream behavior carefully — `searchParams.delete`
+  removes pairs but leaves the `?`; assigning `urlObj.search = ''`
+  drops it. Both arise in our port.
 
 ### Lessons from Phase 6a / 6b — apply to every future port
 

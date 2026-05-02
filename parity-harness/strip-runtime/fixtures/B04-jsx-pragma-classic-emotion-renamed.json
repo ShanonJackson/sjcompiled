@@ -1,0 +1,9 @@
+{
+  "name": "B04-jsx-pragma-classic-emotion-renamed",
+  "description": "Emotion-only with renamed pragma — Compiled does not process",
+  "source": "\n          /** @jsx myJsx */\n          import { css, jsx as myJsx } from '@emotion/react';\n\n          const Component = () => (\n            <div css={{ fontSize: 12, color: 'blue' }}>\n              hello world 2\n            </div>\n          );\n\n          const Component2 = () => (\n            <div css={css({ fontSize: 12, color: 'pink' })}>\n              hello world 2\n            </div>\n          );\n        ",
+  "opts": {
+    "run": "both",
+    "runtime": "classic"
+  }
+}

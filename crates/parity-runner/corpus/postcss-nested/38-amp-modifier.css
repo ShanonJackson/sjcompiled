@@ -1,0 +1,5 @@
+.btn {
+  color: red;
+  &--primary { background: blue; }
+  &--secondary { background: green; }
+}

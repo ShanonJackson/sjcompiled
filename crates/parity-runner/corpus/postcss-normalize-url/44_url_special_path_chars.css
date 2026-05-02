@@ -1,0 +1,2 @@
+a { background: url("http://example.com/a%2fb"); }
+b { background: url("http://example.com/path//with///slashes"); }

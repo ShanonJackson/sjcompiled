@@ -27,6 +27,8 @@ import { atomicifyRules } from '../src/plugins/atomicify-rules.ts';
 import { expandShorthands } from '../src/plugins/expand-shorthands/index.ts';
 // npm `postcss-discard-duplicates` — the v6 used by sort.ts.
 import postcssDiscardDuplicates from 'postcss-discard-duplicates';
+// npm `postcss-nested@5.0.6` — used by transform.ts:48.
+import postcssNested from 'postcss-nested';
 // npm `postcss-normalize-whitespace@5.1.1` — used by transform.ts.
 import postcssNormalizeWhitespace from 'postcss-normalize-whitespace';
 // npm `postcss-discard-comments@5.1.2` — cssnano sub-plugin (Phase 6a).
@@ -139,6 +141,20 @@ const STAGES = {
   // `discard-duplicates` stage above.)
   'npm-postcss-discard-duplicates': (css) => {
     const result = postcss([postcssDiscardDuplicates()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-nested@5.0.6 → stringify, with the same
+  // bubble/unwrap config that transform.ts:48-61 ships in production.
+  // Anomaly #1 in PARITY_VERSIONS.md — `starting-style` is in the bubble
+  // list as a v6.0.2 backport workaround pinned to 5.x.
+  'postcss-nested': (css) => {
+    const result = postcss([
+      postcssNested({
+        bubble: ['container', '-moz-document', 'layer', 'else', 'when', 'starting-style'],
+        unwrap: ['color-profile', 'counter-style', 'font-palette-values', 'page', 'property'],
+      }),
+    ]).process(css, { from: undefined });
     return result.css;
   },
 

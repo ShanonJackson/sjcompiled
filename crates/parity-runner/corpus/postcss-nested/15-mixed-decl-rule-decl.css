@@ -1,0 +1,8 @@
+.a {
+  color: red;
+  font-size: 12px;
+  .b { color: blue; }
+  margin: 1px;
+  .c { color: green; }
+  padding: 2px;
+}

@@ -61,6 +61,14 @@ pub enum Stage {
     /// Distinct from `Stage::DiscardDuplicates` (the LOCAL plugin).
     NpmPostcssDiscardDuplicates,
 
+    /// `parse → postcss-nested@5.0.6 → stringify`. Phase 5a.
+    /// Run with the same `bubble`/`unwrap` opts that `transform.ts:48-61`
+    /// uses, so the parity gate validates the exact configuration baked
+    /// into the production pipeline (no v5 → v6 drift, `starting-style`
+    /// in bubble list, `color-profile`/`counter-style`/`font-palette-values`/
+    /// `page`/`property` in unwrap list).
+    PostcssNested,
+
     /// `parse → postcss-normalize-whitespace@5.1.1 → stringify`. Phase 5b.
     /// Single OnceExit hook — runs once on the parsed root.
     PostcssNormalizeWhitespace,
@@ -117,6 +125,7 @@ impl Stage {
             Stage::AtomicifyRules => "atomicify-rules",
             Stage::ExpandShorthands => "expand-shorthands",
             Stage::NpmPostcssDiscardDuplicates => "npm-postcss-discard-duplicates",
+            Stage::PostcssNested => "postcss-nested",
             Stage::PostcssNormalizeWhitespace => "postcss-normalize-whitespace",
             Stage::PostcssDiscardComments => "postcss-discard-comments",
             Stage::PostcssNormalizeString => "postcss-normalize-string",
@@ -212,6 +221,31 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
         Stage::NpmPostcssDiscardDuplicates => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             postcss_discard_duplicates::postcss_discard_duplicates(&mut root)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssNested => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            // Mirror `packages/css/src/transform.ts:48-61` opts verbatim.
+            let opts = postcss_nested::PostcssNestedOpts {
+                bubble: vec![
+                    "container".to_string(),
+                    "-moz-document".to_string(),
+                    "layer".to_string(),
+                    "else".to_string(),
+                    "when".to_string(),
+                    "starting-style".to_string(),
+                ],
+                unwrap: vec![
+                    "color-profile".to_string(),
+                    "counter-style".to_string(),
+                    "font-palette-values".to_string(),
+                    "page".to_string(),
+                    "property".to_string(),
+                ],
+                preserve_empty: false,
+            };
+            postcss_nested::postcss_nested(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }

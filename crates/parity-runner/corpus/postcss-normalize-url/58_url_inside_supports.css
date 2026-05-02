@@ -1,0 +1,3 @@
+@supports (background: url(/foo.png)) {
+  a { background: url(/foo.png); }
+}

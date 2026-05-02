@@ -1,0 +1,3 @@
+._abc { background: url(/static/img/logo.png) }
+._def { background-image: url("https://cdn.example.com/img/hero.jpg") }
+._ghi { background: url(data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'/>) }

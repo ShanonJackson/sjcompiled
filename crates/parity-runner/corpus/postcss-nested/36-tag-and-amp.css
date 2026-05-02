@@ -1,0 +1,4 @@
+section {
+  &.featured { background: red; }
+  & > article { color: blue; }
+}

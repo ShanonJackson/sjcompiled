@@ -1,0 +1,3 @@
+@media (min-width: 600px) {
+  a { background: url("http://example.com:80/x.png"); }
+}

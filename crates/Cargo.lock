@@ -1454,6 +1454,7 @@ dependencies = [
  "cssnano-postcss-normalize-url",
  "postcss-core",
  "postcss-discard-duplicates",
+ "postcss-nested",
  "postcss-normalize-whitespace",
  "serde",
  "serde_json",

@@ -1,0 +1,10 @@
+.a {
+  color: 1;
+  .b {
+    color: 2;
+    .c {
+      color: 3;
+      .d { color: 4; }
+    }
+  }
+}

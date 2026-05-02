@@ -1,0 +1,9 @@
+{
+  "name": "extract-automatic-stripped",
+  "description": "Baked CC/CS wrapper input. Strip-runtime should remove the runtime and leave just the inner _jsx call. FAILS against passthrough SWC plugin (Phase 0); PASSES once Phase 1 ports strip-runtime.",
+  "opts": {
+    "run": "both",
+    "runtime": "automatic"
+  },
+  "source": "import '@compiled/react';\nconst Component = () => <div css={{ fontSize: 12, color: 'blue' }}>hello world</div>;\n"
+}

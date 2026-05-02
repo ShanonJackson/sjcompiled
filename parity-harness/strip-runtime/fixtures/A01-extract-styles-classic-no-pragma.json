@@ -1,0 +1,13 @@
+{
+  "name": "A01-extract-styles-classic-no-pragma",
+  "description": "classic runtime, no pragma; extractStylesToDirectory writes app.compiled.css",
+  "source": "\n        import '@compiled/react';\n\n        const Component = () => (\n          <div css={{ fontSize: 12, color: 'blue' }}>\n            hello world\n          </div>\n        );\n      ",
+  "opts": {
+    "run": "both",
+    "runtime": "classic",
+    "extractStylesToDirectory": {
+      "source": "src/",
+      "dest": "dist/"
+    }
+  }
+}

@@ -181,25 +181,66 @@ crate version. Cross-reference the SWC plugin compatibility matrix
 the exact `swc_core` version. Pin it in `crates/PARITY_VERSIONS.md`. CI must
 rebuild on every `@swc/core` bump.
 
-### 3.2 The WASI sandbox is the FS boundary, with cap-std semantics
+### 3.2 The WASI sandbox is the FS boundary — cwd is mounted at `/cwd`
 
 A SWC plugin is a sandboxed Wasm module. The host (`@swc/core`) preopens
-**only** `std::env::current_dir()` of the calling Node/Bun process. Source
-of truth: `swc_plugin_backend_wasmtime/src/lib.rs:134-142` and
-`swc_plugin_backend_wasmer/src/lib.rs:194-209` in the upstream SWC repo.
+**only** `std::env::current_dir()` of the calling Node/Bun process,
+**virtually mounted at `/cwd`**. Source of truth:
+`swc_plugin_backend_wasmer/src/lib.rs` (full read+write access) and
+empirically verified by Phase 0 probes at `@swc/core@1.15.8` /
+`swc_core@54.0.0` — see `crates/babel-plugin/PHASE0_FINDINGS.md`.
+
+**Plugin-side path discipline (load-bearing):**
+
+```rust
+// ✅ works — uses the /cwd mount
+fs::read("/cwd/package.json")?;
+fs::write("/cwd/node_modules/.cache/sjcompiled-swc/cache.bin", bytes)?;
+
+// ❌ fails — physical absolute path is outside the preopen
+fs::write("C:/Users/.../package.json", bytes)?;
+
+// ❌ fails — bare-relative resolves against `/`, not the preopen
+fs::write("package.json", bytes)?;
+
+// ❌ fails — env::current_dir() returns Ok("/") cosmetically; joining
+// against it lands at `/`, not `/cwd`
+fs::write(env::current_dir()?.join("foo"), bytes)?;
+```
+
+The same rule applies to reads. See
+`plugins/READ_WRITE.md` for the canonical setup; SWC issue
+swc-project/swc#4997 documents the same pattern from a maintainer.
+
+**Host-side path translation contract:** the host wrapper (Parcel
+transformer in `packages/parcel-transformer/`) computes scratch paths
+in host-absolute form (e.g.
+`<projectRoot>/node_modules/.cache/sjcompiled-swc/worker-12345/`) for
+its own `mkdirSync` / `rmSync` use, then translates to
+`/cwd/<rel-from-project-root>` form before threading into plugin
+config. The plugin only ever sees `/cwd`-prefixed paths and never
+attempts `env::current_dir()`-based path construction.
 
 Implications:
 
 - `Options.cwd` in `@swc/core` does **not** affect the sandbox. It controls
   `.swcrc` lookup and source-map paths only. Setting it to the monorepo root
   does not enlarge what the plugin can read.
-- `..` and absolute paths above the preopen are denied at the cap-std layer,
+- The mount equivalence is `host(<projectRoot>/foo) ≡ plugin(/cwd/foo)`.
+  Both refer to the same physical file; both reads and writes succeed.
+- `..` and absolute paths above `/cwd` are denied at the cap-std layer,
   not by string validation. No string-trick escapes.
 - Symlinks are followed only if the **target** is also inside the preopen.
   pnpm content-addressed stores, Yarn PnP caches, root-hoisted `node_modules`
-  pointing to sibling workspaces — all denied.
+  pointing to sibling workspaces — all denied unless their physical
+  target sits under `<projectRoot>`.
 - There is no JS or `.swcrc` knob to grant additional preopens at this SWC
-  version (a TODO comment in `swc_plugin_backend_wasmer` confirms it).
+  version. The upstream `swc_plugin_backend_wasmer` source has a TODO to
+  make additional preopens configurable; until that lands, `/cwd` is the
+  whole world.
+- Worker spawn cwd MUST be the monorepo root, not the package root, so the
+  preopen covers every source file the plugin's resolver may walk
+  (§3.9.13.7).
 
 ### 3.3 The plugin owns its own resolver — no host pre-walker
 

@@ -1,0 +1,7 @@
+.a {
+  color: red;
+  /* before b */
+  .b { color: blue; }
+  /* after b before c */
+  .c { color: green; }
+}

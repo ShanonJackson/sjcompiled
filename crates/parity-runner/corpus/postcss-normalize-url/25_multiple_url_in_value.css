@@ -1,0 +1,2 @@
+a { background: url("./a.png"), url("./b.png"); }
+b { background: linear-gradient(red, blue), url("/c.png"); }

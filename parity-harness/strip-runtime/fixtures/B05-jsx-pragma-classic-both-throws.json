@@ -1,0 +1,12 @@
+{
+  "name": "B05-jsx-pragma-classic-both-throws",
+  "description": "Compiled + Emotion both imported with /** @jsx jsx */ — throws",
+  "source": "\n          /** @jsx jsx */\n          import { css } from '@compiled/react';\n          import { jsx } from '@emotion/react';\n\n          const Component = () => (\n            <div css={{ fontSize: 12, color: 'blue' }}>\n              hello world 2\n            </div>\n          );\n\n          const Component2 = () => (\n            <div css={css({ fontSize: 12, color: 'pink' })}>\n              hello world 2\n            </div>\n          );\n        ",
+  "opts": {
+    "run": "both",
+    "runtime": "classic"
+  },
+  "expectsError": {
+    "babelMessage": "Found a `jsx` function call"
+  }
+}

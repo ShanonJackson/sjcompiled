@@ -1,0 +1,10 @@
+.a {
+  color: red;
+  @media (max-width: 100px) {
+    /* a comment */
+    color: blue;
+    font-size: 10px;
+    .b { background: green; }
+    .c { background: yellow; }
+  }
+}

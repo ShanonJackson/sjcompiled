@@ -1,0 +1,9 @@
+{
+  "name": "B08-jsx-pragma-automatic-compiled",
+  "description": "/** @jsxImportSource @compiled/react */ — imports JSX runtime from React",
+  "source": "\n          /** @jsxImportSource @compiled/react */\n          import { css } from '@compiled/react';\n\n          const Component = () => (\n            <div css={{ fontSize: 12, color: 'blue' }}>\n              hello world 2\n            </div>\n          );\n\n          const Component2 = () => (\n            <div css={css({ fontSize: 12, color: 'pink' })}>\n              hello world 2\n            </div>\n          );\n        ",
+  "opts": {
+    "run": "both",
+    "runtime": "automatic"
+  }
+}

@@ -108,4 +108,89 @@ mod roundtrip_tests {
 
     #[test]
     fn leading_underscore_hack() { assert_round_trip("a { _color: red; }"); }
+
+    /// Regression for the rawCache `beforeOpen` fallback. A freshly-built
+    /// Rule with no `raws.between` set should emit `selector ` + `{`
+    /// (single space) — the upstream `DEFAULT_RAW.beforeOpen = " "`
+    /// fallback. Hits when a plugin (e.g. `postcss-nested`) builds a
+    /// wrapper rule from scratch.
+    #[test]
+    fn fresh_rule_gets_default_between_space() {
+        let mut r = Root::new();
+        r.nodes_mut().push(Node {
+            kind: NodeKind::Rule(rule::Rule {
+                selector: ".x".to_string(),
+                nodes: vec![Node {
+                    kind: NodeKind::Declaration(declaration::Declaration {
+                        prop: "color".to_string(),
+                        value: "red".to_string(),
+                        important: false,
+                        variable: false,
+                    }),
+                    raws: Raws::default(),
+                    source: Source::default(),
+                }],
+            }),
+            raws: Raws::default(),
+            source: Source::default(),
+        });
+
+        let out = stringify(&r);
+        assert!(out.contains(".x {"), "expected `.x {{` in output: {out:?}");
+    }
+
+    /// Regression for the rawCache `semicolon` fallback. Sibling rule
+    /// in the tree has `raws.semicolon = true`; the freshly-built rule
+    /// inherits via the cache scan and emits a trailing `;`.
+    #[test]
+    fn fresh_rule_inherits_semicolon_from_sibling() {
+        let mut r = parse("a { color: red; }").unwrap();
+        r.nodes_mut().push(Node {
+            kind: NodeKind::Rule(rule::Rule {
+                selector: ".x".to_string(),
+                nodes: vec![Node {
+                    kind: NodeKind::Declaration(declaration::Declaration {
+                        prop: "color".to_string(),
+                        value: "blue".to_string(),
+                        important: false,
+                        variable: false,
+                    }),
+                    raws: Raws::default(),
+                    source: Source::default(),
+                }],
+            }),
+            raws: Raws::default(),
+            source: Source::default(),
+        });
+        let out = stringify(&r);
+        // Sibling sample → `raws.semicolon = Some(true)` → emit `;`.
+        assert!(out.contains(".x { color: blue;"), "got: {out:?}");
+    }
+
+    /// Regression: with no sibling sample for `raws.semicolon`, the
+    /// fallback is `DEFAULT_RAW.semicolon = false` → no trailing `;`.
+    #[test]
+    fn fresh_rule_no_sibling_omits_trailing_semicolon() {
+        let mut r = Root::new();
+        r.nodes_mut().push(Node {
+            kind: NodeKind::Rule(rule::Rule {
+                selector: ".x".to_string(),
+                nodes: vec![Node {
+                    kind: NodeKind::Declaration(declaration::Declaration {
+                        prop: "color".to_string(),
+                        value: "red".to_string(),
+                        important: false,
+                        variable: false,
+                    }),
+                    raws: Raws::default(),
+                    source: Source::default(),
+                }],
+            }),
+            raws: Raws::default(),
+            source: Source::default(),
+        });
+        let out = stringify(&r);
+        assert!(out.contains("color: red"), "got: {out:?}");
+        assert!(!out.contains("color: red;"), "got: {out:?}");
+    }
 }

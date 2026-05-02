@@ -1,0 +1,16 @@
+{
+  "name": "A02-extract-styles-classic-source-not-found",
+  "description": "classic runtime; extractStylesToDirectory.source does not match → throws",
+  "source": "\n        import '@compiled/react';\n\n        const Component = () => (\n          <div css={{ fontSize: 12, color: 'blue' }}>\n            hello world\n          </div>\n        );\n      ",
+  "opts": {
+    "run": "both",
+    "runtime": "classic",
+    "extractStylesToDirectory": {
+      "source": "not-existing-src/",
+      "dest": "dist/"
+    }
+  },
+  "expectsError": {
+    "babelMessage": "Source directory 'not-existing-src/' was not found relative to source file ('../src/app.tsx')"
+  }
+}

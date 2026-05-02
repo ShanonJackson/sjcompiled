@@ -1,0 +1,13 @@
+{
+  "name": "B07-jsx-pragma-classic-config-myjsx-throws",
+  "description": "No pragma, babelJSXPragma=jsx, code uses renamed myJsx — throws",
+  "source": "\n        /** @jsx myJsx */\n        import { css, jsx as myJsx } from '@compiled/react';\n\n        const Component = () => (\n          <div css={{ fontSize: 12, color: 'blue' }}>\n            hello world 2\n          </div>\n        );\n\n        const Component2 = () => (\n          <div css={css({ fontSize: 12, color: 'pink' })}>\n            hello world 2\n          </div>\n        );\n      ",
+  "opts": {
+    "run": "both",
+    "runtime": "classic",
+    "babelJSXPragma": "jsx"
+  },
+  "expectsError": {
+    "babelMessage": "Found a `jsx` function call"
+  }
+}

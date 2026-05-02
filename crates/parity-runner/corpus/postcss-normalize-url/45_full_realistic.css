@@ -1,0 +1,6 @@
+._a { background: url(/static/img/a.png) }
+._b { background-image: url("https://cdn.example.com/img/b.jpg?utm_source=x&v=1") }
+._c { background: url(data:image/svg+xml;base64,PHN2Zy8+) }
+._d { mask-image: url(./icons/d.svg) }
+._e { content: url(chrome-extension://aaa/foo.png) }
+@namespace svg url("http://www.w3.org/2000/svg");

@@ -1,0 +1,4 @@
+.a {
+  color: red;
+  @page :first { margin-top: 1in; }
+}

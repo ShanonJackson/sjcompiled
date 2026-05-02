@@ -1,0 +1,9 @@
+{
+  "name": "C05-source-same-classic-removes-runtime",
+  "description": "same-step pipeline (run='both'), runtime=classic, removes-runtime",
+  "source": "\n    import '@compiled/react';\n\n    const Component = () => (\n      <div css={{ fontSize: 12, color: 'blue' }}>\n        hello world\n      </div>\n    );\n  ",
+  "opts": {
+    "run": "both",
+    "runtime": "classic"
+  }
+}

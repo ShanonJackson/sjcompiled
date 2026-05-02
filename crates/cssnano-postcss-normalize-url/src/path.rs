@@ -1,12 +1,29 @@
-//! Port of Node `lib/path.js` (POSIX subset only — `path.posix.normalize`).
+//! Port of Node `lib/path.js` — `path.normalize` with the host-OS split.
 //!
-//! Upstream `postcss-normalize-url@5.1.0` calls `require('path').normalize(url)`
-//! which is the OS-active `path` module (POSIX on Linux/macOS, Win32 on
-//! Windows). Production builds of the consuming monorepo run on Linux, so
-//! this port targets `path.posix.normalize` semantics. On Windows hosts
-//! the JS oracle would diverge from this port for inputs containing
-//! backslashes or Windows drive letters — those inputs are unlikely in CSS
-//! `url(...)` calls (which use forward-slash URL syntax, not file paths).
+//! Upstream `postcss-normalize-url@5.1.0`:
+//!
+//! ```js
+//! return path.normalize(url).replace(new RegExp('\\' + path.sep, 'g'), '/');
+//! ```
+//!
+//! `require('path')` is the host-OS module:
+//! * POSIX: `path.posix` — only `/` is a separator. `path.sep === '/'`, so
+//!   the trailing replace is a no-op.
+//! * Win32: `path.win32` — both `/` and `\` are separators. Output uses `\`.
+//!   `path.sep === '\\'`, so the trailing replace converts every `\` back
+//!   to `/`. Net effect: any `\` in the INPUT becomes `/` in the output.
+//!
+//! We replicate this OS-dependence faithfully via `cfg(windows)`. The Rust
+//! NAPI binary is per-platform; the Linux build uses POSIX semantics, the
+//! Windows build uses Win32 semantics. Both match Node on the same OS
+//! byte-for-byte. This OS-dependent behavior is an upstream "bug" (a Win32
+//! build can produce different bytes than a Linux build for the same input)
+//! — bug-for-bug rule applies; we do not "fix" it.
+//!
+//! For inputs CSS authors actually write (`url(./img/foo.png)`,
+//! `url(/static/x.png)`, etc.), POSIX and Win32 normalize agree because
+//! the input contains no `\`. The OS divergence only surfaces for unusual
+//! inputs containing backslashes.
 //!
 //! Algorithm mirrors Node v16+ `lib/path.js` `posix.normalize` byte-for-byte:
 //!
@@ -24,6 +41,48 @@
 //!   return isAbsolute ? `/${path}` : path;
 //! }
 //! ```
+
+/// Public entry — mirrors upstream `path.normalize(url).replace(sep, '/')`.
+/// Compiled for the host OS via `cfg(windows)`.
+#[cfg(windows)]
+pub fn host_normalize_to_forward_slashes(path: &str) -> String {
+    win32_normalize_to_forward_slashes(path)
+}
+
+#[cfg(not(windows))]
+pub fn host_normalize_to_forward_slashes(path: &str) -> String {
+    // POSIX: separator is already `/`; replace step is a no-op.
+    posix_normalize(path)
+}
+
+/// Mirrors `path.win32.normalize(input).replace(/\\/g, '/')`. Win32
+/// normalize accepts both `/` and `\` as separators and emits `\`. The
+/// upstream replace then converts `\` back to `/`. Net effect: separator
+/// agnostic input → forward-slash output, with `..`/`.` segments
+/// collapsed identically to POSIX (since `\` and `/` are interchangeable
+/// at the input).
+///
+/// Drive letters and UNC paths are filtered out by upstream
+/// `WINDOWS_PATH_REGEX` BEFORE convert() runs — so we never see `C:\foo`
+/// or `\\server\share` here. We assume the input is a relative-style
+/// path. To keep parity with Node, we follow Win32 normalize's segment
+/// algorithm (same as POSIX once you treat both separators alike).
+#[cfg(windows)]
+fn win32_normalize_to_forward_slashes(path: &str) -> String {
+    if path.is_empty() {
+        return ".".to_string();
+    }
+
+    // Treat both separators as equivalent: rewrite `\` to `/` up front,
+    // then run posix_normalize. This is exactly what Node Win32 does
+    // semantically, modulo the output-separator difference (which the
+    // trailing `.replace(\\, /)` resolves anyway).
+    //
+    // Verified against `path.win32.normalize(...).replace(/\\/g, '/')`
+    // for inputs without drive letters / UNC prefixes.
+    let unified: String = path.chars().map(|c| if c == '\\' { '/' } else { c }).collect();
+    posix_normalize(&unified)
+}
 
 /// Mirrors Node's `posix.normalize(path)`.
 pub fn posix_normalize(path: &str) -> String {

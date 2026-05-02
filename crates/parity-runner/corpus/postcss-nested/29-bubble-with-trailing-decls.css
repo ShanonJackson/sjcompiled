@@ -1,0 +1,5 @@
+.a {
+  color: red;
+  @media (max-width: 100px) { color: blue; }
+  font-size: 12px;
+}

@@ -1,0 +1,13 @@
+{
+  "name": "A03-extract-styles-classic-with-pragma",
+  "description": "classic runtime, /** @jsx myJsx */ pragma + extractStylesToDirectory",
+  "source": "\n          /** @jsx myJsx */\n          import { css, jsx as myJsx } from '@compiled/react';\n\n          const Component = () => (\n            <div css={{ fontSize: 12, color: 'blue' }}>\n              hello world 2\n            </div>\n          );\n\n          const Component2 = () => (\n            <div css={css({ fontSize: 12, color: 'pink' })}>\n              hello world 2\n            </div>\n          );\n        ",
+  "opts": {
+    "run": "both",
+    "runtime": "classic",
+    "extractStylesToDirectory": {
+      "source": "src/",
+      "dest": "dist/"
+    }
+  }
+}

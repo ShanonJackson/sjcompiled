@@ -1,0 +1,9 @@
+{
+  "name": "C01-source-same-automatic-removes-runtime",
+  "description": "same-step pipeline (run='both'), runtime=automatic, removes-runtime",
+  "source": "\n    import '@compiled/react';\n\n    const Component = () => (\n      <div css={{ fontSize: 12, color: 'blue' }}>\n        hello world\n      </div>\n    );\n  ",
+  "opts": {
+    "run": "both",
+    "runtime": "automatic"
+  }
+}

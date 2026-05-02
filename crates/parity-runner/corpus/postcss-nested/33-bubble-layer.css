@@ -1,0 +1,7 @@
+.a {
+  color: red;
+  @layer base {
+    color: blue;
+    .b { color: green; }
+  }
+}

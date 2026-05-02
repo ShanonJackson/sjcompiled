@@ -1,0 +1,3 @@
+a { background: url(data:image/png;charset=us-ascii;base64,AAAA); }
+b { background: url(data:image/png;base64,AAAA); }
+c { background: url(data:application/octet-stream,bytes); }

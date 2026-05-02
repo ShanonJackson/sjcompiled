@@ -1,0 +1,4 @@
+.a, .b {
+  color: red;
+  &:hover, &:focus { color: blue; }
+}

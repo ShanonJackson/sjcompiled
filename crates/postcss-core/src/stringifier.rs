@@ -38,6 +38,24 @@ pub struct Stringifier {
     /// value with trailing non-newline stripped then non-whitespace
     /// stripped.
     cache_before_close: Option<String>,
+    /// `rawBeforeOpen` upstream — line 237. Sample for the
+    /// `between` slot on Rule/AtRule nodes whose own
+    /// `raws.between == None`. Walks the tree for the first non-decl
+    /// node with a defined `raws.between`; no transform applied.
+    /// Falls back to `DEFAULT_RAW["beforeOpen"] = " "`.
+    cache_before_open: Option<String>,
+    /// `rawSemicolon` upstream — line 304. Sample for the
+    /// `raws.semicolon` flag on a container whose `raws.semicolon ==
+    /// None`. Walks for the first container with non-empty body whose
+    /// last child is a Declaration AND has a defined `raws.semicolon`.
+    /// Falls back to `false` (the upstream `DEFAULT_RAW["semicolon"]`).
+    cache_semicolon: Option<bool>,
+    /// `rawColon` upstream — line 265. Sample for the `between` slot
+    /// on a Declaration node whose own `raws.between == None`. Walks
+    /// for the first decl with a defined `raws.between`, then strips
+    /// any character that is neither whitespace nor `:`. Falls back to
+    /// `DEFAULT_RAW["colon"] = ": "`.
+    cache_colon: Option<String>,
     cache_populated: bool,
 }
 
@@ -49,6 +67,9 @@ impl Stringifier {
             cache_before_decl: None,
             cache_before_comment: None,
             cache_before_close: None,
+            cache_before_open: None,
+            cache_semicolon: None,
+            cache_colon: None,
             cache_populated: false,
         }
     }
@@ -68,6 +89,9 @@ impl Stringifier {
         self.cache_before_decl = scan_before_decl(root_node);
         self.cache_before_comment = scan_before_comment(root_node);
         self.cache_before_close = scan_before_close(root_node);
+        self.cache_before_open = scan_before_open(root_node);
+        self.cache_semicolon = scan_semicolon(root_node);
+        self.cache_colon = scan_colon(root_node);
         self.cache_populated = true;
     }
 
@@ -133,7 +157,13 @@ impl Stringifier {
     /// `decl(node, semicolon)` — line 112.
     fn decl(&mut self, node: &Node, semicolon: bool) {
         let d = match &node.kind { NodeKind::Declaration(d) => d, _ => unreachable!() };
-        let between = node.raws.between.clone().unwrap_or_else(|| ":".to_string());
+        // Mirrors upstream `between = this.raw(node, 'between', 'colon')`:
+        // when `raws.between` is undefined, fall back to the rawCache
+        // `colon` scan; then to `DEFAULT_RAW["colon"] = ": "`.
+        let between = match &node.raws.between {
+            Some(b) => b.clone(),
+            None => self.cache_colon.clone().unwrap_or_else(|| default_raw("colon").to_string()),
+        };
         let value = self.raw_value_str(node, &d.value, node.raws.value.as_ref());
         let mut s = String::new();
         s.push_str(&d.prop);
@@ -160,7 +190,13 @@ impl Stringifier {
 
     /// `block(node, start)` — line 74.
     fn block(&mut self, node: &Node, start: &str) {
-        let between = node.raws.between.clone().unwrap_or_default();
+        // Mirrors upstream `between = this.raw(node, 'between', 'beforeOpen')`:
+        // when `raws.between` is undefined, fall back to the rawCache
+        // `beforeOpen` scan, then to `DEFAULT_RAW["beforeOpen"] = " "`.
+        let between = match &node.raws.between {
+            Some(b) => b.clone(),
+            None => self.default_raws_between(),
+        };
         self.out.push_str(start);
         self.out.push_str(&between);
         self.out.push('{');
@@ -197,6 +233,16 @@ impl Stringifier {
             .unwrap_or_else(|| default_raw("beforeClose").to_string())
     }
 
+    /// Default `raws.between` for a Rule/AtRule with no `raws.between`
+    /// set. Mirrors upstream `rawBeforeOpen` — uses the first non-decl
+    /// node's `raws.between` as the sample, falls back to
+    /// `DEFAULT_RAW["beforeOpen"]` (`" "`).
+    fn default_raws_between(&self) -> String {
+        self.cache_before_open
+            .clone()
+            .unwrap_or_else(|| default_raw("beforeOpen").to_string())
+    }
+
     /// `body(node)` — line 90.
     fn body(&mut self, node: &Node) {
         let children = match node.nodes() { Some(c) => c, None => return };
@@ -207,7 +253,13 @@ impl Stringifier {
             last -= 1;
         }
         let parent_is_root = matches!(node.kind, NodeKind::Root(_));
-        let semicolon = node.raws.semicolon.unwrap_or(false);
+        // Mirrors upstream `semicolon = this.raw(node, 'semicolon')`:
+        // when `raws.semicolon` is undefined, fall back to the rawCache
+        // `semicolon` scan; then to `DEFAULT_RAW["semicolon"] = false`.
+        let semicolon = match node.raws.semicolon {
+            Some(s) => s,
+            None => self.cache_semicolon.unwrap_or(false),
+        };
         for (i, child) in children.iter().enumerate() {
             match &child.raws.before {
                 Some(before) => self.out.push_str(before),
@@ -426,6 +478,92 @@ fn strip_trailing_non_newline(s: &str) -> String {
         s[..=last_nl].to_string()
     } else {
         s.to_string()
+    }
+}
+
+/// `rawBeforeOpen(root)` — line 237. Find the first non-decl node with
+/// a defined `raws.between` and return it verbatim (no normalization).
+/// Used as the default for `Rule.raws.between` / `AtRule.raws.between`
+/// when the node itself doesn't have one.
+fn scan_before_open(root_node: &Node) -> Option<String> {
+    let mut found: Option<String> = None;
+    walk_for_open_sample(root_node, &mut found);
+    found
+}
+
+fn walk_for_open_sample(n: &Node, out: &mut Option<String>) {
+    if out.is_some() { return; }
+    if let Some(children) = n.nodes() {
+        for child in children {
+            if out.is_some() { return; }
+            // Upstream's `if (i.type !== 'decl')` check.
+            if !matches!(child.kind, NodeKind::Declaration(_)) {
+                if let Some(between) = &child.raws.between {
+                    *out = Some(between.clone());
+                    return;
+                }
+            }
+            walk_for_open_sample(child, out);
+        }
+    }
+}
+
+/// `rawColon(root)` — line 265. Find first decl with defined
+/// `raws.between`, strip any character not in `[\s:]`. The result is
+/// the indent-stripped `:` separator used by fresh decls that were
+/// built without their own `raws.between`.
+fn scan_colon(root_node: &Node) -> Option<String> {
+    let mut found: Option<String> = None;
+    walk_for_colon_sample(root_node, &mut found);
+    found.map(|v| {
+        v.chars()
+            .filter(|c| c.is_whitespace() || *c == ':' || *c == '\u{FEFF}')
+            .collect()
+    })
+}
+
+fn walk_for_colon_sample(n: &Node, out: &mut Option<String>) {
+    if out.is_some() { return; }
+    if let Some(children) = n.nodes() {
+        for child in children {
+            if out.is_some() { return; }
+            if let NodeKind::Declaration(_) = &child.kind {
+                if let Some(between) = &child.raws.between {
+                    *out = Some(between.clone());
+                    return;
+                }
+            }
+            walk_for_colon_sample(child, out);
+        }
+    }
+}
+
+/// `rawSemicolon(root)` — line 304. Find the first container with a
+/// non-empty body whose **last child is a Declaration** and has a
+/// defined `raws.semicolon`. Returns the boolean.
+fn scan_semicolon(root_node: &Node) -> Option<bool> {
+    let mut found: Option<bool> = None;
+    walk_for_semicolon_sample(root_node, &mut found);
+    found
+}
+
+fn walk_for_semicolon_sample(n: &Node, out: &mut Option<bool>) {
+    if out.is_some() { return; }
+    if let Some(children) = n.nodes() {
+        // Check this node's own qualification first — `i.last.type ===
+        // 'decl' && i.raws.semicolon !== undefined`.
+        if let Some(last) = children.last() {
+            if matches!(last.kind, NodeKind::Declaration(_)) {
+                if let Some(s) = n.raws.semicolon {
+                    *out = Some(s);
+                    return;
+                }
+            }
+        }
+        for child in children {
+            if out.is_some() { return; }
+            walk_for_semicolon_sample(child, out);
+        }
     }
 }
 

@@ -1,0 +1,4 @@
+[type="text"] {
+  color: red;
+  &:focus { color: blue; }
+}

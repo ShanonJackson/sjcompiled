@@ -109,9 +109,9 @@ fn convert(url: &str, options: &NormalizeOptions) -> String {
             Err(_) => url.to_string(),
         }
     } else {
-        // `path.normalize(url).replace(...)` — POSIX `path.posix.normalize`
-        // emits `/` separators already, so the upstream replace is a no-op.
-        path::posix_normalize(url)
+        // Upstream: `path.normalize(url).replace(new RegExp('\\' + path.sep, 'g'), '/')`.
+        // Host-OS dependent — see `path::host_normalize_to_forward_slashes`.
+        path::host_normalize_to_forward_slashes(url)
     }
 }
 

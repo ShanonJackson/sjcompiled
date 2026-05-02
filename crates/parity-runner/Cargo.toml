@@ -14,6 +14,7 @@ path = "src/main.rs"
 postcss-core = { workspace = true }
 compiled-css = { workspace = true }
 postcss-discard-duplicates = { workspace = true }
+postcss-nested = { workspace = true }
 postcss-normalize-whitespace = { workspace = true }
 cssnano-postcss-discard-comments = { workspace = true }
 cssnano-postcss-normalize-string = { workspace = true }

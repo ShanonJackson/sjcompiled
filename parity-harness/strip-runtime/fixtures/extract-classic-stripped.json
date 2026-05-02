@@ -1,0 +1,9 @@
+{
+  "name": "extract-classic-stripped",
+  "description": "Same as extract-automatic-stripped but classic runtime — exercises React.createElement detection.",
+  "opts": {
+    "run": "both",
+    "runtime": "classic"
+  },
+  "source": "import '@compiled/react';\nconst Component = () => <div css={{ fontSize: 12, color: 'blue' }}>hello world</div>;\n"
+}

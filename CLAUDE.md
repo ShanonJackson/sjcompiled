@@ -9,3 +9,10 @@ This is obviously incredibly complex work, The only way the "WHOLE" is what we w
 
 In order to do this correctly, it's probably best if we replicate their folder/file structure of what we have to port from JS -> Rust identically as well. That way it's very easy to compare old/new source and spot differences in logic (which should never occur)
 
+
+# DRIFT DETECTION - 
+THIS PART IS CRITICAL!
+If you think someone hasn't ported something OUTSIDE your work CORRECTLY; Immedietly I.E "Drift detected in X - <Explanation here>" this is CRITICALLY important. otherwise if many things have slight drift the "WHOLE" will have MAJOR drift. Minor drift is unnacceptable.
+
+
+

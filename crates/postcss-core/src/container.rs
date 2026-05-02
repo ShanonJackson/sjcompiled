@@ -307,10 +307,16 @@ pub fn insert_before_with_normalize(parent: &mut Node, exist_index: usize, mut a
     let parent_is_root = matches!(parent.kind, NodeKind::Root(_));
     let is_prepend = exist_index == 0;
 
-    // Step 1: super.normalize semantics — if add.raws.before is
-    // undefined and the sample's is defined, copy with non-whitespace
-    // stripped. Mirrors postcss/lib/container.js::normalize.
-    if add.raws.before.is_none() {
+    // Step 1: `Container.normalize(nodes, sample)` — line 173 upstream.
+    // The strip-non-whitespace pass at line 211 only fires when a sample
+    // is supplied. `Container.insertBefore` (line 156) passes a sample,
+    // but `Root.normalize` (root.js line 15) calls `super.normalize(child)`
+    // WITHOUT one — the JS `if (sample && ...)` short-circuits, so the
+    // strip step is a no-op on Root parents. We mirror by skipping
+    // Step 1 entirely when `parent_is_root`. Otherwise use the next-
+    // sibling at `exist_index` as the sample, matching the call from
+    // `Container.insertBefore(exist, add)` (line 156).
+    if !parent_is_root && add.raws.before.is_none() {
         if let Some(nodes) = parent.nodes() {
             if let Some(sample) = nodes.get(exist_index) {
                 if let Some(sb) = &sample.raws.before {
