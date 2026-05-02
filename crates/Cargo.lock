@@ -543,8 +543,11 @@ dependencies = [
 name = "cssnano-postcss-normalize-positions"
 version = "0.0.1"
 dependencies = [
+ "indexmap",
+ "once_cell",
  "postcss-core",
  "postcss-value-parser",
+ "regex",
 ]
 
 [[package]]
@@ -1437,6 +1440,7 @@ dependencies = [
  "compiled-css",
  "css",
  "cssnano-postcss-discard-comments",
+ "cssnano-postcss-normalize-positions",
  "cssnano-postcss-normalize-string",
  "postcss-core",
  "postcss-discard-duplicates",

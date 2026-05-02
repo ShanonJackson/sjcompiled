@@ -1,0 +1,2 @@
+a { background-position: calc(50% + 10px) center; }
+b { background-position: min(10px, 20px) max(5%, 30%); }

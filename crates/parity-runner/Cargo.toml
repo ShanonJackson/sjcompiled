@@ -17,6 +17,7 @@ postcss-discard-duplicates = { workspace = true }
 postcss-normalize-whitespace = { workspace = true }
 cssnano-postcss-discard-comments = { workspace = true }
 cssnano-postcss-normalize-string = { workspace = true }
+cssnano-postcss-normalize-positions = { workspace = true }
 css = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

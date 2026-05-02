@@ -1,0 +1,3 @@
+a { background-position: var(--p); }
+b { background-position: var(--x) var(--y); }
+c { background: red var(--p) center; }

@@ -33,6 +33,8 @@ import postcssNormalizeWhitespace from 'postcss-normalize-whitespace';
 import postcssDiscardComments from 'postcss-discard-comments';
 // npm `postcss-normalize-string@5.1.0` — cssnano sub-plugin (Phase 6b).
 import postcssNormalizeString from 'postcss-normalize-string';
+// npm `postcss-normalize-positions@5.1.1` — cssnano sub-plugin (Phase 6b).
+import postcssNormalizePositions from 'postcss-normalize-positions';
 
 // Sheets returned by extract-stylesheets are joined with U+001E (record
 // separator) so they ride the single-string bridge protocol unambiguously.
@@ -160,6 +162,16 @@ const STAGES = {
   // change reduces escapes, and collapses `\\\n` (escaped newline).
   'postcss-normalize-string': (css) => {
     const result = postcss([postcssNormalizeString()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-normalize-positions@5.1.1 (default opts) → stringify.
+  // Walks `background`, `background-position`, and `(-vendor-)?perspective-origin`
+  // decls; rewrites position-keyword pairs (left/top → 0 0, right bottom →
+  // 100% 100%) per upstream's keyword/two-keyword rules. var()/env()/constant()
+  // short-circuits the current background entry; `/` defers to background-size.
+  'postcss-normalize-positions': (css) => {
+    const result = postcss([postcssNormalizePositions()]).process(css, { from: undefined });
     return result.css;
   },
 

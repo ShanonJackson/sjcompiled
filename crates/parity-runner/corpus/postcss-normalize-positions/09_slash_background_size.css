@@ -1,0 +1,2 @@
+a { background: red right top / cover; }
+b { background: url(foo.png) left bottom / 50% 50% no-repeat; }

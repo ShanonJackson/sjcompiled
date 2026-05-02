@@ -1,0 +1,4 @@
+._abcd1234 { background-position: left top; }
+._efgh5678 { background-position: right bottom; }
+._ijkl9012 { background: red center top / cover no-repeat; }
+._mnop3456 { -webkit-perspective-origin: top right; }

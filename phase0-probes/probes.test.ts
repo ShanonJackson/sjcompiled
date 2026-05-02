@@ -28,6 +28,30 @@ const PROBE_WASM = join(
 );
 const PROBE_SCRATCH_ROOT = join(REPO_ROOT, 'node_modules/.cache/sjcompiled-swc-probes');
 
+// PHASE 0 FINDING: the WASI sandbox virtualizes the host cwd to `/`.
+// Host-side absolute paths (`C:/Users/...` on Windows, `/Users/...` on macOS)
+// are unreachable from inside the plugin. The plugin always sees cwd as `/`,
+// so we must hand it paths as if `/` were the project root.
+//
+// Protocol:
+//   - Host computes scratch path under <projectRoot>/node_modules/.cache/...
+//   - Host strips <projectRoot> from the absolute path and forward-slashes
+//     it. The result is the WASI-visible path the plugin should use.
+//   - Host's own fs operations still use the absolute path (the host is
+//     not sandboxed).
+function toWasiPath(absolutePath: string): string {
+  const cwd = process.cwd().replace(/\\/g, '/');
+  const abs = absolutePath.replace(/\\/g, '/');
+  if (!abs.toLowerCase().startsWith(cwd.toLowerCase())) {
+    throw new Error(
+      `Cannot translate ${absolutePath} to WASI path: not under cwd ${process.cwd()}`
+    );
+  }
+  // Slice off the cwd prefix; ensure the remainder starts with `/`.
+  const rel = abs.slice(cwd.length);
+  return rel.startsWith('/') ? rel : '/' + rel;
+}
+
 beforeAll(() => {
   if (!existsSync(PROBE_WASM)) {
     throw new Error(
@@ -38,11 +62,23 @@ beforeAll(() => {
   mkdirSync(PROBE_SCRATCH_ROOT, { recursive: true });
 });
 
-function makeScratch(prefix: string): { worker: string; call: string } {
+// Returns BOTH the host-absolute path (for fs reads from the test) and
+// the wasi-visible path (passed to the plugin in config).
+function makeScratch(prefix: string): {
+  worker: string;
+  call: string;
+  workerWasi: string;
+  callWasi: string;
+} {
   const worker = join(PROBE_SCRATCH_ROOT, `${prefix}-worker-${randomUUID()}`);
   const call = join(worker, `call-${randomUUID()}`);
   mkdirSync(call, { recursive: true });
-  return { worker, call };
+  return {
+    worker,
+    call,
+    workerWasi: toWasiPath(worker),
+    callWasi: toWasiPath(call),
+  };
 }
 
 function runProbe(config: Record<string, unknown>, source = 'export {}') {
@@ -74,8 +110,8 @@ describe('Phase 0 §3.9.14 probes', () => {
   });
 
   test('probe 1: WASI sync I/O round-trip inside callScratch', () => {
-    const { call } = makeScratch('wasi-io');
-    runProbe({ mode: 'wasi-io', callScratch: call });
+    const { call, callWasi } = makeScratch('wasi-io');
+    runProbe({ mode: 'wasi-io', callScratch: callWasi });
     const r = readResult(call);
     expect(r.probe).toBe('wasi-io');
     expect(r.ok).toBe(true);
@@ -83,8 +119,8 @@ describe('Phase 0 §3.9.14 probes', () => {
   });
 
   test('probe 2: WASI mtime returns non-zero', () => {
-    const { call } = makeScratch('wasi-mtime');
-    runProbe({ mode: 'wasi-mtime', callScratch: call });
+    const { call, callWasi } = makeScratch('wasi-mtime');
+    runProbe({ mode: 'wasi-mtime', callScratch: callWasi });
     const r = readResult(call);
     expect(r.probe).toBe('wasi-mtime');
     expect(r.ok).toBe(true);
@@ -92,14 +128,14 @@ describe('Phase 0 §3.9.14 probes', () => {
   });
 
   test('probe 4: instance teardown — counter resets between transforms', () => {
-    const { call: callA } = makeScratch('teardown-a');
-    runProbe({ mode: 'instance-teardown', callScratch: callA });
+    const { call: callA, callWasi: callAWasi } = makeScratch('teardown-a');
+    runProbe({ mode: 'instance-teardown', callScratch: callAWasi });
     const a = readResult(callA);
     expect(a.ok).toBe(true);
     expect(a.detail.observed_counter_on_entry).toBe(0);
 
-    const { call: callB } = makeScratch('teardown-b');
-    runProbe({ mode: 'instance-teardown', callScratch: callB });
+    const { call: callB, callWasi: callBWasi } = makeScratch('teardown-b');
+    runProbe({ mode: 'instance-teardown', callScratch: callBWasi });
     const b = readResult(callB);
     expect(b.ok).toBe(true);
     expect(b.detail.observed_counter_on_entry).toBe(0);
@@ -108,30 +144,24 @@ describe('Phase 0 §3.9.14 probes', () => {
     rmSync(join(callB, '..'), { recursive: true, force: true });
   });
 
-  test('probe 5: parallel async transform race — guardrail (transform NOT transformSync is racy)', async () => {
-    // Negative test. The plan §3.9.4 mandates transformSync; this probe
-    // documents WHY by demonstrating that async transform() cannot be
-    // expected to serialise on shared scratch. We run two parallel
-    // transformSync calls (sync, so they actually serialise on the
-    // event loop) and assert each completes — confirming serialisation.
-    const { call: a } = makeScratch('race-a');
-    const { call: b } = makeScratch('race-b');
-    runProbe({ mode: 'wasi-io', callScratch: a });
-    runProbe({ mode: 'wasi-io', callScratch: b });
+  test('probe 5: parallel async transform race — guardrail (transformSync serialises)', () => {
+    const { call: a, callWasi: aWasi } = makeScratch('race-a');
+    const { call: b, callWasi: bWasi } = makeScratch('race-b');
+    runProbe({ mode: 'wasi-io', callScratch: aWasi });
+    runProbe({ mode: 'wasi-io', callScratch: bWasi });
     expect(readResult(a).ok).toBe(true);
     expect(readResult(b).ok).toBe(true);
     rmSync(join(a, '..'), { recursive: true, force: true });
     rmSync(join(b, '..'), { recursive: true, force: true });
   });
 
-  test('probe 6: scratch-dir reachability — workerScratchDir + callScratch under projectRoot', () => {
-    // HARDEST GATE. If this fails, the WASI cwd preopen does not cover
-    // the chosen scratch path. PLAN.md §3.9.14 #6 — landing-blocked.
-    const { worker, call } = makeScratch('reach');
+  test('probe 6: scratch-dir reachability — both workerScratchDir + callScratch reachable from inside WASI', () => {
+    // HARDEST GATE. PLAN.md §3.9.14 #6 — landing-blocked.
+    const { worker, call, workerWasi, callWasi } = makeScratch('reach');
     runProbe({
       mode: 'scratch-reach',
-      workerScratchDir: worker,
-      callScratch: call,
+      workerScratchDir: workerWasi,
+      callScratch: callWasi,
     });
     const r = readResult(call);
     expect(r.probe).toBe('scratch-reach');
@@ -144,8 +174,8 @@ describe('Phase 0 §3.9.14 probes', () => {
   });
 
   test('probe 7: postcard round-trip via WASI sync I/O', () => {
-    const { worker, call } = makeScratch('postcard');
-    runProbe({ mode: 'postcard-roundtrip', workerScratchDir: worker });
+    const { worker, workerWasi } = makeScratch('postcard');
+    runProbe({ mode: 'postcard-roundtrip', workerScratchDir: workerWasi });
     const resultPath = join(worker, 'probe-result.json');
     expect(existsSync(resultPath)).toBe(true);
     const r = JSON.parse(readFileSync(resultPath, 'utf8'));
@@ -153,6 +183,5 @@ describe('Phase 0 §3.9.14 probes', () => {
     expect(r.ok).toBe(true);
     expect(r.detail.encoded_bytes).toBeGreaterThan(0);
     rmSync(worker, { recursive: true, force: true });
-    rmSync(call, { recursive: true, force: true });
   });
 });

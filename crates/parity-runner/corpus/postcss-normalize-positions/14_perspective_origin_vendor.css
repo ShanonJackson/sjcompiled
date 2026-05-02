@@ -1,0 +1,3 @@
+a { perspective-origin: left top; }
+b { -webkit-perspective-origin: right bottom; }
+c { -moz-perspective-origin: top right; }

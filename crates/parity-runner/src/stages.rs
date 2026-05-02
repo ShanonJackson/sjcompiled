@@ -73,6 +73,11 @@ pub enum Stage {
     /// Phase 6b. Default `preferredQuote: 'double'`.
     PostcssNormalizeString,
 
+    /// `parse → postcss-normalize-positions@5.1.1 → stringify`. Phase 6b.
+    /// Rewrites `background-position` / `*-perspective-origin` keyword pairs
+    /// (left/top → 0 0, etc.). No options.
+    PostcssNormalizePositions,
+
     /// The full `sort()` entry point — `packages/css/src/sort.ts`. Runs
     /// `postcss-discard-duplicates@6 → mergeDuplicateAtRules → sortAtomicStyleSheet`
     /// with default opts (both `Option<bool>` flags `None`, mirroring the
@@ -100,6 +105,7 @@ impl Stage {
             Stage::PostcssNormalizeWhitespace => "postcss-normalize-whitespace",
             Stage::PostcssDiscardComments => "postcss-discard-comments",
             Stage::PostcssNormalizeString => "postcss-normalize-string",
+            Stage::PostcssNormalizePositions => "postcss-normalize-positions",
             Stage::Sort => "sort",
         }
     }
@@ -209,6 +215,12 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             let opts = cssnano_postcss_normalize_string::NormalizeStringOpts::default();
             cssnano_postcss_normalize_string::postcss_normalize_string(&mut root, &opts)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssNormalizePositions => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            cssnano_postcss_normalize_positions::postcss_normalize_positions(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }

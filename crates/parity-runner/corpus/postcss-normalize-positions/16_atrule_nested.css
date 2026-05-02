@@ -1,0 +1,6 @@
+@media (min-width: 700px) {
+  a { background-position: left top; }
+}
+@supports (background: url("x")) {
+  b { background-position: right bottom; }
+}
