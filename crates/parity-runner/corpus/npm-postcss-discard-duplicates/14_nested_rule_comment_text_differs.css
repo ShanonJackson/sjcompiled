@@ -1,0 +1,6 @@
+@media (min-width: 100px) {
+  a { /* alpha */ color: red; }
+}
+@media (min-width: 100px) {
+  a { /* bravo */ color: red; }
+}

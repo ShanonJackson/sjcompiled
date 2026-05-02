@@ -1,11 +1,11 @@
 import { join } from 'path';
 
-import { runBenchmark } from '@compiled/benchmark';
+import { runBenchmark } from '@sjcompiled/benchmark';
 
 import { transform as transformCode } from '../test-utils';
 
 const code = `
-  import '@compiled/react';
+  import '@sjcompiled/react';
 
   import { colorMixin } from '../__fixtures__/mixins/objects';
   import { secondary } from '../__fixtures__/mixins/simple';

@@ -5,7 +5,7 @@ import { transform } from './transform';
 // and how they interact with:
 //
 // * JSX pragma comments /** @jsx jsx */ and
-//     /** @jsxImportSource @compiled/react */, and
+//     /** @jsxImportSource @sjcompiled/react */, and
 // * @babel/preset-react's JSX pragma-related config options
 //     (discussed in
 //     https://babeljs.io/docs/babel-plugin-transform-react-jsx
@@ -17,7 +17,7 @@ describe('Compiled setup with classic runtime', () => {
       it('converts JSX elements to React.createElement', () => {
         const code = `
         /** @jsx jsx */
-        import { css, jsx } from '@compiled/react';
+        import { css, jsx } from '@sjcompiled/react';
 
         const Component = () => (
           <div css={{ fontSize: 12, color: 'blue' }}>
@@ -34,7 +34,7 @@ describe('Compiled setup with classic runtime', () => {
 
         const codeWithRenamedImport = `
         /** @jsx myJsx */
-        import { css, jsx as myJsx } from '@compiled/react';
+        import { css, jsx as myJsx } from '@sjcompiled/react';
 
         const Component = () => (
           <div css={{ fontSize: 12, color: 'blue' }}>
@@ -181,7 +181,7 @@ describe('Compiled setup with classic runtime', () => {
       it('throws error', () => {
         const code = `
           /** @jsx jsx */
-          import { css } from '@compiled/react';
+          import { css } from '@sjcompiled/react';
           import { jsx } from '@emotion/react';
 
           const Component = () => (
@@ -211,7 +211,7 @@ describe('Compiled setup with classic runtime', () => {
     it('throws error if pragma is set in babel config', () => {
       const code = `
         /** @jsx jsx */
-        import { css, jsx } from '@compiled/react';
+        import { css, jsx } from '@sjcompiled/react';
 
         const Component = () => (
           <div css={{ fontSize: 12, color: 'blue' }}>
@@ -228,7 +228,7 @@ describe('Compiled setup with classic runtime', () => {
 
       const codeWithRenamedImport = `
         /** @jsx myJsx */
-        import { css, jsx as myJsx } from '@compiled/react';
+        import { css, jsx as myJsx } from '@sjcompiled/react';
 
         const Component = () => (
           <div css={{ fontSize: 12, color: 'blue' }}>
@@ -261,8 +261,8 @@ describe('Compiled setup with automatic runtime', () => {
     describe('if Compiled is used in file', () => {
       it('imports JSX runtime from React, not Compiled', () => {
         const code = `
-          /** @jsxImportSource @compiled/react */
-          import { css } from '@compiled/react';
+          /** @jsxImportSource @sjcompiled/react */
+          import { css } from '@sjcompiled/react';
 
           const Component = () => (
             <div css={{ fontSize: 12, color: 'blue' }}>
@@ -283,7 +283,7 @@ describe('Compiled setup with automatic runtime', () => {
         });
 
         expect(actual).toContain("'react/jsx-runtime'");
-        expect(actual).not.toContain("'@compiled/react/jsx-runtime'");
+        expect(actual).not.toContain("'@sjcompiled/react/jsx-runtime'");
 
         // jsx function calls from React (and not from Compiled/Emotion/etc)
         // have "PURE" comments added beforehand by @babel/preset-react.
@@ -318,7 +318,7 @@ describe('Compiled setup with automatic runtime', () => {
 
         expect(actual).toContain("'@emotion/react/jsx-runtime'");
 
-        expect(actual).not.toContain("'@compiled/react/jsx-runtime'");
+        expect(actual).not.toContain("'@sjcompiled/react/jsx-runtime'");
 
         // If any of the below statements are present, that means we accidentally
         // got rid of the /** @jsxImportSource @emotion/react */ and the default React
@@ -332,7 +332,7 @@ describe('Compiled setup with automatic runtime', () => {
   describe('without JSX pragma', () => {
     it('imports JSX from Compiled if pragma is set in babel config', () => {
       const code = `
-        import { css, jsx } from '@compiled/react';
+        import { css, jsx } from '@sjcompiled/react';
 
         const Component = () => (
           <div css={{ fontSize: 12, color: 'blue' }}>
@@ -350,10 +350,10 @@ describe('Compiled setup with automatic runtime', () => {
       const actual = transform(code, {
         run: 'both',
         runtime: 'automatic',
-        babelJSXImportSource: '@compiled/react',
+        babelJSXImportSource: '@sjcompiled/react',
       });
 
-      expect(actual).toContain("'@compiled/react/jsx-runtime'");
+      expect(actual).toContain("'@sjcompiled/react/jsx-runtime'");
       expect(actual).not.toContain("'react/jsx-runtime'");
     });
   });

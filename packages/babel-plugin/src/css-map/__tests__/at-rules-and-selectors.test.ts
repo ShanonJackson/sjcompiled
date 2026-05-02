@@ -11,7 +11,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
 
   it('should parse a mix of at rules and the selectors object', () => {
     const actual = transform(`
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
 
       const styles = cssMap({
         success: {
@@ -78,7 +78,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
 
   it('should parse selectors object', () => {
     const actual = transform(`
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
 
       const styles = cssMap({
         success: {
@@ -125,7 +125,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
   it('should error if duplicate selectors passed (inside selectors object and outside)', () => {
     expect(() => {
       transform(`
-        import { cssMap } from '@compiled/react';
+        import { cssMap } from '@sjcompiled/react';
 
         const styles = cssMap({
           success: {
@@ -147,7 +147,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
   it('should error if duplicate selectors passed using different formats (mixing an identifier and a string literal)', () => {
     expect(() => {
       transform(`
-        import { cssMap } from '@compiled/react';
+        import { cssMap } from '@sjcompiled/react';
 
         const styles = cssMap({
           success: {
@@ -172,7 +172,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
     // This is due to the parent-orphaned-pseudos plugin in @sjcompiled/css.
     expect(() => {
       transform(`
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
 
       const styles = cssMap({
         success: {
@@ -191,7 +191,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
   it('should error if duplicate selectors passed using both the forms `&:hover` and `:hover`', () => {
     expect(() => {
       transform(`
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
 
       const styles = cssMap({
         success: {
@@ -212,7 +212,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
 
   it('should not error if selector has same name as property', () => {
     const actual = transform(`
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
 
       const styles = cssMap({
         success: {
@@ -248,7 +248,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
 
     for (const secondHalf of permutations) {
       const actual = transform(`
-        import { cssMap } from '@compiled/react';
+        import { cssMap } from '@sjcompiled/react';
 
         const styles = cssMap({
           success: {
@@ -282,7 +282,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
   // When nested, the at-rule is not processed like an at-rule - it is processed like a CSS selector.
   it('should parse the @starting-style at-rule when nested', () => {
     const actual = transform(`
-        import { cssMap } from '@compiled/react';
+        import { cssMap } from '@sjcompiled/react';
 
         const styles = cssMap({
           success: {
@@ -309,7 +309,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
   it('should error if more than one selectors key passed', () => {
     expect(() => {
       transform(`
-        import { cssMap } from '@compiled/react';
+        import { cssMap } from '@sjcompiled/react';
 
         const styles = cssMap({
           success: {
@@ -333,7 +333,7 @@ describe('css map advanced functionality (at rules, selectors object)', () => {
   it('should error if value of selectors key is not an object', () => {
     expect(() => {
       transform(`
-        import { cssMap } from '@compiled/react';
+        import { cssMap } from '@sjcompiled/react';
 
         const styles = cssMap({
           success: {

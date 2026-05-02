@@ -15,7 +15,7 @@ describe('class names behaviour', () => {
 
   it('should transform class names single usage', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = () => (
         <ClassNames>
@@ -38,7 +38,7 @@ describe('class names behaviour', () => {
 
   it('should transform children as function with body', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = () => (
         <ClassNames>
@@ -65,7 +65,7 @@ describe('class names behaviour', () => {
 
   it('should transform style property access', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = () => (
         <ClassNames>
@@ -87,7 +87,7 @@ describe('class names behaviour', () => {
 
   it('should transform css property access', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = () => (
         <ClassNames>
@@ -110,7 +110,7 @@ describe('class names behaviour', () => {
 
   it('should transform keyframes', () => {
     const actual = transform(`
-      import { ClassNames, keyframes } from '@compiled/react';
+      import { ClassNames, keyframes } from '@sjcompiled/react';
 
       const fadeOut = keyframes({
         from: {
@@ -187,7 +187,7 @@ describe('class names behaviour', () => {
 
   it('should not transform object property access from invalid style prop', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = () => (
         <ClassNames>
@@ -209,7 +209,7 @@ describe('class names behaviour', () => {
 
   it('should transform style renamed prop usage', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = () => (
         <ClassNames>
@@ -231,7 +231,7 @@ describe('class names behaviour', () => {
 
   it('should transform class names renamed prop single usage', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = () => (
         <ClassNames>
@@ -254,7 +254,7 @@ describe('class names behaviour', () => {
 
   it('should transform class names multiple usage', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = () => (
         <ClassNames>
@@ -294,7 +294,7 @@ describe('class names behaviour', () => {
 
   it('should transform class names renamed usage', () => {
     const actual = transform(`
-      import { ClassNames as CN } from '@compiled/react';
+      import { ClassNames as CN } from '@sjcompiled/react';
 
       const ListItem = () => (
         <CN>
@@ -317,7 +317,7 @@ describe('class names behaviour', () => {
 
   it('should add an identifier nonce to the style element', () => {
     const code = `
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = () => (
         <ClassNames>
@@ -333,7 +333,7 @@ describe('class names behaviour', () => {
 
   it('should transform children as function return', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = ({ children }) => (
         <ClassNames>
@@ -356,7 +356,7 @@ describe('class names behaviour', () => {
 
   it('should place self closing jsx element as a child', () => {
     const actual = transform(`
-    import { ClassNames } from '@compiled/react';
+    import { ClassNames } from '@sjcompiled/react';
 
     const ZoomOnHover = ({ children }) => (
       <ClassNames>
@@ -370,7 +370,7 @@ describe('class names behaviour', () => {
 
   it('should replace style identifier with undefined', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const Component = ({ children }) => (
         <ClassNames>
@@ -384,7 +384,7 @@ describe('class names behaviour', () => {
 
   it('should replace style identifier with css variable object', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const Component = ({ children, color }) => (
         <ClassNames>
@@ -414,7 +414,7 @@ describe('class names behaviour', () => {
 
   it('should not transform style identifier when its coming from outer scope', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const EmphasisText = ({ className, children, style }) => (
         <ClassNames>
@@ -442,7 +442,7 @@ describe('class names behaviour', () => {
 
   it('should transform style and css renamed prop coming from local variable', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = () => (
         <ClassNames>
@@ -483,7 +483,7 @@ describe('class names behaviour', () => {
 
   it('should apply conditional logical expression object spread styles', () => {
     const actual = transform(`
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = (props) => (
         <ClassNames>
@@ -502,7 +502,7 @@ describe('class names behaviour', () => {
   it('should apply array logical-based conditional css', () => {
     const actual = transform(
       `
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = (props) => (
         <ClassNames>
@@ -527,7 +527,7 @@ describe('class names behaviour', () => {
   it('should apply array prop ternary-based inline conditional css', () => {
     const actual = transform(
       `
-      import { ClassNames } from '@compiled/react';
+      import { ClassNames } from '@sjcompiled/react';
 
       const ListItem = (props) => (
         <ClassNames>

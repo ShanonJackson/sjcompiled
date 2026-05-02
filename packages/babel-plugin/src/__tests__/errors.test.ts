@@ -10,13 +10,13 @@ describe('error handling', () => {
   it('should throw when using using an invalid css node', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         <div css={() => {}} />
       `);
     }).toThrowErrorMatchingInlineSnapshot(`
       "unknown file: This ArrowFunctionExpression was unable to have its styles extracted — no Compiled APIs were found in scope, if you're using createStrictAPI make sure to configure importSources (4:18).
-        2 |         import '@compiled/react';
+        2 |         import '@sjcompiled/react';
         3 |
       > 4 |         <div css={() => {}} />
           |                   ^^^^^^^^
@@ -27,13 +27,13 @@ describe('error handling', () => {
   it('should throw when spreading an identifier that does not exist', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         <div css={{ ...dontexist }} />
       `);
     }).toThrowErrorMatchingInlineSnapshot(`
       "unknown file: Variable could not be found (4:23).
-        2 |         import '@compiled/react';
+        2 |         import '@sjcompiled/react';
         3 |
       > 4 |         <div css={{ ...dontexist }} />
           |                        ^^^^^^^^^
@@ -44,13 +44,13 @@ describe('error handling', () => {
   it('should throw when referencing an identifier that does not exist', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         <div css={dontexist} />
       `);
     }).toThrowErrorMatchingInlineSnapshot(`
       "unknown file: Variable could not be found (4:18).
-        2 |         import '@compiled/react';
+        2 |         import '@sjcompiled/react';
         3 |
       > 4 |         <div css={dontexist} />
           |                   ^^^^^^^^^
@@ -61,7 +61,7 @@ describe('error handling', () => {
   it('should throw when referencing an identifier that isnt supported', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         class HelloWorld {}
 
@@ -80,13 +80,13 @@ describe('error handling', () => {
   it('should throw when composing invalid css', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         <div css={[...hello]} />
       `);
     }).toThrowErrorMatchingInlineSnapshot(`
       "unknown file: SpreadElement isn't a supported CSS type - try using an object or string (4:18).
-        2 |         import '@compiled/react';
+        2 |         import '@sjcompiled/react';
         3 |
       > 4 |         <div css={[...hello]} />
           |                   ^^^^^^^^^^

@@ -19,7 +19,7 @@ describe('handling of values for CSS `content` property', () => {
 
   it('should handle blank content', () => {
     const code = `
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       const ListItem = styled.div({
         content: '',
@@ -32,7 +32,7 @@ describe('handling of values for CSS `content` property', () => {
 
   it('should handle blank content (variant #1)', () => {
     const code = `
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       const ListItem = styled.div({
         content: \`\`,
@@ -45,7 +45,7 @@ describe('handling of values for CSS `content` property', () => {
 
   it('should handle blank content (variant #2)', () => {
     const code = `
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       const hello = '';
       const ListItem = styled.div({
@@ -59,7 +59,7 @@ describe('handling of values for CSS `content` property', () => {
 
   it('should handle blank content (variant #2)', () => {
     const code = `
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       const hello = 'this is a string';
       const ListItem = styled.div({
@@ -73,7 +73,7 @@ describe('handling of values for CSS `content` property', () => {
 
   it('should add quotes to custom content values', () => {
     const code = `
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       const ListItem = styled.div({
         content: 'hello',
@@ -86,7 +86,7 @@ describe('handling of values for CSS `content` property', () => {
 
   it('should not add quotes if they exist already', () => {
     const code = `
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       const ListItem = styled.div({
         content: "'hello'",
@@ -99,7 +99,7 @@ describe('handling of values for CSS `content` property', () => {
 
   it('should not add quotes if they exist already (variant)', () => {
     const code = `
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       const ListItem = styled.div({
         content: '"hello"',
@@ -112,7 +112,7 @@ describe('handling of values for CSS `content` property', () => {
 
   it("should not add quotes to content values that shouldn't accept them", () => {
     const code = `
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       const ListItem = styled.div({
         '._01 &': { content: 'none' },

@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { css } from '@compiled/react';
+import { css } from '@sjcompiled/react';
 
 import { secondary } from './simple';
 

@@ -25,11 +25,7 @@ import {
   optimizeConditionalStatement,
   recomposeTemplateLiteral,
 } from './manipulate-template-literal';
-import {
-  objectPropertyToString,
-  expressionToString,
-  canBeStaticallyConcatenated,
-} from './object-property-to-string';
+import { objectPropertyToString } from './object-property-to-string';
 import { resolveBinding } from './resolve-binding';
 import type {
   CSSOutput,
@@ -374,7 +370,7 @@ const extractConditionalExpression = (node: t.ConditionalExpression, meta: Metad
       isCompiledCSSTaggedTemplateExpression(pathNode, meta.state) ||
       isCompiledCSSCallExpression(pathNode, meta.state)
     ) {
-      cssOutput = buildCssInternal(pathNode, meta);
+      cssOutput = buildCss(pathNode, meta);
     } else if (t.isIdentifier(pathNode)) {
       const resolved = resolveBinding(pathNode.name, meta, evaluateExpression);
 
@@ -384,7 +380,7 @@ const extractConditionalExpression = (node: t.ConditionalExpression, meta: Metad
         (isCompiledCSSTaggedTemplateExpression(resolved.node, resolved.meta.state) ||
           isCompiledCSSCallExpression(resolved.node, resolved.meta.state))
       ) {
-        cssOutput = buildCssInternal(resolved.node, resolved.meta);
+        cssOutput = buildCss(resolved.node, resolved.meta);
         assertNoImportedCssVariables(pathNode, meta, resolved, cssOutput);
       }
     } else if (t.isConditionalExpression(pathNode)) {
@@ -440,7 +436,7 @@ const extractLogicalExpression = (node: t.ArrowFunctionExpression, meta: Metadat
 
   if (t.isExpression(node.body)) {
     const { value: propValue, meta: updatedMeta } = evaluateExpression(node.body, meta);
-    const result = buildCssInternal(propValue, updatedMeta);
+    const result = buildCss(propValue, updatedMeta);
 
     callbackIfFileIncluded(meta, updatedMeta);
 
@@ -452,7 +448,7 @@ const extractLogicalExpression = (node: t.ArrowFunctionExpression, meta: Metadat
 };
 
 /*
- * Extracts the keyframes CSS from the `@compiled/react` keyframes usage.
+ * Extracts the keyframes CSS from the `@sjcompiled/react` keyframes usage.
  *
  * @param expression {t.CallExpression | t.TaggedTemplateExpression} The keyframes declaration
  * @param meta {Metadata} Useful metadata that can be used during the transformation
@@ -469,7 +465,7 @@ const extractKeyframes = (
   const selector = `@keyframes ${name}`;
   const { css, variables } = toCSSRule(
     selector,
-    buildCssInternal(
+    buildCss(
       t.isCallExpression(expression) ? (expression.arguments as t.Expression[]) : expression.quasi,
       { ...meta, context: 'keyframes', keyframe: name }
     )
@@ -525,20 +521,6 @@ const extractObjectExpression = (node: t.ObjectExpression, meta: Metadata): CSSO
         return;
       }
 
-      if (t.isCallExpression(propValue) && canBeStaticallyConcatenated(propValue)) {
-        // We're concatenating the string expression on our own, eg.: `color: 'red '.concat('blue')` => `color: 'red blue'`
-        const value = expressionToString(propValue, updatedMeta);
-
-        css.push({
-          type: 'unconditional',
-          css: `${isCustomPropertyName(key) ? key : kebabCase(key)}: ${
-            key === 'content' ? normalizeContentValue(value) : value
-          };`,
-        });
-
-        return;
-      }
-
       if (t.isNumericLiteral(propValue)) {
         // We've found a numeric literal like: `fontSize: 12`
         css.push({
@@ -559,7 +541,7 @@ const extractObjectExpression = (node: t.ObjectExpression, meta: Metadata): CSSO
       if (t.isObjectExpression(propValue) || t.isLogicalExpression(propValue)) {
         // We've found either an object like `{}` or a logical expression `isPrimary && {}`.
         // We can handle both the same way as they end up resulting in a CSS rule.
-        const result = toCSSRule(key, buildCssInternal(propValue, updatedMeta));
+        const result = toCSSRule(key, buildCss(propValue, updatedMeta));
         css.push(...result.css);
         variables.push(...result.variables);
 
@@ -673,7 +655,7 @@ const extractObjectExpression = (node: t.ObjectExpression, meta: Metadata): CSSO
       }
 
       const { value: propValue, meta: updatedMeta } = evaluateExpression(prop.argument, meta);
-      const result = buildCssInternal(propValue, updatedMeta);
+      const result = buildCss(propValue, updatedMeta);
 
       callbackIfFileIncluded(meta, updatedMeta);
 
@@ -698,7 +680,7 @@ const extractObjectExpression = (node: t.ObjectExpression, meta: Metadata): CSSO
  *
  * @returns {Boolean} Whether the cache was generated
  */
-export const generateCacheForCSSMap = (node: t.Identifier, meta: Metadata): void => {
+const generateCacheForCSSMap = (node: t.Identifier, meta: Metadata): void => {
   if (meta.state.cssMap[node.name] || meta.state.ignoreMemberExpressions[node.name]) {
     return;
   }
@@ -763,7 +745,7 @@ function extractMemberExpression(
 
   if (fallbackToEvaluate) {
     const { value, meta: updatedMeta } = evaluateExpression(node, meta);
-    return buildCssInternal(value, updatedMeta);
+    return buildCss(value, updatedMeta);
   }
 
   return undefined;
@@ -844,7 +826,7 @@ const extractTemplateLiteral = (node: t.TemplateLiteral, meta: Metadata): CSSOut
         ? nestedTemplateLiteralMeta
         : updatedMeta;
 
-      const result = buildCssInternal(interpolation, buildCssMeta);
+      const result = buildCss(interpolation, buildCssMeta);
 
       if (result.css.length) {
         // Add previous accumulative CSS first before CSS from expressions
@@ -908,7 +890,7 @@ const extractTemplateLiteral = (node: t.TemplateLiteral, meta: Metadata): CSSOut
     if (t.isArrowFunctionExpression(prop)) {
       if (t.isLogicalExpression(prop.body)) {
         const { value: propValue, meta: updatedMeta } = evaluateExpression(prop.body, meta);
-        const result = buildCssInternal(propValue, updatedMeta);
+        const result = buildCss(propValue, updatedMeta);
 
         callbackIfFileIncluded(meta, updatedMeta);
 
@@ -946,7 +928,7 @@ const extractArray = (node: t.ArrayExpression | t.Expression[], meta: Metadata) 
 
     const result = t.isConditionalExpression(element)
       ? extractConditionalExpression(element, meta)
-      : buildCssInternal(element, meta);
+      : buildCss(element, meta);
 
     css.push(...result.css);
     variables.push(...result.variables);
@@ -959,15 +941,12 @@ const extractArray = (node: t.ArrayExpression | t.Expression[], meta: Metadata) 
 };
 
 /**
- * Internal functionality to return a CSS string and CSS variables array from an input node.
+ * Will return a CSS string and CSS variables array from an input node.
  *
  * @param node Node we're interested in extracting CSS from.
  * @param meta {Metadata} Useful metadata that can be used during the transformation
  */
-export const buildCssInternal = (
-  node: t.Expression | t.Expression[],
-  meta: Metadata
-): CSSOutput => {
+export const buildCss = (node: t.Expression | t.Expression[], meta: Metadata): CSSOutput => {
   if (Array.isArray(node)) {
     return extractArray(node, meta);
   }
@@ -977,7 +956,7 @@ export const buildCssInternal = (
   }
 
   if (t.isTSAsExpression(node)) {
-    return buildCssInternal(node.expression, meta);
+    return buildCss(node.expression, meta);
   }
 
   if (t.isTemplateLiteral(node)) {
@@ -1037,7 +1016,7 @@ export const buildCssInternal = (
       );
     }
 
-    const result = buildCssInternal(resolvedBinding.node, resolvedBinding.meta);
+    const result = buildCss(resolvedBinding.node, resolvedBinding.meta);
 
     assertNoImportedCssVariables(node, meta, resolvedBinding, result);
 
@@ -1050,7 +1029,7 @@ export const buildCssInternal = (
 
   if (t.isLogicalExpression(node)) {
     const expression = node.left;
-    const result = buildCssInternal(node.right, meta);
+    const result = buildCss(node.right, meta);
     const css = result.css.map((item) => {
       if (item.type === 'logical') {
         return {
@@ -1083,11 +1062,11 @@ export const buildCssInternal = (
   }
 
   if (isCompiledCSSTaggedTemplateExpression(node, meta.state)) {
-    return buildCssInternal(node.quasi, meta);
+    return buildCss(node.quasi, meta);
   }
 
   if (isCompiledCSSCallExpression(node, meta.state)) {
-    return buildCssInternal(node.arguments[0] as t.ObjectExpression, meta);
+    return buildCss(node.arguments[0] as t.ObjectExpression, meta);
   }
 
   const areCompiledAPIsEnabled =
@@ -1102,43 +1081,4 @@ export const buildCssInternal = (
     node,
     meta.parentPath
   );
-};
-
-/**
- * See "indirect selector" tests in `packages/babel-plugin/src/__tests__/index.test.ts`
- * Basically, I want to select anything that's indirect and has a dynamic variable in it.
- *
- * Think `&>div{color:var(--_color)}` or `&~div{color:var(--_color)}`,
- * but not `&:hover{color:var(--_color)}` or `[data-id~="test"]{color:var(--_color)}` (which also has `~` in it)
- *
- * This isn't perfectly conclusive, but relatively high confidence.
- */
-const invalidDynamicIndirectSelectorRegex = /(\+|~|\||\|\|)[^=\{]+\{[^\}]+var\(--_/;
-/**
- * Will return a CSS string and CSS variables array from an input node.
- *
- * This includes some top-level error handling for invalid CSS combinations.
- *
- * @param node Node we're interested in extracting CSS from.
- * @param meta {Metadata} Useful metadata that can be used during the transformation
- */
-export const buildCss = (node: t.Expression | t.Expression[], meta: Metadata): CSSOutput => {
-  const output = buildCssInternal(node, meta);
-
-  // Check for invalid dynamic selectors
-  if (
-    output.css.some(
-      (item) =>
-        (item.type === 'unconditional' || item.type === 'conditional') &&
-        invalidDynamicIndirectSelectorRegex.test(getItemCss(item))
-    )
-  ) {
-    throw buildCodeFrameError(
-      'Found a mix of an indirect selector and a dynamic variable which is unsupported with Compiled.  See: https://compiledcssinjs.com/docs/limitations#mixing-dynamic-styles-and-indirect-selectors',
-      null,
-      meta.parentPath
-    );
-  }
-
-  return output;
 };

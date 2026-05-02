@@ -4,7 +4,7 @@ describe('ClassNames used with a css tagged template expression', () => {
   describe('transforms a quasi that contains', () => {
     it('no expressions', () => {
       const actual = transform(`
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
 
         const ListItem = () => (
           <ClassNames>
@@ -21,7 +21,7 @@ describe('ClassNames used with a css tagged template expression', () => {
 
     it('a declared string literal expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
 
         const fontSize = '12px';
 
@@ -37,7 +37,7 @@ describe('ClassNames used with a css tagged template expression', () => {
 
     it('a declared numeric literal expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
 
         const fontSize = 12;
 
@@ -53,7 +53,7 @@ describe('ClassNames used with a css tagged template expression', () => {
 
     it('a declared object expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
 
         const color = { color: 'blue' };
 
@@ -69,7 +69,7 @@ describe('ClassNames used with a css tagged template expression', () => {
 
     it('a suffixed dynamic expression using inline styles', () => {
       const code = `
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
         import { fontSize } from './nah';
 
         const ListItem = () => (
@@ -93,7 +93,7 @@ describe('ClassNames used with a css tagged template expression', () => {
 
     it('a zero arity call expression referencing an arrow function that returns an object expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
 
         const color = () => ({ color: 'blue' });
 
@@ -109,7 +109,7 @@ describe('ClassNames used with a css tagged template expression', () => {
 
     it('a zero arity call expression referencing a function declaration that returns an object expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
 
         function color() { return { color: 'blue' }; }
 
@@ -125,7 +125,7 @@ describe('ClassNames used with a css tagged template expression', () => {
 
     it('a multi arity call expression referencing an arrow function that returns an object expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
 
         const color1 = 'black';
         const mixin = ({ color1, color2: c }, color3, radius) => ({
@@ -171,7 +171,7 @@ describe('ClassNames used with a css tagged template expression', () => {
 
     it('a multi arity member call expression referencing an arrow function that returns an object expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
 
         const mixin = {
           value: (color1, r, color2) => ({
@@ -210,7 +210,7 @@ describe('ClassNames used with a css tagged template expression', () => {
 
     it('a call expression with unresolved arguments', () => {
       const actual = transform(`
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
 
         const radius = 10;
         const mixin = (color1, radius, size, weight) => ({
@@ -251,7 +251,7 @@ describe('ClassNames used with a css tagged template expression', () => {
 
     it('duplicate properties', () => {
       const actual = transform(`
-        import { ClassNames } from '@compiled/react';
+        import { ClassNames } from '@sjcompiled/react';
 
         const primary = () => ({
           fontSize: '32px',

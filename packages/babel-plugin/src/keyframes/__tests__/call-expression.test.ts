@@ -23,7 +23,7 @@ describe('keyframes', () => {
 
   describe('transforms an object call expression', () => {
     const createSingleAnimationSmokeTest = (usage: string) => `
-      import { css, keyframes, styled } from '@compiled/react';
+      import { css, keyframes, styled } from '@sjcompiled/react';
 
       const fadeOut = keyframes({
         'from, 25%': {
@@ -44,7 +44,7 @@ describe('keyframes', () => {
     `;
 
     const createMultipleAnimationsSmokeTest = (buildUsage: (animations: string) => string) => `
-      import { css, keyframes, styled } from '@compiled/react';
+      import { css, keyframes, styled } from '@sjcompiled/react';
 
       const fadeOut = keyframes({
         from: {
@@ -82,7 +82,7 @@ describe('keyframes', () => {
             const _3 = "._j7hqb4f3{animation-name:k1wmcptp}";
             const _2 = "._5sagymdr{animation-duration:2s}";
             const _ =
-              "@keyframes k1wmcptp{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const fadeOut = null;
             <CC>
               <CS>{[_, _2, _3, _4]}</CS>
@@ -100,7 +100,7 @@ describe('keyframes', () => {
           expect(actual).toMatchInlineSnapshot(`
             "const _2 = "._y44vjvcp{animation:k1wmcptp 2s ease-in-out}";
             const _ =
-              "@keyframes k1wmcptp{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const fadeOut = null;
             <CC>
               <CS>{[_, _2]}</CS>
@@ -135,7 +135,7 @@ describe('keyframes', () => {
 
       it('by inlining identifiers that reference constant literals', () => {
         const actual = transform(`
-          import { keyframes } from '@compiled/react';
+          import { keyframes } from '@sjcompiled/react';
 
           const fromColor = 'blue';
           const fromOpacity = 1;
@@ -176,7 +176,7 @@ describe('keyframes', () => {
 
       it('by inlining identifiers that reference an object expression', () => {
         const actual = transform(`
-          import { keyframes } from '@compiled/react';
+          import { keyframes } from '@sjcompiled/react';
 
           const from = { opacity: 1 };
           const to = { opacity: 0 };
@@ -206,7 +206,7 @@ describe('keyframes', () => {
 
       it('by inlining member expressions that reference identifiers with simple values', () => {
         const actual = transform(`
-          import { keyframes } from '@compiled/react';
+          import { keyframes } from '@sjcompiled/react';
 
           const from = { color: 'blue', opacity: 1 };
           const to = { color: 'indigo', opacity: 0 };
@@ -249,7 +249,7 @@ describe('keyframes', () => {
       describe('by inlining nested member expressions that reference', () => {
         it('simple values', () => {
           const actual = transform(`
-            import { css, keyframes } from '@compiled/react';
+            import { css, keyframes } from '@sjcompiled/react';
 
             const animation = {
               colors: {
@@ -305,7 +305,7 @@ describe('keyframes', () => {
 
         it('identifiers with simple values', () => {
           const actual = transform(`
-            import { keyframes } from '@compiled/react';
+            import { keyframes } from '@sjcompiled/react';
 
             const fromOpacity = 1;
             const toOpacity = 1;
@@ -372,7 +372,7 @@ describe('keyframes', () => {
 
       it('by inlining call expressions that return simple values', () => {
         const actual = transform(`
-          import { keyframes } from '@compiled/react';
+          import { keyframes } from '@sjcompiled/react';
 
           const identity = (x) => x;
 
@@ -406,7 +406,7 @@ describe('keyframes', () => {
 
       it('by inlining identifiers that reference simple call expressions', () => {
         const actual = transform(`
-          import { keyframes } from '@compiled/react';
+          import { keyframes } from '@sjcompiled/react';
 
           const identity = (x) => x;
 
@@ -450,7 +450,7 @@ describe('keyframes', () => {
 
       it('by inlining an arrow function call expression that returns an object expression', () => {
         const actual = transform(`
-          import { keyframes } from '@compiled/react';
+          import { keyframes } from '@sjcompiled/react';
 
           const from = () => ({ color: 'blue', opacity: 1 });
           const to = () => ({ color: 'indigo', opacity: 0 });
@@ -486,7 +486,7 @@ describe('keyframes', () => {
 
       it('by inlining a function declaration call expression that returns an object expression', () => {
         const actual = transform(`
-          import { keyframes } from '@compiled/react';
+          import { keyframes } from '@sjcompiled/react';
 
           function from() {
             return { color: 'blue', opacity: 1 };
@@ -532,7 +532,7 @@ describe('keyframes', () => {
       describe('by inlining member expressions that return object expressions', () => {
         it('through an arrow function call expression', () => {
           const actual = transform(`
-            import { keyframes } from '@compiled/react';
+            import { keyframes } from '@sjcompiled/react';
 
             const from = () => ({ color: 'blue', opacity: 1 });
             const to = () => ({ color: 'indigo', opacity: 0 });
@@ -574,7 +574,7 @@ describe('keyframes', () => {
 
         it('through an identifier that references an arrow function call expression', () => {
           const actual = transform(`
-            import { keyframes } from '@compiled/react';
+            import { keyframes } from '@sjcompiled/react';
 
             const getFrom = () => ({ color: 'blue', opacity: 1 });
             const getTo = () => ({ color: 'indigo', opacity: 0 });
@@ -623,7 +623,7 @@ describe('keyframes', () => {
       describe('by inlining suffixes prefixed by an', () => {
         it('identifier that references a number literal', () => {
           const actual = transform(`
-            import { keyframes } from '@compiled/react';
+            import { keyframes } from '@sjcompiled/react';
 
             const fromFontSize = 14;
             const toFontSize = 18;
@@ -656,7 +656,7 @@ describe('keyframes', () => {
 
         it('arrow function expression call that returns a number literal', () => {
           const actual = transform(`
-            import { keyframes } from '@compiled/react';
+            import { keyframes } from '@sjcompiled/react';
 
             const fromFontSize = () => 14;
             const toFontSize = () => 18;
@@ -691,7 +691,7 @@ describe('keyframes', () => {
       describe('by preserving runtime values', () => {
         it('for a static keyframe', () => {
           const actual = transform(`
-            import { keyframes } from '@compiled/react';
+            import { keyframes } from '@sjcompiled/react';
 
             const getOpacity = (x) => runtime.enabled ? x : 1;
 
@@ -735,7 +735,7 @@ describe('keyframes', () => {
 
         describe('for a dynamic keyframe with shadowed values', () => {
           const createDynamicAnimations = (length: number) => `
-            import { keyframes } from '@compiled/react';
+            import { keyframes } from '@sjcompiled/react';
 
             const generateKeyframes = (fromColor, toColor) =>
               keyframes({
@@ -857,7 +857,7 @@ describe('keyframes', () => {
             const _3 = "._j7hqb4f3{animation-name:k1wmcptp}";
             const _2 = "._5sagymdr{animation-duration:2s}";
             const _ =
-              "@keyframes k1wmcptp{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const fadeOut = null;
             <CC>
               <CS>{[_, _2, _3, _4]}</CS>
@@ -875,7 +875,7 @@ describe('keyframes', () => {
           expect(actual).toMatchInlineSnapshot(`
             "const _2 = "._y44vjvcp{animation:k1wmcptp 2s ease-in-out}";
             const _ =
-              "@keyframes k1wmcptp{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const fadeOut = null;
             <CC>
               <CS>{[_, _2]}</CS>
@@ -918,7 +918,7 @@ describe('keyframes', () => {
 
           expect(actual).toMatchInlineSnapshot(`
             "const _4 =
-              "@keyframes k1wmcptp{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const _3 = "._1pgl1ytf{animation-timing-function:ease-in-out}";
             const _2 = "._j7hqb4f3{animation-name:k1wmcptp}";
             const _ = "._5sagymdr{animation-duration:2s}";
@@ -952,7 +952,7 @@ describe('keyframes', () => {
 
           expect(actual).toMatchInlineSnapshot(`
             "const _2 =
-              "@keyframes k1wmcptp{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const _ = "._y44vjvcp{animation:k1wmcptp 2s ease-in-out}";
             const fadeOut = null;
             const StyledComponent = forwardRef(
@@ -1028,7 +1028,7 @@ describe('keyframes', () => {
 
           expect(actual).toMatchInlineSnapshot(`
             "const _4 =
-              "@keyframes k1wmcptp{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const _3 = "._1pgl1ytf{animation-timing-function:ease-in-out}";
             const _2 = "._j7hqb4f3{animation-name:k1wmcptp}";
             const _ = "._5sagymdr{animation-duration:2s}";
@@ -1062,7 +1062,7 @@ describe('keyframes', () => {
 
           expect(actual).toMatchInlineSnapshot(`
             "const _2 =
-              "@keyframes k1wmcptp{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const _ = "._y44vjvcp{animation:k1wmcptp 2s ease-in-out}";
             const fadeOut = null;
             const StyledComponent = forwardRef(
@@ -1132,7 +1132,7 @@ describe('keyframes', () => {
 
   describe('transforms a template literal call expression', () => {
     const createSingleAnimationSmokeTest = (usage: string) => `
-      import { css, keyframes, styled } from '@compiled/react';
+      import { css, keyframes, styled } from '@sjcompiled/react';
 
       const fadeOut = keyframes(\`
         from, 25% {
@@ -1153,7 +1153,7 @@ describe('keyframes', () => {
     `;
 
     const createMultipleAnimationsSmokeTest = (buildUsage: (animations: string) => string) => `
-      import { css, keyframes, styled } from '@compiled/react';
+      import { css, keyframes, styled } from '@sjcompiled/react';
 
       const fadeOut = keyframes(\`
         from {
@@ -1191,7 +1191,7 @@ describe('keyframes', () => {
             const _3 = "._j7hq1c6j{animation-name:khheuil}";
             const _2 = "._5sagymdr{animation-duration:2s}";
             const _ =
-              "@keyframes khheuil{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const fadeOut = null;
             <CC>
               <CS>{[_, _2, _3, _4]}</CS>
@@ -1209,7 +1209,7 @@ describe('keyframes', () => {
           expect(actual).toMatchInlineSnapshot(`
             "const _2 = "._y44v1go4{animation:khheuil 2s ease-in-out}";
             const _ =
-              "@keyframes khheuil{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const fadeOut = null;
             <CC>
               <CS>{[_, _2]}</CS>
@@ -1255,7 +1255,7 @@ describe('keyframes', () => {
             const _3 = "._j7hq1c6j{animation-name:khheuil}";
             const _2 = "._5sagymdr{animation-duration:2s}";
             const _ =
-              "@keyframes khheuil{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const fadeOut = null;
             <CC>
               <CS>{[_, _2, _3, _4]}</CS>
@@ -1273,7 +1273,7 @@ describe('keyframes', () => {
           expect(actual).toMatchInlineSnapshot(`
             "const _2 = "._y44v1go4{animation:khheuil 2s ease-in-out}";
             const _ =
-              "@keyframes khheuil{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const fadeOut = null;
             <CC>
               <CS>{[_, _2]}</CS>
@@ -1316,7 +1316,7 @@ describe('keyframes', () => {
 
           expect(actual).toMatchInlineSnapshot(`
             "const _4 =
-              "@keyframes khheuil{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const _3 = "._1pgl1ytf{animation-timing-function:ease-in-out}";
             const _2 = "._j7hq1c6j{animation-name:khheuil}";
             const _ = "._5sagymdr{animation-duration:2s}";
@@ -1350,7 +1350,7 @@ describe('keyframes', () => {
 
           expect(actual).toMatchInlineSnapshot(`
             "const _2 =
-              "@keyframes khheuil{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const _ = "._y44v1go4{animation:khheuil 2s ease-in-out}";
             const fadeOut = null;
             const StyledComponent = forwardRef(
@@ -1426,7 +1426,7 @@ describe('keyframes', () => {
 
           expect(actual).toMatchInlineSnapshot(`
             "const _4 =
-              "@keyframes khheuil{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const _3 = "._1pgl1ytf{animation-timing-function:ease-in-out}";
             const _2 = "._j7hq1c6j{animation-name:khheuil}";
             const _ = "._5sagymdr{animation-duration:2s}";
@@ -1460,7 +1460,7 @@ describe('keyframes', () => {
 
           expect(actual).toMatchInlineSnapshot(`
             "const _2 =
-              "@keyframes khheuil{0%{opacity:1}25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
+              "@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}";
             const _ = "._y44v1go4{animation:khheuil 2s ease-in-out}";
             const fadeOut = null;
             const StyledComponent = forwardRef(

@@ -158,11 +158,11 @@ export default declare<State>((api) => {
             // Delete the JSX pragma from the file, so that JSX
             // elements don't get converted to jsx functions when using Compiled.
             // This is to avoid having an import from a library that isn't
-            // `@compiled/react/runtime` in the final output:
+            // `@sjcompiled/react/runtime` in the final output:
             //
-            //     import { jsx } from '@compiled/react'
-            //     import { jsx as _jsx } from '@compiled/react/jsx-runtime';
-            //     import { jsxs as _jsxs } from '@compiled/react/jsx-runtime';
+            //     import { jsx } from '@sjcompiled/react'
+            //     import { jsx as _jsx } from '@sjcompiled/react/jsx-runtime';
+            //     import { jsxs as _jsxs } from '@sjcompiled/react/jsx-runtime';
 
             // Hide the JSX pragma from the
             // @babel/plugin-transform-react-jsx plugin

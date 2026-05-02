@@ -516,8 +516,9 @@ fn scan_colon(root_node: &Node) -> Option<String> {
     let mut found: Option<String> = None;
     walk_for_colon_sample(root_node, &mut found);
     found.map(|v| {
+        // JS `value.replace(/[^\s:]/g, '')` — JS `\s` set, not Rust's.
         v.chars()
-            .filter(|c| c.is_whitespace() || *c == ':' || *c == '\u{FEFF}')
+            .filter(|c| is_js_regex_whitespace(*c) || *c == ':')
             .collect()
     })
 }
@@ -610,4 +611,57 @@ pub(crate) fn is_js_regex_whitespace(c: char) -> bool {
 
 fn strip_non_whitespace(s: &str) -> String {
     s.chars().filter(|c| is_js_regex_whitespace(*c)).collect()
+}
+
+#[cfg(test)]
+mod js_whitespace_tests {
+    use super::*;
+
+    /// Lock the JS `\s` ↔ Rust `White_Space` divergence: U+0085 is in
+    /// Rust's `White_Space` but NOT in JS `\s`. JS treats it as
+    /// non-whitespace; we must too.
+    #[test]
+    fn nel_u0085_is_not_js_whitespace() {
+        assert!(!is_js_regex_whitespace('\u{0085}'),
+            "U+0085 (NEL) is in Unicode White_Space but NOT in JS \\s");
+        // strip_non_whitespace keeps only JS-whitespace chars; U+0085
+        // must be stripped (treated as non-whitespace).
+        assert_eq!(strip_non_whitespace("\u{0085}"), "");
+        assert_eq!(strip_non_whitespace("a\u{0085}b"), "");
+    }
+
+    /// Lock the inverse: U+FEFF (ZWNBSP/BOM) IS JS `\s` but NOT in
+    /// Rust's `White_Space`. We must keep it.
+    #[test]
+    fn zwnbsp_ufeff_is_js_whitespace() {
+        assert!(is_js_regex_whitespace('\u{FEFF}'));
+        assert_eq!(strip_non_whitespace("\u{FEFF}"), "\u{FEFF}");
+    }
+
+    /// Sanity: ASCII whitespace + LineTerminators are kept.
+    #[test]
+    fn ascii_whitespace_kept() {
+        for c in ['\t', '\n', '\u{000B}', '\u{000C}', '\r', ' '] {
+            assert!(is_js_regex_whitespace(c), "char {:?} should be JS whitespace", c);
+        }
+    }
+
+    /// Space_Separator (Zs) characters are kept — covers Mongolian
+    /// vowel separator (U+1680), various quad spaces (U+2000-200A),
+    /// narrow no-break space (U+202F), medium math space (U+205F),
+    /// ideographic space (U+3000).
+    #[test]
+    fn space_separator_kept() {
+        for c in ['\u{1680}', '\u{2000}', '\u{200A}', '\u{202F}', '\u{205F}', '\u{3000}'] {
+            assert!(is_js_regex_whitespace(c), "char U+{:04X} should be JS whitespace", c as u32);
+        }
+    }
+
+    /// Non-whitespace characters get stripped.
+    #[test]
+    fn non_whitespace_stripped() {
+        assert_eq!(strip_non_whitespace("a"), "");
+        assert_eq!(strip_non_whitespace("abc"), "");
+        assert_eq!(strip_non_whitespace("\n  abc \n"), "\n   \n");
+    }
 }

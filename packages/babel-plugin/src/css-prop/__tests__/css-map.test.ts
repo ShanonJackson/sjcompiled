@@ -14,7 +14,7 @@ describe('css map behaviour', () => {
     transformCode(code, { pretty: false, ...opts });
 
   const styles = `
-    import { css, cssMap } from '@compiled/react';
+    import { css, cssMap } from '@sjcompiled/react';
 
     const styles = cssMap({
       danger: {
@@ -50,7 +50,7 @@ describe('css map behaviour', () => {
 
     expect(actual).toMatchInlineSnapshot(`
         "import * as React from "react";
-        import { ax, ix, CC, CS } from "@compiled/react/runtime";
+        import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
         const _5 = "._syaz13q2{color:blue}";
         const _4 = "._bfhkbf54{background-color:green}";
         const _3 = "._syazbf54{color:green}";

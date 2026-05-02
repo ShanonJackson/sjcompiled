@@ -223,11 +223,9 @@ fn nodes_equal(a: &Node, b: &Node) -> bool {
                 return false;
             }
         }
-        (NodeKind::Comment(ca), NodeKind::Comment(cb)) => {
-            if ca.text != cb.text {
-                return false;
-            }
-        }
+        // Upstream `equals()` (src/index.js:38-69) has NO `comment` case in
+        // its switch — two comments are considered equal as long as their
+        // type matches, regardless of `text`. Do NOT add a Comment branch.
         _ => {}
     }
 
@@ -323,6 +321,29 @@ mod tests {
     #[test]
     fn dedupe_three_consecutive_decls() {
         let out = run("color: red; color: red; color: red;");
+        assert_eq!(out.matches("color: red").count(), 1, "got: {out:?}");
+    }
+
+    // Upstream `equals()` does NOT compare comment text — see src/index.js:38-69
+    // (no `comment` case in the switch). Two atrules whose only difference is
+    // the body of an inner comment are considered equal by JS, so dedupe must
+    // remove the earlier one. The Rust port previously diverged here.
+    #[test]
+    fn atrule_inner_comment_text_is_ignored_in_equality() {
+        let out = run(
+            "@media (min-width:100px){/* a */color:red}@media (min-width:100px){/* b */color:red}",
+        );
+        assert_eq!(out.matches("@media").count(), 1, "got: {out:?}");
+    }
+
+    #[test]
+    fn rule_inner_comment_text_is_ignored_in_equality() {
+        // dedupeRule snapshots `last`'s decls and runs dedupeNode against the
+        // earlier rule's body for each. The earlier rule loses the matching
+        // decl; if its only remaining children are comments, `empty(node)`
+        // (src/index.js:14-16) is truthy and the rule is removed entirely.
+        let out = run("a { /* keep */ color: red; } a { color: red; }");
+        assert_eq!(out.matches("a {").count(), 1, "got: {out:?}");
         assert_eq!(out.matches("color: red").count(), 1, "got: {out:?}");
     }
 }

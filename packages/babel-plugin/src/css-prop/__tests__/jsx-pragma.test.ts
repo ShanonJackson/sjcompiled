@@ -3,13 +3,13 @@ import { transform } from '../../test-utils';
 describe('local jsx namespace', () => {
   it('should transform css prop using jsx import source', () => {
     const actual = transform(`
-      /** @jsxImportSource @compiled/react */
+      /** @jsxImportSource @sjcompiled/react */
 
       <div css={{ color: 'red' }}>hello</div>;
     `);
 
     expect(actual).toMatchInlineSnapshot(`
-      "import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      "import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       const _ = "._syaz5scu{color:red}";
       <CC>
         <CS>{[_]}</CS>
@@ -23,14 +23,14 @@ describe('local jsx namespace', () => {
     const actual = transform(`
       /** @jsxRuntime classic */
       /** @jsx jsx */
-      import { jsx } from '@compiled/react';
+      import { jsx } from '@sjcompiled/react';
 
       <div css={{ color: 'red' }}>hello</div>;
     `);
 
     expect(actual).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       const _ = "._syaz5scu{color:red}";
       <CC>
         <CS>{[_]}</CS>

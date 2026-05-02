@@ -13,7 +13,7 @@ describe('custom import source', () => {
       { filename: './foo/index.js' }
     );
 
-    expect(actual).toInclude('@compiled/react/runtime');
+    expect(actual).toInclude('@sjcompiled/react/runtime');
   });
 
   it('should pick up custom relative import source', () => {
@@ -28,7 +28,7 @@ describe('custom import source', () => {
       { filename: './foo/index.js', importSources: ['./bar/stub-api'] }
     );
 
-    expect(actual).toInclude('@compiled/react/runtime');
+    expect(actual).toInclude('@sjcompiled/react/runtime');
   });
 
   it('should pick up custom absolute import source', () => {
@@ -43,7 +43,7 @@ describe('custom import source', () => {
       { filename: './foo/index.js', importSources: ['/bar/stub-api'] }
     );
 
-    expect(actual).toInclude('@compiled/react/runtime');
+    expect(actual).toInclude('@sjcompiled/react/runtime');
   });
 
   it('should pick up custom package import source', () => {
@@ -58,7 +58,7 @@ describe('custom import source', () => {
       { filename: './foo/index.js', importSources: ['@af/compiled'] }
     );
 
-    expect(actual).toInclude('@compiled/react/runtime');
+    expect(actual).toInclude('@sjcompiled/react/runtime');
   });
 
   it('should pick up an automatic pragma from a custom package import source', () => {
@@ -70,7 +70,7 @@ describe('custom import source', () => {
       { filename: './foo/index.js', importSources: ['@af/compiled'] }
     );
 
-    expect(actual).toInclude('@compiled/react/runtime');
+    expect(actual).toInclude('@sjcompiled/react/runtime');
   });
 
   it("should handle custom package sources that aren't found", () => {
@@ -92,7 +92,7 @@ describe('custom import source', () => {
     expect(() =>
       transform(
         `
-        /** @jsxImportSource @compiled/react */
+        /** @jsxImportSource @sjcompiled/react */
         import { css } from '@private/misconfigured';
 
         const styles = css({ color: 'red' });

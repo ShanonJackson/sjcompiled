@@ -3,7 +3,7 @@ import { transform } from '../test-utils';
 describe('import specifiers', () => {
   it('should evaluate simple expressions', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       <div css={{ fontSize: 8 * 2 }}>hello world</div>
     `);
@@ -13,7 +13,7 @@ describe('import specifiers', () => {
 
   it('should inline mutable identifier that is not mutated', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       let notMutatedAgain = 20;
 
@@ -25,7 +25,7 @@ describe('import specifiers', () => {
 
   it('should bail out evaluating expression referencing a mutable identifier', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       let mutable = 2;
       mutable = 1;
@@ -38,7 +38,7 @@ describe('import specifiers', () => {
 
   it('should bail out evaluating identifier expression referencing a mutated identifier', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       let mutable = 2;
       const dontchange = mutable;
@@ -53,7 +53,7 @@ describe('import specifiers', () => {
   it('should not exhaust the stack when an identifier references itself', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         let heading = heading || 20;
 
@@ -64,7 +64,7 @@ describe('import specifiers', () => {
 
   it('should bail out evaluating expression that references a constant expression referencing a mutated expression', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       let mutable = false;
       const dontchange = mutable ? 1 : 2;
@@ -78,7 +78,7 @@ describe('import specifiers', () => {
 
   it('should bail out evaluating a binary expression referencing a mutated identifier', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       let mutable = 2;
       mutable = 3;
@@ -92,7 +92,7 @@ describe('import specifiers', () => {
   it('should not blow up when referencing local destructured args in arrow func', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         export const Component = ({ foo, color }) => {
           return (
@@ -106,7 +106,7 @@ describe('import specifiers', () => {
   it('should not blow up when referencing local args in arrow func', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         export const Component = (props) => {
           return (
@@ -120,7 +120,7 @@ describe('import specifiers', () => {
   it('should not blow up when referencing local destructured args in func', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         function Component({ foo, color }) {
           return (
@@ -134,7 +134,7 @@ describe('import specifiers', () => {
   it('should not blow up when referencing local args in func', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         function Component(props) {
           return (
@@ -148,7 +148,7 @@ describe('import specifiers', () => {
   it('should not blow up when destructured local args in func', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         function DestructuredComp(props) {
           const { foo, color } = props;
@@ -163,7 +163,7 @@ describe('import specifiers', () => {
 
   it('handles object destructuring', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       const { foo, color } = { foo: 14, color: 'blue' };
 
@@ -183,7 +183,7 @@ describe('import specifiers', () => {
 
   it('statically evaluates deconstructed values from deeply nested objects', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       const theme = {
         borders: '1px solid black',
@@ -233,7 +233,7 @@ describe('import specifiers', () => {
 
   it('handles the destructuring coming from an identifier', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       const obj = { foo: 14, color: 'blue' };
       const { foo, color } = obj;
@@ -254,7 +254,7 @@ describe('import specifiers', () => {
 
   it('should build css template literal from the css api', () => {
     const actual = transform(`
-      import { css } from '@compiled/react';
+      import { css } from '@sjcompiled/react';
 
       const primary = css\`
         color: red;
@@ -268,7 +268,7 @@ describe('import specifiers', () => {
 
   it('handles the destructuring coming from a referenced identifier', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       const obj = { foo: 14, color: 'blue' };
       const bar = obj;
@@ -290,7 +290,7 @@ describe('import specifiers', () => {
 
   it('handles the function call destructuring coming from a referenced identifier', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       const obj = { foo: () => ({ bar: 14 }), color: 'blue' };
       const bar = obj;
@@ -313,7 +313,7 @@ describe('import specifiers', () => {
   it('should not blow up when member expression object is other than "Identifier" or "Call Expression"', () => {
     expect(() => {
       transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         function Component() {
           return (
@@ -326,7 +326,7 @@ describe('import specifiers', () => {
 
   it('handles the computed object property with static evaluation of variable', () => {
     const actual = transform(`
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       const media = '@media screen'
       const obj = { [media]: { color: 'blue' } };
@@ -346,7 +346,7 @@ describe('import specifiers', () => {
   it('handles the computed object property, where the variable in property is defined inside `as const` expression', () => {
     const actual = transform(
       `
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         const something = { large: '@media screen' } as const;
 
@@ -364,7 +364,7 @@ describe('import specifiers', () => {
 
   it('uses fallback node when evaluating a non expression returning a non static value', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       function getLineHeight() {
         return Math.random();
@@ -383,7 +383,7 @@ describe('import specifiers', () => {
   describe('binary expresssions', () => {
     it('statically evaluates calculated value with identifier', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         const spacing = 8;
 
@@ -395,7 +395,7 @@ describe('import specifiers', () => {
 
     it('statically evaluates calculated value with nested binary', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         const spacing = 8;
 
@@ -407,7 +407,7 @@ describe('import specifiers', () => {
 
     it('statically evaluates calculated value with multiple identifiers', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         const one = 1;
         const two = 2;
@@ -421,7 +421,7 @@ describe('import specifiers', () => {
 
     it('statically evaluates calculated value within calc utility', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         const spacing = 8;
 
@@ -436,7 +436,7 @@ describe('import specifiers', () => {
 
     it('statically evaluates calculated value with string literal containing numeric value', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         const stringSpacing = '8';
 
@@ -448,7 +448,7 @@ describe('import specifiers', () => {
 
     it('statically evaluates calculated value with unary expression', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         const getSpacing = () => 8;
 
@@ -460,7 +460,7 @@ describe('import specifiers', () => {
 
     it('falls back to dynamic evaluation when non static value used', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         const getSpacing = () => Math.random();
 
@@ -477,7 +477,7 @@ describe('import specifiers', () => {
     it('statically evaluates a TS const expression', () => {
       const actual = transform(
         `
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         const styles = { color: 'red' } as const;
 
@@ -494,7 +494,7 @@ describe('import specifiers', () => {
     it('statically evaluates a TS const expression in a resolved binding', () => {
       const actual = transform(
         `
-        import { styled } from "@compiled/react";
+        import { styled } from "@sjcompiled/react";
 
         const style = {
           backgroundColor: 'red'
@@ -517,7 +517,7 @@ describe('import specifiers', () => {
 
     it('should bail out evaluating non-exist call expression, which has member expression', () => {
       const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
 
       <div css={{ marginTop: foo.bar() }} />
     `);

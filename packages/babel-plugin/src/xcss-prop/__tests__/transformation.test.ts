@@ -8,7 +8,7 @@ describe('xcss prop transformation', () => {
 
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       const _ = "._syaz5scu{color:red}";
       <CC>
         <CS>{[_]}</CS>
@@ -45,7 +45,7 @@ describe('xcss prop transformation', () => {
 
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       const _ = "._syaz5scu{color:red}";
       <CC>
         <CS>{[_]}</CS>
@@ -57,7 +57,7 @@ describe('xcss prop transformation', () => {
 
   it('should work with css map', () => {
     const result = transform(`
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
 
       const styles = cssMap({
         primary: { color: 'red' },
@@ -68,7 +68,7 @@ describe('xcss prop transformation', () => {
 
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       const _ = "._syaz5scu{color:red}";
       const styles = {
         primary: "_syaz5scu",
@@ -83,7 +83,7 @@ describe('xcss prop transformation', () => {
 
   it('should allow ternaries', () => {
     const result = transform(`
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
 
       const styles = cssMap({
         primary: { color: 'red' },
@@ -95,7 +95,7 @@ describe('xcss prop transformation', () => {
 
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       const _2 = "._syaz13q2{color:blue}";
       const _ = "._syaz5scu{color:red}";
       const styles = {
@@ -112,7 +112,7 @@ describe('xcss prop transformation', () => {
 
   it('should allow concatenating styles', () => {
     const result = transform(`
-      import { cssMap, j } from '@compiled/react';
+      import { cssMap, j } from '@sjcompiled/react';
 
       const styles = cssMap({
         primary: { color: 'red' },
@@ -124,8 +124,8 @@ describe('xcss prop transformation', () => {
 
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
-      import { j } from "@compiled/react";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
+      import { j } from "@sjcompiled/react";
       const _2 = "._syaz13q2{color:blue}";
       const _ = "._syaz5scu{color:red}";
       const styles = {
@@ -147,7 +147,7 @@ describe('xcss prop transformation', () => {
   it('should transform xcss prop when compiled is in scope', () => {
     const result = transform(
       `
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
 
       const styles = cssMap({
         primary: { color: 'red' },
@@ -159,7 +159,7 @@ describe('xcss prop transformation', () => {
 
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       const _ = "._syaz5scu{color:red}";
       const styles = {
         primary: "_syaz5scu",
@@ -181,7 +181,7 @@ describe('xcss prop transformation', () => {
 
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       <CC>
         <CS>{[]}</CS>
         {<Component xcss={undefined} />}
@@ -213,7 +213,7 @@ describe('xcss prop transformation', () => {
   it('should only add styles to xcss call sites that use them', () => {
     const result = transform(
       `
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
       import Button from '@atlaskit/button';
 
       const stylesOne = cssMap({ text: { color: 'red' } })
@@ -232,7 +232,7 @@ describe('xcss prop transformation', () => {
 
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       import Button from "@atlaskit/button";
       const _2 = "._syaz13q2{color:blue}";
       const _ = "._syaz5scu{color:red}";
@@ -265,7 +265,7 @@ describe('xcss prop transformation', () => {
       `
       import { Box, xcss } from '@atlaskit/primitives';
       import Button from '@atlaskit/button';
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
 
       const styles = cssMap({ text: { color: 'red' } })
 
@@ -283,7 +283,7 @@ describe('xcss prop transformation', () => {
     // Here, xcss runs at runtime
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       import { Box, xcss } from "@atlaskit/primitives";
       import Button from "@atlaskit/button";
       const _ = "._syaz5scu{color:red}";
@@ -334,7 +334,7 @@ describe('xcss prop transformation', () => {
 //
 // We only choose to worry about cases where we don't have
 // two different CSS-in-JS libraries being explicitly imported,
-// i.e. xcss prop, where @compiled/react isn't imported but
+// i.e. xcss prop, where @sjcompiled/react isn't imported but
 // @sjcompiled/babel-plugin will still process the xcss usages.
 describe('xcss prop interacting with other libraries', () => {
   it('should skip importing Compiled runtime when no direct Compiled usage was found', () => {
@@ -400,7 +400,7 @@ describe('xcss prop interacting with other libraries', () => {
 
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       import { css, jsx } from "@emotion/react";
       import { Box } from "@atlaskit/primitives";
       const _ = "._syaz5scu{color:red}";
@@ -426,7 +426,7 @@ describe('xcss prop interacting with other libraries', () => {
   it("xcss prop shouldn't affect styled prop from styled-components", () => {
     const result = transform(
       `
-      import { cssMap } from '@compiled/react';
+      import { cssMap } from '@sjcompiled/react';
       import styled from 'styled-components';
       import Button from '@atlaskit/button';
 
@@ -452,7 +452,7 @@ describe('xcss prop interacting with other libraries', () => {
 
     expect(result).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@compiled/react/runtime";
+      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
       import styled from "styled-components";
       import Button from "@atlaskit/button";
       const _3 = "._syaz13q2{color:blue}";

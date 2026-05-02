@@ -13,7 +13,7 @@ describe('module traversal', () => {
 
   it('should replace an identifier referencing a default import specifier object', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import colors from '../__fixtures__/mixins/objects';
 
       <div css={{ color: colors.primary }} />
@@ -24,7 +24,7 @@ describe('module traversal', () => {
 
   it('should replace an identifier referencing a default import specifier string literal', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import color from '../__fixtures__/mixins/simple';
 
       <div css={{ color }} />
@@ -35,7 +35,7 @@ describe('module traversal', () => {
 
   it('should replace an identifier referencing a default import specifier string literal', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { primary } from '../__fixtures__/mixins/simple';
 
       <div css={{ color: primary }} />
@@ -46,7 +46,7 @@ describe('module traversal', () => {
 
   it('should replace an identifier referencing a named import specifier object from a variable declaration export', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { colors } from '../__fixtures__/mixins/objects';
 
       <div css={{ color: colors.primary }} />
@@ -57,7 +57,7 @@ describe('module traversal', () => {
 
   it('should replace an identifier referencing a named import specifier object from an export specifier', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { danger } from '../__fixtures__/mixins/objects';
 
       <div css={{ color: danger }} />
@@ -68,7 +68,7 @@ describe('module traversal', () => {
 
   it('should replace an identifier referencing a node modules named import specifier object', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { colors } from '@compiled-private/module-a';
 
       <div css={{ color: colors.primary }} />
@@ -79,7 +79,7 @@ describe('module traversal', () => {
 
   it('should use css from an identifier referencing a named import object', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { style } from '../__fixtures__/mixins/objects';
 
       <div css={style} />
@@ -90,7 +90,7 @@ describe('module traversal', () => {
 
   it('should inline css from an object spread referencing a named import object', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { style } from '../__fixtures__/mixins/objects';
 
       <div css={{ color: 'blue', ...style }} />
@@ -102,7 +102,7 @@ describe('module traversal', () => {
 
   it('should inline css from an object with multiple identifiers referenced from a named import', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { styleInlining } from '../__fixtures__/mixins/objects';
 
       <div css={styleInlining} />
@@ -115,7 +115,7 @@ describe('module traversal', () => {
 
   it('should inline css from a object with multiple identifiers referenced from a named import', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { styleInlining } from '../__fixtures__/mixins/objects';
 
       <div css={{ ...styleInlining }} />
@@ -128,7 +128,7 @@ describe('module traversal', () => {
 
   it('should inline css from a spread referencing an identifier from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { styleModuleInlining } from '../__fixtures__/mixins/objects';
 
       <div css={{ ...styleModuleInlining }} />
@@ -139,7 +139,7 @@ describe('module traversal', () => {
 
   it('should inline css from an identifier referencing an identifier from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { styleModuleInlining } from '../__fixtures__/mixins/objects';
 
       <div css={styleModuleInlining} />
@@ -150,7 +150,7 @@ describe('module traversal', () => {
 
   it('should inline css from an export rexporting an identifier from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { reexport } from '../__fixtures__/mixins/reexport';
 
       <div css={{ color: reexport }} />
@@ -161,7 +161,7 @@ describe('module traversal', () => {
 
   it('should inline css from a member expression export rexporting an identifier from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { objectReexport } from '../__fixtures__/mixins/reexport';
 
       <div css={{ color: objectReexport.foo }} />
@@ -172,7 +172,7 @@ describe('module traversal', () => {
 
   it('should inline css from a member expression that comprises of an import being exposed by a local variable', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { danger } from '../__fixtures__/mixins/objects';
 
       const theme = { danger };
@@ -184,7 +184,7 @@ describe('module traversal', () => {
 
   it('should inline a static string', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { bold } from '../__fixtures__/mixins/strings';
 
       <div css={bold} />
@@ -196,7 +196,7 @@ describe('module traversal', () => {
 
   it('should inline a string with module interpolations', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { italics } from '../__fixtures__/mixins/strings';
 
       <div css={[italics]} />
@@ -208,7 +208,7 @@ describe('module traversal', () => {
 
   it('should inline a string with import interpolations', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { danger } from '../__fixtures__/mixins/strings';
 
       <div css={[danger]} />
@@ -220,7 +220,7 @@ describe('module traversal', () => {
 
   it('should inline css from a spread referencing an identifier with an IIFE property from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { fontMixin } from '../__fixtures__/mixins/objects';
 
       <div css={{ ...fontMixin }} />
@@ -231,7 +231,7 @@ describe('module traversal', () => {
 
   it('should inline css from an array referencing an identifier with an IIFE property from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { fontMixin } from '../__fixtures__/mixins/objects';
 
       <div css={[fontMixin]} />
@@ -242,7 +242,7 @@ describe('module traversal', () => {
 
   it('should inline css from a function mixin referencing an identifier from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { colorMixin } from '../__fixtures__/mixins/objects';
 
       <div css={{ ':hover': colorMixin() }} />
@@ -254,7 +254,7 @@ describe('module traversal', () => {
 
   it('should inline css for object literal from a directly called & assigned function mixin referencing an identifier from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { colorMixin } from '../__fixtures__/mixins/objects';
 
       const colors = colorMixin();
@@ -267,7 +267,7 @@ describe('module traversal', () => {
 
   it('should inline css for string literal from a directly called & assigned function mixin referencing an identifier from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { colorMixin } from '../__fixtures__/mixins/objects';
 
       const colors = colorMixin();
@@ -280,7 +280,7 @@ describe('module traversal', () => {
 
   it('should inline css from a directly called function mixin referencing an identifier from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { colorMixin } from '../__fixtures__/mixins/objects';
 
       <div css={{':hover': { color: colorMixin().color }}} />
@@ -291,7 +291,7 @@ describe('module traversal', () => {
 
   it('should inline css from a directly called function mixin referencing an identifier with an IIFE property from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { spacingMixin } from '../__fixtures__/mixins/objects';
 
       <div css={{':hover': { paddingTop: spacingMixin.padding.top() }}} />
@@ -302,7 +302,7 @@ describe('module traversal', () => {
 
   it('should inline css when destructuring an identifier from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { spacingMixin } from '../__fixtures__/mixins/objects';
 
       const { padding: { top } } = spacingMixin;
@@ -315,7 +315,7 @@ describe('module traversal', () => {
 
   it('should inline css from a function mixin with parameters referencing an identifier from another module', () => {
     const actual = transform(`
-      import '@compiled/react';
+      import '@sjcompiled/react';
       import { colorMixin2 } from '../__fixtures__/mixins/objects';
 
       const color = { blue: 'blue' };
@@ -330,7 +330,7 @@ describe('module traversal', () => {
 
   it('handles template literal with imported selectors from external modules', () => {
     const actual = transform(`
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       import { ID_SELECTOR } from '../__fixtures__/mixins/strings';
 
@@ -350,7 +350,7 @@ describe('module traversal', () => {
 
   it('handles template literal with imported selectors from external modules with substitution', () => {
     const actual = transform(`
-      import { styled } from '@compiled/react';
+      import { styled } from '@sjcompiled/react';
 
       import { JOINED_SELECTOR } from '../__fixtures__/mixins/strings';
       import { primary } from '../__fixtures__/mixins/simple';
@@ -366,11 +366,9 @@ describe('module traversal', () => {
       </BackgroundWithSelector>;
     `);
 
-    // This gets split into two rules due to flattenMultipleSelectors
-    expect(actual).toIncludeMultiple([
-      '._15rzbf54 #joined-selector{background-color:green}',
-      '._1khrbf54 .red{background-color:green}',
-    ]);
+    expect(actual).toInclude(
+      '._15rzbf54 #joined-selector, ._1khrbf54 .red{background-color:green}'
+    );
   });
 
   describe('should call onIncludedFiles with the filepath', () => {
@@ -382,7 +380,7 @@ describe('module traversal', () => {
 
     it('when using a CSS object', () => {
       const code = `
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import { colorMixin2 } from '../__fixtures__/mixins/objects';
 
         const color = { blue: 'blue' };
@@ -404,7 +402,7 @@ describe('module traversal', () => {
 
     it('when using a CSS property', () => {
       const code = `
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import { primary } from '../__fixtures__/mixins/simple';
 
         const Component = (props) => {
@@ -422,7 +420,7 @@ describe('module traversal', () => {
 
     it('when using CSS template literal', () => {
       const code = `
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import { primary } from '../__fixtures__/mixins/simple';
 
         const Component = (props) => {
@@ -442,7 +440,7 @@ describe('module traversal', () => {
   describe('namespace imports', () => {
     it('should replace a member expression referencing a default export', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import * as objects from '../__fixtures__/mixins/objects';
 
         <div css={{ color: objects.default.primary }} />
@@ -453,7 +451,7 @@ describe('module traversal', () => {
 
     it('should replace a member expression referencing a default export from within a local variable', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import * as objects from '../__fixtures__/mixins/objects';
 
         const library = { objects };
@@ -466,7 +464,7 @@ describe('module traversal', () => {
 
     it('should replace a member expression referencing a function export from within a local variable', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import * as objects from '../__fixtures__/mixins/objects';
 
         const library = { objects };
@@ -480,7 +478,7 @@ describe('module traversal', () => {
 
     it('should replace a member expression referencing a named variable export', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import * as objects from '../__fixtures__/mixins/objects';
 
         <div css={{ color: objects.colors.primary }} />
@@ -491,7 +489,7 @@ describe('module traversal', () => {
 
     it('should replace a member expression referencing an export specifier', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import * as objects from '../__fixtures__/mixins/objects';
 
         <div css={{ color: objects.danger }} />
@@ -502,7 +500,7 @@ describe('module traversal', () => {
 
     it('should inline css from an object spread', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import * as objects from '../__fixtures__/mixins/objects';
 
         <div css={{ ...objects.style }} />
@@ -513,7 +511,7 @@ describe('module traversal', () => {
 
     it('should inline css from an call expression', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import * as objects from '../__fixtures__/mixins/objects';
 
         <div css={{ ...objects.colorMixin() }} />
@@ -524,7 +522,7 @@ describe('module traversal', () => {
 
     it('should inline css from an identifier with an IIFE property', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import * as objects from '../__fixtures__/mixins/objects';
 
         <div css={{ ...objects.fontMixin }} />
@@ -535,7 +533,7 @@ describe('module traversal', () => {
 
     it('should inline css from a function mixin with parameters', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import * as objects from '../__fixtures__/mixins/objects';
 
         const color = { blue: 'blue' };
@@ -548,7 +546,7 @@ describe('module traversal', () => {
 
     it('should inline css from a directly called function mixin', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import * as objects from '../__fixtures__/mixins/objects';
 
         <div css={{ ':hover': { paddingTop: objects.spacingMixin.padding.top() }}} />
@@ -561,7 +559,7 @@ describe('module traversal', () => {
   describe('direct re-exports', () => {
     it('should resolve identifier when re-exported as a named export', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import { secondary } from '../__fixtures__/mixins/reexport';
 
         <div css={{ color: secondary }} />
@@ -572,7 +570,7 @@ describe('module traversal', () => {
 
     it('should resolve identifier when re-exported as default export', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import defaultColor from '../__fixtures__/mixins/reexport';
 
         <div css={{ color: defaultColor }} />
@@ -583,7 +581,7 @@ describe('module traversal', () => {
 
     it('should resolve identifier when re-exported default has an alias', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import { reexportedDefault } from '../__fixtures__/mixins/reexport';
 
         <div css={{ color: reexportedDefault }} />
@@ -594,7 +592,7 @@ describe('module traversal', () => {
 
     it('should resolve member expression in CSS prop', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import { plainObjectMixin as styles } from '../__fixtures__/mixins/objects';
 
         <div css={styles.fail}>hello world</div>
@@ -605,7 +603,7 @@ describe('module traversal', () => {
 
     it('should resolve member expression when mixin has CSS call expression ', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import { cssCallExpressionMixin as styles } from '../__fixtures__/mixins/objects';
 
         <div css={styles.fail}>hello world</div>
@@ -616,7 +614,7 @@ describe('module traversal', () => {
 
     it('should resolve member expression when mixin has aliased CSS call expression ', () => {
       const actual = transform(`
-        import { css } from '@compiled/react';
+        import { css } from '@sjcompiled/react';
         import { stylesWithAlias } from '../__fixtures__/mixins/alias';
 
         const styles = {
@@ -639,7 +637,7 @@ describe('module traversal', () => {
 
     it('should resolve member expression if used as CSS property', () => {
       const actual = transform(`
-        import '@compiled/react';
+        import '@sjcompiled/react';
         import { cssPropertyNames } from '../__fixtures__/mixins/objects';
 
         <div css={{ [cssPropertyNames.level1.level2]: 'blue' }} />
