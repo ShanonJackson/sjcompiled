@@ -1,0 +1,2753 @@
+[
+  {
+    "label": "new(0)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "new(1)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "new(-1)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "-1",
+      "toFractionExcludeWhole": "-1",
+      "toString": "-1",
+      "valueOf": "-1"
+    }
+  },
+  {
+    "label": "new(2)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "new(3)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 1,
+      "toFraction": "3",
+      "toFractionExcludeWhole": "3",
+      "toString": "3",
+      "valueOf": "3"
+    }
+  },
+  {
+    "label": "new(0.5)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "1/2",
+      "toFractionExcludeWhole": "1/2",
+      "toString": "0.5",
+      "valueOf": "0.5"
+    }
+  },
+  {
+    "label": "new(1.5)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 2,
+      "toFraction": "3/2",
+      "toFractionExcludeWhole": "1 1/2",
+      "toString": "1.5",
+      "valueOf": "1.5"
+    }
+  },
+  {
+    "label": "new(2.54)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 50,
+      "toFraction": "127/50",
+      "toFractionExcludeWhole": "2 27/50",
+      "toString": "2.54",
+      "valueOf": "2.54"
+    }
+  },
+  {
+    "label": "new(96)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 96,
+      "d": 1,
+      "toFraction": "96",
+      "toFractionExcludeWhole": "96",
+      "toString": "96",
+      "valueOf": "96"
+    }
+  },
+  {
+    "label": "new(100)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 100,
+      "d": 1,
+      "toFraction": "100",
+      "toFractionExcludeWhole": "100",
+      "toString": "100",
+      "valueOf": "100"
+    }
+  },
+  {
+    "label": "new(1000)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1000,
+      "d": 1,
+      "toFraction": "1000",
+      "toFractionExcludeWhole": "1000",
+      "toString": "1000",
+      "valueOf": "1000"
+    }
+  },
+  {
+    "label": "new(0.3333333333333333)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 3,
+      "toFraction": "1/3",
+      "toFractionExcludeWhole": "1/3",
+      "toString": "0.(3)",
+      "valueOf": "0.3333333333333333"
+    }
+  },
+  {
+    "label": "new(-2.3333333333333335)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "-7/3",
+      "toFractionExcludeWhole": "-2 1/3",
+      "toString": "-2.(3)",
+      "valueOf": "-2.3333333333333335"
+    }
+  },
+  {
+    "label": "new(0.1)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 10,
+      "toFraction": "1/10",
+      "toFractionExcludeWhole": "1/10",
+      "toString": "0.1",
+      "valueOf": "0.1"
+    }
+  },
+  {
+    "label": "new(0.2)",
+    "op": "new_number",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 5,
+      "toFraction": "1/5",
+      "toFractionExcludeWhole": "1/5",
+      "toString": "0.2",
+      "valueOf": "0.2"
+    }
+  },
+  {
+    "label": "new(\"0\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "new(\"1\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "new(\"-1\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "-1",
+      "toFractionExcludeWhole": "-1",
+      "toString": "-1",
+      "valueOf": "-1"
+    }
+  },
+  {
+    "label": "new(\"7/8\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 7,
+      "d": 8,
+      "toFraction": "7/8",
+      "toFractionExcludeWhole": "7/8",
+      "toString": "0.875",
+      "valueOf": "0.875"
+    }
+  },
+  {
+    "label": "new(\"-7/3\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "-7/3",
+      "toFractionExcludeWhole": "-2 1/3",
+      "toString": "-2.(3)",
+      "valueOf": "-2.3333333333333335"
+    }
+  },
+  {
+    "label": "new(\"1/3\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 3,
+      "toFraction": "1/3",
+      "toFractionExcludeWhole": "1/3",
+      "toString": "0.(3)",
+      "valueOf": "0.3333333333333333"
+    }
+  },
+  {
+    "label": "new(\"0.5\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "1/2",
+      "toFractionExcludeWhole": "1/2",
+      "toString": "0.5",
+      "valueOf": "0.5"
+    }
+  },
+  {
+    "label": "new(\"-.5\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "-1/2",
+      "toFractionExcludeWhole": "-1/2",
+      "toString": "-0.5",
+      "valueOf": "-0.5"
+    }
+  },
+  {
+    "label": "new(\".5\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "1/2",
+      "toFractionExcludeWhole": "1/2",
+      "toString": "0.5",
+      "valueOf": "0.5"
+    }
+  },
+  {
+    "label": "new(\"1.(3)\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 4,
+      "d": 3,
+      "toFraction": "4/3",
+      "toFractionExcludeWhole": "1 1/3",
+      "toString": "1.(3)",
+      "valueOf": "1.3333333333333333"
+    }
+  },
+  {
+    "label": "new(\"0.(3)\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 3,
+      "toFraction": "1/3",
+      "toFractionExcludeWhole": "1/3",
+      "toString": "0.(3)",
+      "valueOf": "0.3333333333333333"
+    }
+  },
+  {
+    "label": "new(\"-0.(3)\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 3,
+      "toFraction": "-1/3",
+      "toFractionExcludeWhole": "-1/3",
+      "toString": "-0.(3)",
+      "valueOf": "-0.3333333333333333"
+    }
+  },
+  {
+    "label": "new(\"1.'3'\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 4,
+      "d": 3,
+      "toFraction": "4/3",
+      "toFractionExcludeWhole": "1 1/3",
+      "toString": "1.(3)",
+      "valueOf": "1.3333333333333333"
+    }
+  },
+  {
+    "label": "new(\"1 1/2\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 2,
+      "toFraction": "3/2",
+      "toFractionExcludeWhole": "1 1/2",
+      "toString": "1.5",
+      "valueOf": "1.5"
+    }
+  },
+  {
+    "label": "new(\"-2 1/3\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "-7/3",
+      "toFractionExcludeWhole": "-2 1/3",
+      "toString": "-2.(3)",
+      "valueOf": "-2.3333333333333335"
+    }
+  },
+  {
+    "label": "new(\"5:3\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 5,
+      "d": 3,
+      "toFraction": "5/3",
+      "toFractionExcludeWhole": "1 2/3",
+      "toString": "1.(6)",
+      "valueOf": "1.6666666666666667"
+    }
+  },
+  {
+    "label": "new(\"1.0\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "new(\"-0\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "new(\"-0.0\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "new(\"-\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "new(\"+\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "new(\"7\")",
+    "op": "new_string",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 7,
+      "d": 1,
+      "toFraction": "7",
+      "toFractionExcludeWhole": "7",
+      "toString": "7",
+      "valueOf": "7"
+    }
+  },
+  {
+    "label": "new(1,2)",
+    "op": "new_pair",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "1/2",
+      "toFractionExcludeWhole": "1/2",
+      "toString": "0.5",
+      "valueOf": "0.5"
+    }
+  },
+  {
+    "label": "new(3,4)",
+    "op": "new_pair",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 4,
+      "toFraction": "3/4",
+      "toFractionExcludeWhole": "3/4",
+      "toString": "0.75",
+      "valueOf": "0.75"
+    }
+  },
+  {
+    "label": "new(-1,2)",
+    "op": "new_pair",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "-1/2",
+      "toFractionExcludeWhole": "-1/2",
+      "toString": "-0.5",
+      "valueOf": "-0.5"
+    }
+  },
+  {
+    "label": "new(127,50)",
+    "op": "new_pair",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 50,
+      "toFraction": "127/50",
+      "toFractionExcludeWhole": "2 27/50",
+      "toString": "2.54",
+      "valueOf": "2.54"
+    }
+  },
+  {
+    "label": "new(127,4800)",
+    "op": "new_pair",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 4800,
+      "toFraction": "127/4800",
+      "toFractionExcludeWhole": "127/4800",
+      "toString": "0.026458(3)",
+      "valueOf": "0.026458333333333334"
+    }
+  },
+  {
+    "label": "new(254,9600)",
+    "op": "new_pair",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 4800,
+      "toFraction": "127/4800",
+      "toFractionExcludeWhole": "127/4800",
+      "toString": "0.026458(3)",
+      "valueOf": "0.026458333333333334"
+    }
+  },
+  {
+    "label": "new(0,1)",
+    "op": "new_pair",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "new(NaN)",
+    "op": "new_nan",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": "NaN",
+      "d": "NaN",
+      "toFraction": "NaN/NaN",
+      "toFractionExcludeWhole": "NaN/NaN",
+      "toString": "NaN",
+      "valueOf": "NaN"
+    }
+  },
+  {
+    "label": "abs(0.5)",
+    "op": "abs",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "1/2",
+      "toFractionExcludeWhole": "1/2",
+      "toString": "0.5",
+      "valueOf": "0.5"
+    }
+  },
+  {
+    "label": "neg(0.5)",
+    "op": "neg",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "-1/2",
+      "toFractionExcludeWhole": "-1/2",
+      "toString": "-0.5",
+      "valueOf": "-0.5"
+    }
+  },
+  {
+    "label": "inverse(0.5)",
+    "op": "inverse",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "clone(0.5)",
+    "op": "clone",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "1/2",
+      "toFractionExcludeWhole": "1/2",
+      "toString": "0.5",
+      "valueOf": "0.5"
+    }
+  },
+  {
+    "label": "valueOf(0.5)",
+    "op": "valueOf",
+    "result": {
+      "kind": "number",
+      "value": "0.5"
+    }
+  },
+  {
+    "label": "toContinued(0.5)",
+    "op": "toContinued",
+    "result": {
+      "kind": "array_of_number",
+      "value": [
+        0,
+        2
+      ]
+    }
+  },
+  {
+    "label": "abs(-2.3333333333333335)",
+    "op": "abs",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "7/3",
+      "toFractionExcludeWhole": "2 1/3",
+      "toString": "2.(3)",
+      "valueOf": "2.3333333333333335"
+    }
+  },
+  {
+    "label": "neg(-2.3333333333333335)",
+    "op": "neg",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "7/3",
+      "toFractionExcludeWhole": "2 1/3",
+      "toString": "2.(3)",
+      "valueOf": "2.3333333333333335"
+    }
+  },
+  {
+    "label": "inverse(-2.3333333333333335)",
+    "op": "inverse",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 3,
+      "d": 7,
+      "toFraction": "-3/7",
+      "toFractionExcludeWhole": "-3/7",
+      "toString": "-0.(428571)",
+      "valueOf": "-0.42857142857142855"
+    }
+  },
+  {
+    "label": "clone(-2.3333333333333335)",
+    "op": "clone",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "-7/3",
+      "toFractionExcludeWhole": "-2 1/3",
+      "toString": "-2.(3)",
+      "valueOf": "-2.3333333333333335"
+    }
+  },
+  {
+    "label": "valueOf(-2.3333333333333335)",
+    "op": "valueOf",
+    "result": {
+      "kind": "number",
+      "value": "-2.3333333333333335"
+    }
+  },
+  {
+    "label": "toContinued(-2.3333333333333335)",
+    "op": "toContinued",
+    "result": {
+      "kind": "array_of_number",
+      "value": [
+        2,
+        3
+      ]
+    }
+  },
+  {
+    "label": "abs(2.54)",
+    "op": "abs",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 50,
+      "toFraction": "127/50",
+      "toFractionExcludeWhole": "2 27/50",
+      "toString": "2.54",
+      "valueOf": "2.54"
+    }
+  },
+  {
+    "label": "neg(2.54)",
+    "op": "neg",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 127,
+      "d": 50,
+      "toFraction": "-127/50",
+      "toFractionExcludeWhole": "-2 27/50",
+      "toString": "-2.54",
+      "valueOf": "-2.54"
+    }
+  },
+  {
+    "label": "inverse(2.54)",
+    "op": "inverse",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 50,
+      "d": 127,
+      "toFraction": "50/127",
+      "toFractionExcludeWhole": "50/127",
+      "toString": "0.(393700787401574803149606299212598425196850)",
+      "valueOf": "0.3937007874015748"
+    }
+  },
+  {
+    "label": "clone(2.54)",
+    "op": "clone",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 50,
+      "toFraction": "127/50",
+      "toFractionExcludeWhole": "2 27/50",
+      "toString": "2.54",
+      "valueOf": "2.54"
+    }
+  },
+  {
+    "label": "valueOf(2.54)",
+    "op": "valueOf",
+    "result": {
+      "kind": "number",
+      "value": "2.54"
+    }
+  },
+  {
+    "label": "toContinued(2.54)",
+    "op": "toContinued",
+    "result": {
+      "kind": "array_of_number",
+      "value": [
+        2,
+        1,
+        1,
+        5,
+        1,
+        3
+      ]
+    }
+  },
+  {
+    "label": "abs(0)",
+    "op": "abs",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "neg(0)",
+    "op": "neg",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "clone(0)",
+    "op": "clone",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "valueOf(0)",
+    "op": "valueOf",
+    "result": {
+      "kind": "number",
+      "value": "0"
+    }
+  },
+  {
+    "label": "toContinued(0)",
+    "op": "toContinued",
+    "result": {
+      "kind": "array_of_number",
+      "value": [
+        0
+      ]
+    }
+  },
+  {
+    "label": "add(0.5,0.25)",
+    "op": "add",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 4,
+      "toFraction": "3/4",
+      "toFractionExcludeWhole": "3/4",
+      "toString": "0.75",
+      "valueOf": "0.75"
+    }
+  },
+  {
+    "label": "sub(0.5,0.25)",
+    "op": "sub",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 4,
+      "toFraction": "1/4",
+      "toFractionExcludeWhole": "1/4",
+      "toString": "0.25",
+      "valueOf": "0.25"
+    }
+  },
+  {
+    "label": "mul(0.5,0.25)",
+    "op": "mul",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 8,
+      "toFraction": "1/8",
+      "toFractionExcludeWhole": "1/8",
+      "toString": "0.125",
+      "valueOf": "0.125"
+    }
+  },
+  {
+    "label": "div(0.5,0.25)",
+    "op": "div",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "add(0.3333333333333333,0.3333333333333333)",
+    "op": "add",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 3,
+      "toFraction": "2/3",
+      "toFractionExcludeWhole": "2/3",
+      "toString": "0.(6)",
+      "valueOf": "0.6666666666666666"
+    }
+  },
+  {
+    "label": "sub(0.3333333333333333,0.3333333333333333)",
+    "op": "sub",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "mul(0.3333333333333333,0.3333333333333333)",
+    "op": "mul",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 9,
+      "toFraction": "1/9",
+      "toFractionExcludeWhole": "1/9",
+      "toString": "0.(1)",
+      "valueOf": "0.1111111111111111"
+    }
+  },
+  {
+    "label": "div(0.3333333333333333,0.3333333333333333)",
+    "op": "div",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "add(-2.3333333333333335,2)",
+    "op": "add",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 3,
+      "toFraction": "-1/3",
+      "toFractionExcludeWhole": "-1/3",
+      "toString": "-0.(3)",
+      "valueOf": "-0.3333333333333333"
+    }
+  },
+  {
+    "label": "sub(-2.3333333333333335,2)",
+    "op": "sub",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 13,
+      "d": 3,
+      "toFraction": "-13/3",
+      "toFractionExcludeWhole": "-4 1/3",
+      "toString": "-4.(3)",
+      "valueOf": "-4.333333333333333"
+    }
+  },
+  {
+    "label": "mul(-2.3333333333333335,2)",
+    "op": "mul",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 14,
+      "d": 3,
+      "toFraction": "-14/3",
+      "toFractionExcludeWhole": "-4 2/3",
+      "toString": "-4.(6)",
+      "valueOf": "-4.666666666666667"
+    }
+  },
+  {
+    "label": "div(-2.3333333333333335,2)",
+    "op": "div",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 7,
+      "d": 6,
+      "toFraction": "-7/6",
+      "toFractionExcludeWhole": "-1 1/6",
+      "toString": "-1.1(6)",
+      "valueOf": "-1.1666666666666667"
+    }
+  },
+  {
+    "label": "add(127,50)",
+    "op": "add",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 177,
+      "d": 1,
+      "toFraction": "177",
+      "toFractionExcludeWhole": "177",
+      "toString": "177",
+      "valueOf": "177"
+    }
+  },
+  {
+    "label": "sub(127,50)",
+    "op": "sub",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 77,
+      "d": 1,
+      "toFraction": "77",
+      "toFractionExcludeWhole": "77",
+      "toString": "77",
+      "valueOf": "77"
+    }
+  },
+  {
+    "label": "mul(127,50)",
+    "op": "mul",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 6350,
+      "d": 1,
+      "toFraction": "6350",
+      "toFractionExcludeWhole": "6350",
+      "toString": "6350",
+      "valueOf": "6350"
+    }
+  },
+  {
+    "label": "div(127,50)",
+    "op": "div",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 50,
+      "toFraction": "127/50",
+      "toFractionExcludeWhole": "2 27/50",
+      "toString": "2.54",
+      "valueOf": "2.54"
+    }
+  },
+  {
+    "label": "add(2.54,96)",
+    "op": "add",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 4927,
+      "d": 50,
+      "toFraction": "4927/50",
+      "toFractionExcludeWhole": "98 27/50",
+      "toString": "98.54",
+      "valueOf": "98.54"
+    }
+  },
+  {
+    "label": "sub(2.54,96)",
+    "op": "sub",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 4673,
+      "d": 50,
+      "toFraction": "-4673/50",
+      "toFractionExcludeWhole": "-93 23/50",
+      "toString": "-93.46",
+      "valueOf": "-93.46"
+    }
+  },
+  {
+    "label": "mul(2.54,96)",
+    "op": "mul",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 6096,
+      "d": 25,
+      "toFraction": "6096/25",
+      "toFractionExcludeWhole": "243 21/25",
+      "toString": "243.84",
+      "valueOf": "243.84"
+    }
+  },
+  {
+    "label": "div(2.54,96)",
+    "op": "div",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 4800,
+      "toFraction": "127/4800",
+      "toFractionExcludeWhole": "127/4800",
+      "toString": "0.026458(3)",
+      "valueOf": "0.026458333333333334"
+    }
+  },
+  {
+    "label": "dpcm(72)",
+    "op": "dpcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 40,
+      "d": 21,
+      "toFraction": "40/21",
+      "toFractionExcludeWhole": "1 19/21",
+      "toString": "1.(904761)",
+      "valueOf": "1.9047619047619047"
+    }
+  },
+  {
+    "label": "dpi(72)",
+    "op": "dpi",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 4,
+      "toFraction": "3/4",
+      "toFractionExcludeWhole": "3/4",
+      "toString": "0.75",
+      "valueOf": "0.75"
+    }
+  },
+  {
+    "label": "dpcm(96)",
+    "op": "dpcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 50,
+      "toFraction": "127/50",
+      "toFractionExcludeWhole": "2 27/50",
+      "toString": "2.54",
+      "valueOf": "2.54"
+    }
+  },
+  {
+    "label": "dpi(96)",
+    "op": "dpi",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "dpcm(120)",
+    "op": "dpcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 40,
+      "toFraction": "127/40",
+      "toFractionExcludeWhole": "3 7/40",
+      "toString": "3.175",
+      "valueOf": "3.175"
+    }
+  },
+  {
+    "label": "dpi(120)",
+    "op": "dpi",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 5,
+      "d": 4,
+      "toFraction": "5/4",
+      "toFractionExcludeWhole": "1 1/4",
+      "toString": "1.25",
+      "valueOf": "1.25"
+    }
+  },
+  {
+    "label": "dpcm(144)",
+    "op": "dpcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 80,
+      "d": 21,
+      "toFraction": "80/21",
+      "toFractionExcludeWhole": "3 17/21",
+      "toString": "3.(809523)",
+      "valueOf": "3.8095238095238093"
+    }
+  },
+  {
+    "label": "dpi(144)",
+    "op": "dpi",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 2,
+      "toFraction": "3/2",
+      "toFractionExcludeWhole": "1 1/2",
+      "toString": "1.5",
+      "valueOf": "1.5"
+    }
+  },
+  {
+    "label": "dpcm(192)",
+    "op": "dpcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 25,
+      "toFraction": "127/25",
+      "toFractionExcludeWhole": "5 2/25",
+      "toString": "5.08",
+      "valueOf": "5.08"
+    }
+  },
+  {
+    "label": "dpi(192)",
+    "op": "dpi",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "dpcm(240)",
+    "op": "dpcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 127,
+      "d": 20,
+      "toFraction": "127/20",
+      "toFractionExcludeWhole": "6 7/20",
+      "toString": "6.35",
+      "valueOf": "6.35"
+    }
+  },
+  {
+    "label": "dpi(240)",
+    "op": "dpi",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 5,
+      "d": 2,
+      "toFraction": "5/2",
+      "toFractionExcludeWhole": "2 1/2",
+      "toString": "2.5",
+      "valueOf": "2.5"
+    }
+  },
+  {
+    "label": "dpcm(288)",
+    "op": "dpcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 160,
+      "d": 21,
+      "toFraction": "160/21",
+      "toFractionExcludeWhole": "7 13/21",
+      "toString": "7.(619047)",
+      "valueOf": "7.619047619047619"
+    }
+  },
+  {
+    "label": "dpi(288)",
+    "op": "dpi",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 1,
+      "toFraction": "3",
+      "toFractionExcludeWhole": "3",
+      "toString": "3",
+      "valueOf": "3"
+    }
+  },
+  {
+    "label": "dpcm(384)",
+    "op": "dpcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 254,
+      "d": 25,
+      "toFraction": "254/25",
+      "toFractionExcludeWhole": "10 4/25",
+      "toString": "10.16",
+      "valueOf": "10.16"
+    }
+  },
+  {
+    "label": "dpi(384)",
+    "op": "dpi",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 4,
+      "d": 1,
+      "toFraction": "4",
+      "toFractionExcludeWhole": "4",
+      "toString": "4",
+      "valueOf": "4"
+    }
+  },
+  {
+    "label": "simplify(0.1, undefined)",
+    "op": "simplify",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 10,
+      "toFraction": "1/10",
+      "toFractionExcludeWhole": "1/10",
+      "toString": "0.1",
+      "valueOf": "0.1"
+    }
+  },
+  {
+    "label": "simplify(0.1, 0.001)",
+    "op": "simplify",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 10,
+      "toFraction": "1/10",
+      "toFractionExcludeWhole": "1/10",
+      "toString": "0.1",
+      "valueOf": "0.1"
+    }
+  },
+  {
+    "label": "simplify(0.1, 0.1)",
+    "op": "simplify",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 10,
+      "toFraction": "1/10",
+      "toFractionExcludeWhole": "1/10",
+      "toString": "0.1",
+      "valueOf": "0.1"
+    }
+  },
+  {
+    "label": "simplify(0.1, 0)",
+    "op": "simplify",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 10,
+      "toFraction": "1/10",
+      "toFractionExcludeWhole": "1/10",
+      "toString": "0.1",
+      "valueOf": "0.1"
+    }
+  },
+  {
+    "label": "simplify(0.1, Infinity)",
+    "op": "simplify",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "simplify(0.1, -1)",
+    "op": "simplify",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 10,
+      "toFraction": "1/10",
+      "toFractionExcludeWhole": "1/10",
+      "toString": "0.1",
+      "valueOf": "0.1"
+    }
+  },
+  {
+    "label": "equals(0.5,0.5)",
+    "op": "equals",
+    "result": {
+      "kind": "bool",
+      "value": true
+    }
+  },
+  {
+    "label": "compare(0.5,0.5)",
+    "op": "compare",
+    "result": {
+      "kind": "number",
+      "value": "0"
+    }
+  },
+  {
+    "label": "divisible(0.5,0.5)",
+    "op": "divisible",
+    "result": {
+      "kind": "bool",
+      "value": true
+    }
+  },
+  {
+    "label": "equals(0.3333333333333333,0.3333333333333333)",
+    "op": "equals",
+    "result": {
+      "kind": "bool",
+      "value": true
+    }
+  },
+  {
+    "label": "compare(0.3333333333333333,0.3333333333333333)",
+    "op": "compare",
+    "result": {
+      "kind": "number",
+      "value": "0"
+    }
+  },
+  {
+    "label": "divisible(0.3333333333333333,0.3333333333333333)",
+    "op": "divisible",
+    "result": {
+      "kind": "bool",
+      "value": true
+    }
+  },
+  {
+    "label": "equals(0.5,0.25)",
+    "op": "equals",
+    "result": {
+      "kind": "bool",
+      "value": false
+    }
+  },
+  {
+    "label": "compare(0.5,0.25)",
+    "op": "compare",
+    "result": {
+      "kind": "number",
+      "value": "1"
+    }
+  },
+  {
+    "label": "divisible(0.5,0.25)",
+    "op": "divisible",
+    "result": {
+      "kind": "bool",
+      "value": true
+    }
+  },
+  {
+    "label": "equals(0.25,0.5)",
+    "op": "equals",
+    "result": {
+      "kind": "bool",
+      "value": false
+    }
+  },
+  {
+    "label": "compare(0.25,0.5)",
+    "op": "compare",
+    "result": {
+      "kind": "number",
+      "value": "-1"
+    }
+  },
+  {
+    "label": "divisible(0.25,0.5)",
+    "op": "divisible",
+    "result": {
+      "kind": "bool",
+      "value": false
+    }
+  },
+  {
+    "label": "ceil(0.123456,undefined)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "floor(0.123456,undefined)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "round(0.123456,undefined)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "ceil(0.123456,0)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "floor(0.123456,0)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "round(0.123456,0)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "ceil(0.123456,2)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 13,
+      "d": 100,
+      "toFraction": "13/100",
+      "toFractionExcludeWhole": "13/100",
+      "toString": "0.13",
+      "valueOf": "0.13"
+    }
+  },
+  {
+    "label": "floor(0.123456,2)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 25,
+      "toFraction": "3/25",
+      "toFractionExcludeWhole": "3/25",
+      "toString": "0.12",
+      "valueOf": "0.12"
+    }
+  },
+  {
+    "label": "round(0.123456,2)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 25,
+      "toFraction": "3/25",
+      "toFractionExcludeWhole": "3/25",
+      "toString": "0.12",
+      "valueOf": "0.12"
+    }
+  },
+  {
+    "label": "ceil(0.123456,4)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 247,
+      "d": 2000,
+      "toFraction": "247/2000",
+      "toFractionExcludeWhole": "247/2000",
+      "toString": "0.1235",
+      "valueOf": "0.1235"
+    }
+  },
+  {
+    "label": "floor(0.123456,4)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 617,
+      "d": 5000,
+      "toFraction": "617/5000",
+      "toFractionExcludeWhole": "617/5000",
+      "toString": "0.1234",
+      "valueOf": "0.1234"
+    }
+  },
+  {
+    "label": "round(0.123456,4)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 247,
+      "d": 2000,
+      "toFraction": "247/2000",
+      "toFractionExcludeWhole": "247/2000",
+      "toString": "0.1235",
+      "valueOf": "0.1235"
+    }
+  },
+  {
+    "label": "ceil(-0.123456,undefined)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "floor(-0.123456,undefined)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "-1",
+      "toFractionExcludeWhole": "-1",
+      "toString": "-1",
+      "valueOf": "-1"
+    }
+  },
+  {
+    "label": "round(-0.123456,undefined)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "ceil(-0.123456,0)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "floor(-0.123456,0)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "-1",
+      "toFractionExcludeWhole": "-1",
+      "toString": "-1",
+      "valueOf": "-1"
+    }
+  },
+  {
+    "label": "round(-0.123456,0)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "ceil(-0.123456,2)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 3,
+      "d": 25,
+      "toFraction": "-3/25",
+      "toFractionExcludeWhole": "-3/25",
+      "toString": "-0.12",
+      "valueOf": "-0.12"
+    }
+  },
+  {
+    "label": "floor(-0.123456,2)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 13,
+      "d": 100,
+      "toFraction": "-13/100",
+      "toFractionExcludeWhole": "-13/100",
+      "toString": "-0.13",
+      "valueOf": "-0.13"
+    }
+  },
+  {
+    "label": "round(-0.123456,2)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 3,
+      "d": 25,
+      "toFraction": "-3/25",
+      "toFractionExcludeWhole": "-3/25",
+      "toString": "-0.12",
+      "valueOf": "-0.12"
+    }
+  },
+  {
+    "label": "ceil(-0.123456,4)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 617,
+      "d": 5000,
+      "toFraction": "-617/5000",
+      "toFractionExcludeWhole": "-617/5000",
+      "toString": "-0.1234",
+      "valueOf": "-0.1234"
+    }
+  },
+  {
+    "label": "floor(-0.123456,4)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 247,
+      "d": 2000,
+      "toFraction": "-247/2000",
+      "toFractionExcludeWhole": "-247/2000",
+      "toString": "-0.1235",
+      "valueOf": "-0.1235"
+    }
+  },
+  {
+    "label": "round(-0.123456,4)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 247,
+      "d": 2000,
+      "toFraction": "-247/2000",
+      "toFractionExcludeWhole": "-247/2000",
+      "toString": "-0.1235",
+      "valueOf": "-0.1235"
+    }
+  },
+  {
+    "label": "ceil(1.5,undefined)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "floor(1.5,undefined)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "round(1.5,undefined)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "ceil(1.5,0)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "floor(1.5,0)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "round(1.5,0)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "ceil(1.5,2)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 2,
+      "toFraction": "3/2",
+      "toFractionExcludeWhole": "1 1/2",
+      "toString": "1.5",
+      "valueOf": "1.5"
+    }
+  },
+  {
+    "label": "floor(1.5,2)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 2,
+      "toFraction": "3/2",
+      "toFractionExcludeWhole": "1 1/2",
+      "toString": "1.5",
+      "valueOf": "1.5"
+    }
+  },
+  {
+    "label": "round(1.5,2)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 2,
+      "toFraction": "3/2",
+      "toFractionExcludeWhole": "1 1/2",
+      "toString": "1.5",
+      "valueOf": "1.5"
+    }
+  },
+  {
+    "label": "ceil(1.5,4)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 2,
+      "toFraction": "3/2",
+      "toFractionExcludeWhole": "1 1/2",
+      "toString": "1.5",
+      "valueOf": "1.5"
+    }
+  },
+  {
+    "label": "floor(1.5,4)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 2,
+      "toFraction": "3/2",
+      "toFractionExcludeWhole": "1 1/2",
+      "toString": "1.5",
+      "valueOf": "1.5"
+    }
+  },
+  {
+    "label": "round(1.5,4)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 3,
+      "d": 2,
+      "toFraction": "3/2",
+      "toFractionExcludeWhole": "1 1/2",
+      "toString": "1.5",
+      "valueOf": "1.5"
+    }
+  },
+  {
+    "label": "ceil(-0.5,undefined)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "floor(-0.5,undefined)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "-1",
+      "toFractionExcludeWhole": "-1",
+      "toString": "-1",
+      "valueOf": "-1"
+    }
+  },
+  {
+    "label": "round(-0.5,undefined)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "ceil(-0.5,0)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "floor(-0.5,0)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "-1",
+      "toFractionExcludeWhole": "-1",
+      "toString": "-1",
+      "valueOf": "-1"
+    }
+  },
+  {
+    "label": "round(-0.5,0)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "ceil(-0.5,2)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "-1/2",
+      "toFractionExcludeWhole": "-1/2",
+      "toString": "-0.5",
+      "valueOf": "-0.5"
+    }
+  },
+  {
+    "label": "floor(-0.5,2)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "-1/2",
+      "toFractionExcludeWhole": "-1/2",
+      "toString": "-0.5",
+      "valueOf": "-0.5"
+    }
+  },
+  {
+    "label": "round(-0.5,2)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "-1/2",
+      "toFractionExcludeWhole": "-1/2",
+      "toString": "-0.5",
+      "valueOf": "-0.5"
+    }
+  },
+  {
+    "label": "ceil(-0.5,4)",
+    "op": "ceil",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "-1/2",
+      "toFractionExcludeWhole": "-1/2",
+      "toString": "-0.5",
+      "valueOf": "-0.5"
+    }
+  },
+  {
+    "label": "floor(-0.5,4)",
+    "op": "floor",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "-1/2",
+      "toFractionExcludeWhole": "-1/2",
+      "toString": "-0.5",
+      "valueOf": "-0.5"
+    }
+  },
+  {
+    "label": "round(-0.5,4)",
+    "op": "round",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 1,
+      "d": 2,
+      "toFraction": "-1/2",
+      "toFractionExcludeWhole": "-1/2",
+      "toString": "-0.5",
+      "valueOf": "-0.5"
+    }
+  },
+  {
+    "label": "pow(2,3)",
+    "op": "pow",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 8,
+      "d": 1,
+      "toFraction": "8",
+      "toFractionExcludeWhole": "8",
+      "toString": "8",
+      "valueOf": "8"
+    }
+  },
+  {
+    "label": "pow(2,-3)",
+    "op": "pow",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 8,
+      "toFraction": "1/8",
+      "toFractionExcludeWhole": "1/8",
+      "toString": "0.125",
+      "valueOf": "0.125"
+    }
+  },
+  {
+    "label": "pow(4,0.5)",
+    "op": "pow",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "pow(-2,3)",
+    "op": "pow",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 8,
+      "d": 1,
+      "toFraction": "-8",
+      "toFractionExcludeWhole": "-8",
+      "toString": "-8",
+      "valueOf": "-8"
+    }
+  },
+  {
+    "label": "pow(8,[1,3])",
+    "op": "pow_pair",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "gcd([5,8],[3,7])",
+    "op": "gcd",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 56,
+      "toFraction": "1/56",
+      "toFractionExcludeWhole": "1/56",
+      "toString": "0.017(857142)",
+      "valueOf": "0.017857142857142856"
+    }
+  },
+  {
+    "label": "lcm([5,8],[3,7])",
+    "op": "lcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 15,
+      "d": 1,
+      "toFraction": "15",
+      "toFractionExcludeWhole": "15",
+      "toString": "15",
+      "valueOf": "15"
+    }
+  },
+  {
+    "label": "mod([5,8],[3,7])",
+    "op": "mod",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 11,
+      "d": 56,
+      "toFraction": "11/56",
+      "toFractionExcludeWhole": "11/56",
+      "toString": "0.196(428571)",
+      "valueOf": "0.19642857142857142"
+    }
+  },
+  {
+    "label": "gcd([6,1],[2,1])",
+    "op": "gcd",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 2,
+      "d": 1,
+      "toFraction": "2",
+      "toFractionExcludeWhole": "2",
+      "toString": "2",
+      "valueOf": "2"
+    }
+  },
+  {
+    "label": "lcm([6,1],[2,1])",
+    "op": "lcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 6,
+      "d": 1,
+      "toFraction": "6",
+      "toFractionExcludeWhole": "6",
+      "toString": "6",
+      "valueOf": "6"
+    }
+  },
+  {
+    "label": "mod([6,1],[2,1])",
+    "op": "mod",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 0,
+      "d": 1,
+      "toFraction": "0",
+      "toFractionExcludeWhole": "0",
+      "toString": "0",
+      "valueOf": "0"
+    }
+  },
+  {
+    "label": "gcd([13,3],[7,8])",
+    "op": "gcd",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 24,
+      "toFraction": "1/24",
+      "toFractionExcludeWhole": "1/24",
+      "toString": "0.041(6)",
+      "valueOf": "0.041666666666666664"
+    }
+  },
+  {
+    "label": "lcm([13,3],[7,8])",
+    "op": "lcm",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 91,
+      "d": 1,
+      "toFraction": "91",
+      "toFractionExcludeWhole": "91",
+      "toString": "91",
+      "valueOf": "91"
+    }
+  },
+  {
+    "label": "mod([13,3],[7,8])",
+    "op": "mod",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 5,
+      "d": 6,
+      "toFraction": "5/6",
+      "toFractionExcludeWhole": "5/6",
+      "toString": "0.8(3)",
+      "valueOf": "0.8333333333333334"
+    }
+  },
+  {
+    "label": "toFraction(1/1, false)",
+    "op": "toFraction_false",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "toFraction(1/1, true)",
+    "op": "toFraction_true",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "toLatex(1/1, false)",
+    "op": "toLatex_false",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "toLatex(1/1, true)",
+    "op": "toLatex_true",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 1,
+      "toFraction": "1",
+      "toFractionExcludeWhole": "1",
+      "toString": "1",
+      "valueOf": "1"
+    }
+  },
+  {
+    "label": "toFraction(7/3, false)",
+    "op": "toFraction_false",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "7/3",
+      "toFractionExcludeWhole": "2 1/3",
+      "toString": "2.(3)",
+      "valueOf": "2.3333333333333335"
+    }
+  },
+  {
+    "label": "toFraction(7/3, true)",
+    "op": "toFraction_true",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "7/3",
+      "toFractionExcludeWhole": "2 1/3",
+      "toString": "2.(3)",
+      "valueOf": "2.3333333333333335"
+    }
+  },
+  {
+    "label": "toLatex(7/3, false)",
+    "op": "toLatex_false",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "7/3",
+      "toFractionExcludeWhole": "2 1/3",
+      "toString": "2.(3)",
+      "valueOf": "2.3333333333333335"
+    }
+  },
+  {
+    "label": "toLatex(7/3, true)",
+    "op": "toLatex_true",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "7/3",
+      "toFractionExcludeWhole": "2 1/3",
+      "toString": "2.(3)",
+      "valueOf": "2.3333333333333335"
+    }
+  },
+  {
+    "label": "toFraction(-7/3, false)",
+    "op": "toFraction_false",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "-7/3",
+      "toFractionExcludeWhole": "-2 1/3",
+      "toString": "-2.(3)",
+      "valueOf": "-2.3333333333333335"
+    }
+  },
+  {
+    "label": "toFraction(-7/3, true)",
+    "op": "toFraction_true",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "-7/3",
+      "toFractionExcludeWhole": "-2 1/3",
+      "toString": "-2.(3)",
+      "valueOf": "-2.3333333333333335"
+    }
+  },
+  {
+    "label": "toLatex(-7/3, false)",
+    "op": "toLatex_false",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "-7/3",
+      "toFractionExcludeWhole": "-2 1/3",
+      "toString": "-2.(3)",
+      "valueOf": "-2.3333333333333335"
+    }
+  },
+  {
+    "label": "toLatex(-7/3, true)",
+    "op": "toLatex_true",
+    "result": {
+      "kind": "fraction",
+      "s": -1,
+      "n": 7,
+      "d": 3,
+      "toFraction": "-7/3",
+      "toFractionExcludeWhole": "-2 1/3",
+      "toString": "-2.(3)",
+      "valueOf": "-2.3333333333333335"
+    }
+  },
+  {
+    "label": "toFraction(1/3, false)",
+    "op": "toFraction_false",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 3,
+      "toFraction": "1/3",
+      "toFractionExcludeWhole": "1/3",
+      "toString": "0.(3)",
+      "valueOf": "0.3333333333333333"
+    }
+  },
+  {
+    "label": "toFraction(1/3, true)",
+    "op": "toFraction_true",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 3,
+      "toFraction": "1/3",
+      "toFractionExcludeWhole": "1/3",
+      "toString": "0.(3)",
+      "valueOf": "0.3333333333333333"
+    }
+  },
+  {
+    "label": "toLatex(1/3, false)",
+    "op": "toLatex_false",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 3,
+      "toFraction": "1/3",
+      "toFractionExcludeWhole": "1/3",
+      "toString": "0.(3)",
+      "valueOf": "0.3333333333333333"
+    }
+  },
+  {
+    "label": "toLatex(1/3, true)",
+    "op": "toLatex_true",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 1,
+      "d": 3,
+      "toFraction": "1/3",
+      "toFractionExcludeWhole": "1/3",
+      "toString": "0.(3)",
+      "valueOf": "0.3333333333333333"
+    }
+  },
+  {
+    "label": "toFraction(22/7, false)",
+    "op": "toFraction_false",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 22,
+      "d": 7,
+      "toFraction": "22/7",
+      "toFractionExcludeWhole": "3 1/7",
+      "toString": "3.(142857)",
+      "valueOf": "3.142857142857143"
+    }
+  },
+  {
+    "label": "toFraction(22/7, true)",
+    "op": "toFraction_true",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 22,
+      "d": 7,
+      "toFraction": "22/7",
+      "toFractionExcludeWhole": "3 1/7",
+      "toString": "3.(142857)",
+      "valueOf": "3.142857142857143"
+    }
+  },
+  {
+    "label": "toLatex(22/7, false)",
+    "op": "toLatex_false",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 22,
+      "d": 7,
+      "toFraction": "22/7",
+      "toFractionExcludeWhole": "3 1/7",
+      "toString": "3.(142857)",
+      "valueOf": "3.142857142857143"
+    }
+  },
+  {
+    "label": "toLatex(22/7, true)",
+    "op": "toLatex_true",
+    "result": {
+      "kind": "fraction",
+      "s": 1,
+      "n": 22,
+      "d": 7,
+      "toFraction": "22/7",
+      "toFractionExcludeWhole": "3 1/7",
+      "toString": "3.(142857)",
+      "valueOf": "3.142857142857143"
+    }
+  }
+]

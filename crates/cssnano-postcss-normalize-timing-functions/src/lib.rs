@@ -328,4 +328,41 @@ mod tests {
         let out = run("a { -webkit-transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1); }");
         assert!(out.contains("ease"), "got: {out:?}");
     }
+
+    #[test]
+    fn cubic_bezier_five_args_with_unparseable_does_not_substitute() {
+        // Regression for the `filter_map` drift. Five even-indexed
+        // children where the trailing one is non-numeric: JS preserves
+        // NaN (length 5, bails), prior Rust dropped the None (length 4,
+        // spuriously substituted `ease`).
+        let css = "a { transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1, abc); }";
+        let out = run(css);
+        assert!(!out.contains("ease"), "must NOT substitute ease; got: {out:?}");
+        assert!(out.contains("cubic-bezier"), "must preserve original; got: {out:?}");
+    }
+
+    #[test]
+    fn preserves_raws_value_on_noop() {
+        // Regression for the raws-clearing drift. The decl value has a
+        // trailing comment captured into `raws.value.raw`; transform is
+        // a no-op (unknown bezier curve), so the stringifier should emit
+        // `raws.value.raw` (with the comment). Prior code cleared
+        // `raws.value` → comment was lost.
+        let css = "a { transition-timing-function: cubic-bezier(0.1, 0.2, 0.3, 0.4) /* trailing */; }";
+        let out = run(css);
+        assert!(
+            out.contains("/* trailing */"),
+            "trailing comment must survive no-op normalization; got: {out:?}"
+        );
+    }
+
+    #[test]
+    fn cubic_bezier_with_calc_inside_does_not_substitute() {
+        // A non-word inside cubic-bezier args produces a NaN entry in JS
+        // (`parseFloat("calc")` = NaN). Length is still 4, but the key
+        // contains "NaN" so no conversion matches. Behavior must match.
+        let css = "a { transition-timing-function: cubic-bezier(calc(0.25), 0.1, 0.25, 1); }";
+        let out = run(css);
+        assert!(!out.contains(": ease"), "must not substitute; got: {out:?}");
+    }
 }

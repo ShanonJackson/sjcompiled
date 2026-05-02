@@ -9,7 +9,7 @@ actually run before claiming a piece is byte-clean.
 
 ## 1. Where you actually are
 
-`cargo test -p autoprefixer` → **56 passing** (52 unit + 4 parity).
+`cargo test -p autoprefixer` → **57 passing** (53 unit + 4 parity).
 That number is the floor; your work must keep it there or grow it.
 Run it before EVERY commit.
 
@@ -295,6 +295,16 @@ growing as you find more:
   except autoprefixer's `-o-` resolution path which builds `n/d`
   manually. Don't switch to `fraction.to_fraction(false)` — that
   emits `"1 1/2"` mixed-number form, which JS doesn't.
+- **`resolution.js::prefixQuery` calls `value.simplify()` after unit
+  conversion.** This is NOT just GCD reduction — JS fraction-js's
+  `simplify(eps=0.001)` does continued-fraction approximation,
+  collapsing irrational-looking ratios into nicer rationals (e.g.
+  192dpcm → 487.68/96 → reduced 4877/960 → simplified ~127/25).
+  The `-o-` branch emits `n/d` directly, so without simplify the
+  Rust port produced different bytes from JS. Fixed in
+  `resolution.rs::prefix_query` via `f.simplify(None)` (None →
+  default 0.001 eps, matching JS). Pinned by the
+  `prefix_query_o_dpcm_uses_simplify` regression test.
 - `decl.raws.before` is `Option<String>` in postcss-core. JS treats
   it as `string` with default `''`. Use `.as_deref().map(...).unwrap_or(false)`
   for boolean predicates and `.clone().unwrap_or_default()` for

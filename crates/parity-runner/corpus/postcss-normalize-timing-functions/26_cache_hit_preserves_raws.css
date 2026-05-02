@@ -1,0 +1,5 @@
+/* Two decls share the same value string. The second goes through the
+   `cache.has(value)` branch which (in the prior buggy port) also
+   cleared raws. Verifies the cache-hit path preserves comment raws. */
+a { transition-timing-function: cubic-bezier(0.1, 0.2, 0.3, 0.4) /* first */; }
+b { transition-timing-function: cubic-bezier(0.1, 0.2, 0.3, 0.4) /* second */; }

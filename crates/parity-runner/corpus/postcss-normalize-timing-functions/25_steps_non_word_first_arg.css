@@ -1,0 +1,7 @@
+/* Steps with non-word first arg: blocks 1 & 2 (step-start / step-end)
+   require nodes[0].type === 'word'. A function or other type fails
+   that check, but block 3 (`steps(_, end)` -> strip default) only
+   inspects nodes[2] and can still fire — the trailing `, end` should
+   be stripped even when the count is a calc(). */
+a { transition-timing-function: steps(calc(2), end); }
+b { animation-timing-function: steps(calc(3), jump-end); }

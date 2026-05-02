@@ -1,0 +1,5 @@
+/* `calc()` inside cubic-bezier — value-parser tokenizes as a Function
+   node whose `value` is "calc". JS `parseFloat("calc")` = NaN, so the
+   conversion key contains "NaN" and no substitution fires. */
+a { transition-timing-function: cubic-bezier(calc(0.25), 0.1, 0.25, 1); }
+b { animation-timing-function: cubic-bezier(0, calc(0), 0.58, 1); }

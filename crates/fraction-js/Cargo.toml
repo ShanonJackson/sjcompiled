@@ -8,3 +8,6 @@ description = "Byte-for-byte Rust port of fraction.js@4.2.0"
 
 [dependencies]
 libm = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

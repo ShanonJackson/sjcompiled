@@ -1,0 +1,7 @@
+/* Trailing comments after a value are captured into `raws.value.raw`.
+   When transform is a no-op (unknown bezier), the stringifier must
+   emit the raw form so the comment survives.
+   Surfaces the `node.raws.value = None` drift. */
+a { transition-timing-function: cubic-bezier(0.1, 0.2, 0.3, 0.4) /* keep me */; }
+b { animation-timing-function: cubic-bezier(0.05, 0.5, 0.95, 0.5) /* and me */; }
+c { transition: 1s cubic-bezier(0.7, 0.0, 0.3, 1.0) /* mid */; }

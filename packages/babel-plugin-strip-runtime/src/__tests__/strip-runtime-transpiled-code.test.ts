@@ -9,7 +9,7 @@ import stripRuntimeBabelPlugin from '../index';
 const testStyleSheetPath =
   '@sjcompiled/webpack-loader/css-loader!@sjcompiled/webpack-loader/css-loader/compiled-css.css';
 const regexToFindRequireStatements =
-  /(require\('@compiled\/webpack-loader\/css-loader!@compiled\/webpack-loader\/css-loader\/compiled-css\.css\?style=.*;)/g;
+  /(require\('@sjcompiled\/webpack-loader\/css-loader!@sjcompiled\/webpack-loader\/css-loader\/compiled-css\.css\?style=.*;)/g;
 const testSSR = true;
 
 const transform = (

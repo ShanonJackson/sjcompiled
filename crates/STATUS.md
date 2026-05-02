@@ -425,6 +425,33 @@ Cleanup is a future cosmetic task — no parity impact.
 - Full audit document at
   `crates/_vendor/POSTCSS_DISCARD_DUPLICATES_6.0.0_REAUDIT.md`.
 
+**postcss-discard-duplicates 6.0.0 second-pass re-audit (2026-05-02):**
+- Independent re-walk of `src/index.js` against
+  `crates/postcss-discard-duplicates/src/lib.rs`. **No further code
+  changes needed** — every previously-fixed divergence is still
+  resolved correctly and every unflagged path is line-by-line 1:1.
+- Three adversarial corpus entries added to
+  `crates/parity-runner/corpus/npm-postcss-discard-duplicates/` to
+  lock code paths the existing 15 entries did not directly exercise:
+  - `16_statement_atrule_dedupe.css` — statement atrule (`@import …;`)
+    dedupe, `Node::nodes()` returns `None` on both sides because
+    `AtRule.has_block` is false. Confirms `equals` does not enter
+    the recursive nodes-zip when both lack a body.
+  - `17_four_consecutive_dup_rules.css` — heavy index-shift in
+    `dedupe()`'s outer loop (rightmost rule's `dedupe_rule` removes
+    three earlier rules in one pass; outer loop re-processes the
+    survivor idempotently).
+  - `18_dedupe_skips_unrelated_sibling.css` — right-to-left scan
+    must walk past an unrelated middle sibling to find the equal
+    earlier `@media`.
+- Verification: `parity-runner npm-postcss-discard-duplicates` now
+  18/18 byte-clean (and 18/18 deterministic); `parity-runner sort`
+  12/12 byte-clean; both NAPI verifiers 12/12; full Rust workspace
+  `cargo test` 721/0 (15/15 in `postcss-discard-duplicates`).
+- Audit appended at
+  `crates/_vendor/POSTCSS_DISCARD_DUPLICATES_6.0.0_REAUDIT.md`
+  ("Second-pass re-audit (2026-05-02)").
+
 **postcss-values-parser 6.0.2 re-audit landed (2026-05-02):**
 - Version is **not** drifted between REFERENCE_LOCK_FILE and AFM (both
   pin `6.0.2`). Audit ran to close pre-existing transcription gaps in
@@ -587,16 +614,23 @@ Cleanup is a future cosmetic task — no parity impact.
   `backslash_followed_by_non_special_falls_through`,
   `cache_key_collision_resistant_with_pipe_in_value`,
   `preserves_raws_on_noop_normalization`) — crate now 11 tests, all green.
-- Thirteen adversarial corpus entries added (`16..28`) covering:
-  BACKSLASH fall-through, consecutive escapes, mixed-whitespace runs,
-  `|`-in-value cache keys, single-class escape rewrap (both directions),
-  nested function strings, `@supports`/`@media` params, attr-selector
-  quotes, empty strings inside functions, sibling string nodes,
-  Unicode (Latin-1, CJK, astral-plane emoji) bodies, and
-  raws-comment-after-value/atrule/selector preservation.
+- Twenty-four adversarial corpus entries added (`16..39`) in two waves.
+  Wave 1 (`16..28`): BACKSLASH fall-through, consecutive escapes,
+  mixed-whitespace runs, `|`-in-value cache keys, single-class escape
+  rewrap (both directions), nested function strings,
+  `@supports`/`@media` params, attr-selector quotes, empty strings in
+  functions, sibling string nodes, Unicode (Latin-1, CJK,
+  astral-plane emoji) bodies, raws-comment preservation.
+  Wave 2 (`29..39`): `@font-face` with `url()`+`format()` chains,
+  custom properties (`--foo: 'bar'`), `!important` on string values,
+  selectors with internal comments, `@keyframes` body strings,
+  mid-decl comments between strings, 13-rule cache stress,
+  double-backslash bodies, combinator+attr selectors, deeply-nested
+  `var(var(var('deep')))`, `raws.between` (between prop and `:`)
+  comments. **No further drift surfaced after wave 2.**
 - Verification gates rerun: `cargo test --workspace --no-fail-fast` all
-  green; `parity-runner postcss-normalize-string` 28/28 byte-clean
-  (15 existing + 13 new); determinism 28/28; both NAPI verifiers 12/12.
+  green; `parity-runner postcss-normalize-string` 39/39 byte-clean
+  (15 existing + 24 new); determinism 39/39; both NAPI verifiers 12/12.
 - Full audit document at
   `crates/_vendor/POSTCSS_NORMALIZE_STRING_5.1.0_REAUDIT.md`.
 
@@ -638,6 +672,101 @@ Cleanup is a future cosmetic task — no parity impact.
   determinism on `postcss-core-roundtrip` (37/37).
 - Full audit document at
   `crates/_vendor/FRACTION_JS_4.2.0_REAUDIT.md`.
+- **Same-session addendum:** closed two cross-platform divergence
+  hazards flagged after the initial round. (1) Replaced `f64::ln` /
+  `f64::powf` / `(10.0).powi(n)` with `libm::log` / `libm::pow` at
+  every site that mirrors a JS `Math.log` / `Math.pow` / `Math.LN10`
+  call (parse-Number log branch, parse-Str decimal/repeating, `Fraction::pow`
+  ×6, `Fraction::ceil/floor/round`). The `libm` crate is a pure-Rust
+  port of the Sun fdlibm sources V8 ships in `src/base/ieee754.cc`,
+  so results are bit-identical to V8 across Windows/Linux/macOS —
+  whereas the system libm differs by up to 1 ULP between platforms,
+  enough to land `floor(1 + log10(p1))` on a different integer near
+  power-of-10 boundaries. Added module-local `JS_LN10` constant to
+  spell the intent. (2) Added `js_int32_trunc(x: f64) -> f64` matching
+  ECMA-262 ToInt32 (NaN/±Inf → 0, otherwise `trunc(x) mod 2^32` as
+  signed) and replaced all four `(n_val / d_val).trunc()` sites in
+  `to_string_dec` — JS `N / D | 0` wraps on overflow, `f64::trunc`
+  does not. Three regression tests added (now 24 total). Workspace
+  dep added: `libm = "0.2"`. All gates re-run green: `parity-runner
+  postcss-core-roundtrip` 39/39 byte-clean; both NAPI verifiers 12/12;
+  determinism 41/41.
+
+**postcss-discard-comments 5.1.2 re-audit landed (2026-05-02):**
+- Pin is `5.1.2` in BOTH `REFERENCE_LOCK_FILE/yarn.lock` and AFM
+  resolution — no version drift. Re-audit was for **port-quality**
+  drift in the existing `crates/cssnano-postcss-discard-comments/`
+  port (3 source files: `index.js`, `lib/commentParser.js`,
+  `lib/commentRemover.js`).
+- Walked all three upstream files line-by-line against the Rust port.
+  **One non-cosmetic divergence fixed**: the kept-comment path in
+  `process_node` had a stray `return Mutation::Keep` after the
+  early-removal branch, which short-circuited past the
+  `raws.between` / decl / rule / atrule blocks. Upstream `index.js`
+  lines 73-77 only `return` when the comment is REMOVED — kept
+  comments fall through. Postcss-core does not currently emit
+  `raws.between` on comments, so the observable effect on the
+  existing corpus was nil, but the control flow is now mirrored
+  verbatim. The unclosed-comment infinite-loop bug in
+  `commentParser.js` is preserved 1:1 (unreachable in practice
+  because postcss's tokenizer already rejects unclosed comments at
+  parse time).
+- Three regression tests added inside
+  `crates/cssnano-postcss-discard-comments/src/lib.rs` citing the
+  upstream lines they cover: `kept_comment_does_not_short_circuit_processing`,
+  `atrule_aftername_only_drop_comment_becomes_space`,
+  `important_with_only_drop_comments_collapses_to_canonical`. All
+  15 unit tests still green.
+- 12 adversarial corpus entries added to
+  `crates/parity-runner/corpus/postcss-discard-comments/` (`16..27`)
+  covering: at-rule afterName comment-only collapse, selector
+  separator-`''` token-joining, !important collapse-to-canonical,
+  `/*!` survival across decl-value / selector / at-rule-params /
+  raws.between, comment-only decl values, deeply nested DFS pre-order
+  walk, and `url()`-inside-paren `list.space` paren-tracking.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast`
+  all green; `parity-runner postcss-discard-comments` 27/27
+  byte-clean (JS vs Rust); both NAPI verifiers 12/12; determinism
+  on `postcss-discard-comments` (27/27).
+- Full audit document at
+  `crates/_vendor/POSTCSS_DISCARD_COMMENTS_5.1.2_REAUDIT.md`.
+
+**postcss-normalize-timing-functions 5.1.0 re-audit landed (2026-05-02):**
+- Pin is `5.1.0` in BOTH `REFERENCE_LOCK_FILE/yarn.lock` and AFM
+  resolution — no version drift. Re-audit was for **port-quality**
+  drift in the existing `crates/cssnano-postcss-normalize-timing-functions/`
+  port (single source file: `index.js`).
+- Walked the 147-line upstream `index.js` line-by-line against the
+  Rust port. **Two non-cosmetic divergences fixed:** (1) Plugin entry
+  unconditionally cleared `node.raws.value = None` after both the
+  cache-hit and fresh-transform writes — but postcss's stringifier
+  already does the `raws.value.value === decl.value ? raws.value.raw
+  : decl.value` comparison, so the prior code lost source bytes (e.g.
+  trailing `/* comment */` after a value) on no-op transforms. Same
+  shape as the bug previously found in `cssnano-postcss-normalize-string`.
+  (2) `cubic-bezier` value collection used `filter_map(js_parse_float)`
+  which silently drops unparseable entries; JS `.map(getValue)`
+  preserves NaN entries, so unparseable args stay in the array and
+  the `length !== 4` gate fires correctly. Surfaced by
+  `cubic-bezier(0.25, 0.1, 0.25, 1, abc)`: JS bails (length 5),
+  prior Rust spuriously substituted `ease` (length 4 after dropping NaN).
+- Four regression tests added inside
+  `crates/cssnano-postcss-normalize-timing-functions/src/lib.rs`:
+  `cubic_bezier_five_args_with_unparseable_does_not_substitute`,
+  `preserves_raws_value_on_noop`,
+  `cubic_bezier_with_calc_inside_does_not_substitute`, plus existing
+  coverage. Crate now 18 tests, all green.
+- Five adversarial corpus entries added to
+  `crates/parity-runner/corpus/postcss-normalize-timing-functions/`
+  (`22..26`) covering: trailing-comment raws preservation on no-op
+  transform, five-arg cubic-bezier with unparseable trailing arg,
+  `calc()`-inside-cubic-bezier NaN-key path, `steps(calc(N), end)`
+  block-3 strip-default fall-through, and cache-hit raws preservation.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast`
+  all green; `parity-runner postcss-normalize-timing-functions` 26/26
+  byte-clean (JS vs Rust); determinism 26/26; both NAPI verifiers 12/12.
+- Full audit document at
+  `crates/_vendor/POSTCSS_NORMALIZE_TIMING_FUNCTIONS_5.1.0_REAUDIT.md`.
 
 ## postcss version pin: `8.4.31` → `8.5.6` (no code changes)
 

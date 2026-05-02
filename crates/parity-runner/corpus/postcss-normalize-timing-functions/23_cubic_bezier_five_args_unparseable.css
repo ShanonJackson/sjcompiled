@@ -1,0 +1,8 @@
+/* Five-arg cubic-bezier with the trailing arg unparseable.
+   JS `getValue` returns NaN; `map` preserves the entry, so length is
+   5 and the function bails out. A `filter_map` would drop the NaN,
+   leaving length 4 and triggering a spurious `ease` substitution.
+   Surfaces the `filter_map` drift. */
+a { transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1, abc); }
+b { animation-timing-function: cubic-bezier(0, 0, 1, 1, def); }
+c { transition-timing-function: cubic-bezier(0.42, 0, 1, 1, xyz); }

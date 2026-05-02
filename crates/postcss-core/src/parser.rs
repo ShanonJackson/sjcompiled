@@ -19,10 +19,57 @@ use crate::tokenize::{tokenizer, Token, TokenKind, Tokenizer};
 // `SAFE_COMMENT_NEIGHBOR = { empty: true, space: true }` — line 10.
 fn is_safe_comment_neighbor(s: &str) -> bool { s == "empty" || s == "space" }
 
-static RE_BLANK: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\s*$").unwrap());
-// `^(\s*)([^]*\S)(\s*)$` — `[^]` is "any char including newline" in JS.
-static RE_COMMENT_TRIM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?s)^(\s*)((?:.|\n)*\S)(\s*)$").unwrap());
+// **Why no Rust regex for the comment trim?**
+//
+// Upstream uses two regexes on `comment.text`:
+//   - `^\s*$`            — "is the body all whitespace?"
+//   - `^(\s*)([^]*\S)(\s*)$` — split into leading ws / trimmed body / trailing ws.
+//
+// Rust's `regex` crate uses Unicode `White_Space` for `\s`/`\S`. JS uses
+// the ECMAScript `\s` set — they disagree on **U+0085** (in Rust's set,
+// not in JS's) and **U+FEFF** (in JS's set, not in Rust's). A comment
+// like `/*\u{FEFF}!keep*/` flows out of this trim into
+// `postcss-discard-comments`'s `text.startsWith('!')` check; under JS
+// the leading `\u{FEFF}` is stripped and the comment is kept; under
+// Rust regex `\s` it would NOT be stripped and the comment is dropped.
+// Silent hash divergence for any input with exotic whitespace adjacent
+// to `!` in a comment.
+//
+// We replace both regexes with manual scans over
+// [`crate::stringifier::is_js_regex_whitespace`] which enumerates the
+// JS `\s` set exactly. See [`is_blank_comment_body`] and
+// [`split_comment_body`] below.
 static RE_WORD_HAS_LETTER: Lazy<Regex> = Lazy::new(|| Regex::new(r"\w").unwrap());
+
+/// Mirrors JS `^\s*$` against `body` using the ECMAScript `\s` set.
+fn is_blank_comment_body(body: &str) -> bool {
+    body.chars().all(crate::stringifier::is_js_regex_whitespace)
+}
+
+/// Mirrors JS `^(\s*)([^]*\S)(\s*)$` capture: returns
+/// `(leading_ws, trimmed_body, trailing_ws)`. Caller MUST guarantee the
+/// body is not all-whitespace (otherwise the regex doesn't match —
+/// `\S` requires at least one non-whitespace char). Use
+/// [`is_blank_comment_body`] to gate.
+fn split_comment_body(body: &str) -> (&str, &str, &str) {
+    let mut start_byte = 0usize;
+    for (i, c) in body.char_indices() {
+        if !crate::stringifier::is_js_regex_whitespace(c) {
+            start_byte = i;
+            break;
+        }
+    }
+    // Trailing: walk back until a non-whitespace char.
+    let mut end_byte = body.len();
+    let mut iter = body.char_indices().rev();
+    for (i, c) in iter.by_ref() {
+        if !crate::stringifier::is_js_regex_whitespace(c) {
+            end_byte = i + c.len_utf8();
+            break;
+        }
+    }
+    (&body[..start_byte], &body[start_byte..end_byte], &body[end_byte..])
+}
 
 /// Stack frame indicating which container we're appending into. We use a
 /// path of indices into the Root's tree because mutable borrowing through
@@ -180,19 +227,22 @@ impl Parser {
 
     // ---- comment ----
 
-    /// `comment(token)` — line 173.
+    /// `comment(token)` — line 173. Mirrors upstream's two-step trim
+    /// using JS-spec `\s` semantics — see the comment above
+    /// [`is_blank_comment_body`] for the divergence trap this avoids.
     fn comment(&mut self, token: &Token) {
         let mut comment = Comment::default();
         let mut raws = Raws::default();
         let body = &token.content[2..token.content.len() - 2];
-        if RE_BLANK.is_match(body) {
+        if is_blank_comment_body(body) {
             comment.text = String::new();
             raws.left = Some(body.to_string());
             raws.right = Some(String::new());
-        } else if let Some(caps) = RE_COMMENT_TRIM.captures(body) {
-            comment.text = caps.get(2).unwrap().as_str().to_string();
-            raws.left = Some(caps.get(1).unwrap().as_str().to_string());
-            raws.right = Some(caps.get(3).unwrap().as_str().to_string());
+        } else {
+            let (left, mid, right) = split_comment_body(body);
+            comment.text = mid.to_string();
+            raws.left = Some(left.to_string());
+            raws.right = Some(right.to_string());
         }
         let mut node = Node::new(NodeKind::Comment(comment));
         node.raws = raws;
@@ -695,4 +745,97 @@ fn string_from(tokens: &mut Vec<Token>, from: usize) -> String {
     }
     tokens.truncate(from);
     result
+}
+
+#[cfg(test)]
+mod comment_trim_tests {
+    use super::*;
+    use crate::{parse, NodeKind};
+
+    /// Locates the first comment in a parsed root and returns its
+    /// `(text, raws.left, raws.right)`.
+    fn extract_comment(css: &str) -> (String, String, String) {
+        let root = parse(css).expect("parse");
+        let n = root.nodes().iter()
+            .find(|n| matches!(n.kind, NodeKind::Comment(_)))
+            .expect("comment present");
+        let text = match &n.kind {
+            NodeKind::Comment(c) => c.text.clone(),
+            _ => unreachable!(),
+        };
+        (
+            text,
+            n.raws.left.clone().unwrap_or_default(),
+            n.raws.right.clone().unwrap_or_default(),
+        )
+    }
+
+    /// Lock the divergence the agent flagged: `/*\u{FEFF}!keep*/` must
+    /// trim the leading ZWNBSP so `text` starts with `!`. Then
+    /// `postcss-discard-comments`'s `text.startsWith('!')` correctly
+    /// preserves the comment.
+    #[test]
+    fn ufeff_zwnbsp_is_trimmed_from_comment() {
+        let (text, left, right) = extract_comment("/*\u{FEFF}!keep*/ a { color: red; }");
+        assert_eq!(left, "\u{FEFF}", "ZWNBSP must land on raws.left, not on text");
+        assert_eq!(text, "!keep", "trimmed text must NOT contain ZWNBSP");
+        assert_eq!(right, "");
+        assert!(text.starts_with('!'),
+            "discard-comments depends on this — `!keep` comments survive");
+    }
+
+    /// Lock the inverse: U+0085 (NEL) is in Unicode `White_Space` but
+    /// NOT in JS `\s`. JS does NOT trim it from a comment; we must NOT
+    /// trim it either. Otherwise `/*\u{0085}hi*/` would have text="hi"
+    /// (JS) vs text="\u{0085}hi" (us) — but the divergence is the
+    /// other direction here: we'd over-trim and JS wouldn't.
+    ///
+    /// Pre-fix: Rust `regex` `\s*` matched `\u{0085}` and trimmed it →
+    /// text = "hi". JS's `\s*` would NOT match → text = "\u{0085}hi".
+    /// Post-fix: our manual scan uses `is_js_regex_whitespace`, which
+    /// excludes U+0085 → text = "\u{0085}hi", matching JS.
+    #[test]
+    fn nel_u0085_is_not_trimmed_from_comment() {
+        let (text, left, _right) = extract_comment("/*\u{0085}hi*/ a {}");
+        assert_eq!(left, "", "NEL is NOT JS whitespace; must not land on raws.left");
+        assert_eq!(text, "\u{0085}hi", "NEL stays in text");
+    }
+
+    /// Standard ASCII whitespace trim still works.
+    #[test]
+    fn ascii_whitespace_trim_works() {
+        let (text, left, right) = extract_comment("/*  hello  */ a {}");
+        assert_eq!(left, "  ");
+        assert_eq!(text, "hello");
+        assert_eq!(right, "  ");
+    }
+
+    /// All-whitespace comment body becomes empty text + body-on-left.
+    #[test]
+    fn blank_comment_body() {
+        let (text, left, right) = extract_comment("/*   */ a {}");
+        assert_eq!(text, "");
+        assert_eq!(left, "   ");
+        assert_eq!(right, "");
+    }
+
+    /// All-whitespace via JS-spec whitespace (U+FEFF) — must hit the
+    /// blank branch, not the trim branch.
+    #[test]
+    fn blank_comment_body_with_zwnbsp_only() {
+        let (text, left, right) = extract_comment("/*\u{FEFF}\u{FEFF}*/ a {}");
+        assert_eq!(text, "");
+        assert_eq!(left, "\u{FEFF}\u{FEFF}");
+        assert_eq!(right, "");
+    }
+
+    /// Trailing JS whitespace is trimmed off the end. Mirrors
+    /// `/*hi  */` → text="hi", right="  ".
+    #[test]
+    fn trailing_whitespace_to_right() {
+        let (text, left, right) = extract_comment("/*hi\u{FEFF}*/ a {}");
+        assert_eq!(left, "");
+        assert_eq!(text, "hi");
+        assert_eq!(right, "\u{FEFF}");
+    }
 }

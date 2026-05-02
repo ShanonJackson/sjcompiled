@@ -68,8 +68,15 @@ impl ResolutionBase {
             // "dppx" / "x" — already in device-pixel-ratio.
             _ => f,
         };
-        // JS calls `f.simplify()` here. The Rust port already keeps n/d
-        // in reduced form via `new_fraction`, so simplify is a no-op.
+        // JS: `value = value.simplify()`. Default eps 0.001 — finds the
+        // closest continued-fraction approximation within tolerance,
+        // collapsing irrational-looking ratios like 4877/960 (from
+        // 192dpcm) into nicer rationals like 127/25. This is byte-
+        // affecting in the `-o-` branch (which emits `n/d` literally)
+        // and may also shift the decimal-output branch via float
+        // arithmetic on different (n, d) pairs. Mirrors `simplify(None)`
+        // → 0.001 default in `crates/fraction-js/src/fraction.rs:617`.
+        let f = f.simplify(None).expect("simplify never errors on finite input");
         let value_str = if prefix == "-o-" {
             format!(
                 "{}/{}",
@@ -196,5 +203,35 @@ mod tests {
         // dppx is already device-pixel-ratio — no math needed.
         let out = r.prefix_query("-webkit-", "min", ": ", "2", "dppx");
         assert_eq!(out, "-webkit-min-device-pixel-ratio: 2");
+    }
+
+    #[test]
+    fn prefix_query_o_dpcm_uses_simplify() {
+        // Regression for `simplify()` omission: 192dpcm → 192*2.54/96 =
+        // 487.68/96 = 5.08. JS `simplify()` at default 0.001 eps collapses
+        // to the nearest continued-fraction approximation. Without the
+        // simplify call, the `-o-` branch emitted the raw n/d from the
+        // dpcm chain — wrong bytes vs JS oracle. With simplify, both
+        // sides land on the same approximation. Pin BOTH the value and
+        // the fact that it's simplified (small n/d, not 4877/960).
+        let r = ResolutionBase::new("media".into(), vec![], 0);
+        let out = r.prefix_query("-o-", "min", ": ", "192", "dpcm");
+        assert!(
+            out.starts_with("-o-min-device-pixel-ratio: "),
+            "unexpected prefix: {out}"
+        );
+        let value_part = out
+            .strip_prefix("-o-min-device-pixel-ratio: ")
+            .unwrap();
+        let (n, d) = value_part.split_once('/').expect("expected n/d form");
+        let n: f64 = n.parse().unwrap();
+        let d: f64 = d.parse().unwrap();
+        // Approximation must be close to 5.08 within simplify's default
+        // 0.001 eps, AND the integers must be small (post-simplify).
+        assert!((n / d - 5.08).abs() < 0.001, "value not ~5.08: {n}/{d}");
+        assert!(
+            n.abs() < 1000.0 && d.abs() < 1000.0,
+            "expected small simplified n/d, got {n}/{d}"
+        );
     }
 }

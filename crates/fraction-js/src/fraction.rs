@@ -972,6 +972,34 @@ mod tests {
         assert!(s.n.is_nan());
     }
 
+    /// JS `eps || 0.001` keeps Infinity (truthy). With `eps = Infinity` the
+    /// first continued-fraction iterate trivially satisfies `diff < eps`, so
+    /// `simplify(Infinity)` for `0.1` returns the very first CF approximant
+    /// `0/1` (then `mul(s)` keeps the sign). Pin so a future "tighten the
+    /// match arm" doesn't accidentally collapse Infinity to default.
+    #[test]
+    fn simplify_infinity_returns_first_cf_iterate() {
+        // Verified against JS oracle:
+        //   new Fraction(0.1).simplify(Infinity).toFraction() === "0"
+        let f = Fraction::new(0.1).unwrap();
+        let s = f.simplify(Some(f64::INFINITY)).unwrap();
+        assert_eq!(s.to_fraction(false), "0");
+        assert_eq!(s.s, 1.0);
+        assert_eq!(s.n, 0.0);
+        assert_eq!(s.d, 1.0);
+    }
+
+    /// JS `eps || 0.001` keeps negative numbers (truthy). `diff` is `abs(...)`
+    /// so `diff < negative` is never true; the loop completes and returns
+    /// `this`. Pin so we never start treating negatives as falsy.
+    #[test]
+    fn simplify_negative_eps_returns_self() {
+        // Verified: new Fraction(0.1).simplify(-1).toFraction() === "1/10"
+        let f = Fraction::new(0.1).unwrap();
+        let s = f.simplify(Some(-1.0)).unwrap();
+        assert_eq!(s.to_fraction(false), "1/10");
+    }
+
     /// JS regex `.` skips line terminators. Either way the input is
     /// malformed; we just need the SAME error path.
     #[test]

@@ -5,7 +5,7 @@ import { transform, transformSync } from './transform';
 const testStyleSheetPath =
   '@sjcompiled/webpack-loader/css-loader!@sjcompiled/webpack-loader/css-loader/compiled-css.css';
 const regexToFindRequireStatements =
-  /(require\('@compiled\/webpack-loader\/css-loader!@compiled\/webpack-loader\/css-loader\/compiled-css\.css\?style=.*;)/g;
+  /(require\('@sjcompiled\/webpack-loader\/css-loader!@sjcompiled\/webpack-loader\/css-loader\/compiled-css\.css\?style=.*;)/g;
 const testSSR = true;
 
 // This test suite is designed to test source code, which is also known as first-party code

@@ -352,4 +352,47 @@ mod tests {
         let out = run("a { color: red /* hi */ blue; }");
         assert!(!out.contains("/* hi */"), "got: {out:?}");
     }
+
+    /// Regression: upstream `index.js` lines 73-77 — when a comment is
+    /// KEPT (canRemove returns false/undefined), the function does NOT
+    /// `return`. Instead, control flows past the comment-removal block
+    /// to the `raws.between` check and beyond. Earlier the Rust port had
+    /// an `early return Mutation::Keep` after the kept-comment branch
+    /// which would skip the rest of `process_node`. Postcss core does
+    /// not currently emit `raws.between` on comment nodes so the
+    /// observable effect was nil, but the control flow is now mirrored
+    /// verbatim so that any future change in postcss-core's raws
+    /// population can't silently produce a hash divergence.
+    #[test]
+    fn kept_comment_does_not_short_circuit_processing() {
+        // Two important comments survive; a third drop-able comment is
+        // removed. The kept comments must still be in the output — proving
+        // the kept-comment path doesn't accidentally drop them as a side
+        // effect of the fall-through change.
+        let out = run("/*! one */ /* drop */ /*! two */ a { color: red; }");
+        assert!(out.contains("/*! one */"), "got: {out:?}");
+        assert!(out.contains("/*! two */"), "got: {out:?}");
+        assert!(!out.contains("/* drop */"), "got: {out:?}");
+    }
+
+    /// Regression: at-rule with `raws.afterName` consisting of nothing
+    /// but a removable comment must collapse to a single space. Mirrors
+    /// upstream `index.js` lines 132-134: `if (!commentsReplaced.length)
+    /// node.raws.afterName = commentsReplaced + ' '`.
+    #[test]
+    fn atrule_aftername_only_drop_comment_becomes_space() {
+        let out = run("@media/* drop */(min-width: 100px) { a { color: red; } }");
+        assert!(!out.contains("/* drop */"), "got: {out:?}");
+        assert!(out.contains("@media (min-width"), "got: {out:?}");
+    }
+
+    /// Regression: `!important` containing only removable comments must
+    /// collapse to the canonical literal `!important`. Mirrors upstream
+    /// `index.js` lines 96-104.
+    #[test]
+    fn important_with_only_drop_comments_collapses_to_canonical() {
+        let out = run("a { color: red !/* drop */important; }");
+        assert!(!out.contains("/* drop */"), "got: {out:?}");
+        assert!(out.contains("!important"), "got: {out:?}");
+    }
 }
