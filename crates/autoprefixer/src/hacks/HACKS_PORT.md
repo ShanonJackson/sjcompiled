@@ -159,6 +159,31 @@ reg.register::<crate::hacks::align_content::AlignContent>();
 
 Keep the order alphabetical by JS filename.
 
+## Path-shift gotcha (read this before writing any insert loop)
+
+JS holds a node reference across `parent.insertBefore(node, cloned)` —
+the reference auto-follows when the original's index shifts. We use
+*index paths*. Each successful `insert_before_at_path(root, path, ...)`
+shifts the original's index up by 1 because the clone is spliced at
+the original's slot. The path becomes stale the moment the insert
+returns.
+
+If your hack's `add` (or any method that calls
+`insert_before_at_path` in a loop) iterates multiple prefixes:
+
+```rust
+let mut current_path = path.to_vec();
+for prefix in &prefixes {
+    if self.add(root, &current_path, prefix).is_some() {
+        if let Some(last) = current_path.last_mut() { *last += 1; }
+    }
+}
+```
+
+The bug is silent: tests that only insert one prefix won't catch it;
+tests that insert two or more will. See `at_rule.rs::process` for the
+canonical example.
+
 ## Don't re-port these
 
 `flex-spec.js` and `grid-utils.js` aren't classes — they're shared

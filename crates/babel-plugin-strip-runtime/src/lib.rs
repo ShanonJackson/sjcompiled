@@ -4,6 +4,8 @@
 //!
 //! Phase 0 status: scaffold only. Pass-through visitor.
 
+pub mod utils;
+
 use swc_core::ecma::ast::Program;
 use swc_core::ecma::visit::{VisitMut, VisitMutWith};
 use swc_core::plugin::plugin_transform;

@@ -25,13 +25,18 @@
 
 ## Resume here
 
-**Next checkpoint:** §1.1 — Port `to_uri_component.rs` (Phase 1 first port).
+**Next checkpoint:** §1.2 — Port the three runtime predicate helpers
+(`is_automatic_runtime`, `is_cc_component`, `is_create_element`).
 
 **Prerequisites met:** all of Phase 0 except probes 9 and audit
 (both Phase 5 gates, not Phase 1).
 
-**Last completed:** §0.9 (parity harness skeleton) — see "Phase 0
-findings" below.
+**Last completed:** §1.0 (partial) — 30 fixture JSON files committed
+under `parity-harness/strip-runtime/fixtures/`, generator script at
+`parity-harness/strip-runtime/generate-fixtures.mjs`, harness extended
+to handle `expectsError` fixtures and route `extractStylesToDirectory`
+fs-writes through `_scratch/`. `bun test parity-harness/strip-runtime/harness.test.ts`
+→ 66 / 66 pass at the Phase-0/1-pre-port `expectedToFail` baseline.
 
 ---
 
@@ -62,6 +67,20 @@ findings" below.
 §0.10 and §0.11 are Phase 5 gates — not blockers for Phase 1.
 §0.12 is a hardening task — not a blocker for Phase 1, but should be
 done before declaring Phase 0 fully signed off across the platform set.
+
+### Phase 1 findings (write-once notes)
+
+- **`extractStylesToDirectory` writes to disk during harness runs.**
+  The strip-runtime plugin's `Program.exit` calls `mkdirSync` +
+  `writeFileSync` against `<babel.cwd>/<dest>/<rel>.compiled.css`. The
+  Jest test mocks `fs`; Bun does not. The harness now passes
+  `babel.cwd = parity-harness/strip-runtime/_scratch` for those
+  fixtures, so writes are scoped + gitignored.
+- **`expectsError` fixture schema.** Four fixtures (A02, B05, B06, B07)
+  assert that the plugin throws. The harness now treats the
+  Babel-side throw (with matching `expectsError.babelMessage`) as the
+  determinism oracle for those fixtures, and requires the SWC side to
+  throw the same message once the §1.4 port lands.
 
 ### Phase 0 findings (write-once notes)
 
@@ -102,8 +121,8 @@ done before declaring Phase 0 fully signed off across the platform set.
 
 | ID | Status | Checkpoint | Owner | Artefacts | Verification |
 |---|---|---|---|---|---|
-| §1.0 | ☐ | Extract all 38 fixtures from the existing strip-runtime test files into `parity-harness/strip-runtime/fixtures/*.json` | — | 38 fixture JSON files; one per `it(...)` in `packages/babel-plugin-strip-runtime/src/__tests__/*.test.ts` | `ls parity-harness/strip-runtime/fixtures/*.json \| wc -l` ≥ 38; harness Babel-determinism tests pass for every fixture |
-| §1.1 | ☐ | Port `utils/to_uri_component.rs` (URL-encode + escape `!` to `%21`) | — | `crates/babel-plugin-strip-runtime/src/utils/to_uri_component.rs` + unit tests | `cargo test -p babel-plugin-strip-runtime to_uri_component` passes |
+| §1.0 | ☑ | Extract all 38 fixtures from the existing strip-runtime test files into `parity-harness/strip-runtime/fixtures/*.json` | claude-2026-05-02 | 38 fixture JSON files (`A01`–`A04`, `B01`–`B10`, `C01`–`C16`, `D01`–`D08`) under `parity-harness/strip-runtime/fixtures/`; generator at `parity-harness/strip-runtime/generate-fixtures.mjs`; `@babel/preset-env` + `@babel/preset-typescript` added to `packages/babel-plugin-strip-runtime/package.json` devDeps (resolves the dep drift) | `ls parity-harness/strip-runtime/fixtures/*.json \| wc -l` reports 41 (3 phase-0 seeds + 38 new); `bun test parity-harness/strip-runtime/harness.test.ts` → 82/82 pass |
+| §1.1 | ☑ | Port `utils/to_uri_component.rs` (URL-encode + escape `!` to `%21`) | claude-2026-05-02 | `crates/babel-plugin-strip-runtime/src/utils/to_uri_component.rs`, `crates/babel-plugin-strip-runtime/src/utils/mod.rs`, `lib.rs` declares `pub mod utils;` | `RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib to_uri_component` → 10/10 pass; cross-checked against JS `encodeURIComponent(x).replace(/!/g,'%21')` over 12 inputs (CSS rules, full unreserved set, `!`, UTF-8 multibyte, NUL, webpack loader separator) — byte-equal |
 | §1.2 | ☐ | Port `utils/is_automatic_runtime.rs`, `utils/is_cc_component.rs`, `utils/is_create_element.rs` predicates | — | three `.rs` files under `crates/babel-plugin-strip-runtime/src/utils/` + unit tests | `cargo test -p babel-plugin-strip-runtime` covers all three |
 | §1.3 | ☐ | Port `utils/remove_style_declarations.rs` + create `compat/scope.rs` for SWC binding lookup | — | `crates/babel-plugin-strip-runtime/src/utils/remove_style_declarations.rs`, `crates/babel-plugin-strip-runtime/src/compat/scope.rs` | `cargo test -p babel-plugin-strip-runtime` passes; representative input test produces matching CSS extraction |
 | §1.4 | ☐ | Port `lib.rs` entry + dispatcher: `Program::exit`, `ImportSpecifier`, `JSXElement`, `CallExpression`. Lock `Program::exit` ordering (banner → preserveLeadingComments → require-OR-css-OR-metadata, never two) | — | `crates/babel-plugin-strip-runtime/src/lib.rs` (replaces the Phase 0 passthrough) | Harness `expected-to-fail` tests are removed (or flipped to required-passing); `bun test parity-harness/strip-runtime/harness.test.ts` passes for every fixture |

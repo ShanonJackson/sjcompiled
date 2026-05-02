@@ -13,6 +13,11 @@ In order to do this correctly, it's probably best if we replicate their folder/f
 # DRIFT DETECTION - 
 THIS PART IS CRITICAL!
 If you think someone hasn't ported something OUTSIDE your work CORRECTLY; Immedietly I.E "Drift detected in X - <Explanation here>" this is CRITICALLY important. otherwise if many things have slight drift the "WHOLE" will have MAJOR drift. Minor drift is unnacceptable.
+DONT try and "WORK AROUND" drift; That's not your call to make. Drift is the enemy.
+
+# Quality
+Quality is more important than speed; Again if we port something even slightly incorrectly when we eventually integrate it into the 60-90GB Monorepo ANY issue that CAN happen WILL happen.
 
 
-
+# Performance
+Performance is a side-goal that should NEVER come at the cost of correctness but yet is important. If we ship the entire thing end-to-end and it's slower than the original we've failed.

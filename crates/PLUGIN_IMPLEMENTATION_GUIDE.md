@@ -171,6 +171,139 @@ Different AST: `Numeric { value, unit }`, `Word`, `Func { name, nodes }`,
 must drop `node.raws_before` / `node.raws_after` if they aren't valid for
 the new shape, otherwise the original bytes get re-emitted.
 
+### Per-node attribute bag (`Node.attrs`)
+
+Every `postcss_core::Node` carries an `attrs: NodeAttrs` field — an
+insertion-ordered map of plugin-private state. Mirrors the JS pattern of
+stashing state directly on the AST (`node._autoprefixerPrefix`,
+`decl._autoprefixerCascade`, etc.).
+
+```rust
+use postcss_core::{AttrValue, NodeKind};
+
+// Memo: cache the prefix decision on first visit, read on subsequent.
+if let Some(b) = node.attrs.get_bool("_autoprefixerPrefix") {
+    return b;
+}
+let answer = compute_prefix(node);
+node.attrs.set("_autoprefixerPrefix", AttrValue::Bool(answer));
+```
+
+**Conventions plugin authors must follow:**
+
+1. **Namespace your keys** with your plugin name: `_<plugin>_<field>`.
+   Bare keys like `cache` will collide with another plugin tomorrow.
+2. **Use `IndexMap` shapes** (`AttrValue::StringMap`, `NestedStringMap`)
+   when iteration order reaches output bytes. `HashMap` is banned (the
+   cardinal-rule check still applies).
+3. **`AttrValue` variants are extensible** but only by changing the
+   `postcss-core` enum — file an issue first if you need a shape that
+   isn't `Bool`/`String`/`Int`/`StringMap`/`NestedStringMap`.
+
+When deep-cloning a node, plugins like autoprefixer drop their
+private keys to prevent stale memoization on the clone:
+
+```rust
+// Mirrors `prefixer.js::clone` upstream.
+let clone = node.clone_without(&["_autoprefixerPrefix", "_autoprefixerValues"]);
+```
+
+`Node::clone_without(&[])` is identical to `node.clone()`.
+
+### Parent-aware visitors (`walk_*_mut_with_parent`)
+
+Most plugins only need the simple `walk_*_mut` family from § 3 above.
+Some plugins (autoprefixer, anything that does `node.parent.parent`)
+need to walk *up* the tree or call methods on arbitrary ancestors.
+
+For those, use the parent-aware family:
+
+```rust
+use postcss_core::{
+    walk_decls_mut_with_parent, DeferredMutation,
+    node_at_path, parent_some, walk_up_with,
+};
+
+walk_decls_mut_with_parent(&mut root.root, |root, path, ctx| {
+    // `root: &mut Node` — entire tree, you choose when to take a
+    //                    mutable borrow vs an immutable borrow.
+    // `path: &[usize]`  — index path from root to the current node.
+    // `ctx: WalkCtx`    — { index, parent_len } for the current visit.
+
+    // READ the current node:
+    let is_color_red = match node_at_path(root, path).map(|n| &n.kind) {
+        Some(NodeKind::Declaration(d)) => d.prop == "color" && d.value == "red",
+        _ => false,
+    };
+
+    // READ siblings — by predicate:
+    let has_bg_sibling = parent_some(root, path, |s| {
+        matches!(&s.kind, NodeKind::Declaration(sd) if sd.prop == "background")
+    });
+    let no_display_sibling = parent_every(root, path, |s| match &s.kind {
+        NodeKind::Declaration(d) => d.prop != "display",
+        _ => true,
+    });
+
+    // READ siblings — by index (for `selector.js::already`-style backward scans):
+    let prev = sibling_relative(root, path, -1);     // previous sibling, or None
+    let first = sibling_at(root, path, 0);           // absolute index 0
+    let all_siblings = parent_nodes(root, path);     // full Vec<Node>, or None at root
+
+    // WALK UP through ancestors:
+    walk_up_with(root, path, |anc| {
+        // return false to stop early
+        true
+    });
+
+    // MUTATE: defer via DeferredMutation. The visitor adjusts cursor.
+    DeferredMutation::Keep
+});
+```
+
+**Architectural drift you need to know about.** Upstream JS uses
+`node.parent` back-pointers; this port uses **index paths**. Reasons:
+
+- `Weak<Node>` back-pointers turn ownership into a fight with the
+  borrow checker — every existing plugin would have to wrap nodes in
+  `Rc<RefCell<...>>` and lose static borrow safety.
+- Index paths cost an extra `Vec<usize>` per visit but compose with
+  the existing simple `walk_*_mut` family without breaking it.
+- The closure receives `&mut Node` (root) and `&[usize]` (path) instead
+  of `&mut Node` (current) so it can re-borrow root immutably to call
+  `parent_some` etc. — Rust can't prove the alias-safety statically;
+  this signature side-steps it.
+
+**Mutations during a parent-aware walk** must use `DeferredMutation`:
+
+| Variant | Effect |
+|---|---|
+| `Keep` | Leave; descend into children. |
+| `Remove` | Drop the node. Cursor stays. |
+| `Replace(node)` | Swap; descend into replacement. |
+| `ReplaceMany(vec)` | 1-to-N substitution; cursor advances past inserts. |
+| `InsertBefore(vec)` | Splice before this node; cursor advances. |
+| `InsertAfter(vec)` | Splice after; cursor advances past original + inserts. |
+
+These map 1:1 to the `Mutation` enum used by `walk_*_mut`. The cursor
+adjustment is identical — nothing gets skipped or double-visited.
+
+For raw `node.parent.insertBefore(node, cloned)` style calls outside
+the visitor's normal mutation flow, use:
+
+```rust
+use postcss_core::insert_before_at_path;
+insert_before_at_path(&mut root.root, &path, new_node);
+```
+
+This calls into `insert_before_with_normalize` so the Root's
+raws-transfer fires correctly when inserting at index 0.
+
+**When NOT to use the parent-aware family:** if your plugin only needs
+to look at the current node and its direct children (most local
+plugins fall in this bucket), stay on `walk_*_mut` from § 3 — simpler,
+slightly faster, no path arithmetic.
+
 ---
 
 ## 4. Helpers you must use

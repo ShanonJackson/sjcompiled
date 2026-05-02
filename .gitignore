@@ -4,3 +4,4 @@ dist/
 .DS_Store
 *.log
 bun.lockb
+parity-harness/strip-runtime/_scratch/

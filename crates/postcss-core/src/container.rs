@@ -655,3 +655,623 @@ mod tests {
         assert_eq!(r.nodes().unwrap().len(), 3);
     }
 }
+
+// ============================================================================
+// Parent-aware visitor surface
+// ============================================================================
+//
+// Autoprefixer (and plugins like it) need access to a node's *ancestors*
+// during a visit — `node.parent.parent` etc. JS expresses that with back-
+// pointers; in Rust those back-pointers turn ownership into a fight.
+//
+// **Architectural drift from upstream — by design:**
+// We model the parent chain as a [`NodePath`] (a `Vec<usize>` of child
+// indices, root → ... → node). This is an *index path*, not a back-pointer.
+// Plugin authors get the equivalent functionality via:
+//
+//   - [`node_at_path`] / [`node_at_path_mut`] — resolve the path back to
+//     a node reference.
+//   - [`parent_path`] — drop the last index to get the parent's path.
+//   - [`parent_index_of`] — `node.parent.index(node)` — the last element
+//     of the path.
+//   - [`parent_some`] / [`parent_every`] — `node.parent.some(f)` /
+//     `node.parent.every(f)`.
+//   - [`walk_up_with`] — `parentPrefix` walk from a node up through every
+//     ancestor.
+//   - [`insert_before_at_path`] — `node.parent.insertBefore(node, cloned)`
+//     equivalent. Defers to [`insert_before_with_normalize`] so Root's
+//     raws-transfer fires correctly.
+//
+// The visitor family `walk_*_mut_with_parent` runs alongside the existing
+// `walk_*_mut` family. Plugins that don't need parent access stay on the
+// simpler API. Authors are expected to read this section before reaching
+// for the parent-aware variants — see PLUGIN_IMPLEMENTATION_GUIDE.md.
+
+/// A path of child indices from a [`Root`](crate::Root)'s top container
+/// to a target node. Empty path == the Root itself.
+///
+/// We expose this as a plain `Vec<usize>` alias for ergonomic slicing;
+/// callers who hold one across visitor invocations should clone it (the
+/// walker reuses an internal scratch buffer).
+pub type NodePath = Vec<usize>;
+
+/// Resolve `path` against `root` and return the node at that path, or
+/// the root node when the path is empty. `None` if any index is out of
+/// bounds.
+pub fn node_at_path<'a>(root: &'a Node, path: &[usize]) -> Option<&'a Node> {
+    let mut cur = root;
+    for &i in path {
+        cur = cur.nodes()?.get(i)?;
+    }
+    Some(cur)
+}
+
+/// Mutable variant of [`node_at_path`].
+pub fn node_at_path_mut<'a>(root: &'a mut Node, path: &[usize]) -> Option<&'a mut Node> {
+    let mut cur = root;
+    for &i in path {
+        cur = cur.nodes_mut()?.get_mut(i)?;
+    }
+    Some(cur)
+}
+
+/// Drop the last index — gives the path to the node's parent. Panics on
+/// empty paths (you don't have a parent if you're root).
+#[inline]
+pub fn parent_path(path: &[usize]) -> &[usize] {
+    debug_assert!(!path.is_empty(), "parent_path called on root");
+    &path[..path.len() - 1]
+}
+
+/// `node.parent.index(node)` — last element of the path.
+#[inline]
+pub fn parent_index_of(path: &[usize]) -> usize {
+    debug_assert!(!path.is_empty(), "parent_index_of called on root");
+    path[path.len() - 1]
+}
+
+/// `node.parent.some(f)` upstream — true if any sibling (including the
+/// node itself) satisfies the predicate.
+pub fn parent_some<F: FnMut(&Node) -> bool>(root: &Node, path: &[usize], mut f: F) -> bool {
+    let parent = node_at_path(root, parent_path(path));
+    let Some(parent) = parent else { return false; };
+    let Some(nodes) = parent.nodes() else { return false; };
+    nodes.iter().any(|c| f(c))
+}
+
+/// `node.parent.every(f)` upstream.
+pub fn parent_every<F: FnMut(&Node) -> bool>(root: &Node, path: &[usize], mut f: F) -> bool {
+    let parent = node_at_path(root, parent_path(path));
+    let Some(parent) = parent else { return false; };
+    let Some(nodes) = parent.nodes() else { return false; };
+    nodes.iter().all(|c| f(c))
+}
+
+/// `parentPrefix(node)` style ancestor walk — invoke `f(ancestor)` for
+/// each ancestor of the node at `path`, from immediate parent up to
+/// root. Stops when `f` returns `false`.
+///
+/// Mirrors upstream `prefixer.js::parentPrefix`'s recursive
+/// `this.parentPrefix(node.parent)` chain.
+pub fn walk_up_with<F: FnMut(&Node) -> bool>(root: &Node, path: &[usize], mut f: F) {
+    if path.is_empty() { return; }
+    let mut p = path.len();
+    while p > 0 {
+        p -= 1;
+        let ancestor_path = &path[..p];
+        if let Some(anc) = node_at_path(root, ancestor_path) {
+            if !f(anc) { return; }
+        } else {
+            return;
+        }
+    }
+}
+
+/// `node.parent.insertBefore(node, newNode)` upstream — splices `add`
+/// in front of the node at `path`. Adjusts subsequent operations'
+/// reasoning about the path: the old node now lives at
+/// `parent_path[..-1] + [parent_idx + 1]`. **The walk cursor is buffered
+/// by the parent-aware visitor family** so calling this from inside a
+/// `walk_*_mut_with_parent` callback is safe — the visitor applies the
+/// insert after the callback returns and shifts its cursor accordingly.
+pub fn insert_before_at_path(root: &mut Node, path: &[usize], add: Node) {
+    let idx = parent_index_of(path);
+    let pp = parent_path(path).to_vec();
+    if let Some(parent_node) = node_at_path_mut(root, &pp) {
+        insert_before_with_normalize(parent_node, idx, add);
+    }
+}
+
+/// `node.parent.nodes` upstream — returns the parent's full child list.
+/// Returns `None` if `path` is empty (the node is root, no parent) or if
+/// the parent isn't a container.
+pub fn parent_nodes<'a>(root: &'a Node, path: &[usize]) -> Option<&'a Vec<Node>> {
+    if path.is_empty() { return None; }
+    let parent = node_at_path(root, parent_path(path))?;
+    parent.nodes()
+}
+
+/// `node.parent.nodes[i]` upstream — sibling at an absolute index in
+/// the parent's child list. `None` if out of bounds. Useful for
+/// `selector.js::already`-style backward scans where the index math is
+/// the obvious source of off-by-one bugs.
+pub fn sibling_at<'a>(root: &'a Node, path: &[usize], abs_index: usize) -> Option<&'a Node> {
+    parent_nodes(root, path)?.get(abs_index)
+}
+
+/// Sibling at a relative offset from the node at `path`. `offset = -1`
+/// is the previous sibling, `+1` is the next. Returns `None` if the
+/// resulting index is out of bounds (or underflows when `offset` is
+/// negative on a node already at index 0).
+pub fn sibling_relative<'a>(root: &'a Node, path: &[usize], offset: isize) -> Option<&'a Node> {
+    if path.is_empty() { return None; }
+    let cur = parent_index_of(path) as isize;
+    let target = cur.checked_add(offset)?;
+    if target < 0 { return None; }
+    sibling_at(root, path, target as usize)
+}
+
+// ----------------------------------------------------------------------------
+// Parent-aware visitor family
+// ----------------------------------------------------------------------------
+//
+// `walk_*_mut_with_parent` callbacks receive `(root, path, ctx)`:
+//   - `root`: `&mut Node` rooted at the original Root, so callbacks can
+//     reach any ancestor or sibling via the helpers above.
+//   - `path`: `&[usize]` index path to the current node (last element is
+//     the cursor index in the immediate parent).
+//   - `ctx`: `WalkCtx { index, parent_len }` for backwards-compat with
+//     existing visitors.
+//
+// Mutations are buffered in a `Vec<DeferredMutation>` and applied after
+// each callback returns. This is required because rust's borrow checker
+// can't statically prove that an `&mut Node` returned by the visitor
+// doesn't alias `&mut Root` passed in alongside.
+
+/// A buffered mutation — emitted by parent-aware callbacks.
+#[derive(Debug, Clone)]
+pub enum DeferredMutation {
+    Keep,
+    Remove,
+    Replace(Node),
+    ReplaceMany(Vec<Node>),
+    /// `node.parent.insertBefore(node, ...)` — splice these nodes in
+    /// front of the path the callback was invoked with.
+    InsertBefore(Vec<Node>),
+    /// `node.parent.insertAfter(node, ...)`.
+    InsertAfter(Vec<Node>),
+}
+
+impl From<Mutation> for DeferredMutation {
+    fn from(m: Mutation) -> Self {
+        match m {
+            Mutation::Keep => DeferredMutation::Keep,
+            Mutation::Remove => DeferredMutation::Remove,
+            Mutation::Replace(n) => DeferredMutation::Replace(n),
+            Mutation::ReplaceMany(v) => DeferredMutation::ReplaceMany(v),
+            Mutation::InsertBefore(v) => DeferredMutation::InsertBefore(v),
+            Mutation::InsertAfter(v) => DeferredMutation::InsertAfter(v),
+        }
+    }
+}
+
+/// Walk every descendant of `root_node` depth-first. The callback
+/// receives `(root, path, ctx)`:
+///
+///   - `root: &mut Node` — the entire tree, so the callback can call
+///     [`parent_some`] / [`parent_every`] / [`walk_up_with`] /
+///     [`node_at_path_mut`] to inspect or mutate any ancestor or
+///     sibling.
+///   - `path: &[usize]` — index path from `root` to the current visited
+///     node.
+///   - `ctx: WalkCtx` — `{ index, parent_len }` for the current visit.
+///
+/// **Why pass `root` instead of the current node directly?** Rust can't
+/// statically prove that `&mut Node` (current) and `&Node` (root) don't
+/// alias, even though current is a descendant. By giving the callback
+/// only `root`, we let it choose when to take a mutable borrow (via
+/// [`node_at_path_mut`]) and when to re-borrow immutably (via
+/// [`parent_some`] etc.). This is the architectural drift from upstream
+/// — see PLUGIN_IMPLEMENTATION_GUIDE.md § "Parent-aware visitors".
+///
+/// **Cursor adjustment:** the walker maintains the invariant that
+/// `path[..-1]` always points at the parent of the current visit
+/// position. Insert/remove operations are applied AFTER the callback
+/// and the cursor at `path[-1]` is shifted accordingly:
+///
+///   - `Remove`: cursor stays — the next sibling slid down.
+///   - `InsertBefore(N)`: cursor advances past the N inserts.
+///   - `InsertAfter(N)`: cursor advances past the original AND the N inserts.
+///   - `Replace`: cursor advances past the replacement (and we descend into it).
+///   - `ReplaceMany(N)`: cursor advances past the N replacements (no descent).
+///
+/// Any sibling-list mutation outside `path[..-1]`'s subtree is
+/// unsupported in this version — the callback should restrict its
+/// `insert_before_at_path` calls to the immediate parent.
+pub fn walk_mut_with_parent<F>(root: &mut Node, mut f: F)
+where
+    F: FnMut(&mut Node, &[usize], WalkCtx) -> DeferredMutation,
+{
+    let mut path: Vec<usize> = Vec::new();
+    walk_mut_with_parent_inner(root, &mut path, &mut f);
+}
+
+fn walk_mut_with_parent_inner<F>(root: &mut Node, path: &mut Vec<usize>, f: &mut F)
+where
+    F: FnMut(&mut Node, &[usize], WalkCtx) -> DeferredMutation,
+{
+    // Snapshot the parent's child count for cursor bookkeeping.
+    let cur_len = node_at_path(root, path).and_then(|n| n.nodes()).map(|c| c.len()).unwrap_or(0);
+    if cur_len == 0 { return; }
+
+    let mut i = 0usize;
+    loop {
+        // Re-read len each iter — it can change as we mutate.
+        let parent_len = node_at_path(root, path).and_then(|n| n.nodes()).map(|c| c.len()).unwrap_or(0);
+        if i >= parent_len { break; }
+
+        path.push(i);
+        let ctx = WalkCtx { index: i, parent_len };
+
+        // Visit. The callback gets `&mut Node` to root + the path —
+        // it picks when to take mutable vs immutable borrows.
+        let mutation = f(root, path.as_slice(), ctx);
+
+        // Decide whether to descend.
+        let descend = matches!(mutation, DeferredMutation::Keep);
+
+        // Apply mutation.
+        let path_to_parent = path[..path.len() - 1].to_vec();
+        match mutation {
+            DeferredMutation::Keep => {
+                if descend {
+                    walk_mut_with_parent_inner(root, path, f);
+                }
+                path.pop();
+                i += 1;
+            }
+            DeferredMutation::Remove => {
+                path.pop();
+                if let Some(parent) = node_at_path_mut(root, &path_to_parent) {
+                    remove_at(parent, i);
+                }
+                // cursor stays
+            }
+            DeferredMutation::Replace(new_node) => {
+                path.pop();
+                if let Some(parent) = node_at_path_mut(root, &path_to_parent) {
+                    replace_at(parent, i, new_node);
+                }
+                // descend into the replacement.
+                path.push(i);
+                walk_mut_with_parent_inner(root, path, f);
+                path.pop();
+                i += 1;
+            }
+            DeferredMutation::ReplaceMany(new_nodes) => {
+                let len = new_nodes.len();
+                path.pop();
+                if let Some(parent) = node_at_path_mut(root, &path_to_parent) {
+                    remove_at(parent, i);
+                    insert_before(parent, i, new_nodes);
+                }
+                // skip past the replacements (no descent — matches Mutation::ReplaceMany).
+                i += len;
+            }
+            DeferredMutation::InsertBefore(prefix) => {
+                let len = prefix.len();
+                path.pop();
+                if let Some(parent) = node_at_path_mut(root, &path_to_parent) {
+                    insert_before(parent, i, prefix);
+                }
+                i += len + 1;
+            }
+            DeferredMutation::InsertAfter(suffix) => {
+                let len = suffix.len();
+                path.pop();
+                if let Some(parent) = node_at_path_mut(root, &path_to_parent) {
+                    insert_after(parent, i, suffix);
+                }
+                i += len + 1;
+            }
+        }
+    }
+}
+
+/// Filtered variants — same shape as `walk_mut_with_parent` but only
+/// fires the callback when the *current node* (at `path`) matches the
+/// named kind. The kind check resolves through `node_at_path(root, path)`
+/// since the closure receives root, not the current node.
+pub fn walk_decls_mut_with_parent<F>(root: &mut Node, mut f: F)
+where
+    F: FnMut(&mut Node, &[usize], WalkCtx) -> DeferredMutation,
+{
+    walk_mut_with_parent(root, |r, path, ctx| {
+        let is_match = matches!(node_at_path(r, path).map(|n| &n.kind), Some(NodeKind::Declaration(_)));
+        if is_match { f(r, path, ctx) } else { DeferredMutation::Keep }
+    });
+}
+
+pub fn walk_rules_mut_with_parent<F>(root: &mut Node, mut f: F)
+where
+    F: FnMut(&mut Node, &[usize], WalkCtx) -> DeferredMutation,
+{
+    walk_mut_with_parent(root, |r, path, ctx| {
+        let is_match = matches!(node_at_path(r, path).map(|n| &n.kind), Some(NodeKind::Rule(_)));
+        if is_match { f(r, path, ctx) } else { DeferredMutation::Keep }
+    });
+}
+
+pub fn walk_at_rules_mut_with_parent<F>(root: &mut Node, mut f: F)
+where
+    F: FnMut(&mut Node, &[usize], WalkCtx) -> DeferredMutation,
+{
+    walk_mut_with_parent(root, |r, path, ctx| {
+        let is_match = matches!(node_at_path(r, path).map(|n| &n.kind), Some(NodeKind::AtRule(_)));
+        if is_match { f(r, path, ctx) } else { DeferredMutation::Keep }
+    });
+}
+
+pub fn walk_comments_mut_with_parent<F>(root: &mut Node, mut f: F)
+where
+    F: FnMut(&mut Node, &[usize], WalkCtx) -> DeferredMutation,
+{
+    walk_mut_with_parent(root, |r, path, ctx| {
+        let is_match = matches!(node_at_path(r, path).map(|n| &n.kind), Some(NodeKind::Comment(_)));
+        if is_match { f(r, path, ctx) } else { DeferredMutation::Keep }
+    });
+}
+
+#[cfg(test)]
+mod parent_aware_tests {
+    use super::*;
+    use crate::{parse, stringify};
+
+    #[test]
+    fn parent_index_and_some_every() {
+        let r = parse("a { color: red; font-size: 12px; }").unwrap();
+        // Walk to the second decl.
+        let path = vec![0, 1];
+        let n = node_at_path(&r.root, &path).expect("decl exists");
+        assert!(matches!(n.kind, NodeKind::Declaration(_)));
+        assert_eq!(parent_index_of(&path), 1);
+        // Parent has at least one decl with prop="color"?
+        assert!(parent_some(&r.root, &path, |n| matches!(&n.kind, NodeKind::Declaration(d) if d.prop == "color")));
+        // Every child of parent is a decl.
+        assert!(parent_every(&r.root, &path, |n| matches!(n.kind, NodeKind::Declaration(_))));
+    }
+
+    #[test]
+    fn walk_up_visits_each_ancestor() {
+        let r = parse("@media (min-width: 100px) { a { color: red; } }").unwrap();
+        // Path to the decl: root → atrule(0) → rule(0) → decl(0).
+        let path = vec![0, 0, 0];
+        let mut visited: Vec<&'static str> = Vec::new();
+        walk_up_with(&r.root, &path, |anc| {
+            visited.push(match &anc.kind {
+                NodeKind::Root(_) => "root",
+                NodeKind::AtRule(_) => "atrule",
+                NodeKind::Rule(_) => "rule",
+                _ => "other",
+            });
+            true
+        });
+        assert_eq!(visited, vec!["rule", "atrule", "root"]);
+    }
+
+    #[test]
+    fn insert_before_at_path_splices_sibling() {
+        let mut r = parse("a { color: red; }").unwrap();
+        // Path to the decl.
+        let path = vec![0, 0];
+        // Build a new decl to splice in.
+        let new_decl = Node::new(NodeKind::Declaration(crate::declaration::Declaration {
+            prop: "background".to_string(),
+            value: "blue".to_string(),
+            important: false,
+            variable: false,
+        }));
+        insert_before_at_path(&mut r.root, &path, new_decl);
+        let out = stringify(&r);
+        // The new decl arrived first.
+        let bg_idx = out.find("background").expect("bg present");
+        let color_idx = out.find("color").expect("color present");
+        assert!(bg_idx < color_idx, "bg should come first: {out:?}");
+    }
+
+    #[test]
+    fn walk_decls_mut_with_parent_can_check_sibling() {
+        // Plugin pattern: only count `color: red` decls when their parent
+        // also has a `background` decl. The closure takes only `root`,
+        // re-borrows it immutably to read the current node and check
+        // siblings — borrow-checker friendly.
+        let mut r = parse("a { color: red; } b { color: red; background: blue; }").unwrap();
+        let mut hits = 0usize;
+        walk_decls_mut_with_parent(&mut r.root, |root, path, _ctx| {
+            // Read the current decl.
+            let is_color_red = match node_at_path(root, path).map(|n| &n.kind) {
+                Some(NodeKind::Declaration(d)) => d.prop == "color" && d.value == "red",
+                _ => false,
+            };
+            if is_color_red {
+                let has_bg = parent_some(root, path, |s| {
+                    matches!(&s.kind, NodeKind::Declaration(sd) if sd.prop == "background")
+                });
+                if has_bg { hits += 1; }
+            }
+            DeferredMutation::Keep
+        });
+        // Only the `b { ... }` rule has a `background` sibling.
+        assert_eq!(hits, 1);
+    }
+
+    #[test]
+    fn deferred_insert_before_advances_cursor() {
+        // Insert a new sibling before each decl; verify no double-visit.
+        let mut r = parse("a { color: red; font-size: 12px; }").unwrap();
+        let mut visited = 0usize;
+        walk_decls_mut_with_parent(&mut r.root, |_root, _path, _ctx| {
+            visited += 1;
+            // Insert one new decl before the current one.
+            let new_decl = Node::new(NodeKind::Declaration(crate::declaration::Declaration {
+                prop: "border".to_string(),
+                value: "0".to_string(),
+                important: false,
+                variable: false,
+            }));
+            DeferredMutation::InsertBefore(vec![new_decl])
+        });
+        // Visited count == original decl count (2). If cursor adjustment
+        // were broken we'd loop forever or visit the inserts.
+        assert_eq!(visited, 2, "visited count: {visited}");
+        let out = stringify(&r);
+        assert!(out.matches("border: 0").count() == 2, "got: {out:?}");
+    }
+
+    #[test]
+    fn parent_nodes_returns_full_child_list() {
+        let r = parse("a { color: red; font-size: 12px; background: blue; }").unwrap();
+        // Path to second decl.
+        let path = vec![0, 1];
+        let siblings = parent_nodes(&r.root, &path).expect("parent has children");
+        assert_eq!(siblings.len(), 3);
+        // Cardinal: order matches doc order.
+        if let NodeKind::Declaration(d) = &siblings[0].kind { assert_eq!(d.prop, "color"); }
+        if let NodeKind::Declaration(d) = &siblings[2].kind { assert_eq!(d.prop, "background"); }
+    }
+
+    #[test]
+    fn parent_nodes_returns_none_for_root() {
+        let r = parse("a {}").unwrap();
+        // Empty path → node is root → no parent.
+        assert!(parent_nodes(&r.root, &[]).is_none());
+    }
+
+    #[test]
+    fn sibling_at_absolute_index() {
+        let r = parse("a { color: red; font-size: 12px; }").unwrap();
+        let path = vec![0, 0];
+        let sib = sibling_at(&r.root, &path, 1).expect("sibling exists");
+        if let NodeKind::Declaration(d) = &sib.kind { assert_eq!(d.prop, "font-size"); }
+        // OOB returns None.
+        assert!(sibling_at(&r.root, &path, 99).is_none());
+    }
+
+    #[test]
+    fn sibling_relative_walks_backward() {
+        // `selector.js::already` use case — walk backward looking for a
+        // non-rule sibling.
+        let r = parse("a {} b {} c {}").unwrap();
+        let path = vec![2]; // the `c` rule
+        let prev = sibling_relative(&r.root, &path, -1).expect("prev exists");
+        if let NodeKind::Rule(rule) = &prev.kind { assert_eq!(rule.selector.trim(), "b"); }
+        let prev_prev = sibling_relative(&r.root, &path, -2).expect("prev-prev exists");
+        if let NodeKind::Rule(rule) = &prev_prev.kind { assert_eq!(rule.selector.trim(), "a"); }
+        // Underflow returns None — the most common off-by-one trap.
+        assert!(sibling_relative(&r.root, &path, -3).is_none());
+    }
+
+    #[test]
+    fn sibling_relative_underflow_does_not_panic() {
+        let r = parse("a {}").unwrap();
+        // node at index 0, offset -1 underflows.
+        let path = vec![0];
+        assert!(sibling_relative(&r.root, &path, -1).is_none());
+        // Even with isize::MIN, no panic.
+        assert!(sibling_relative(&r.root, &path, isize::MIN).is_none());
+    }
+
+    #[test]
+    fn parent_every_returns_true_when_all_match() {
+        let r = parse("a { color: red; font-size: 12px; }").unwrap();
+        let path = vec![0, 0];
+        // All siblings are decls.
+        assert!(parent_every(&r.root, &path, |n| matches!(n.kind, NodeKind::Declaration(_))));
+        // Not all siblings are atrules.
+        assert!(!parent_every(&r.root, &path, |n| matches!(n.kind, NodeKind::AtRule(_))));
+    }
+
+    /// Direct exercise of the autoprefixer pattern from `value.js:37` —
+    /// `rule.every(i => i.prop !== prefixed)`. Returns true iff *no*
+    /// sibling has the named prop.
+    #[test]
+    fn parent_every_inverse_predicate_pattern() {
+        let r = parse("a { color: red; font-size: 12px; }").unwrap();
+        let path = vec![0, 0];
+        // No sibling has prop=="display" → every() inverse is true.
+        let no_display = parent_every(&r.root, &path, |n| match &n.kind {
+            NodeKind::Declaration(d) => d.prop != "display",
+            _ => true,
+        });
+        assert!(no_display);
+        // A sibling has prop=="color" → every() inverse is false.
+        let no_color = parent_every(&r.root, &path, |n| match &n.kind {
+            NodeKind::Declaration(d) => d.prop != "color",
+            _ => true,
+        });
+        assert!(!no_color);
+    }
+
+    /// Sanity check the autoprefixer agent flagged: `clone_without` must
+    /// recurse into nested rules so `_autoprefixerPrefix` set on a decl
+    /// inside an at-rule body is also stripped on the clone.
+    #[test]
+    fn clone_without_recurses_into_descendants() {
+        use crate::node::AttrValue;
+        // Parse a 3-level tree: root → atrule → rule → decl.
+        let mut r = parse("@media print { a { color: red; } }").unwrap();
+        // Stash a key on every level.
+        let path_atrule: Vec<usize> = vec![0];
+        let path_rule: Vec<usize> = vec![0, 0];
+        let path_decl: Vec<usize> = vec![0, 0, 0];
+        for p in [&path_atrule[..], &path_rule[..], &path_decl[..]] {
+            let n = node_at_path_mut(&mut r.root, p).expect("path exists");
+            n.attrs.set("_autoprefixerPrefix", AttrValue::Bool(true));
+            n.attrs.set("kept", AttrValue::Bool(true));
+        }
+
+        // Clone the at-rule node, strip the autoprefixer key.
+        let original_atrule = node_at_path(&r.root, &path_atrule).unwrap();
+        let cloned = original_atrule.clone_without(&["_autoprefixerPrefix"]);
+
+        // Top-level clone is stripped.
+        assert!(cloned.attrs.get("_autoprefixerPrefix").is_none());
+        assert!(cloned.attrs.get("kept").is_some(), "non-listed keys are kept");
+
+        // Descendant rule and decl are also stripped (the autoprefixer
+        // agent's actual bug case).
+        let cloned_rule = cloned.nodes().expect("atrule has body").get(0).expect("rule exists");
+        assert!(cloned_rule.attrs.get("_autoprefixerPrefix").is_none(), "nested rule still has key — recursion broken");
+        assert!(cloned_rule.attrs.get("kept").is_some());
+        let cloned_decl = cloned_rule.nodes().expect("rule has body").get(0).expect("decl exists");
+        assert!(cloned_decl.attrs.get("_autoprefixerPrefix").is_none(), "nested decl still has key — recursion broken");
+        assert!(cloned_decl.attrs.get("kept").is_some());
+
+        // Original tree is untouched (deep clone, not a move).
+        let orig_rule = node_at_path(&r.root, &path_rule).unwrap();
+        assert!(orig_rule.attrs.get("_autoprefixerPrefix").is_some());
+    }
+
+    #[test]
+    fn walk_up_can_be_called_from_visitor() {
+        // Plugin pattern that autoprefixer needs:
+        // `parentPrefix(node) → if any ancestor's name has a vendor prefix, return it`.
+        // We test the read pattern here: visitor walks up and inspects each
+        // ancestor's kind while holding only `&mut root`.
+        let mut r = parse("@media print { a { color: red; } }").unwrap();
+        let mut ancestor_kinds_seen: Vec<&'static str> = Vec::new();
+        walk_decls_mut_with_parent(&mut r.root, |root, path, _ctx| {
+            walk_up_with(root, path, |anc| {
+                ancestor_kinds_seen.push(match &anc.kind {
+                    NodeKind::Root(_) => "root",
+                    NodeKind::AtRule(_) => "atrule",
+                    NodeKind::Rule(_) => "rule",
+                    _ => "other",
+                });
+                true
+            });
+            DeferredMutation::Keep
+        });
+        assert_eq!(ancestor_kinds_seen, vec!["rule", "atrule", "root"]);
+    }
+}

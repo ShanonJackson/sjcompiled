@@ -21,8 +21,7 @@ impl Root {
         Root {
             root: Node {
                 kind: NodeKind::Root(RootInner::default()),
-                raws: Raws::default(),
-                source: Source::default(),
+                ..Node::default()
             },
         }
     }

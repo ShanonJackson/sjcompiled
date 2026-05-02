@@ -48,7 +48,7 @@ impl SelectorBase {
     }
 
     /// JS: `possible()` → Browsers.prefixes().
-    pub fn possible(&self) -> &'static [&'static str] {
+    pub fn possible(&self) -> &'static [String] {
         crate::browsers::Browsers::prefixes()
     }
 

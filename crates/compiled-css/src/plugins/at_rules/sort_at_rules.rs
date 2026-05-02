@@ -90,6 +90,7 @@ mod tests {
                 kind: postcss_core::NodeKind::Root(postcss_core::root::RootInner::default()),
                 raws: postcss_core::Raws::default(),
                 source: postcss_core::Source::default(),
+                ..Node::default()
             },
             at_rule_name: name.to_string(),
             query: query.to_string(),

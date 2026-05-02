@@ -1,56 +1,140 @@
 //! Port of `crates/_vendor/autoprefixer-10.4.14/package/lib/value.js`.
 //!
-//! `Value extends Prefixer`. Hacks like `gradient`, `cross-fade`,
+//! `class Value extends Prefixer`. Hacks like `gradient`, `cross-fade`,
 //! `display-flex`, `image-set`, `pixelated`, `intrinsic`, `filter-value`
 //! subclass this.
-//!
-//! # Status (Phase 7 foundation)
-//!
-//! Struct + signatures locked. Bodies unimplemented — depend on a
-//! node-attribute bag (`_autoprefixerValues` cache) plus parent-pointer
-//! API. Foundation agent's TODO. **Hacks agent: do not start.**
 
-use postcss_core::Node;
+use indexmap::IndexMap;
+use once_cell::sync::OnceCell;
+use postcss_core::{AttrValue, Node, NodeKind};
+use regex::Regex;
 
 use crate::old_value::OldValue;
 use crate::prefixer::PrefixerBase;
+use crate::utils;
+
+/// `decl.attrs[_autoprefixerValues]: { prefix → value-with-prefixed-tokens }`.
+pub const ATTR_VALUES: &str = "_autoprefixerValues";
 
 pub struct ValueBase {
     pub prefixer: PrefixerBase,
+    /// `regexpCache` — JS uses a per-instance lazy field. We cache once.
+    regexp_cache: OnceCell<Regex>,
 }
 
 impl ValueBase {
     pub fn new(name: String, prefixes: Vec<String>, all_id: usize) -> Self {
-        Self { prefixer: PrefixerBase::new(name, prefixes, all_id) }
+        Self {
+            prefixer: PrefixerBase::new(name, prefixes, all_id),
+            regexp_cache: OnceCell::new(),
+        }
     }
 
-    /// JS: `check(decl)` — `decl.value` includes name AND matches regexp.
-    pub fn check(&self, _decl: &Node) -> bool {
-        unimplemented!("Phase 7 — port value.js::check")
+    /// JS: `check(decl)` — `decl.value` includes `this.name` AND matches
+    /// `this.regexp()`.
+    pub fn check(&self, decl: &Node) -> bool {
+        let value = match &decl.kind {
+            NodeKind::Declaration(d) => &d.value,
+            _ => return false,
+        };
+        if !value.contains(&self.prefixer.name) {
+            return false;
+        }
+        self.regexp().is_match(value)
     }
 
-    /// JS: `regexp()` — lazy. `(^|[\\s,(])(name($|[\\s(,]))` case-insensitive.
-    pub fn regexp(&self) -> regex::Regex {
-        unimplemented!("Phase 7 — port value.js::regexp (lazy cache)")
+    /// JS: `regexp()` — lazy. Built from `utils.regexp(this.name)`.
+    pub fn regexp(&self) -> &Regex {
+        self.regexp_cache
+            .get_or_init(|| utils::regexp(&self.prefixer.name, true))
     }
 
-    /// JS: `replace(string, prefix)` — `$1${prefix}$2`.
-    pub fn replace(&self, _string: &str, _prefix: &str) -> String {
-        unimplemented!("Phase 7 — port value.js::replace")
+    /// JS: `replace(string, prefix)` — `string.replace(regexp, '$1' + prefix + '$2')`.
+    pub fn replace(&self, string: &str, prefix: &str) -> String {
+        // utils::regexp captures group 1 = prefix-context (`^` or `[\s,(]`),
+        // group 2 = `name` followed by `$|[\s(,]`. JS `.replace()` puts
+        // the prefix between groups 1 and 2. The Rust `regex` crate's
+        // `Replacer` API needs a function for that.
+        let re = self.regexp();
+        re.replace_all(string, |caps: &regex::Captures| {
+            format!(
+                "{}{prefix}{}",
+                caps.get(1).map(|m| m.as_str()).unwrap_or(""),
+                caps.get(2).map(|m| m.as_str()).unwrap_or(""),
+            )
+        })
+        .into_owned()
     }
 
     /// JS: `value(decl)` — return `decl.raws.value.raw` if it represents
     /// the unmodified original `decl.value`, else `decl.value`.
-    pub fn value(&self, _decl: &Node) -> String {
-        unimplemented!("Phase 7 — port value.js::value")
+    /// ```js
+    /// if (decl.raws.value && decl.raws.value.value === decl.value) return decl.raws.value.raw
+    /// else return decl.value
+    /// ```
+    pub fn value(&self, decl: &Node) -> String {
+        let (current_value, raws_value) = match &decl.kind {
+            NodeKind::Declaration(d) => (&d.value, decl.raws.value.as_ref()),
+            _ => return String::new(),
+        };
+        match raws_value {
+            Some(rv) if rv.value == *current_value => rv.raw.clone(),
+            _ => current_value.clone(),
+        }
     }
 
-    /// JS: `add(decl, prefix)` — apply `replace` repeatedly until stable.
-    pub fn add(&mut self, _decl: &mut Node, _prefix: &str) {
-        unimplemented!("Phase 7 — port value.js::add")
+    /// JS: `add(decl, prefix)` — populate `decl._autoprefixerValues[prefix]`
+    /// by repeatedly calling `replace` until the string stabilises.
+    /// ```js
+    /// add(decl, prefix) {
+    ///   if (!decl._autoprefixerValues) decl._autoprefixerValues = {}
+    ///   let value = decl._autoprefixerValues[prefix] || this.value(decl)
+    ///   let before
+    ///   do {
+    ///     before = value
+    ///     value = this.replace(value, prefix)
+    ///     if (value === false) return
+    ///   } while (value !== before)
+    ///   decl._autoprefixerValues[prefix] = value
+    /// }
+    /// ```
+    pub fn add(&mut self, decl: &mut Node, prefix: &str) {
+        // Pull or initialise the cache map.
+        let initial = self
+            .stored_value(decl, prefix)
+            .unwrap_or_else(|| self.value(decl));
+
+        let mut value = initial;
+        loop {
+            let before = value.clone();
+            value = self.replace(&before, prefix);
+            if value == before {
+                break;
+            }
+        }
+
+        let map = decl
+            .attrs
+            .get_string_map_mut(ATTR_VALUES)
+            .map(|m| m as *mut IndexMap<String, String>);
+        match map {
+            Some(ptr) => unsafe { (*ptr).insert(prefix.to_string(), value) },
+            None => {
+                let mut m = IndexMap::new();
+                m.insert(prefix.to_string(), value);
+                decl.attrs.set(ATTR_VALUES, AttrValue::StringMap(m));
+                None
+            }
+        };
     }
 
-    /// JS: `old(prefix)` → new OldValue(this.name, prefix + this.name).
+    fn stored_value(&self, decl: &Node, prefix: &str) -> Option<String> {
+        decl.attrs
+            .get_string_map(ATTR_VALUES)
+            .and_then(|m| m.get(prefix).cloned())
+    }
+
+    /// JS: `old(prefix)` → `new OldValue(this.name, prefix + this.name)`.
     pub fn old(&self, prefix: &str) -> OldValue {
         OldValue::new(
             self.prefixer.name.clone(),
@@ -58,5 +142,74 @@ impl ValueBase {
             None,
             None,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use postcss_core::parse;
+
+    fn first_decl(root: &mut Node) -> &mut Node {
+        // root → rule(0) → decl(0)
+        let rule = root.nodes_mut().unwrap().get_mut(0).unwrap();
+        rule.nodes_mut().unwrap().get_mut(0).unwrap()
+    }
+
+    #[test]
+    fn check_returns_true_when_value_contains_name() {
+        let mut r = parse("a { display: flex; }").unwrap();
+        let v = ValueBase::new("flex".into(), vec!["-webkit-".into()], 0);
+        assert!(v.check(first_decl(&mut r.root)));
+    }
+
+    #[test]
+    fn check_returns_false_when_value_lacks_name() {
+        let mut r = parse("a { display: block; }").unwrap();
+        let v = ValueBase::new("flex".into(), vec!["-webkit-".into()], 0);
+        assert!(!v.check(first_decl(&mut r.root)));
+    }
+
+    #[test]
+    fn replace_inserts_prefix_at_word_boundary() {
+        let v = ValueBase::new("flex".into(), vec!["-webkit-".into()], 0);
+        let out = v.replace("display: flex;", "-webkit-");
+        assert!(out.contains("-webkit-flex"));
+    }
+
+    #[test]
+    fn replace_does_not_match_inside_word() {
+        let v = ValueBase::new("flex".into(), vec!["-webkit-".into()], 0);
+        // `inflex` should not match — name is preceded by `n`, not a
+        // boundary char. utils::regexp's group 1 is `^|[\s,(]`.
+        let out = v.replace("display: inflex;", "-webkit-");
+        assert_eq!(out, "display: inflex;");
+    }
+
+    #[test]
+    fn value_returns_decl_value_by_default() {
+        let mut r = parse("a { display: flex; }").unwrap();
+        let v = ValueBase::new("flex".into(), vec!["-webkit-".into()], 0);
+        assert_eq!(v.value(first_decl(&mut r.root)), "flex");
+    }
+
+    #[test]
+    fn add_caches_prefixed_value_on_node() {
+        let mut r = parse("a { display: flex; }").unwrap();
+        let mut v = ValueBase::new("flex".into(), vec!["-webkit-".into()], 0);
+        v.add(first_decl(&mut r.root), "-webkit-");
+        let cached = first_decl(&mut r.root)
+            .attrs
+            .get_string_map(ATTR_VALUES)
+            .unwrap();
+        assert_eq!(cached.get("-webkit-").unwrap(), "-webkit-flex");
+    }
+
+    #[test]
+    fn old_constructs_old_value_with_combined_string() {
+        let v = ValueBase::new("flex".into(), vec!["-webkit-".into()], 0);
+        let ov = v.old("-webkit-");
+        assert_eq!(ov.unprefixed, "flex");
+        assert_eq!(ov.prefixed, "-webkit-flex");
     }
 }

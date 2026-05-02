@@ -261,6 +261,7 @@ fn atomicify_decl(node: &Node, internal: &mut AtomicifyInternalOpts) -> Node {
         // Preserve source so any error tied to this decl still has the
         // original line/col info — matches upstream's `node.clone()`.
         source: node.source.clone(),
+        ..Node::default()
     };
 
     // newRule: build a Rule with raws { before:"", after:"", between:"", selector:RawValue("","") }
@@ -278,6 +279,7 @@ fn atomicify_decl(node: &Node, internal: &mut AtomicifyInternalOpts) -> Node {
             ..Raws::default()
         },
         source: Source::default(),
+        ..Node::default()
     }
 }
 
@@ -453,6 +455,7 @@ fn atomicify_atrule(
             ..Raws::default()
         },
         source: node.source.clone(),
+        ..Node::default()
     })
 }
 

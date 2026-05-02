@@ -34,21 +34,24 @@ End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 | 6g | postcss-minify-gradients@5.1.1 | **SCAFFOLDED** — uses colord. |
 | 6g | postcss-colormin@5.3.1 | **SCAFFOLDED** — highest-risk cssnano plugin. |
 | 6h | cssnano-preset-default@5.2.14 (orchestrator) | **SCAFFOLDED** |
-| 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs` (partial — `parent_prefix` walk-parent TODO) ported. 11 unit tests passing. Split contract: see "Phase 7 split contract" section below. |
+| 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **Fully ported (byte-clean):** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs` (incl. `parent_prefix` via `walk_up_with` + `Node.attrs` cache + `clone_without` strip), `at_rule.rs` (full `add` + `process`). **20 unit tests passing.** Stubbed (signature-only): `browsers.rs`, `declaration.rs`, `value.rs`, `selector.rs`, `resolution.rs`, `supports.rs`, `transition.rs`, `prefixes.rs`, `processor.rs`, `info.rs`, `autoprefixer.rs`, `data/prefixes.rs`, all 58 hacks. Split contract: see "Phase 7 split contract" section below. |
 | 8a | `sort()` NAPI bridge + sort.ts engine flag | **DONE** — 12/12 corpus byte-clean end-to-end on win32-x64-msvc. See "Phase 8a ship" section below. |
 | 8b | `transformCss` NAPI bridge + transform.ts engine flag | **NOT STARTED** — blocks on Phase 5/6/7 plugin ports. |
 
 ## Test totals
 
 `RUSTFLAGS="" cargo test --workspace --no-fail-fast`:
-- **462 tests pass / 0 fail / 1 ignored / 0 failed suites.**
+- **502 tests pass / 0 fail / 1 ignored / 0 failed suites.**
   (12 from Phase 5b `postcss-normalize-whitespace`,
   12 from Phase 6a `postcss-discard-comments`,
   7 from Phase 6b `postcss-normalize-string`,
   12 from Phase 6b `postcss-normalize-positions`,
   15 from Phase 6b `postcss-normalize-timing-functions`,
   33 from Phase 6b `postcss-normalize-url`,
-  4 from Phase 5a `postcss-nested`.)
+  4 from Phase 5a `postcss-nested`,
+  20 from Phase 7 `autoprefixer` foundation,
+  3 new postcss-core round-trip tests pinning the
+  `rawSemicolon` / `rawBeforeOpen` / `rawColon` fallbacks.)
 
 ## Phase 8a ship — `sort()` end-to-end byte-clean through NAPI
 
@@ -220,22 +223,55 @@ registration contract.
 2. ✅ Scaffold crate + module tree (compiles cleanly).
 3. ✅ Port leaf utilities (`utils`, `vendor`, `brackets`, `old_value`,
    `old_selector`).
-4. 🟡 Port `prefixer.rs` (partial — base trait + `parent_prefix`; the
-   walk-parent path needs a parent-pointer surface from
-   `postcss-core`).
-5. ⬜ Port `browsers.rs` (browserslist-shim integration).
-6. ⬜ Port `data/prefixes.rs` (~1100 LOC static data table — codegen
+4. ✅ Port `prefixer.rs` — full. `parent_prefix` walks ancestors via
+   `postcss_core::walk_up_with`, caches answers via `Node.attrs`
+   (`_autoprefixerPrefix`), `clone_node` delegates to
+   `Node::clone_without(CLONE_STRIP_KEYS)`. Tests pin all 5 cases.
+5. ✅ Port `at_rule.rs` — full `add` + `process`. Uses
+   `parent_some` for the sibling-existence guard,
+   `insert_before_at_path` for the clone insert.
+6. ⬜ Port `browsers.rs` (browserslist-shim integration).
+7. ⬜ Port `data/prefixes.rs` (~1100 LOC static data table — codegen
    from `data/prefixes.js`).
-7. ⬜ Port mid-tier base classes (`value.rs`, `selector.rs`,
-   `at_rule.rs`, `resolution.rs`).
-8. ⬜ Port heavier base classes (`declaration.rs`, `supports.rs`,
-   `transition.rs`).
-9. ⬜ Port `prefixes.rs` (registry — wires hacks → declaration types).
-10. ⬜ Port `processor.rs` + `info.rs` + `autoprefixer.rs` (entry
+8. ⬜ Port mid-tier base classes: `value.rs`, `selector.rs`,
+   `resolution.rs` (signature-only stubs in place; trait surface
+   locked).
+9. ⬜ Port heavier base classes: `declaration.rs`, `supports.rs`,
+   `transition.rs`.
+10. ⬜ Port `prefixes.rs` (registry — wires hacks → declaration types).
+11. ⬜ Port `processor.rs` + `info.rs` + `autoprefixer.rs` (entry
     point).
-11. ⬜ Add `Stage::Autoprefixer` parity-runner gate (requires
+12. ⬜ Add `Stage::Autoprefixer` parity-runner gate (requires
     parity-runner edits + parity-bridge.mjs — re-ask permission).
-12. ⬜ Wire into `crates/css/src/transform.rs` (re-ask permission).
+13. ⬜ Wire into `crates/css/src/transform.rs` (re-ask permission).
+
+### Path-shift gotcha — load-bearing for every base class
+
+JS holds a node *reference* across `parent.insertBefore(node, cloned)`
+calls — the reference auto-follows when the original's index shifts.
+The Rust port uses *index paths*. Each successful
+`insert_before_at_path(root, path, clone)` shifts the original's index
+in its parent up by 1 because the clone is spliced at the original's
+slot. **The path becomes stale** the moment the insert returns.
+
+Fix pattern (see `at_rule.rs::process`):
+
+```rust
+let mut current_path = path.to_vec();
+for prefix in &prefixes {
+    if self.add(root, &current_path, prefix).is_some() {
+        if let Some(last) = current_path.last_mut() { *last += 1; }
+    }
+}
+```
+
+**`value.js`, `selector.js`, `declaration.js` all do the same `parent
+.insertBefore` pattern in a loop.** Apply the same path-bump on every
+successful insert. The bug is silent: tests that only insert one
+prefix won't catch it; tests that insert two or more will.
+
+If the hacks agent ports a hack that does its own insert outside the
+base class's `add`, follow the same pattern.
 
 ### Hacks agent's responsibilities
 
@@ -538,13 +574,13 @@ line should be removed (it'll become a double-space).
 
 - **Postcss `rawCache` defaults are load-bearing.** Any plugin that
   creates fresh nodes (Rule/AtRule/Decl/Comment) inherits styling via
-  `rawCache` walks at stringify time. Our `postcss-core` stringifier
-  implements `rawBefore{Rule,Decl,Comment,Close}` but is missing
-  `rawSemicolon` and the `rawBeforeOpen` (`rule.raws.between`)
-  fallback. Plugins must work around this by inheriting from a
-  same-styled source node. **Future fix in `postcss-core`:** add the
-  two scanners + default lookups; then plugin-side workarounds become
-  redundant.
+  `rawCache` walks at stringify time. The `postcss-core` stringifier
+  now implements `rawBefore{Rule,Decl,Comment,Close,Open}`,
+  `rawSemicolon`, and `rawColon`, mirroring upstream
+  `stringifier.js::raw`. New plugins should construct fresh nodes with
+  NO explicit `raws` and let the stringifier derive defaults — do not
+  hard-code inherited values from a source node, that's a divergence
+  trap.
 - **Postcss-selector-parser doesn't emit descendant Combinators.**
   See the section above. Plugins that mutate selector ASTs around
   Nesting/Combinator nodes need to be aware of the

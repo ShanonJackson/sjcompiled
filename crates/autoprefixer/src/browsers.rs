@@ -1,57 +1,178 @@
 //! Port of `crates/_vendor/autoprefixer-10.4.14/package/lib/browsers.js`.
 
-/// Static set of vendor prefixes autoprefixer recognises.
-/// JS: `Browsers.prefixes()` returns the union over caniuse-db prefix
-/// columns. We pin the same union for parity.
-const PREFIX_LIST: &[&str] = &[
-    "-webkit-",
-    "-moz-",
-    "-o-",
-    "-ms-",
-    "-khtml-",
-];
+use std::sync::OnceLock;
 
-#[derive(Debug, Clone, Default)]
+use indexmap::IndexMap;
+
+use crate::utils;
+
+/// `Browsers.prefixes()` — derived from `caniuse-lite/dist/unpacker/agents`.
+/// JS pushes `-${agents[name].prefix}-` for each agent, dedupes via
+/// `utils.uniq`, and sorts by descending length.
+fn build_prefixes() -> Vec<String> {
+    let agents: &IndexMap<String, caniuse_db::agents::Agent> = &caniuse_db::agents::AGENTS;
+    let raw: Vec<String> = agents
+        .values()
+        .map(|a| format!("-{}-", a.prefix))
+        .collect();
+    let mut deduped = utils::uniq(&raw);
+    // JS: `.sort((a, b) => b.length - a.length)` — stable on ties; matches
+    // V8's TimSort. Rust's `sort_by` is also stable, so equal-length
+    // entries keep their first-seen order from `uniq`.
+    deduped.sort_by(|a, b| b.len().cmp(&a.len()));
+    deduped
+}
+
+static PREFIXES_CACHE: OnceLock<Vec<String>> = OnceLock::new();
+static PREFIXES_REGEXP: OnceLock<regex::Regex> = OnceLock::new();
+
+/// Holds caniuse data + browserslist-resolved selection. JS constructor:
+/// `constructor(data, requirements, options, browserslistOpts)`.
+#[derive(Debug, Clone)]
 pub struct Browsers {
     pub selected: Vec<String>,
-    pub data: serde_json::Value,
     pub options: BrowsersOptions,
+    pub browserslist_opts: BrowserslistOpts,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct BrowsersOptions {
+    /// JS `options.from` — feeds into browserslist as `opts.path`.
+    pub from: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct BrowserslistOpts {
     pub ignore_unknown_versions: bool,
-    pub stats: Option<serde_json::Value>,
-    pub env: Option<String>,
-    pub path: Option<String>,
 }
 
 impl Browsers {
-    /// Static list of vendor prefixes.
-    pub fn prefixes() -> &'static [&'static str] {
-        PREFIX_LIST
+    /// Static — return all prefixes for default browser data. Cached
+    /// across calls (JS uses a class-static `prefixesCache`).
+    pub fn prefixes() -> &'static [String] {
+        PREFIXES_CACHE.get_or_init(build_prefixes)
+    }
+
+    /// Static — `withPrefix(value)` — does `value` contain any of the
+    /// recognised prefixes? JS builds `new RegExp(prefixes.join('|'))`.
+    pub fn with_prefix(value: &str) -> bool {
+        let re = PREFIXES_REGEXP.get_or_init(|| {
+            let pattern = Self::prefixes().join("|");
+            regex::Regex::new(&pattern).expect("valid prefix-union regex")
+        });
+        re.is_match(value)
     }
 
     /// True if `prefix` is one of the recognised vendor prefixes.
+    /// (Convenience helper used by `prefixer.rs::sanitize`.)
     pub fn is_prefix(prefix: &str) -> bool {
-        PREFIX_LIST.contains(&prefix)
+        Self::prefixes().iter().any(|p| p == prefix)
     }
 
-    pub fn new(_data: serde_json::Value, _requirements: Vec<String>, _options: BrowsersOptions) -> Self {
-        unimplemented!("Phase 7 — port browsers.js constructor + cleanBrowsers + selected resolution")
+    /// JS: `constructor(data, requirements, options, browserslistOpts)`.
+    pub fn new(
+        requirements: Vec<String>,
+        options: BrowsersOptions,
+        browserslist_opts: BrowserslistOpts,
+    ) -> Self {
+        let selected = Self::parse_static(&requirements, &options, &browserslist_opts);
+        Self { selected, options, browserslist_opts }
     }
 
-    pub fn selected(&self) -> &[String] {
-        &self.selected
+    /// JS: `this.data` — the caniuse-lite agents table. Static singleton
+    /// in our world.
+    pub fn data() -> &'static IndexMap<String, caniuse_db::agents::Agent> {
+        &caniuse_db::agents::AGENTS
     }
 
-    /// Return prefix for browser name (e.g. "ios_saf" → "-webkit-").
-    pub fn prefix(&self, _browser: &str) -> String {
-        unimplemented!("Phase 7 — port browsers.js::prefix")
+    /// JS: `parse(requirements)` — calls `browserslist(requirements, opts)`.
+    /// `opts.path = this.options.from`. We split out the static helper so
+    /// the constructor can call it without holding `&self`.
+    fn parse_static(
+        requirements: &[String],
+        options: &BrowsersOptions,
+        browserslist_opts: &BrowserslistOpts,
+    ) -> Vec<String> {
+        let _ = options.from; // path option not yet plumbed through shim
+        let query = requirements.join(", ");
+        let opts = browserslist_shim::index::ResolveOpts {
+            ignore_unknown_versions: browserslist_opts.ignore_unknown_versions,
+            ..Default::default()
+        };
+        browserslist_shim::index::resolve_with(&query, &opts)
     }
 
-    /// Is browser in selected list.
-    pub fn is_selected(&self, _browser: &str) -> bool {
-        unimplemented!("Phase 7 — port browsers.js::isSelected")
+    /// Re-resolve `selected` against new requirements (matches the JS
+    /// instance method, used by tests).
+    pub fn parse(&mut self, requirements: &[String]) -> Vec<String> {
+        Self::parse_static(requirements, &self.options, &self.browserslist_opts)
+    }
+
+    /// JS: `prefix(browser)` — `browser` is "name version".
+    /// ```js
+    /// let [name, version] = browser.split(' ')
+    /// let data = this.data[name]
+    /// let prefix = data.prefix_exceptions && data.prefix_exceptions[version]
+    /// if (!prefix) prefix = data.prefix
+    /// return `-${prefix}-`
+    /// ```
+    pub fn prefix(&self, browser: &str) -> String {
+        let mut parts = browser.splitn(2, ' ');
+        let name = parts.next().unwrap_or("");
+        let version = parts.next().unwrap_or("");
+        let agent = Self::data()
+            .get(name)
+            .expect("Browsers::prefix called with unknown agent name");
+        let p = agent
+            .prefix_exceptions
+            .get(version)
+            .map(String::as_str)
+            .unwrap_or(agent.prefix.as_str());
+        format!("-{p}-")
+    }
+
+    /// JS: `isSelected(browser) { return this.selected.includes(browser) }`.
+    pub fn is_selected(&self, browser: &str) -> bool {
+        self.selected.iter().any(|b| b == browser)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prefixes_includes_webkit_and_moz() {
+        let p = Browsers::prefixes();
+        assert!(p.iter().any(|s| s == "-webkit-"));
+        assert!(p.iter().any(|s| s == "-moz-"));
+    }
+
+    #[test]
+    fn prefixes_sorted_by_descending_length_stable() {
+        let p = Browsers::prefixes();
+        for w in p.windows(2) {
+            assert!(
+                w[0].len() >= w[1].len(),
+                "expected descending length, got {:?} then {:?}",
+                w[0],
+                w[1]
+            );
+        }
+    }
+
+    #[test]
+    fn with_prefix_detects_known_prefixes() {
+        assert!(Browsers::with_prefix("display: -webkit-flex"));
+        assert!(Browsers::with_prefix("color: -moz-something"));
+        assert!(!Browsers::with_prefix("display: flex"));
+    }
+
+    #[test]
+    fn is_prefix_recognises_vendor_strings() {
+        assert!(Browsers::is_prefix("-webkit-"));
+        assert!(Browsers::is_prefix("-moz-"));
+        assert!(!Browsers::is_prefix("-zzz-"));
+        assert!(!Browsers::is_prefix(""));
     }
 }

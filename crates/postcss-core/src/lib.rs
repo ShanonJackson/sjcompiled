@@ -40,14 +40,21 @@ pub use comment::Comment;
 pub use css_syntax_error::CssSyntaxError;
 pub use declaration::Declaration;
 pub use input::Input;
-pub use node::{Node, NodeKind, RawValue, Raws, Source, SourcePosition};
+pub use node::{AttrValue, Node, NodeAttrs, NodeKind, RawValue, Raws, Source, SourcePosition};
 pub use parser::Parser;
 pub use root::Root;
 pub use rule::Rule;
 pub use stringifier::{stringify, stringify_node, Stringifier};
 pub use js_number::js_number_to_string;
 pub use plugin_error::{PluginError, PluginResult};
-pub use container::{Mutation, Visit, WalkCtx};
+pub use container::{
+    DeferredMutation, Mutation, NodePath, Visit, WalkCtx,
+    insert_before_at_path, node_at_path, node_at_path_mut, parent_every,
+    parent_index_of, parent_nodes, parent_path, parent_some, sibling_at,
+    sibling_relative, walk_at_rules_mut_with_parent, walk_comments_mut_with_parent,
+    walk_decls_mut_with_parent, walk_mut_with_parent, walk_rules_mut_with_parent,
+    walk_up_with,
+};
 
 /// `parse(css)` — entry that mirrors `node_modules/postcss/lib/parse.js`.
 pub fn parse(css: &str) -> Result<Root, CssSyntaxError> {
@@ -129,10 +136,12 @@ mod roundtrip_tests {
                     }),
                     raws: Raws::default(),
                     source: Source::default(),
+                    ..Node::default()
                 }],
             }),
             raws: Raws::default(),
             source: Source::default(),
+            ..Node::default()
         });
 
         let out = stringify(&r);
@@ -157,10 +166,12 @@ mod roundtrip_tests {
                     }),
                     raws: Raws::default(),
                     source: Source::default(),
+                    ..Node::default()
                 }],
             }),
             raws: Raws::default(),
             source: Source::default(),
+            ..Node::default()
         });
         let out = stringify(&r);
         // Sibling sample → `raws.semicolon = Some(true)` → emit `;`.
@@ -184,10 +195,12 @@ mod roundtrip_tests {
                     }),
                     raws: Raws::default(),
                     source: Source::default(),
+                    ..Node::default()
                 }],
             }),
             raws: Raws::default(),
             source: Source::default(),
+            ..Node::default()
         });
         let out = stringify(&r);
         assert!(out.contains("color: red"), "got: {out:?}");

@@ -56,10 +56,12 @@ const fixtures: Fixture[] = readdirSync(FIXTURES_DIR)
   .map((f) => JSON.parse(readFileSync(join(FIXTURES_DIR, f), 'utf8')) as Fixture)
   .map((f) => ({
     ...f,
-    // Mark stripping-required fixtures as expected-to-fail at Phase 0.
-    expectedToFail:
-      f.expectedToFail ??
-      f.name.includes('stripped'),
+    // Phase-0/1-pre-port escape hatch: every fixture is expected-to-fail
+    // against the passthrough SWC plugin EXCEPT the explicit `passthrough`
+    // baseline. When §1.4 ports the dispatcher, this auto-flag is removed
+    // (or each fixture is graduated by hand) and the parity tests must
+    // pass for real.
+    expectedToFail: f.expectedToFail ?? !f.name.includes('passthrough'),
   }));
 
 beforeAll(() => {
