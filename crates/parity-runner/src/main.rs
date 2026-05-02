@@ -55,6 +55,7 @@ fn main() -> ExitCode {
         "postcss-normalize-positions" => Stage::PostcssNormalizePositions,
         "postcss-normalize-timing-functions" => Stage::PostcssNormalizeTimingFunctions,
         "postcss-normalize-url" => Stage::PostcssNormalizeUrl,
+        "postcss-minify-selectors" => Stage::PostcssMinifySelectors,
         "sort" => Stage::Sort,
         s => {
             eprintln!("unknown stage: {s}");

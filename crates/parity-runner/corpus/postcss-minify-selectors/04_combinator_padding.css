@@ -1,0 +1,3 @@
+.a   >   .b { color: red; }
+.x ~ .y { color: blue; }
+.p  +  .q { color: green; }

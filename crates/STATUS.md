@@ -1090,6 +1090,16 @@ on.
   `verify-engine-flag` 12/12; determinism on `discard-empty-rules` 16/16.
 - Full audit document at
   `crates/_vendor/COMPILED_CSS_LOCAL_PLUGINS_AFM_REAUDIT.md`.
+- **Two known drifts deferred (documented in `crates/POSSIBLE_DRIFT_CAUSES.md`):**
+  - `sort_at_rules::locale_compare_en` is byte cmp, not UCA. Triggers only
+    on the stage-4 tiebreaker between two at-rules with equal names + equal
+    breakpoint sequences whose `query` strings differ in non-ASCII tokens
+    (e.g. `@layer ärea` vs `@layer azul`). Closing it requires ~10 MB of
+    CLDR data — banned by CLAUDE.md "WASI/WASM Compilation".
+  - `discard_empty_rules::is_js_whitespace` strips a strict superset of
+    ECMA-262 Table 33 (extras: U+0085 NEL, U+1680 OGHAM). Triggers only on
+    decl values consisting entirely of those characters. NBSP, ASCII
+    whitespace, ZWNBSP, LS/PS all match exactly.
 
 ## postcss version pin: `8.4.31` → `8.5.6` (no code changes)
 

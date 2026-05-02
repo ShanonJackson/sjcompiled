@@ -25,3 +25,6 @@ Performance is a side-goal that should NEVER come at the cost of correctness but
 
 # Never
 - Never edit packages/babel-plugin, packages/babel-plugin-strip-runtime, packages/css and packages/utils consider them 100% IMMUTABLE as their EXACT source was copied from a monorepo.
+
+# WASI/WASM Compilation
+- Please don't add like 10MB Rust library or anything like that. We will eventually 'build' the whole thing to WASM/WASI and we don't want a like 50MB binary.

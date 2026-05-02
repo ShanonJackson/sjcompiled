@@ -1,0 +1,24 @@
+/* Interactions between the three short-circuits — comma (resets
+   shouldContinue=true), slash (sets shouldContinue=false until next
+   comma), and var/env/constant (sets shouldContinue=false AND nulls
+   the current range entry). Tests:
+
+   - `var()` THEN `/` THEN keywords: var nulls range, slash keeps
+     shouldContinue=false → keywords ignored within the layer.
+   - `/` THEN keywords THEN `,` THEN keywords: slash blocks layer 1,
+     comma resets, layer 2 rewrites normally.
+   - keywords THEN `/` THEN keywords: only the pre-slash keywords mark
+     a range; post-slash keywords are background-size, ignored.
+   - `var()` AT END of comma-separated input (after layers that DID
+     get processed): final var must not retroactively poison earlier
+     ranges (each layer has its own range entry).
+   - Multiple commas with NO content between: rangeIndex increments,
+     creates sparse holes in `ranges`, ranges.forEach must skip them.
+*/
+a { background: red var(--p) / cover left top; }
+b { background-position: right top / cover, left bottom; }
+c { background-position: left top / 50%; }
+d { background-position: left top, right bottom, var(--p); }
+e { background-position: , , left top; }
+f { background-position: left top, , right bottom; }
+g { background: linear-gradient(red, blue) right center / cover, var(--bg) left top; }

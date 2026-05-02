@@ -1,0 +1,12 @@
+/* The plugin's per-call cache is keyed on `decl.value`. Postcss strips
+   `!important` from `decl.value` (it lives on `decl.important` instead),
+   so a value with `!important` and the same value WITHOUT `!important`
+   share a cache slot. Both must produce identical transforms — the
+   `!important` on the second decl is preserved by postcss-core
+   independently of the cache hit. Locks that the cache hit doesn't
+   accidentally drop or duplicate the !important suffix. */
+a { background-position: left top !important; }
+b { background-position: left top; }
+c { background-position: left top !important; }
+d { background-position: right bottom; }
+e { background-position: right bottom !important; }

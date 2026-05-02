@@ -389,10 +389,29 @@ fn process_container(parent: &mut sp::Node, unique_top_level: &mut IndexSet<Stri
             }
             sp::NodeKind::Universal => {
                 // Upstream `universal()` (lines 175-181) removes the `*`
-                // when the next sibling exists and isn't a combinator.
-                let next_kind = parent.nodes.get(i + 1).map(|n| n.kind.clone());
-                let should_remove =
-                    matches!(next_kind, Some(k) if k != sp::NodeKind::Combinator);
+                // when the next sibling exists AND isn't a combinator.
+                //
+                // Parser-divergence carve-out: our parser stores
+                // descendant combinators as `spaces.before` on the next
+                // sibling rather than emitting an explicit
+                // `Combinator{value: " "}` node. Upstream's `next.type`
+                // is `'combinator'` for the descendant case; ours is
+                // whatever follows. So we treat "next sibling carries
+                // whitespace in `spaces.before`" as equivalent to
+                // "next sibling is a combinator" — `* .a` keeps the `*`
+                // (descendant combinator follows) while `*.a` (compound
+                // selector, no whitespace) drops it. Verified against
+                // upstream JS via `packages/css/scripts/dbg-minify.mjs`.
+                let next = parent.nodes.get(i + 1);
+                let next_is_explicit_combinator =
+                    matches!(next.map(|n| n.kind.clone()), Some(sp::NodeKind::Combinator));
+                let next_has_descendant_ws = next
+                    .map(|n| n.spaces.before.chars().any(|c| c.is_whitespace()))
+                    .unwrap_or(false);
+                let next_exists = next.is_some();
+                let should_remove = next_exists
+                    && !next_is_explicit_combinator
+                    && !next_has_descendant_ws;
                 if should_remove {
                     parent.nodes.remove(i);
                     parent.raw_value = None;

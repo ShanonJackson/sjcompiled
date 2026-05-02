@@ -136,6 +136,7 @@ impl Stage {
             Stage::PostcssNormalizePositions => "postcss-normalize-positions",
             Stage::PostcssNormalizeTimingFunctions => "postcss-normalize-timing-functions",
             Stage::PostcssNormalizeUrl => "postcss-normalize-url",
+            Stage::PostcssMinifySelectors => "postcss-minify-selectors",
             Stage::Sort => "sort",
         }
     }
@@ -283,6 +284,12 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             let opts = cssnano_postcss_normalize_url::NormalizeUrlOpts::default();
             cssnano_postcss_normalize_url::postcss_normalize_url(&mut root, &opts)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssMinifySelectors => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            cssnano_postcss_minify_selectors::postcss_minify_selectors(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }

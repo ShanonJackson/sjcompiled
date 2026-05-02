@@ -1460,6 +1460,7 @@ dependencies = [
  "compiled-css",
  "css",
  "cssnano-postcss-discard-comments",
+ "cssnano-postcss-minify-selectors",
  "cssnano-postcss-normalize-positions",
  "cssnano-postcss-normalize-string",
  "cssnano-postcss-normalize-timing-functions",

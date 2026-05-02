@@ -40,6 +40,8 @@ import postcssNormalizePositions from 'postcss-normalize-positions';
 import postcssNormalizeTimingFunctions from 'postcss-normalize-timing-functions';
 // npm `postcss-normalize-url@5.1.0` — cssnano sub-plugin (Phase 6b).
 import postcssNormalizeUrl from 'postcss-normalize-url';
+// npm `postcss-minify-selectors@5.2.1` — cssnano sub-plugin (Phase 6c).
+import postcssMinifySelectors from 'postcss-minify-selectors';
 
 // Sheets returned by extract-stylesheets are joined with U+001E (record
 // separator) so they ride the single-string bridge protocol unambiguously.
@@ -206,6 +208,18 @@ const STAGES = {
   // stripTextFragment all `false`.
   'postcss-normalize-url': (css) => {
     const result = postcss([postcssNormalizeUrl()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-minify-selectors@5.2.1 (no opts) → stringify.
+  // OnceExit-only plugin: walks every Rule, runs each selector through a
+  // postcss-selector-parser pipeline that clears spaces, dispatches per-kind
+  // reducers (attribute/combinator/pseudo/tag/universal), dedupes top-level
+  // Selector arms (only when post-clear stringification matches — the
+  // upstream "leading-space-on-second-arg" bug means `.a, .a` does NOT
+  // dedupe; `.a,.a` does), and lex-sorts the surviving Selectors.
+  'postcss-minify-selectors': (css) => {
+    const result = postcss([postcssMinifySelectors()]).process(css, { from: undefined });
     return result.css;
   },
 
