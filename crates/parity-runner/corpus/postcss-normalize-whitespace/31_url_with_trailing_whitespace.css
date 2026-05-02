@@ -1,0 +1,11 @@
+/* Re-audit: postcss-value-parser@4.2.0 — closed url() with trailing
+   whitespace must emit sourceEndIndex = next + 1 (parse.js:230). Earlier
+   port wrote `next`, off-by-one. Multiple URL shapes exercise both the
+   word+trailing-ws and word+trailing-ws+ie9-hack paths. */
+a {
+  background: url(  foo.png  );
+  background-image: url(   bar.png   );
+  mask-image: url(\
+    nested.svg\
+  );
+}

@@ -1,7 +1,7 @@
 {
   "name": "B02-jsx-pragma-classic-compiled-renamed",
   "description": "/** @jsx myJsx */ + import { jsx as myJsx } — same expectation as B01",
-  "source": "\n        /** @jsx myJsx */\n        import { css, jsx as myJsx } from '@compiled/react';\n\n        const Component = () => (\n          <div css={{ fontSize: 12, color: 'blue' }}>\n            hello world 2\n          </div>\n        );\n\n        const Component2 = () => (\n          <div css={css({ fontSize: 12, color: 'pink' })}>\n            hello world 2\n          </div>\n        );\n      ",
+  "source": "\n        /** @jsx myJsx */\n        import { css, jsx as myJsx } from '@sjcompiled/react';\n\n        const Component = () => (\n          <div css={{ fontSize: 12, color: 'blue' }}>\n            hello world 2\n          </div>\n        );\n\n        const Component2 = () => (\n          <div css={css({ fontSize: 12, color: 'pink' })}>\n            hello world 2\n          </div>\n        );\n      ",
   "opts": {
     "run": "both",
     "runtime": "classic"

@@ -1,0 +1,10 @@
+/* Re-audit: postcss-value-parser@4.2.0 — slash after a closed paren at
+   the root level. JS `parent` becomes the truthy-but-typeless root frame
+   after close-paren, so the whitespace BEFORE `/` is emitted as a space
+   node rather than the div's `before`. Prior Rust port lost the space
+   node and produced collapsed output. */
+a {
+  width: (1px) / 2;
+  height: var(--ratio) / 1;
+  flex: calc(1px + 2px) / 4;
+}

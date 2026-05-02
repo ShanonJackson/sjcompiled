@@ -16,6 +16,16 @@ use crate::nodes::quoted::Quoted;
 use crate::nodes::unicode_range::UnicodeRange;
 use crate::nodes::word::Word;
 use crate::tokenize::{get_tokens, VKind, VToken};
+use once_cell::sync::Lazy;
+use regex::Regex;
+
+// Mirror upstream `Func.js:90-92`:
+//   const reColorFunctions = /^(hsla?|hwb|lab|lch|rgba?)$/i;
+//   const reVar = /^var$/i;
+//   const reVarPrefix = /^--[^\s]+$/;
+static RE_COLOR_FUNCTIONS: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)^(hsla?|hwb|lab|lch|rgba?)$").unwrap());
+static RE_VAR: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)^var$").unwrap());
+static RE_VAR_PREFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^--[^\s]+$").unwrap());
 
 pub struct ValuesParser {
     pub input: String,
@@ -51,10 +61,23 @@ impl ValuesParser {
                     if stack_func.len() > 1 {
                         let nodes = stack_root.pop().unwrap();
                         let pending = stack_func.pop().flatten().expect("func frame");
+                        // Upstream `Func.js:195-196`: set isColor / isVar after children are built.
+                        let is_color = RE_COLOR_FUNCTIONS.is_match(&pending.name);
+                        let first_value = nodes.first().and_then(|n| match &n.kind {
+                            NodeKind::Word(w) => Some(w.common.value.as_str()),
+                            NodeKind::Numeric(n) => Some(n.common.value.as_str()),
+                            NodeKind::Quoted(q) => Some(q.common.value.as_str()),
+                            _ => None,
+                        }).unwrap_or("");
+                        let is_var = RE_VAR.is_match(&pending.name)
+                            && !nodes.is_empty()
+                            && RE_VAR_PREFIX.is_match(first_value);
                         let func = Func {
                             common: pending.common,
                             name: pending.name,
                             nodes,
+                            is_color,
+                            is_var,
                             ..Default::default()
                         };
                         let mut node = Node {
@@ -158,8 +181,10 @@ impl ValuesParser {
                             common: common_for(tok),
                         }), tok, &mut spaces_before));
                     } else {
+                        // Mirror upstream `Word.js:38`: testHex is `/^#(.+)/`,
+                        // not `startsWith('#')` — bare `"#"` must NOT be is_hex.
                         let is_var = Word::is_variable_name(v);
-                        let is_hex = v.starts_with('#');
+                        let is_hex = Word::test_hex(v);
                         push_into(&mut stack_root, make_node(NodeKind::Word(Word {
                             common: common_for(tok),
                             is_variable: is_var,
@@ -173,14 +198,20 @@ impl ValuesParser {
         }
 
         // Unwind any unclosed function frames as Funcs with `unclosed = true`.
+        // JS aborts via `parser.unclosedBracket(brackets)` (throws), so there is
+        // no upstream reference for is_color/is_var on unclosed funcs. We still
+        // tag is_color so the AST shape is consistent with the closed-func path
+        // for recovery callers.
         while stack_func.len() > 1 {
             let nodes = stack_root.pop().unwrap();
             let pending = stack_func.pop().flatten().unwrap();
+            let is_color = RE_COLOR_FUNCTIONS.is_match(&pending.name);
             let func = Func {
                 common: pending.common,
                 name: pending.name,
                 nodes,
                 unclosed: true,
+                is_color,
                 ..Default::default()
             };
             let node = Node {

@@ -1,0 +1,10 @@
+/* Re-audit: postcss-value-parser@4.2.0 — values whose final word ends
+   in `\` (or any escape that pushes the parser past `value.length`)
+   panicked the prior Rust port at the slice. JS `slice` clamps. The
+   word's sourceEndIndex preserves the unclamped value; the slice is
+   clamped to value.len(). */
+a {
+  --escape: a\;
+  content: "x"\;
+  color: \red;
+}

@@ -73,6 +73,14 @@ pub fn parse(input: &str) -> Vec<Node> {
     let mut name = String::new();
     let mut before = String::new();
     let mut after = String::new();
+    // Mirrors upstream `var parent;` truthiness. Starts undefined; flipped
+    // truthy when JS assigns `parent = token` in the (non-url) open-paren
+    // branch (parse.js:240). Stays truthy thereafter — close-paren reassigns
+    // `parent = stack[balanced]` which is the root frame `{nodes: tokens}`,
+    // a truthy object whose `type` is undefined. Used by the slash-divider
+    // whitespace branch at parse.js:54-61, where `!parent` flips behavior
+    // versus a truthy-but-typeless root frame.
+    let mut parent_assigned = false;
 
     while pos < max {
         if code <= 32 {
@@ -87,11 +95,22 @@ pub fn parse(input: &str) -> Vec<Node> {
             let close_paren = code == CLOSE_PAREN && balanced > 0;
             // peek prev
             let prev_is_div = stack.last().and_then(|v| v.last()).map(|n| n.kind == NodeKind::Div).unwrap_or(false);
-            let parent_is_calc = current_func_is_calc(&frame_func);
+            // Mirrors parse.js:54-61. The slash sub-condition is
+            //   `!parent || (parent && parent.type === "function" && parent.value !== "calc")`
+            // which is true when JS `parent` is undefined (no paren has yet
+            // been opened) OR when we are inside a non-calc function. It is
+            // FALSE when `parent` is the root frame `{nodes: tokens}`
+            // (truthy, no `type` field) — that state is reached only AFTER a
+            // close-paren returns to the top level. Prior Rust port treated
+            // this case as `!parent`-true, mishandling whitespace before a
+            // top-level `/` after a closed function (e.g. `(1) / 2`).
+            let in_non_calc_function = match frame_func.last() {
+                Some(Some(p)) => p.name != "calc",
+                _ => false,
+            };
             let div_after = code == COMMA || code == COLON
                 || (code == SLASH && bytes_at(&value, next + 1) != STAR
-                    && (frame_func.last().and_then(|f| f.as_ref()).is_none()
-                        || !parent_is_calc));
+                    && (!parent_assigned || in_non_calc_function));
             if close_paren {
                 after = token;
             } else if prev_is_div {
@@ -195,6 +214,10 @@ pub fn parse(input: &str) -> Vec<Node> {
             code = bytes_at(&value, pos);
         } else if code == SLASH || code == COMMA || code == COLON {
             let token = (code as char).to_string();
+            // parse.js:144-153 reads `pos - before.length` BEFORE clearing
+            // `before` (clear happens at parse.js:155). Capture the length
+            // up-front so the moved-out `before` doesn't read 0.
+            let before_len = before.len();
             let take_before = std::mem::take(&mut before);
             stack.last_mut().unwrap().push(Node {
                 kind: NodeKind::Div,
@@ -204,7 +227,7 @@ pub fn parse(input: &str) -> Vec<Node> {
                 quote: None,
                 unclosed: false,
                 nodes: Vec::new(),
-                source_index: pos.saturating_sub(before.len()),
+                source_index: pos.saturating_sub(before_len),
                 source_end_index: pos + token.len(),
             });
             pos += 1;
@@ -253,8 +276,7 @@ pub fn parse(input: &str) -> Vec<Node> {
                     if code > 32 { break; }
                 }
                 let mut nodes: Vec<Node> = Vec::new();
-                let mut after_str = String::new();
-                let func_source_end_index;
+                let after_str: String;
                 if parens_open_pos < whitespace_pos {
                     if pos != whitespace_pos + 1 {
                         nodes.push(Node {
@@ -274,15 +296,18 @@ pub fn parse(input: &str) -> Vec<Node> {
                             quote: None, unclosed: false, nodes: Vec::new(),
                             source_index: whitespace_pos + 1, source_end_index: next,
                         });
-                        func_source_end_index = next;
                     } else {
                         after_str = value[whitespace_pos + 1..next].to_string();
-                        func_source_end_index = next;
                     }
                 } else {
                     after_str = String::new();
-                    func_source_end_index = if unclosed { next } else { next + 1 };
                 }
+                // parse.js:230 — `token.sourceEndIndex = token.unclosed ? next : pos`
+                // where `pos = next + 1` was set on parse.js:229. The earlier
+                // inner-branch assignment to `next` (parse.js:223) is overridden
+                // by this outer write. Prior Rust port set `next` for the
+                // closed-with-trailing-whitespace case; should be `next + 1`.
+                let func_source_end_index = if unclosed { next } else { next + 1 };
                 let func_node = Node {
                     kind: NodeKind::Function,
                     value: func_name.clone(),
@@ -307,6 +332,9 @@ pub fn parse(input: &str) -> Vec<Node> {
                 };
                 stack.push(Vec::new());
                 frame_func.push(Some(pending));
+                // parse.js:240 sets `parent = token` here. URL branch above
+                // intentionally does NOT, leaving JS `parent` undefined.
+                parent_assigned = true;
             }
         } else if code == CLOSE_PAREN && balanced > 0 {
             pos += 1;
@@ -344,7 +372,14 @@ pub fn parse(input: &str) -> Vec<Node> {
                     || (code == CLOSE_PAREN && balanced > 0);
                 if stop { break; }
             }
-            let token = value[pos..next].to_string();
+            // parse.js:287 — `token = value.slice(pos, next)`. JS `slice`
+            // clamps both endpoints to `value.length`, so a backslash at the
+            // very end of the input that pushes `next` past `value.length`
+            // does not throw. Rust's string indexing panics on out-of-range,
+            // so we clamp the slice end while keeping the raw `next` for
+            // sourceEndIndex (parse.js:307 stores the unclamped value).
+            let slice_end = next.min(value.len());
+            let token = value[pos..slice_end].to_string();
             if code == OPEN_PAREN {
                 name = token;
             } else {
@@ -398,4 +433,110 @@ struct PendingFunc {
 
 fn current_func_is_calc(frames: &[Option<PendingFunc>]) -> bool {
     matches!(frames.last(), Some(Some(p)) if p.name == "calc")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stringify::stringify;
+
+    // Re-audit regression: `(1) / 2`. After a top-level close-paren, JS
+    // `parent` is the root frame (truthy, no `type`), so the slash-divider
+    // whitespace branch (parse.js:54-61) takes the FALSE path and emits a
+    // space node before the `/` div. Prior Rust port emitted no space and
+    // attached the whitespace as the div's `before`.
+    #[test]
+    fn slash_after_close_paren_emits_space() {
+        let nodes = parse("(1) / 2");
+        assert_eq!(stringify(&nodes), "(1) / 2");
+        assert_eq!(nodes.len(), 4);
+        assert_eq!(nodes[0].kind, NodeKind::Function);
+        assert_eq!(nodes[1].kind, NodeKind::Space);
+        assert_eq!(nodes[1].value, " ");
+        assert_eq!(nodes[2].kind, NodeKind::Div);
+        assert_eq!(nodes[2].value, "/");
+        assert_eq!(nodes[2].before, "");
+        assert_eq!(nodes[2].after, " ");
+        assert_eq!(nodes[3].kind, NodeKind::Word);
+    }
+
+    // Sanity: at the very top of the input (JS `parent` undefined),
+    // whitespace before `/` is still attached as the div's `before`.
+    #[test]
+    fn slash_at_root_uses_div_before() {
+        let nodes = parse("1 / 2");
+        assert_eq!(stringify(&nodes), "1 / 2");
+        assert_eq!(nodes.len(), 3);
+        assert_eq!(nodes[1].kind, NodeKind::Div);
+        assert_eq!(nodes[1].before, " ");
+        assert_eq!(nodes[1].after, " ");
+    }
+
+    // url() does not assign JS `parent`, so a slash after a closed url()
+    // still treats the surrounding whitespace as the div's `before`/`after`.
+    #[test]
+    fn slash_after_url_uses_div_before() {
+        let nodes = parse("url(foo) / 2");
+        assert_eq!(stringify(&nodes), "url(foo) / 2");
+        assert_eq!(nodes.len(), 3);
+        assert_eq!(nodes[1].kind, NodeKind::Div);
+        assert_eq!(nodes[1].before, " ");
+        assert_eq!(nodes[1].after, " ");
+    }
+
+    // Re-audit regression: closed url() with trailing whitespace must set
+    // sourceEndIndex to `next + 1` (position past `)`), not `next` itself.
+    #[test]
+    fn url_trailing_whitespace_source_end_index() {
+        let nodes = parse("url(  foo.png  )");
+        assert_eq!(stringify(&nodes), "url(  foo.png  )");
+        assert_eq!(nodes.len(), 1);
+        let url = &nodes[0];
+        assert_eq!(url.kind, NodeKind::Function);
+        assert_eq!(url.before, "  ");
+        assert_eq!(url.after, "  ");
+        assert_eq!(url.source_end_index, 16);
+    }
+
+    // Re-audit regression: div sourceIndex was computed against a moved-out
+    // `before` (length 0). For `1 ,2` the comma's sourceIndex must be 1
+    // (= pos(2) - before.length(1)), not 2.
+    #[test]
+    fn div_source_index_uses_pre_clear_before_len() {
+        let nodes = parse("1 ,2");
+        assert_eq!(stringify(&nodes), "1 ,2");
+        assert_eq!(nodes.len(), 3);
+        let div = &nodes[1];
+        assert_eq!(div.kind, NodeKind::Div);
+        assert_eq!(div.value, ",");
+        assert_eq!(div.before, " ");
+        assert_eq!(div.source_index, 1);
+        assert_eq!(div.source_end_index, 3);
+    }
+
+    // Multi-space variant — pos - before.length must collapse correctly.
+    #[test]
+    fn div_source_index_multi_space() {
+        let nodes = parse("1   /   2");
+        assert_eq!(stringify(&nodes), "1   /   2");
+        let div = &nodes[1];
+        assert_eq!(div.source_index, 1);
+        assert_eq!(div.source_end_index, 8);
+        assert_eq!(div.before, "   ");
+        assert_eq!(div.after, "   ");
+    }
+
+    // Re-audit regression: input ending with a single backslash drove the
+    // word loop to advance `next` past `value.len()`, panicking on the
+    // subsequent slice. JS `slice` clamps; Rust now mirrors via min().
+    // sourceEndIndex preserves the unclamped value to match JS.
+    #[test]
+    fn word_trailing_backslash_does_not_panic() {
+        let nodes = parse("a\\");
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].kind, NodeKind::Word);
+        assert_eq!(nodes[0].value, "a\\");
+        assert_eq!(nodes[0].source_index, 0);
+        assert_eq!(nodes[0].source_end_index, 3);
+    }
 }

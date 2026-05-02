@@ -129,7 +129,7 @@ function bakeTranspiled(code, opts) {
 // =============================================================
 
 const extractStylesCode = `
-        import '@compiled/react';
+        import '@sjcompiled/react';
 
         const Component = () => (
           <div css={{ fontSize: 12, color: 'blue' }}>
@@ -140,7 +140,7 @@ const extractStylesCode = `
 
 const extractStylesClassicPragmaCode = `
           /** @jsx myJsx */
-          import { css, jsx as myJsx } from '@compiled/react';
+          import { css, jsx as myJsx } from '@sjcompiled/react';
 
           const Component = () => (
             <div css={{ fontSize: 12, color: 'blue' }}>
@@ -156,8 +156,8 @@ const extractStylesClassicPragmaCode = `
         `;
 
 const extractStylesAutomaticPragmaCode = `
-          /** @jsxImportSource @compiled/react */
-          import { css } from '@compiled/react';
+          /** @jsxImportSource @sjcompiled/react */
+          import { css } from '@sjcompiled/react';
 
           const Component = () => (
             <div css={{ fontSize: 12, color: 'blue' }}>
@@ -212,7 +212,7 @@ writeFixture('A03-extract-styles-classic-with-pragma.json', {
 writeFixture('A04-extract-styles-automatic-with-pragma.json', {
   name: 'A04-extract-styles-automatic-with-pragma',
   description:
-    'automatic runtime, /** @jsxImportSource @compiled/react */ pragma + extractStylesToDirectory',
+    'automatic runtime, /** @jsxImportSource @sjcompiled/react */ pragma + extractStylesToDirectory',
   source: extractStylesAutomaticPragmaCode,
   opts: {
     run: 'both',
@@ -227,7 +227,7 @@ writeFixture('A04-extract-styles-automatic-with-pragma.json', {
 
 const jsxPragmaClassicCompiledDefault = `
         /** @jsx jsx */
-        import { css, jsx } from '@compiled/react';
+        import { css, jsx } from '@sjcompiled/react';
 
         const Component = () => (
           <div css={{ fontSize: 12, color: 'blue' }}>
@@ -244,7 +244,7 @@ const jsxPragmaClassicCompiledDefault = `
 
 const jsxPragmaClassicCompiledRenamed = `
         /** @jsx myJsx */
-        import { css, jsx as myJsx } from '@compiled/react';
+        import { css, jsx as myJsx } from '@sjcompiled/react';
 
         const Component = () => (
           <div css={{ fontSize: 12, color: 'blue' }}>
@@ -295,7 +295,7 @@ const jsxPragmaClassicEmotionRenamed = `
 
 const jsxPragmaClassicBoth = `
           /** @jsx jsx */
-          import { css } from '@compiled/react';
+          import { css } from '@sjcompiled/react';
           import { jsx } from '@emotion/react';
 
           const Component = () => (
@@ -312,8 +312,8 @@ const jsxPragmaClassicBoth = `
         `;
 
 const jsxPragmaAutomaticCompiled = `
-          /** @jsxImportSource @compiled/react */
-          import { css } from '@compiled/react';
+          /** @jsxImportSource @sjcompiled/react */
+          import { css } from '@sjcompiled/react';
 
           const Component = () => (
             <div css={{ fontSize: 12, color: 'blue' }}>
@@ -346,7 +346,7 @@ const jsxPragmaAutomaticEmotion = `
         `;
 
 const jsxPragmaAutomaticImportSource = `
-        import { css, jsx } from '@compiled/react';
+        import { css, jsx } from '@sjcompiled/react';
 
         const Component = () => (
           <div css={{ fontSize: 12, color: 'blue' }}>
@@ -363,7 +363,7 @@ const jsxPragmaAutomaticImportSource = `
 
 writeFixture('B01-jsx-pragma-classic-compiled-default.json', {
   name: 'B01-jsx-pragma-classic-compiled-default',
-  description: '/** @jsx jsx */ + import { jsx } from @compiled/react — converts to React.createElement',
+  description: '/** @jsx jsx */ + import { jsx } from @sjcompiled/react — converts to React.createElement',
   source: jsxPragmaClassicCompiledDefault,
   opts: { run: 'both', runtime: 'classic' },
 });
@@ -415,7 +415,7 @@ writeFixture('B07-jsx-pragma-classic-config-myjsx-throws.json', {
 
 writeFixture('B08-jsx-pragma-automatic-compiled.json', {
   name: 'B08-jsx-pragma-automatic-compiled',
-  description: '/** @jsxImportSource @compiled/react */ — imports JSX runtime from React',
+  description: '/** @jsxImportSource @sjcompiled/react */ — imports JSX runtime from React',
   source: jsxPragmaAutomaticCompiled,
   opts: { run: 'both', runtime: 'automatic' },
 });
@@ -430,9 +430,9 @@ writeFixture('B09-jsx-pragma-automatic-emotion.json', {
 writeFixture('B10-jsx-pragma-automatic-importsource.json', {
   name: 'B10-jsx-pragma-automatic-importsource',
   description:
-    'No pragma comment, babelJSXImportSource=@compiled/react — imports JSX from Compiled',
+    'No pragma comment, babelJSXImportSource=@sjcompiled/react — imports JSX from Compiled',
   source: jsxPragmaAutomaticImportSource,
-  opts: { run: 'both', runtime: 'automatic', babelJSXImportSource: '@compiled/react' },
+  opts: { run: 'both', runtime: 'automatic', babelJSXImportSource: '@sjcompiled/react' },
 });
 
 // =============================================================
@@ -440,7 +440,7 @@ writeFixture('B10-jsx-pragma-automatic-importsource.json', {
 // =============================================================
 
 const sourceSharedCode = `
-    import '@compiled/react';
+    import '@sjcompiled/react';
 
     const Component = () => (
       <div css={{ fontSize: 12, color: 'blue' }}>
@@ -450,7 +450,7 @@ const sourceSharedCode = `
   `;
 
 const STYLE_SHEET_PATH =
-  '@compiled/webpack-loader/css-loader!@compiled/webpack-loader/css-loader/compiled-css.css';
+  '@sjcompiled/webpack-loader/css-loader!@sjcompiled/webpack-loader/css-loader/compiled-css.css';
 
 // "same step" mode: opts.run = 'both', source unchanged.
 const sameStepConfigs = [
@@ -514,7 +514,7 @@ for (const runtime of ['automatic', 'classic']) {
 
 if (process.env.GENERATE_TRANSPILED === '1') {
   const transpiledSharedCode = `
-    import '@compiled/react';
+    import '@sjcompiled/react';
 
     const Component = () => (
       <div css={{ fontSize: 12, color: 'blue' }}>

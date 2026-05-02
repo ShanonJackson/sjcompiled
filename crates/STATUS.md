@@ -125,6 +125,33 @@ deltas applied:
 - Full audit document at
   `crates/_vendor/POSTCSS_SELECTOR_PARSER_6.0.13_TO_6.1.2_AUDIT.md`.
 
+**colord 2.9.1 → 2.9.3 audit landed (2026-05-02):**
+- Full source-tree diff: only `CHANGELOG.md` and `package.json`
+  differ between the two versions. All `.js`/`.mjs`/`.ts` files
+  (including every plugin) are byte-identical (verified via
+  `diff -rq` and a directional `cmp -s` sweep in both directions).
+- The two upstream releases are pure packaging fixes:
+  2.9.2 added `"./package.json"` to the `exports` map; 2.9.3 added
+  `"types"` keys for TypeScript 4.7 module resolution. Neither
+  affects runtime color math, parse output, rounding, short-form
+  `#fff`/`#ffffff` decisions, or stringification.
+- **Zero Rust source changes required.** `crates/colord/` remains
+  scaffolded as before; its `src/lib.rs` header already cites 2.9.3
+  (set during the original AFM repin). When the actual port is
+  written, target the existing 2.9.3 source — no 2.9.1-vs-2.9.3
+  delta to track.
+- No new corpus entries added — there are no changed code paths to
+  exercise. The 2.9.1↔2.9.3 deltas live entirely in `package.json`'s
+  `exports` map (Node.js module resolution), unreachable from CSS
+  input. Existing `postcss-core-roundtrip`, NAPI-sort, and
+  engine-flag gates exercise the colord-consuming pipeline
+  transitively.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast`
+  all green; `postcss-core-roundtrip` 32/32 byte-clean (JS vs Rust);
+  determinism 32/32 (JS oracle stable); both NAPI verifiers 12/12.
+- Full audit document at
+  `crates/_vendor/COLORD_2.9.1_TO_2.9.3_AUDIT.md`.
+
 **Audit findings (browserslist 4.24.4 → 4.24.2):**
 - Default query string is **identical** (`> 0.5%, last 2 versions,
   Firefox ESR, not dead`).
@@ -256,6 +283,59 @@ This is the only test-level change needed for the data swap.
 - Full audit document at
   `crates/_vendor/BROWSERSLIST_4.24.4_TO_4.24.2_AUDIT.md`.
 
+**Re-audit findings (caniuse-api 3.0.0, port-quality re-check) (2026-05-02):**
+- Pin is `3.0.0` in BOTH `REFERENCE_LOCK_FILE/yarn.lock` and AFM resolution
+  — no version drift. Re-audit was for **port-quality** drift.
+- Walked every line of upstream `dist/index.js` + `dist/utils.js` (the npm
+  tarball ships compiled output only — no `src/`) against
+  `crates/caniuse-api/src/{index,utils}.rs`. Five real divergences found:
+  - `utils.rs` `parse_caniuse_data`: `split_whitespace()` → `split(' ')`
+    (JS `String#split(" ")` preserves empty entries between consecutive
+    spaces; collapsing them silently dropped a key from the output).
+  - `utils.rs` `parse_caniuse_data`: added `js_parse_float()` helper.
+    Rust `f64::from_str` is strict; JS `parseFloat` parses the longest
+    numeric prefix. Concrete fail: caniuse-lite Android stats key
+    `"4.4.3-4.4.4"` after `split("-")[0]` → `"4.4.3"` — JS yields 4.4,
+    Rust used to yield `Err` and `continue`'d, dropping the entry.
+  - `utils.rs` `strip_first_hash_digits`: rewrote to require the digits
+    suffix (regex is `/#\d+/`, not `/#\d*/`). Old code stripped a lone
+    `#` even when no digits followed.
+  - `index.rs` `is_supported`: catch branch now mirrors the upstream JS
+    bug at `dist/index.js:56` (`data = features[res[0]]` assigns the
+    packed string; `data.stats` is undefined → `every` returns false
+    for non-empty browser lists). Old port unpacked correctly and
+    diverged.
+  - `index.rs` `is_supported`: browser-version split changed
+    `splitn(2, ' ')` → `split(' ')` to match JS literal-space split.
+  - `utils.rs` `clean_browsers_list`: `HashSet` → `IndexSet` for the
+    dedup membership set. Functionally identical today (Vec is the
+    source of truth), but `HashSet`'s `RandomState` would silently
+    introduce process-randomized order if a future refactor ever
+    iterated the membership set. Determinism is now structural.
+  - `index.rs` browser-scope storage: `Mutex<Vec<String>>` →
+    `RwLock<Vec<String>>`. Write path now resolves the new scope
+    OUTSIDE the lock and performs a single atomic Vec swap inside —
+    matches the JS "single-event-loop-tick swap" semantics, prevents
+    readers from being serialized behind a write that's doing
+    browserslist config I/O, and guarantees no reader ever observes a
+    half-applied scope when invoked from multiple NAPI worker threads.
+- Crate is currently dormant (no consumer wires it yet — five would-be
+  consumers in cssnano-* are scaffolded but not invoking the API), so
+  none of these surfaced in the existing 20-stage parity corpus. They
+  would have caused silent hash divergence once a consumer started
+  calling through. Bias-toward-verbatim port applied; bugs preserved.
+- Added 11 in-crate unit tests covering each fixed path (including a
+  concurrent reader-thread test for the RwLock atomic-swap contract
+  and a determinism test for the IndexSet dedup). No parity-runner
+  stage to extend — when consumers wire up (Phase 6f and onward), their
+  parity stages will exercise these paths against the JS oracle.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast` all
+  green (17 caniuse-api tests, 6 → 17); `parity-runner postcss-core-roundtrip`
+  35/35 byte-clean; both NAPI verifiers 12/12; determinism on
+  `postcss-core-roundtrip` (35/35).
+- Full audit document at
+  `crates/_vendor/CANIUSE_API_3.0.0_REAUDIT.md`.
+
 **Stale `_vendor/` directories** (kept, not deleted):
 `caniuse-lite-1.0.30001690`, `browserslist-4.24.4`, `colord-2.9.1`,
 `electron-to-chromium-1.5.76`, `node-releases-2.0.19`,
@@ -295,6 +375,98 @@ Cleanup is a future cosmetic task — no parity impact.
   `postcss-nested` (41/41).
 - Full audit document at
   `crates/_vendor/POSTCSS_NESTED_5.0.6_REAUDIT.md`.
+
+**postcss-discard-duplicates 6.0.0 re-audit landed (2026-05-02):**
+- Version is **not** drifted between REFERENCE_LOCK_FILE and AFM (both
+  pin `6.0.0`). The audit closed two equality-semantics gaps in the
+  existing port that the 8-entry corpus had not been exercising.
+- Rust port updates in `crates/postcss-discard-duplicates/src/lib.rs`:
+  - `nodes_equal`: removed the explicit `Comment.text` comparison.
+    Upstream `equals()` (`src/index.js:38-69`) has NO `comment` case
+    in its switch — two comments are considered equal as long as
+    `type` matches, regardless of `text`. Now matches verbatim.
+  - `trim_str`: replaced `str::trim()` with `trim_matches(is_ecma_whitespace)`
+    where the predicate hand-rolls `String.prototype.trim()`'s
+    ECMA-262 WhiteSpace + LineTerminator set. Rust's default
+    `is_whitespace` differs from JS at U+0085 (NEL — only Rust)
+    and U+FEFF (BOM/ZWNBSP — only JS); `raws.before` /
+    `raws.afterName` containing either codepoint would diverge
+    equality between JS and Rust. Same divergence pattern already
+    flagged for `postcss-normalize-whitespace`.
+- Adversarial corpus added: 7 entries to
+  `crates/parity-runner/corpus/npm-postcss-discard-duplicates/`
+  (`09..15`) — atrule with differing inner comment text (the
+  comment-text fix), rule with leading comment then duplicated decl
+  (`empty()` ignores comments), `!important` flag distinguishes,
+  decl `raws.before` whitespace trim equality, atrule
+  `raws.before`/`raws.afterName` whitespace trim equality, nested
+  rule inside duplicate `@media` with differing inner comment text,
+  duplicate `@media` with U+FEFF (BOM) in the second atrule's
+  `raws.before` (locks in the trim fix).
+- Five unit tests added to `lib.rs::tests` — two for the
+  comment-text-ignored contract (atrule + rule paths), three for
+  the trim semantics (BOM stripped, NEL preserved, Zs stripped).
+- Verification gates rerun: `cargo test --workspace --no-fail-fast`
+  all green (15/15 in `postcss-discard-duplicates`); `parity-runner
+  npm-postcss-discard-duplicates` 15/15 byte-clean; `parity-runner
+  sort` 12/12 byte-clean; both NAPI verifiers 12/12; determinism on
+  `npm-postcss-discard-duplicates` (15/15).
+- Full audit document at
+  `crates/_vendor/POSTCSS_DISCARD_DUPLICATES_6.0.0_REAUDIT.md`.
+
+**postcss-values-parser 6.0.2 re-audit landed (2026-05-02):**
+- Version is **not** drifted between REFERENCE_LOCK_FILE and AFM (both
+  pin `6.0.2`). Audit ran to close pre-existing transcription gaps in
+  the original port; `expand-shorthands/*.ts` is the sole consumer.
+- Walked all 14 upstream files (`index.js`, `tokenize.js`, `walker.js`,
+  `ValuesParser.js`, `ValuesStringifier.js`, plus 9 `nodes/*.js`)
+  against the Rust port. Found and fixed: (1) `UnicodeRange` regex was
+  anchored + hex-only; upstream is unanchored, capital-U only, allows
+  `\w` chars. (2) `Numeric` unit was over-permissive `(.*)`; replaced
+  with the strict `unitRegex` so `5%a` is correctly rejected.
+  (3) `Operator.chars` had 5 entries; upstream lists 10 (`=`, `<=`,
+  `>=`, `<`, `>` were missing). (4) `OPERATOR_REGEX` rewritten to the
+  literal upstream `([/\|*}])`. (5) `PUNCT_CHARS` corrected to upstream
+  `[',', ':', '(', ')', '[', ']', '{', '}']` set. (6) `Word.is_hex`
+  tightened from `starts_with('#')` to upstream `^#(.+)`. (7) `Func.is_color`
+  and `Func.is_var` now set during parse using upstream regexes.
+- Acknowledged-but-not-ported (no current Rust consumer reads them):
+  `Word.is_color`, `Word.is_url`, `Func.params`. Each is recomputed
+  inline in `compiled-css/expand_shorthands/utils.rs`.
+- 7 Rust files touched; 7 new corpus entries added (4 expand-shorthands,
+  3 postcss-core-roundtrip) covering the touched code paths.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast`
+  all green (49 tests in `postcss-values-parser` after fix, was 15);
+  `parity-runner expand-shorthands` 42/42 byte-clean; `parity-runner
+  postcss-core-roundtrip` 35/35 byte-clean; both NAPI verifiers 12/12;
+  determinism on `expand-shorthands` (42/42).
+- Full audit document at
+  `crates/_vendor/POSTCSS_VALUES_PARSER_6.0.2_REAUDIT.md`.
+
+**cssnano-utils 3.1.0 re-audit landed (2026-05-02):**
+- Version is **not** drifted between REFERENCE_LOCK_FILE and AFM (both
+  pin `3.1.0`). Audit ran because this package is shared helpers used
+  transitively by every cssnano plugin we run — any latent transcription
+  gap would propagate widely.
+- Walked all four upstream files in
+  `node_modules/.bun/cssnano-utils@3.1.0+*/...src/` (`index.js`,
+  `getArguments.js`, `rawCache.js`, `sameParent.js`) against
+  `crates/cssnano-utils/src/{lib,get_arguments,raw_cache,same_parent}.rs`
+  line-by-line. **No divergence found** — Rust port is already 1:1.
+- No Rust files modified; no corpus entries added (per CLAUDE.md "do
+  not improve along the way" rule).
+- Caller-graph audit: three crates (`cssnano-postcss-ordered-values`,
+  `-minify-gradients`, `-minify-params`) declare `cssnano-utils` as a
+  Cargo dep but no source file actually imports `cssnano_utils::*`
+  yet — declarations are currently vestigial, so there is no
+  consumer-side divergence surface either.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast`
+  all green (incl. `cssnano-utils` unit tests in `get_arguments.rs`
+  and `same_parent.rs`); `parity-runner postcss-core-roundtrip` 32/32
+  byte-clean; both NAPI verifiers 12/12; determinism on
+  `postcss-core-roundtrip` (32/32).
+- Full audit document at
+  `crates/_vendor/CSSNANO_UTILS_3.1.0_REAUDIT.md`.
 
 ## postcss version pin: `8.4.31` → `8.5.6` (no code changes)
 

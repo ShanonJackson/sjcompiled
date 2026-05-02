@@ -95,6 +95,80 @@ mod tests {
             panic!("expected UnicodeRange, got {:?}", root.nodes[0].kind);
         }
     }
+
+    /// Drift fix: lowercase `u+0025` is NOT a UnicodeRange per upstream
+    /// (`Word.js:18` regex is `U\+...`, capital-U only). It must classify
+    /// as a Word.
+    #[test]
+    fn lowercase_u_is_not_unicode_range() {
+        let root = parse("u+0025");
+        // The wrapped tokenizer splits on `+` (operator), so `u+0025` becomes
+        // tokens [u, +, 0025]. The first node is therefore Word `u`. The key
+        // assertion is that NO node in the tree is UnicodeRange.
+        let any_ur = root.nodes.iter().any(|n| matches!(n.kind, NodeKind::UnicodeRange(_)));
+        assert!(!any_ur, "lowercase u+xxxx must not classify as UnicodeRange");
+    }
+
+    /// Drift fix: `Func.is_color` is set from `Func.js:90` regex
+    /// `^(hsla?|hwb|lab|lch|rgba?)$/i` — color functions only.
+    #[test]
+    fn func_is_color_for_rgb() {
+        let root = parse("rgb(1,2,3)");
+        if let NodeKind::Func(f) = &root.nodes[0].kind {
+            assert!(f.is_color, "rgb() must have is_color=true");
+        } else { panic!(); }
+    }
+
+    #[test]
+    fn func_is_color_case_insensitive() {
+        let root = parse("RGBA(1,2,3,1)");
+        if let NodeKind::Func(f) = &root.nodes[0].kind {
+            assert!(f.is_color, "RGBA() must have is_color=true (case-insensitive)");
+        } else { panic!(); }
+    }
+
+    #[test]
+    fn func_not_color_for_calc() {
+        let root = parse("calc(1px + 2px)");
+        if let NodeKind::Func(f) = &root.nodes[0].kind {
+            assert!(!f.is_color, "calc() must NOT have is_color=true");
+        } else { panic!(); }
+    }
+
+    /// Drift fix: `Func.is_var` requires name=`var` (case-insensitive)
+    /// AND first child value matching `/^--[^\s]+$/`.
+    #[test]
+    fn func_is_var_for_css_variable() {
+        let root = parse("var(--foo)");
+        if let NodeKind::Func(f) = &root.nodes[0].kind {
+            assert!(f.is_var, "var(--foo) must have is_var=true");
+        } else { panic!(); }
+    }
+
+    #[test]
+    fn func_not_var_when_no_dash_dash_arg() {
+        let root = parse("var(red)");
+        if let NodeKind::Func(f) = &root.nodes[0].kind {
+            assert!(!f.is_var, "var() with non-`--*` first arg must not have is_var=true");
+        } else { panic!(); }
+    }
+
+    /// Drift fix: `Word.is_hex` uses `/^#(.+)/` — bare `"#"` must NOT
+    /// classify as is_hex (old port used `starts_with('#')`).
+    #[test]
+    fn bare_hash_is_not_hex_word() {
+        // `#` alone may or may not parse as a Word depending on tokenizer;
+        // the property under test is that any Word with value="#"
+        // has is_hex=false. Construct via the tokenizer surface.
+        let root = parse("#");
+        for n in &root.nodes {
+            if let NodeKind::Word(w) = &n.kind {
+                if w.common.value == "#" {
+                    assert!(!w.is_hex, "bare # must not have is_hex=true");
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

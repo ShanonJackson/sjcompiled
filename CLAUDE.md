@@ -21,3 +21,7 @@ Quality is more important than speed; Again if we port something even slightly i
 
 # Performance
 Performance is a side-goal that should NEVER come at the cost of correctness but yet is important. If we ship the entire thing end-to-end and it's slower than the original we've failed.
+
+
+# Never
+- Never edit packages/babel-plugin, packages/babel-plugin-strip-runtime, packages/css and packages/utils consider them 100% IMMUTABLE as their EXACT source was copied from a monorepo.

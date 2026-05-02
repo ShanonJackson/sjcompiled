@@ -28,3 +28,7 @@ this is the npm package version pinned at 6.0.0 used by `sort.ts`.
 - `14` — nested rule inside duplicate `@media` with differing inner
   **comment text**: comment text equality is by-type-only, so the
   whole earlier atrule subtree is removed.
+- `15` — duplicate `@media` separated by a U+FEFF (BOM/ZWNBSP) in
+  the second atrule's `raws.before`. JS `String.prototype.trim()`
+  strips BOM; Rust's `str::trim()` does NOT. Locks in the
+  `is_ecma_whitespace` predicate inside `trim_str`.

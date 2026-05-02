@@ -57,6 +57,18 @@ pub struct Stringifier {
     /// `DEFAULT_RAW["colon"] = ": "`.
     cache_colon: Option<String>,
     cache_populated: bool,
+    /// Plugin-written `root.rawCache` overrides — populated from the
+    /// Root passed into `stringify_root`. Consulted at upstream's
+    /// **step-3 priority** (BEFORE the tree-scan fallback).
+    /// See `postcss/lib/stringifier.js::raw()` line 158.
+    ///
+    /// Today's pipeline (transformCss / sort) filters out
+    /// `cssnano-util-raw-cache` so this map stays empty — the
+    /// stringifier falls through to step 4. The mechanism still has
+    /// to be wired correctly because *any* future plugin that writes
+    /// `root.rawCache` (or a custom toolchain that bundles
+    /// cssnano-util-raw-cache) must produce identical bytes to JS.
+    raw_cache_overrides: indexmap::IndexMap<String, String>,
 }
 
 impl Stringifier {
@@ -71,16 +83,33 @@ impl Stringifier {
             cache_semicolon: None,
             cache_colon: None,
             cache_populated: false,
+            raw_cache_overrides: indexmap::IndexMap::new(),
         }
     }
 
     pub fn finish(self) -> String { self.out }
 
     /// Top-level — stringifies a Root.
+    ///
+    /// Priority chain for the trailing `raws.after` on the Root itself:
+    ///   1. `root.root.raws.after` — verbatim if set.
+    ///   2. `root.rawCache.after` — plugin override (cssnano-util-raw-cache
+    ///      writes this) per upstream stringifier.js:158.
+    ///   3. (no tree-scan / no DEFAULT_RAW for trailing root after — emit
+    ///      nothing, matches upstream's `if (after) builder(after)`.)
     pub fn stringify_root(&mut self, root: &Root) {
+        self.raw_cache_overrides = root.raw_cache.clone();
         self.populate_cache(&root.root);
         self.body(&root.root);
-        if let Some(after) = &root.root.raws.after { self.out.push_str(after); }
+        match &root.root.raws.after {
+            Some(after) => self.out.push_str(after),
+            None => {
+                let override_after = self.raw_cache_override("after").map(str::to_string);
+                if let Some(v) = override_after {
+                    self.out.push_str(&v);
+                }
+            }
+        }
     }
 
     fn populate_cache(&mut self, root_node: &Node) {
@@ -93,6 +122,21 @@ impl Stringifier {
         self.cache_semicolon = scan_semicolon(root_node);
         self.cache_colon = scan_colon(root_node);
         self.cache_populated = true;
+    }
+
+    /// Mirrors upstream `raw(node, own, detect)` priority for the rawCache
+    /// step (line 158): if `root.rawCache[detect] !== undefined`, return
+    /// that VERBATIM (no fallback to tree-scan). Returns `None` when no
+    /// override is set, leaving the caller to use its tree-scan cache +
+    /// `DEFAULT_RAW` fallback chain.
+    ///
+    /// This is consulted at step 3 of upstream's priority chain. Steps
+    /// 1-2 (`node.raws[own]` + before-on-root-first / document-parent)
+    /// are owned by individual call sites in this stringifier; step 4-5
+    /// (tree-scan + DEFAULT_RAW) are owned by the existing `cache_*`
+    /// fields and the `default_raws_*` helpers below.
+    fn raw_cache_override(&self, detect: &str) -> Option<&str> {
+        self.raw_cache_overrides.get(detect).map(|s| s.as_str())
     }
 
     /// Stringify a single node into the buffer using upstream's
@@ -157,12 +201,17 @@ impl Stringifier {
     /// `decl(node, semicolon)` — line 112.
     fn decl(&mut self, node: &Node, semicolon: bool) {
         let d = match &node.kind { NodeKind::Declaration(d) => d, _ => unreachable!() };
-        // Mirrors upstream `between = this.raw(node, 'between', 'colon')`:
-        // when `raws.between` is undefined, fall back to the rawCache
-        // `colon` scan; then to `DEFAULT_RAW["colon"] = ": "`.
+        // Priority: node.raws.between (step 1) → root.rawCache.colon
+        // (step 3) → tree-scan colon (step 4) → DEFAULT_RAW.colon (step 5).
         let between = match &node.raws.between {
             Some(b) => b.clone(),
-            None => self.cache_colon.clone().unwrap_or_else(|| default_raw("colon").to_string()),
+            None => {
+                if let Some(v) = self.raw_cache_override("colon") {
+                    v.to_string()
+                } else {
+                    self.cache_colon.clone().unwrap_or_else(|| default_raw("colon").to_string())
+                }
+            }
         };
         let value = self.raw_value_str(node, &d.value, node.raws.value.as_ref());
         let mut s = String::new();
@@ -176,15 +225,27 @@ impl Stringifier {
         self.out.push_str(&s);
     }
 
-    /// `comment(node)` — line 106.
+    /// `comment(node)` — line 106. Priority chain on `left` / `right`:
+    /// node.raws.{left,right} (step 1) → root.rawCache.{commentLeft,
+    /// commentRight} (step 3) → DEFAULT_RAW.{commentLeft, commentRight}
+    /// = `" "` (step 5). No tree-scan fallback for these — upstream
+    /// hits `DEFAULT_RAW` directly when both are unset.
     fn comment(&mut self, node: &Node) {
         let c = match &node.kind { NodeKind::Comment(c) => c, _ => unreachable!() };
-        let left = node.raws.left.as_deref().unwrap_or(default_raw("commentLeft"));
-        let right = node.raws.right.as_deref().unwrap_or(default_raw("commentRight"));
+        let left = node.raws.left.as_deref().map(str::to_string).unwrap_or_else(|| {
+            self.raw_cache_override("commentLeft")
+                .map(str::to_string)
+                .unwrap_or_else(|| default_raw("commentLeft").to_string())
+        });
+        let right = node.raws.right.as_deref().map(str::to_string).unwrap_or_else(|| {
+            self.raw_cache_override("commentRight")
+                .map(str::to_string)
+                .unwrap_or_else(|| default_raw("commentRight").to_string())
+        });
         self.out.push_str("/*");
-        self.out.push_str(left);
+        self.out.push_str(&left);
         self.out.push_str(&c.text);
-        self.out.push_str(right);
+        self.out.push_str(&right);
         self.out.push_str("*/");
     }
 
@@ -212,11 +273,18 @@ impl Stringifier {
                 }
             } else {
                 // Empty body: upstream `after = this.raw(node, 'after', 'emptyBody')`.
-                // We don't (yet) implement the rawEmptyBody scan; if
-                // raws.after is undefined here, emit nothing — that
-                // matches upstream's behavior when no sample is found.
-                if let Some(after) = &node.raws.after {
-                    self.out.push_str(after);
+                // Priority: node.raws.after (step 1) → rawCache.emptyBody
+                // (step 3) → tree-scan rawEmptyBody (not implemented; would
+                // need a fourth scanner) → DEFAULT_RAW.emptyBody (`""`).
+                match &node.raws.after {
+                    Some(after) => self.out.push_str(after),
+                    None => {
+                        let override_empty = self.raw_cache_override("emptyBody").map(str::to_string);
+                        if let Some(v) = override_empty {
+                            self.out.push_str(&v);
+                        }
+                        // else emit nothing (matches `DEFAULT_RAW.emptyBody = ""`).
+                    }
                 }
             }
         }
@@ -224,20 +292,25 @@ impl Stringifier {
     }
 
     /// Default `raws.after` for a non-empty container body. Mirrors
-    /// the `beforeClose` branch of upstream `beforeAfter`. Falls back
-    /// to `DEFAULT_RAW["beforeClose"]` (`"\n"`) when no sample was
-    /// found in the tree.
+    /// the `beforeClose` branch of upstream `beforeAfter`. Priority:
+    /// `root.rawCache.beforeClose` (step 3) → tree-scan (step 4) →
+    /// `DEFAULT_RAW.beforeClose = "\n"` (step 5).
     fn default_raws_after(&self) -> String {
+        if let Some(v) = self.raw_cache_override("beforeClose") {
+            return v.to_string();
+        }
         self.cache_before_close
             .clone()
             .unwrap_or_else(|| default_raw("beforeClose").to_string())
     }
 
     /// Default `raws.between` for a Rule/AtRule with no `raws.between`
-    /// set. Mirrors upstream `rawBeforeOpen` — uses the first non-decl
-    /// node's `raws.between` as the sample, falls back to
-    /// `DEFAULT_RAW["beforeOpen"]` (`" "`).
+    /// set. Priority: `root.rawCache.beforeOpen` (step 3) → tree-scan
+    /// (step 4) → `DEFAULT_RAW.beforeOpen = " "` (step 5).
     fn default_raws_between(&self) -> String {
+        if let Some(v) = self.raw_cache_override("beforeOpen") {
+            return v.to_string();
+        }
         self.cache_before_open
             .clone()
             .unwrap_or_else(|| default_raw("beforeOpen").to_string())
@@ -282,6 +355,16 @@ impl Stringifier {
     }
 
     fn default_raws_before(&self, child: &Node) -> String {
+        // Priority: rawCache override (step 3) → tree-scan (step 4) →
+        // DEFAULT_RAW (step 5).
+        let detect = match &child.kind {
+            NodeKind::Declaration(_) => "beforeDecl",
+            NodeKind::Comment(_) => "beforeComment",
+            _ => "beforeRule",
+        };
+        if let Some(v) = self.raw_cache_override(detect) {
+            return v.to_string();
+        }
         match &child.kind {
             NodeKind::Declaration(_) => self
                 .cache_before_decl

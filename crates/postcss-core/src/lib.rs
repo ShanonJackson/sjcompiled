@@ -225,3 +225,163 @@ mod roundtrip_tests {
         assert!(!out.contains("color: red;"), "got: {out:?}");
     }
 }
+
+/// `root.rawCache` priority-chain regression suite.
+///
+/// Mirrors upstream `stringifier.js::raw()` step 3: when a plugin writes
+/// `root.rawCache[detect]`, the stringifier returns that VERBATIM
+/// regardless of what the tree-scan would produce. This is the path that
+/// makes `cssnano-util-raw-cache`-style minification work — write 11
+/// empty strings to rawCache, get back compact output without rewriting
+/// every node's raws individually.
+///
+/// These tests would NOT surface from any test in `cssnano-utils` because
+/// the producer (rawCache plugin) and the consumer (stringifier) live in
+/// different crates with no integration test between them. They live here.
+#[cfg(test)]
+mod raw_cache_tests {
+    use super::*;
+
+    fn build_simple_root() -> Root {
+        // Two rules: `a { color: red; }` and `b { color: blue; }`.
+        // Built fresh (no parser) so every raws.before/between is None.
+        let mut r = Root::new();
+        for (sel, val) in [(".a", "red"), (".b", "blue")] {
+            r.nodes_mut().push(Node {
+                kind: NodeKind::Rule(rule::Rule {
+                    selector: sel.to_string(),
+                    nodes: vec![Node {
+                        kind: NodeKind::Declaration(declaration::Declaration {
+                            prop: "color".to_string(),
+                            value: val.to_string(),
+                            important: false,
+                            variable: false,
+                        }),
+                        ..Node::default()
+                    }],
+                }),
+                ..Node::default()
+            });
+        }
+        r
+    }
+
+    #[test]
+    fn raw_cache_colon_overrides_tree_scan() {
+        // Without rawCache: decl emits ".a { color: red; }" (default ": ").
+        // With rawCache.colon = ":" (cssnano-style minified): emits "color:red".
+        let mut r = build_simple_root();
+        r.set_raw_cache("colon", ":");
+        let out = stringify(&r);
+        assert!(out.contains("color:red"), "expected `color:red` (colon override): {out:?}");
+        assert!(!out.contains("color: red"), "rawCache override should win: {out:?}");
+    }
+
+    #[test]
+    fn raw_cache_before_open_overrides_tree_scan() {
+        // rawCache.beforeOpen = "" should remove the space before `{`.
+        let mut r = build_simple_root();
+        r.set_raw_cache("beforeOpen", "");
+        let out = stringify(&r);
+        assert!(out.contains(".a{"), "expected `.a{{` (beforeOpen=\"\"): {out:?}");
+        assert!(out.contains(".b{"));
+    }
+
+    #[test]
+    fn raw_cache_before_decl_overrides_tree_scan() {
+        // Without override: tree-scan finds no decl `before` (fresh tree),
+        // falls back to DEFAULT_RAW.beforeDecl = "\n".
+        // With override = "": no leading whitespace before each decl.
+        let mut r = build_simple_root();
+        r.set_raw_cache("beforeDecl", "");
+        let out = stringify(&r);
+        // Decl emits without leading newline. The exact bytes around
+        // `color:` vary, but the whole rule should be on one logical line
+        // with no `\n` before `color`.
+        assert!(!out.contains("\ncolor"), "beforeDecl override should suppress newline: {out:?}");
+    }
+
+    #[test]
+    fn raw_cache_before_close_overrides_tree_scan() {
+        // rawCache.beforeClose = "" → `}` immediately after last decl.
+        let mut r = build_simple_root();
+        r.set_raw_cache("beforeClose", "");
+        let out = stringify(&r);
+        // Both rules close with `}` directly after their last byte.
+        // We sniff for `red}` and `blue}` — no whitespace between.
+        assert!(out.contains("red}") || out.contains("red;}"), "got: {out:?}");
+        assert!(out.contains("blue}") || out.contains("blue;}"), "got: {out:?}");
+    }
+
+    #[test]
+    fn raw_cache_full_minify_all_eleven_keys() {
+        // Apply the full `cssnano-util-raw-cache` payload: 11 keys, all
+        // empty except colon (`:`) and indent (`""`). Output should be
+        // fully minified.
+        let mut r = build_simple_root();
+        for (k, v) in [
+            ("colon", ":"),
+            ("indent", ""),
+            ("beforeDecl", ""),
+            ("beforeRule", ""),
+            ("beforeOpen", ""),
+            ("beforeClose", ""),
+            ("beforeComment", ""),
+            ("after", ""),
+            ("emptyBody", ""),
+            ("commentLeft", ""),
+            ("commentRight", ""),
+        ] {
+            r.set_raw_cache(k, v);
+        }
+        let out = stringify(&r);
+        // Every space the default tree-scan would have inserted is gone.
+        assert!(!out.contains(" {"), "beforeOpen should be empty: {out:?}");
+        assert!(!out.contains(": "), "colon should be `:`: {out:?}");
+        assert!(!out.contains("\n"), "no newlines in fully-minified output: {out:?}");
+    }
+
+    #[test]
+    fn raw_cache_empty_does_not_change_output() {
+        // Empty rawCache → identical to unset → tree-scan + DEFAULT_RAW path.
+        // For freshly-built nodes (no parser raws), tree-scan finds no
+        // sample → falls back to DEFAULT_RAW: beforeDecl="\n",
+        // beforeClose="\n", beforeOpen=" ", colon=": ". Output bytes
+        // match what upstream JS produces for the same fresh tree.
+        let r = build_simple_root();
+        let out = stringify(&r);
+        assert_eq!(out, ".a {\ncolor: red\n}\n.b {\ncolor: blue\n}",
+            "no rawCache: DEFAULT_RAW chain produces canonical fresh-tree output");
+    }
+
+    #[test]
+    fn node_raws_still_wins_over_raw_cache() {
+        // rawCache is step 3 in upstream; node.raws.<key> is step 1.
+        // If a node has its own raws.between, it must NOT be overridden.
+        let mut r = Root::new();
+        r.set_raw_cache("colon", ":");
+        // Decl with explicit `raws.between = " /* important */ "`.
+        r.nodes_mut().push(Node {
+            kind: NodeKind::Rule(rule::Rule {
+                selector: ".a".to_string(),
+                nodes: vec![Node {
+                    kind: NodeKind::Declaration(declaration::Declaration {
+                        prop: "color".to_string(),
+                        value: "red".to_string(),
+                        important: false,
+                        variable: false,
+                    }),
+                    raws: Raws {
+                        between: Some(" /* x */ ".to_string()),
+                        ..Raws::default()
+                    },
+                    ..Node::default()
+                }],
+            }),
+            ..Node::default()
+        });
+        let out = stringify(&r);
+        assert!(out.contains("color /* x */ red"),
+            "node.raws.between (step 1) must win over rawCache.colon (step 3): {out:?}");
+    }
+}

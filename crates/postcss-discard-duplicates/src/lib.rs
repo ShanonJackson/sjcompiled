@@ -244,9 +244,41 @@ fn nodes_equal(a: &Node, b: &Node) -> bool {
     true
 }
 
-/// `trimValue(value)` upstream — `value ? value.trim() : value`.
+/// `trimValue(value)` upstream (`src/index.js:6-8`) — `value ? value.trim() : value`.
+///
+/// Uses ECMAScript `String.prototype.trim()` semantics (WhiteSpace +
+/// LineTerminator per ECMA-262). Rust's `str::trim()` strips Unicode
+/// `White_Space`, which DIFFERS at:
+///   - U+0085 (NEL): in Rust `White_Space`, NOT in ECMA WhiteSpace.
+///   - U+FEFF (BOM/ZWNBSP): in ECMA WhiteSpace, NOT in Rust `White_Space`.
+/// Mismatch would let a `raws.before` containing either codepoint diverge
+/// equality between JS and Rust. Use a hand-rolled predicate instead.
 fn trim_str(s: Option<&str>) -> Option<String> {
-    s.map(|v| v.trim().to_string())
+    s.map(|v| v.trim_matches(is_ecma_whitespace).to_string())
+}
+
+fn is_ecma_whitespace(c: char) -> bool {
+    matches!(
+        c,
+        // ECMA WhiteSpace
+        '\u{0009}'    // TAB
+        | '\u{000B}'  // VT
+        | '\u{000C}'  // FF
+        | '\u{0020}'  // SPACE
+        | '\u{00A0}'  // NBSP
+        | '\u{FEFF}'  // ZWNBSP / BOM
+        // ECMA LineTerminator
+        | '\u{000A}'  // LF
+        | '\u{000D}'  // CR
+        | '\u{2028}'  // LS
+        | '\u{2029}'  // PS
+        // Unicode general category Zs (Space_Separator)
+        | '\u{1680}'
+        | '\u{2000}'..='\u{200A}'
+        | '\u{202F}'
+        | '\u{205F}'
+        | '\u{3000}'
+    )
 }
 
 #[cfg(test)]
@@ -345,5 +377,28 @@ mod tests {
         let out = run("a { /* keep */ color: red; } a { color: red; }");
         assert_eq!(out.matches("a {").count(), 1, "got: {out:?}");
         assert_eq!(out.matches("color: red").count(), 1, "got: {out:?}");
+    }
+
+    // `trim_str` mirrors JS `String.prototype.trim()` (ECMA-262 WhiteSpace +
+    // LineTerminator). U+FEFF (BOM) IS whitespace to JS but NOT to Rust's
+    // default `is_whitespace`; U+0085 (NEL) is whitespace to Rust but NOT to
+    // JS. Both must be handled identically here.
+    #[test]
+    fn js_trim_strips_bom_zwnbsp() {
+        assert_eq!(trim_str(Some("\u{FEFF}foo\u{FEFF}")).unwrap(), "foo");
+        assert_eq!(trim_str(Some("\u{FEFF}\u{FEFF}")).unwrap(), "");
+    }
+
+    #[test]
+    fn js_trim_does_not_strip_nel_u0085() {
+        // Rust's str::trim() WOULD strip U+0085. JS does NOT.
+        let trimmed = trim_str(Some("\u{0085}foo\u{0085}")).unwrap();
+        assert_eq!(trimmed, "\u{0085}foo\u{0085}");
+    }
+
+    #[test]
+    fn js_trim_strips_zs_category() {
+        // U+2003 is "EM SPACE" — Zs category. Both Rust and JS strip these.
+        assert_eq!(trim_str(Some("\u{2003}foo\u{2003}")).unwrap(), "foo");
     }
 }

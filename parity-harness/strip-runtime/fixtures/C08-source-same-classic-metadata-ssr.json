@@ -1,11 +1,11 @@
 {
   "name": "C08-source-same-classic-metadata-ssr",
   "description": "same-step pipeline (run='both'), runtime=classic, metadata-ssr",
-  "source": "\n    import '@compiled/react';\n\n    const Component = () => (\n      <div css={{ fontSize: 12, color: 'blue' }}>\n        hello world\n      </div>\n    );\n  ",
+  "source": "\n    import '@sjcompiled/react';\n\n    const Component = () => (\n      <div css={{ fontSize: 12, color: 'blue' }}>\n        hello world\n      </div>\n    );\n  ",
   "opts": {
     "run": "both",
     "runtime": "classic",
-    "styleSheetPath": "@compiled/webpack-loader/css-loader!@compiled/webpack-loader/css-loader/compiled-css.css",
+    "styleSheetPath": "@sjcompiled/webpack-loader/css-loader!@sjcompiled/webpack-loader/css-loader/compiled-css.css",
     "compiledRequireExclude": true
   }
 }
