@@ -15,6 +15,9 @@ THIS PART IS CRITICAL!
 If you think someone hasn't ported something OUTSIDE your work CORRECTLY; Immedietly I.E "Drift detected in X - <Explanation here>" this is CRITICALLY important. otherwise if many things have slight drift the "WHOLE" will have MAJOR drift. Minor drift is unnacceptable.
 DONT try and "WORK AROUND" drift; That's not your call to make. Drift is the enemy.
 
+Finally on 'DRIFT DETECTION' it's important we DONT try WORK AROUND and Patch drift in our implementation. This will cause more drift, not less drift. Because if 1 plugin has a small issue, and we fix the issue in ours now 2 plugins have drift instead of 1.
+
+
 # Quality
 Quality is more important than speed; Again if we port something even slightly incorrectly when we eventually integrate it into the 60-90GB Monorepo ANY issue that CAN happen WILL happen.
 

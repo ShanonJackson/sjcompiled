@@ -90,22 +90,12 @@ fn parse_selector(str: &str, rule_ctx: &Node) -> Result<SelNode, PluginError> {
 /// Nesting (`&`) descendant of `nodes` with a clone of `parent` (or the
 /// `&`-substituted value when `nesting.value != '&'`). Returns whether
 /// any substitution occurred.
-///
-/// **Postcss-selector-parser quirk** (Rust port lacks descendant-combinator
-/// emission — JS upstream emits an explicit `Combinator{value: " "}` for
-/// whitespace, while our parser stores the whitespace as the next node's
-/// `spaces.before`). To preserve byte-clean output for `.b & { ... }`-style
-/// inputs, the Nesting's `spaces` are transferred onto the replacement
-/// node. In JS this transfer isn't needed because the Combinator sits
-/// BETWEEN the previous selector and the Nesting; here it's needed because
-/// the space is fused onto the Nesting itself.
 fn replace_nesting(nodes: &mut SelNode, parent: &SelNode) -> bool {
     let mut replaced = false;
     let mut i = 0;
     while i < nodes.nodes.len() {
         let is_nesting = nodes.nodes[i].kind == SelKind::Nesting;
         if is_nesting {
-            let nesting_spaces = nodes.nodes[i].spaces.clone();
             let nesting_value = nodes.nodes[i].value.clone();
             let mut new_node = if nesting_value != "&" {
                 let cloned_parent = parent.clone();
@@ -127,11 +117,6 @@ fn replace_nesting(nodes: &mut SelNode, parent: &SelNode) -> bool {
             } else {
                 parent.clone()
             };
-            // Transfer Nesting's spaces onto the replacement so the
-            // surrounding whitespace survives stringification. See the
-            // doc comment above for why this transfer is needed in the
-            // Rust port but not in JS.
-            new_node.spaces = nesting_spaces;
             new_node.raw_value = None;
             nodes.nodes[i] = new_node;
             replaced = true;

@@ -86,6 +86,7 @@ impl Parser {
                 // sequence of typed Nodes — matches upstream
                 // `parser.js::class()` / `id()` / `tag()` flow which emits
                 // one ClassName/Identifier/Tag per leading sigil.
+                flush_pending_descendant_combinator(selector, &mut pending_space);
                 let mut split = parse_word_compound(&word);
                 if let Some(first) = split.first_mut() {
                     apply_pending_space(first, pending_space.take(), true);
@@ -95,6 +96,7 @@ impl Parser {
                 }
                 i += 1;
             } else if tok.kind == t::asterisk {
+                flush_pending_descendant_combinator(selector, &mut pending_space);
                 let mut node = Node {
                     kind: NodeKind::Universal,
                     value: "*".to_string(),
@@ -109,6 +111,7 @@ impl Parser {
                 selector.nodes.push(node);
                 i += 1;
             } else if tok.kind == t::ampersand {
+                flush_pending_descendant_combinator(selector, &mut pending_space);
                 let mut node = Node {
                     kind: NodeKind::Nesting,
                     value: "&".to_string(),
@@ -142,6 +145,7 @@ impl Parser {
                 });
                 i += 1;
             } else if tok.kind == t::colon {
+                flush_pending_descendant_combinator(selector, &mut pending_space);
                 let mut value = ":".to_string();
                 let mut j = i + 1;
                 if j < tokens.len() && tokens[j].kind == t::colon {
@@ -210,6 +214,7 @@ impl Parser {
                 selector.nodes.push(node);
                 i = j;
             } else if tok.kind == t::openSquare {
+                flush_pending_descendant_combinator(selector, &mut pending_space);
                 let close = find_matching_square(tokens, i);
                 if let Some(end) = close {
                     let attr_text = self.input[tokens[i].start_pos..tokens[end].end_pos].to_string();
@@ -242,8 +247,9 @@ impl Parser {
                     i = tokens.len();
                 }
             } else {
+                flush_pending_descendant_combinator(selector, &mut pending_space);
                 let txt = self.text(tok);
-                selector.nodes.push(Node {
+                let mut node = Node {
                     kind: NodeKind::Tag,
                     value: txt,
                     raw_value: None,
@@ -252,7 +258,9 @@ impl Parser {
                     attribute: None,
                     attribute_spaces: None,
                     source_index: None,
-                });
+                };
+                apply_pending_space(&mut node, pending_space.take(), true);
+                selector.nodes.push(node);
                 i += 1;
             }
         }
@@ -354,6 +362,77 @@ fn apply_pending_space(node: &mut Node, pending: Option<String>, before: bool) {
         if before { node.spaces.before.push_str(&s); }
         else { node.spaces.after.push_str(&s); }
     }
+}
+
+/// Emit an explicit descendant `Combinator{value: " "}` node when there is
+/// pending whitespace AND the previous emitted sibling is a content node
+/// (i.e. NOT itself a Combinator). Mirrors upstream
+/// `dist/parser.js::combinator` lines 481-569 — specifically the
+/// "descendant combinator" branch (`else { ... }` at line 537) where a
+/// run of whitespace tokens between two content tokens spawns a
+/// `Combinator` node with `value: ' '`.
+///
+/// Slicing follows upstream lines 548-556: if the consumed whitespace
+/// ends with a literal `' '`, the trailing space becomes the
+/// Combinator's `value` and everything before it lives on `spaces.before`.
+/// If it starts with `' '` instead, the leading space is the value and
+/// remainder lives on `spaces.after`. Whitespace runs that contain no
+/// literal SP (e.g. tab-only) fall back to `value: " "` with empty
+/// spaces — upstream stashes the original bytes in `raws.value`, which
+/// our Rust port doesn't model on selector nodes (unreached by AFM
+/// corpus; flag if surfaced).
+///
+/// When there is NO previous content sibling (Selector freshly opened
+/// after a comma split, or pseudo-arg start), the pending whitespace
+/// is RESTORED into `*pending` so the caller's existing
+/// `apply_pending_space` path attaches it to the upcoming node's
+/// `spaces.before` — matching upstream `combinator()` line 488 which
+/// folds pending whitespace into the first child's `spaces.before` when
+/// no last sibling exists (`if (last) { ... } else { nodes.forEach(... newNode ...) }`).
+fn flush_pending_descendant_combinator(
+    selector: &mut Node,
+    pending: &mut Option<String>,
+) {
+    let Some(space) = pending.take() else { return; };
+    let last_is_content = selector
+        .nodes
+        .last()
+        .map(|n| !matches!(n.kind, NodeKind::Combinator))
+        .unwrap_or(false);
+    if !last_is_content {
+        // Restore — caller's apply_pending_space attaches to upcoming
+        // node's spaces.before (the no-last-sibling branch in upstream).
+        *pending = Some(space);
+        return;
+    }
+    let (before, value, after) = if space.ends_with(' ') {
+        (
+            space[..space.len() - 1].to_string(),
+            " ".to_string(),
+            String::new(),
+        )
+    } else if space.starts_with(' ') {
+        (
+            String::new(),
+            " ".to_string(),
+            space[1..].to_string(),
+        )
+    } else {
+        // Tab-only / non-SP whitespace runs — upstream stores raw bytes
+        // in `raws.value` (not modeled here). Emit canonical descendant
+        // marker with empty spaces.
+        (String::new(), " ".to_string(), String::new())
+    };
+    selector.nodes.push(Node {
+        kind: NodeKind::Combinator,
+        value,
+        raw_value: None,
+        nodes: Vec::new(),
+        spaces: Spaces { before, after },
+        attribute: None,
+        attribute_spaces: None,
+        source_index: None,
+    });
 }
 
 /// Split a token list at top-level (paren/square depth = 0) commas.

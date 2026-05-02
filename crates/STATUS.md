@@ -1030,11 +1030,13 @@ on.
   function dispatch case-fold, and per-Root cache dedup across rules
   + at-rules + vendor `-perspective-origin`. All 8 passed JS-vs-Rust
   on the first run — invariant locks, not drift fixes — but each pins
-  a code path the original corpus didn't independently cover. Total
-  38 entries.
+  a code path the original corpus didn't independently cover. Plus 3
+  broader invariant locks added in the same audit
+  (`30_empty_slot_stringify_invariant`, `31_short_circuit_interactions`,
+  `32_cache_key_excludes_important`). Total 41 entries.
 - Verification gates rerun: `cargo test --workspace --no-fail-fast`
-  all green; `parity-runner postcss-normalize-positions` 38/38
-  byte-clean (JS vs Rust); determinism 38/38; both NAPI verifiers
+  all green; `parity-runner postcss-normalize-positions` 41/41
+  byte-clean (JS vs Rust); determinism 41/41; both NAPI verifiers
   12/12; `parity-runner postcss-core-roundtrip` 41/41 (no regression
   in the AST-shape contract).
 - Full audit document at
@@ -1821,12 +1823,12 @@ in every consumer. Now byte-clean.
 |------------------------------------------------------------------------|--------|
 | `cargo test -p postcss-nested`                                         | 4/4 pass |
 | `cargo test --workspace --no-fail-fast`                                | 462/462 pass |
-| `parity-runner --stage postcss-nested --corpus ...`                    | 38/38 byte-clean |
-| `parity-runner --stage postcss-nested ... --determinism`               | 38/38 deterministic |
+| `parity-runner --stage postcss-nested --corpus ...`                    | 41/41 byte-clean |
+| `parity-runner --stage postcss-nested ... --determinism`               | 41/41 deterministic |
 | `parity-runner --stage sort --corpus crates/parity-runner/corpus/sort` | 12/12 (no regression) |
 | `parity-runner --stage merge-duplicate-at-rules ...`                   | 7/7 (no regression) |
 | `parity-runner --stage atomicify-rules ...`                            | 24/24 (no regression) |
-| `parity-runner --stage expand-shorthands ...`                          | 38/38 (no regression) |
+| `parity-runner --stage expand-shorthands ...`                          | 41/41 (no regression) |
 | `parity-runner --stage postcss-normalize-whitespace ...`               | 22/22 (no regression) |
 
 ### Walker design — single forward pass, no re-walk

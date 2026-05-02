@@ -112,22 +112,24 @@ function pluginCreator() {
 pluginCreator.postcss = true;
 const minifySelectors = pluginCreator;
 
-// Inspect parsed shape
-const root = parser().astSync('.a, .a');
-console.log('---AST shape---');
 function dump(n, depth=0) {
   const ind = '  '.repeat(depth);
   console.log(`${ind}${n.type} value=${JSON.stringify(n.value)} spaces=${JSON.stringify(n.spaces)} rawSpaces={before:${JSON.stringify(n.rawSpaceBefore)}, after:${JSON.stringify(n.rawSpaceAfter)}}`);
   if (n.nodes) for (const c of n.nodes) dump(c, depth+1);
 }
-dump(root);
 
-console.log('\n---String of each top-level Selector before any clear---');
-root.nodes.forEach((s, i) => console.log(`[${i}] String=${JSON.stringify(String(s))}`));
+// === Drift evidence: descendant combinator emission ===
+console.log('---UPSTREAM AST for `.a .b` (single Selector, descendant combinator)---');
+dump(parser().astSync('.a .b'));
 
-console.log('\n---After clearing each Selector spaces---');
-root.nodes.forEach((s) => { s.spaces.before = ''; s.spaces.after = ''; });
-root.nodes.forEach((s, i) => console.log(`[${i}] String=${JSON.stringify(String(s))}`));
+console.log('\n---UPSTREAM AST for `* .a`---');
+dump(parser().astSync('* .a'));
+
+console.log('\n---UPSTREAM AST for `.a > .b` (explicit child combinator)---');
+dump(parser().astSync('.a > .b'));
+
+console.log('\n---UPSTREAM AST for `.a+.b` (no spaces around +)---');
+dump(parser().astSync('.a+.b'));
 
 // Now run the actual plugin to verify final byte output.
 console.log('\n---Plugin output for `.a, .a`---');

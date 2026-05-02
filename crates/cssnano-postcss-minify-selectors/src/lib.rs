@@ -329,37 +329,7 @@ fn process_container(parent: &mut sp::Node, unique_top_level: &mut IndexSet<Stri
     while i < parent.nodes.len() {
         // Step 1: clear spaces + raw_value on the current child. Upstream
         // does this UNCONDITIONALLY for every visited node (line 208).
-        //
-        // Parser-divergence carve-out: our `postcss-selector-parser` does
-        // NOT emit explicit `Combinator{value: " "}` nodes for descendant
-        // whitespace (filed as a parser bug — see `crates/postcss-nested`
-        // section in STATUS.md). Instead descendant whitespace lives on
-        // the next non-first sibling's `spaces.before`. Naively clearing
-        // it here would produce `.a.b` from `.a .b`. So we detect the
-        // descendant-combinator case (i > 0, prev sibling is not a
-        // Combinator, current node is a non-leading element kind) and
-        // collapse the whitespace to a single space (matching upstream's
-        // `combinator()` reducer fallback when the trim leaves empty).
-        let parent_is_selector = matches!(parent.kind, sp::NodeKind::Selector);
-        let prev_is_combinator = if i > 0 {
-            matches!(parent.nodes[i - 1].kind, sp::NodeKind::Combinator)
-        } else {
-            false
-        };
-        let before_has_whitespace = parent.nodes[i]
-            .spaces
-            .before
-            .chars()
-            .any(|c| c.is_whitespace());
-        let preserve_descendant = parent_is_selector
-            && i > 0
-            && !prev_is_combinator
-            && before_has_whitespace;
-        parent.nodes[i].spaces.before = if preserve_descendant {
-            " ".to_string()
-        } else {
-            String::new()
-        };
+        parent.nodes[i].spaces.before.clear();
         parent.nodes[i].spaces.after.clear();
         parent.nodes[i].raw_value = None;
 
@@ -390,28 +360,9 @@ fn process_container(parent: &mut sp::Node, unique_top_level: &mut IndexSet<Stri
             sp::NodeKind::Universal => {
                 // Upstream `universal()` (lines 175-181) removes the `*`
                 // when the next sibling exists AND isn't a combinator.
-                //
-                // Parser-divergence carve-out: our parser stores
-                // descendant combinators as `spaces.before` on the next
-                // sibling rather than emitting an explicit
-                // `Combinator{value: " "}` node. Upstream's `next.type`
-                // is `'combinator'` for the descendant case; ours is
-                // whatever follows. So we treat "next sibling carries
-                // whitespace in `spaces.before`" as equivalent to
-                // "next sibling is a combinator" — `* .a` keeps the `*`
-                // (descendant combinator follows) while `*.a` (compound
-                // selector, no whitespace) drops it. Verified against
-                // upstream JS via `packages/css/scripts/dbg-minify.mjs`.
-                let next = parent.nodes.get(i + 1);
-                let next_is_explicit_combinator =
-                    matches!(next.map(|n| n.kind.clone()), Some(sp::NodeKind::Combinator));
-                let next_has_descendant_ws = next
-                    .map(|n| n.spaces.before.chars().any(|c| c.is_whitespace()))
-                    .unwrap_or(false);
-                let next_exists = next.is_some();
-                let should_remove = next_exists
-                    && !next_is_explicit_combinator
-                    && !next_has_descendant_ws;
+                let next_kind = parent.nodes.get(i + 1).map(|n| n.kind.clone());
+                let should_remove =
+                    matches!(next_kind, Some(k) if k != sp::NodeKind::Combinator);
                 if should_remove {
                     parent.nodes.remove(i);
                     parent.raw_value = None;
@@ -538,6 +489,23 @@ mod tests {
         stringify(&root)
     }
 
+    /// Drift evidence dump — Rust parser AST shape for the four canonical
+    /// inputs we just exercised against upstream (`packages/css/scripts/
+    /// dbg-minify.mjs`). Run via `cargo test -p cssnano-postcss-minify-selectors
+    /// drift_evidence -- --nocapture`. KEEP this test — it locks the Rust
+    /// parser shape so a future "fix" that aligns it with upstream surfaces
+    /// here as a diff. When the parser starts emitting explicit descendant
+    /// `Combinator{value: " "}` nodes, this test must be updated to match.
+    #[test]
+    fn drift_evidence_descendant_combinator() {
+        let proc = sp::Processor::new();
+        for input in [".a .b", "* .a", ".a > .b", ".a+.b"] {
+            let root = proc.ast_sync(input).expect("parse");
+            eprintln!("\n--- RUST AST for `{input}` ---");
+            eprintln!("{root:#?}");
+        }
+    }
+
     #[test]
     fn idempotent_on_clean_input() {
         // No-op transform: simple class selector with no whitespace.
@@ -648,12 +616,24 @@ mod tests {
     }
 
     #[test]
-    fn drops_universal_followed_by_class() {
-        // `* .a` → `.a` (universal followed by non-combinator).
+    fn keeps_universal_before_descendant_combinator() {
+        // `* .a` — upstream JS KEEPS the `*` because the parser emits an
+        // explicit `Combinator{value: " "}` between the universal and
+        // the class. universal_reducer's `next.type === 'combinator'`
+        // check sees the descendant combinator and skips removal.
+        // Verified via `packages/css/scripts/dbg-minify.mjs` against the
+        // AFM-pinned `postcss-minify-selectors@5.2.1` —
+        // `* .a { color: red; }` → `* .a { color: red; }` (preserved).
         let out = run("* .a { color: red; }");
-        // The `.a` keeps the descendant combinator (single space) on
-        // its parent Selector after the universal is dropped. Strip the
-        // preceding `*` byte-for-byte.
+        assert!(out.contains('*'), "universal incorrectly dropped: {out:?}");
+    }
+
+    #[test]
+    fn drops_universal_compounded_with_class() {
+        // `*.a` (no whitespace) → `.a`. No descendant combinator between
+        // universal and class; universal_reducer sees ClassName next →
+        // remove. Compound selectors only.
+        let out = run("*.a { color: red; }");
         assert!(!out.contains('*'), "universal not dropped: {out:?}");
     }
 
