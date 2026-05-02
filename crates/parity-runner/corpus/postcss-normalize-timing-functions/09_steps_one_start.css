@@ -1,0 +1,2 @@
+a { transition-timing-function: steps(1, start); }
+b { transition-timing-function: steps(1, jump-start); }

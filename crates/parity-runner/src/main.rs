@@ -53,6 +53,7 @@ fn main() -> ExitCode {
         "postcss-discard-comments" => Stage::PostcssDiscardComments,
         "postcss-normalize-string" => Stage::PostcssNormalizeString,
         "postcss-normalize-positions" => Stage::PostcssNormalizePositions,
+        "postcss-normalize-timing-functions" => Stage::PostcssNormalizeTimingFunctions,
         "sort" => Stage::Sort,
         s => {
             eprintln!("unknown stage: {s}");

@@ -1,0 +1,5 @@
+._abcd1234 { transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1); }
+._efgh5678 { animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1); }
+._ijkl9012 { transition: opacity 200ms cubic-bezier(0, 0, 1, 1); }
+._mnop3456 { -webkit-animation-timing-function: steps(4, end); }
+._qrst7890 { transition-timing-function: steps(1, start); }

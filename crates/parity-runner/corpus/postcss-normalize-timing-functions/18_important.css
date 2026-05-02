@@ -1,0 +1,2 @@
+a { transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1) !important; }
+b { animation-timing-function: steps(4, end) !important; }

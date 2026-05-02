@@ -78,6 +78,12 @@ pub enum Stage {
     /// (left/top → 0 0, etc.). No options.
     PostcssNormalizePositions,
 
+    /// `parse → postcss-normalize-timing-functions@5.1.0 → stringify`. Phase 6b.
+    /// Compresses `cubic-bezier(...)` / `steps(...)` to keyword equivalents
+    /// (ease/linear/ease-in/ease-out/ease-in-out/step-start/step-end), and
+    /// strips the redundant trailing `, end` from `steps(N, end)`. No options.
+    PostcssNormalizeTimingFunctions,
+
     /// The full `sort()` entry point — `packages/css/src/sort.ts`. Runs
     /// `postcss-discard-duplicates@6 → mergeDuplicateAtRules → sortAtomicStyleSheet`
     /// with default opts (both `Option<bool>` flags `None`, mirroring the
@@ -106,6 +112,7 @@ impl Stage {
             Stage::PostcssDiscardComments => "postcss-discard-comments",
             Stage::PostcssNormalizeString => "postcss-normalize-string",
             Stage::PostcssNormalizePositions => "postcss-normalize-positions",
+            Stage::PostcssNormalizeTimingFunctions => "postcss-normalize-timing-functions",
             Stage::Sort => "sort",
         }
     }
@@ -221,6 +228,12 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
         Stage::PostcssNormalizePositions => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             cssnano_postcss_normalize_positions::postcss_normalize_positions(&mut root)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssNormalizeTimingFunctions => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            cssnano_postcss_normalize_timing_functions::postcss_normalize_timing_functions(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }

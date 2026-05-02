@@ -35,6 +35,8 @@ import postcssDiscardComments from 'postcss-discard-comments';
 import postcssNormalizeString from 'postcss-normalize-string';
 // npm `postcss-normalize-positions@5.1.1` — cssnano sub-plugin (Phase 6b).
 import postcssNormalizePositions from 'postcss-normalize-positions';
+// npm `postcss-normalize-timing-functions@5.1.0` — cssnano sub-plugin (Phase 6b).
+import postcssNormalizeTimingFunctions from 'postcss-normalize-timing-functions';
 
 // Sheets returned by extract-stylesheets are joined with U+001E (record
 // separator) so they ride the single-string bridge protocol unambiguously.
@@ -172,6 +174,16 @@ const STAGES = {
   // short-circuits the current background entry; `/` defers to background-size.
   'postcss-normalize-positions': (css) => {
     const result = postcss([postcssNormalizePositions()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-normalize-timing-functions@5.1.0 (default opts) → stringify.
+  // Walks `(-vendor-)?(animation|transition)(-timing-function)?` decls.
+  // Compresses `cubic-bezier(...)` / `steps(...)` to keyword equivalents
+  // (ease/linear/ease-in/ease-out/ease-in-out/step-start/step-end), and strips
+  // the redundant `, end | jump-end` argument from `steps(N, end)`.
+  'postcss-normalize-timing-functions': (css) => {
+    const result = postcss([postcssNormalizeTimingFunctions()]).process(css, { from: undefined });
     return result.css;
   },
 

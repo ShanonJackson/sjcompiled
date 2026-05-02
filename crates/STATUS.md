@@ -21,8 +21,8 @@ End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 | 5c | postcss-discard-duplicates@6.0.0 (npm — used by sort.ts) | **DONE** — byte-clean across 8-entry corpus |
 | 6a | postcss-discard-comments@5.1.2 | **DONE** — byte-clean across 15-entry corpus, deterministic JS oracle |
 | 6b | postcss-normalize-string@5.1.0 | **DONE** — byte-clean across 15-entry corpus, deterministic JS oracle |
-| 6b | postcss-normalize-positions@5.1.1 | **SCAFFOLDED** |
-| 6b | postcss-normalize-timing-functions@5.1.0 | **SCAFFOLDED** |
+| 6b | postcss-normalize-positions@5.1.1 | **DONE** — byte-clean across 20-entry corpus, deterministic JS oracle |
+| 6b | postcss-normalize-timing-functions@5.1.0 | **DONE** — byte-clean across 21-entry corpus, deterministic JS oracle |
 | 6b | postcss-normalize-url@5.1.0 | **SCAFFOLDED** |
 | 6c | postcss-minify-selectors@5.2.1 | **SCAFFOLDED** |
 | 6d | postcss-ordered-values@5.1.3 | **SCAFFOLDED** |
@@ -41,10 +41,12 @@ End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 ## Test totals
 
 `RUSTFLAGS="" cargo test --workspace --no-fail-fast`:
-- **398 tests pass / 0 fail / 1 ignored / 0 failed suites.**
+- **425 tests pass / 0 fail / 1 ignored / 0 failed suites.**
   (12 from Phase 5b `postcss-normalize-whitespace`,
   12 from Phase 6a `postcss-discard-comments`,
-  7 from Phase 6b `postcss-normalize-string`.)
+  7 from Phase 6b `postcss-normalize-string`,
+  12 from Phase 6b `postcss-normalize-positions`,
+  15 from Phase 6b `postcss-normalize-timing-functions`.)
 
 ## Phase 8a ship — `sort()` end-to-end byte-clean through NAPI
 
@@ -350,29 +352,26 @@ darwin-arm64 once `transformCss` is byte-clean.
 
 ## What's left to port (full source-faithful Rust ports)
 
-12 crates. Listed in roughly ascending complexity:
+10 crates. Listed in roughly ascending complexity:
 
-1. `postcss-normalize-positions` — ~50 LOC. Position-keyword rewrite.
-2. `postcss-normalize-timing-functions` — ~50 LOC. Easing-keyword
-   compression.
-3. `postcss-ordered-values` — moderate. Reorders multi-value
+1. `postcss-ordered-values` — moderate. Reorders multi-value
    shorthand parts.
-4. `postcss-minify-selectors` — moderate. Selector minification using
+2. `postcss-minify-selectors` — moderate. Selector minification using
    postcss-selector-parser.
-5. `postcss-normalize-url` — moderate. URL parsing edge cases.
-6. `postcss-normalize-unicode` — moderate, browserslist-aware.
-7. `postcss-reduce-initial` — moderate, caniuse-aware.
-8. `postcss-convert-values` — hard, uses fraction-js, browserslist.
-9. `postcss-minify-params` — hard, caniuse-aware.
-10. `postcss-minify-gradients` — hard, colord-heavy.
-11. `postcss-calc` — VERY hard. Effectively a small expression compiler.
-12. `postcss-colormin` — HARDEST cssnano plugin. Color downgrade
+3. `postcss-normalize-url` — moderate. URL parsing edge cases.
+4. `postcss-normalize-unicode` — moderate, browserslist-aware.
+5. `postcss-reduce-initial` — moderate, caniuse-aware.
+6. `postcss-convert-values` — hard, uses fraction-js, browserslist.
+7. `postcss-minify-params` — hard, caniuse-aware.
+8. `postcss-minify-gradients` — hard, colord-heavy.
+9. `postcss-calc` — VERY hard. Effectively a small expression compiler.
+10. `postcss-colormin` — HARDEST cssnano plugin. Color downgrade
     decisions hinging on caniuse + colord rounding + byte-length
     comparison.
-13. `postcss-nested` (Phase 5a) — VERY hard. Recursive selector
+11. `postcss-nested` (Phase 5a) — VERY hard. Recursive selector
     merging with bubble/unwrap config.
-14. `cssnano-preset-default` — moderate orchestrator (depends on
-    1-12 being byte-clean first).
+12. `cssnano-preset-default` — moderate orchestrator (depends on
+    1-10 being byte-clean first).
 
 Plus Phase 7 (autoprefixer — 8+ weeks of its own) and Phase 8
 (NAPI assembly + the `transformCss` / `sort` end-to-end gates).
@@ -386,10 +385,15 @@ cardinal-rule guidance remains: **a session must take a unit from 0%
 → 100% byte-clean**. Half-done ports become silent byte-drift hazards
 across agent handoffs.
 
-1. **Phase 6 simple band remainder** — `normalize-positions` and
-   `normalize-timing-functions` (the other two,
-   `discard-comments` and `normalize-string`, landed this session).
-   Each ~50-200 LOC; finish one before starting the next.
+The Phase 6b "simple band" (discard-comments, normalize-string,
+normalize-positions, normalize-timing-functions) is **fully byte-clean**.
+The remaining cssnano work is moderate-to-hard.
+
+1. **Phase 6 moderate band** — pick one of:
+   - `normalize-url@5.1.0` (URL parsing edge cases; ~150 LOC).
+   - `minify-selectors@5.2.1` (uses postcss-selector-parser; moderate).
+   - `ordered-values@5.1.3` (multi-value reordering; moderate).
+   Finish one before starting the next.
 2. **Phase 5a** (`postcss-nested`) — multi-day commitment. Recursive
    selector merging. Don't start unless you have time to finish.
 3. **Phase 6 hard band** — `ordered-values`, `minify-selectors`,
@@ -526,6 +530,114 @@ params; rewraps string literals to the preferred quote style (default
 | `cargo test -p cssnano-postcss-normalize-string`                      | 7/7 pass |
 | `parity-runner --stage postcss-normalize-string --corpus ...`         | 15/15 byte-clean |
 | `parity-runner --stage postcss-normalize-string ... --determinism`    | 15/15 deterministic |
+
+## Phase 6b ship — `postcss-normalize-positions@5.1.1` byte-clean
+
+cssnano sub-plugin. Walks decls matching
+`/^(background(-position)?|(-\w+-)?perspective-origin)$/i` and
+rewrites position-keyword pairs to length values per upstream rules
+(`left top` → `0 0`, `right bottom` → `100% 100%`, `top right` →
+`100% 0`, etc.). `var()`/`env()`/`constant()` short-circuits the
+current background entry; `/` defers to background-size.
+
+### What landed this session
+
+1. `crates/cssnano-postcss-normalize-positions/src/lib.rs` — full port
+   of `node_modules/postcss-normalize-positions@5.1.1/src/index.js`.
+   Single source file maps 1:1.
+2. `crates/cssnano-postcss-normalize-positions/Cargo.toml` — added
+   `indexmap`, `regex`, `once_cell` workspace deps. Pre-existing
+   `postcss-core` and `postcss-value-parser` already declared.
+3. Stage + bridge wiring: `Stage::PostcssNormalizePositions`,
+   `parity-bridge.mjs` import, root `package.json` `overrides` pin
+   (`postcss-normalize-positions: 5.1.1`),
+   `packages/css/package.json` devDependency.
+4. Sparse-array semantics replicated via `Vec<Option<Range>>` so
+   `forEach` skips holes (matches the JS sparse-array case where a
+   layer's range slot is never populated, e.g. when an entry hits `/`
+   before any position keyword).
+5. `parseFloat(value)` not-NaN equivalence implemented as
+   `parse_unit(value).is_some()` — `like_number`'s prefix check
+   matches JS `parseFloat`'s "valid leading numeric" semantics
+   exactly.
+6. 20-fixture corpus covering: blank, no-position decls, `left top`,
+   `right bottom`, vertical-first swap, center pair collapse, single
+   keyword, `var()` short-circuit, `/` background-size guard, comma
+   layer reset, three-value-skip rule, dimensions/numbers, calc/min/
+   max math fns, vendor `-webkit-`/`-moz-perspective-origin`,
+   `!important`, atrule nesting, uppercase keywords, mixed
+   keyword+dimension, realistic atomic CSS, empty value.
+
+### Verification gates run
+
+| Gate                                                                    | Status |
+|-------------------------------------------------------------------------|--------|
+| `cargo test -p cssnano-postcss-normalize-positions`                     | 12/12 pass |
+| `cargo test --workspace --no-fail-fast` (excl. `compiled-css-napi`)     | 410/410 pass |
+| `parity-runner --stage postcss-normalize-positions --corpus ...`        | 20/20 byte-clean |
+| `parity-runner --stage postcss-normalize-positions ... --determinism`   | 20/20 deterministic |
+| `parity-runner --stage postcss-normalize-string ...`                    | 15/15 (no regression) |
+| `parity-runner --stage postcss-discard-comments ...`                    | 15/15 (no regression) |
+| `parity-runner --stage sort --corpus crates/parity-runner/corpus/sort`  | 12/12 (no regression) |
+
+## Phase 6b ship — `postcss-normalize-timing-functions@5.1.0` byte-clean
+
+cssnano sub-plugin. Walks decls matching
+`/^(-\w+-)?(animation|transition)(-timing-function)?$/i` and rewrites
+timing functions to keyword equivalents:
+
+- `cubic-bezier(0.25, 0.1, 0.25, 1)` → `ease`.
+- `cubic-bezier(0, 0, 1, 1)` → `linear`.
+- `cubic-bezier(0.42, 0, 1, 1)` → `ease-in`.
+- `cubic-bezier(0, 0, 0.58, 1)` → `ease-out`.
+- `cubic-bezier(0.42, 0, 0.58, 1)` → `ease-in-out`.
+- `steps(1, start | jump-start)` → `step-start`.
+- `steps(1, end | jump-end)` → `step-end`.
+- `steps(N, end | jump-end)` → `steps(N)` (browser default).
+
+### What landed this session
+
+1. `crates/cssnano-postcss-normalize-timing-functions/src/lib.rs` —
+   full port of `node_modules/postcss-normalize-timing-functions@5.1.0/
+   src/index.js`. Single source file maps 1:1.
+2. `Cargo.toml` — added `indexmap`, `regex`, `once_cell` workspace
+   deps. Pre-existing `postcss-core` and `postcss-value-parser` already
+   declared.
+3. JS `parseFloat(s)` parity implemented as
+   `parse_unit(s).map(|u| u.number.parse::<f64>().ok()).flatten()` —
+   `like_number`'s prefix check matches parseFloat's "valid leading
+   numeric" semantics exactly (handles `"0.25"`, `".25"`, `"1px"`,
+   `"1e-2"`, etc.).
+4. cubic-bezier conversion-table key built via
+   `js_number_to_string(v)` joined by `,` — exact 1:1 with JS
+   `[a,b,c,d].toString()`. Uses the existing postcss-core helper
+   instead of a bespoke formatter.
+5. Stage + bridge wiring: `Stage::PostcssNormalizeTimingFunctions`,
+   `parity-bridge.mjs` import, root `package.json` `overrides` pin
+   (`postcss-normalize-timing-functions: 5.1.0`),
+   `packages/css/package.json` devDependency.
+6. 21-fixture corpus covering: blank, no-timing decls, all 5
+   cubic-bezier→keyword conversions, unknown-bezier passthrough,
+   `steps(1, start|jump-start)` → step-start, `steps(1, end|jump-end)`
+   → step-end, `steps(N, end|jump-end)` → `steps(N)`,
+   `steps(N)` (already minimal), keyword passthrough (ease/linear/
+   step-start), comma-list (multiple bezier+steps), transition
+   shorthand inside `transition` / `animation`, vendor prefixes
+   (`-webkit-`/`-moz-`/`-ms-`), uppercase keywords/property names,
+   `!important`, atrule nesting (`@media`/`@keyframes`), realistic
+   atomic CSS, decimal variants (`.25` vs `0.25`, `1.0` vs `1`).
+
+### Verification gates run
+
+| Gate                                                                            | Status |
+|---------------------------------------------------------------------------------|--------|
+| `cargo test -p cssnano-postcss-normalize-timing-functions`                      | 15/15 pass |
+| `cargo test --workspace --no-fail-fast` (excl. `compiled-css-napi`)             | 425/425 pass |
+| `parity-runner --stage postcss-normalize-timing-functions --corpus ...`         | 21/21 byte-clean |
+| `parity-runner --stage postcss-normalize-timing-functions ... --determinism`    | 21/21 deterministic |
+| `parity-runner --stage postcss-normalize-positions ...`                         | 20/20 (no regression) |
+| `parity-runner --stage postcss-normalize-string ...`                            | 15/15 (no regression) |
+| `parity-runner --stage sort --corpus crates/parity-runner/corpus/sort`          | 12/12 (no regression) |
 
 ### Lessons from Phase 6a / 6b — apply to every future port
 

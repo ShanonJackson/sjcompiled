@@ -1,0 +1,3 @@
+a { transition-timing-function: ease; }
+b { animation-timing-function: linear; }
+c { transition-timing-function: step-start; }

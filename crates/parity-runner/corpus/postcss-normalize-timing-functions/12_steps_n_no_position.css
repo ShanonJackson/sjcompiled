@@ -1,0 +1,2 @@
+a { transition-timing-function: steps(5); }
+b { transition-timing-function: steps(2); }

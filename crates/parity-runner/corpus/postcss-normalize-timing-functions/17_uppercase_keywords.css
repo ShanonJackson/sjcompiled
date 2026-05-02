@@ -1,0 +1,3 @@
+a { transition-timing-function: CUBIC-BEZIER(0.25, 0.1, 0.25, 1); }
+b { transition-timing-function: STEPS(1, START); }
+c { Transition-Timing-Function: steps(4, END); }

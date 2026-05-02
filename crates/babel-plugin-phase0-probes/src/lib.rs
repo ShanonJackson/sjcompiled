@@ -82,33 +82,84 @@ fn write_result(call_scratch: &str, result: &ProbeResult) {
 }
 
 fn run_wasi_io(call_scratch: &str) {
-    // Diagnostic: what does the plugin sandbox actually see?
     let cwd = std::env::current_dir();
     eprintln!("[probe wasi-io] env::current_dir() => {:?}", cwd);
     eprintln!("[probe wasi-io] callScratch (host)  => {:?}", call_scratch);
 
-    // Attempt 1: absolute Windows-style path as given.
-    let probe_path = PathBuf::from(call_scratch).join("probe.bin");
-    let payload: &[u8] = b"hello-wasi";
-    eprintln!("[probe wasi-io] writing to {:?}", probe_path);
-    let write_res = fs::write(&probe_path, payload);
-    eprintln!("[probe wasi-io] write result: {:?}", write_res);
-    let read_back = write_res.as_ref().ok().and_then(|_| fs::read(&probe_path).ok());
-    let ok = read_back.as_deref() == Some(payload);
+    // Bisect:
+    //   write attempts
+    let write_candidates: Vec<(&str, PathBuf)> = vec![
+        ("write-rel-cwd",        PathBuf::from("probe-cwd.bin")),
+        ("write-rel-dot",        PathBuf::from("./probe-dot.bin")),
+        ("write-abs-root",       PathBuf::from("/probe-root.bin")),
+        ("write-abs-callscr",    PathBuf::from(call_scratch).join("probe.bin")),
+    ];
+    let mut attempts = Vec::new();
+    for (label, path) in &write_candidates {
+        let res = fs::write(path, b"x");
+        eprintln!("[probe wasi-io] {} {:?} => {:?}", label, path, res);
+        attempts.push(serde_json::json!({
+            "label": label,
+            "path": path.display().to_string(),
+            "ok":   res.is_ok(),
+            "err":  res.err().map(|e| e.to_string()),
+        }));
+    }
 
-    // Even if writing the result fails, the eprintln! above gets through.
+    //   read attempts (hosts pre-creates a known file at <cwd>/package.json)
+    let read_candidates: Vec<(&str, PathBuf)> = vec![
+        ("read-rel-pkgjson",     PathBuf::from("package.json")),
+        ("read-abs-pkgjson",     PathBuf::from("/package.json")),
+        ("read-rel-callscr",     PathBuf::from(call_scratch).join("call-marker.txt")),
+        ("read-rel-srcfile",     PathBuf::from("crates/PARITY_VERSIONS.md")),
+    ];
+    for (label, path) in &read_candidates {
+        let res = fs::read(path);
+        let len = res.as_ref().ok().map(|b| b.len());
+        let err = res.as_ref().err().map(|e| e.to_string());
+        let ok = res.is_ok();
+        eprintln!("[probe wasi-io] {} {:?} => ok={} len={:?} err={:?}",
+                  label, path, ok, len, err);
+        attempts.push(serde_json::json!({
+            "label": label,
+            "path":  path.display().to_string(),
+            "ok":    ok,
+            "err":   err,
+            "len":   len,
+        }));
+    }
+
+    //   list cwd attempt
+    let listing = fs::read_dir(".");
+    let listing_summary = match &listing {
+        Ok(_) => "ok",
+        Err(e) => {
+            eprintln!("[probe wasi-io] read_dir(.) err = {}", e);
+            "err"
+        }
+    };
+    eprintln!("[probe wasi-io] read_dir(.) => {}", listing_summary);
+
+    // best-effort write of result somewhere the test can read it
+    let result_bytes = serde_json::to_vec(&ProbeResult {
+        probe: "wasi-io",
+        ok: attempts.iter().any(|a| a["ok"].as_bool() == Some(true)),
+        detail: serde_json::json!({
+            "cwd_observed": cwd.ok().map(|p| p.display().to_string()),
+            "attempts": attempts,
+            "read_dir_dot": listing_summary,
+        }),
+    })
+    .unwrap();
+    for p in &[
+        "phase0-probes/wasi-io-result.json",
+        "/phase0-probes/wasi-io-result.json",
+    ] {
+        let _ = fs::write(p, &result_bytes);
+    }
     let _ = fs::write(
         PathBuf::from(call_scratch).join("probe-result.json"),
-        serde_json::to_vec(&ProbeResult {
-            probe: "wasi-io",
-            ok,
-            detail: serde_json::json!({
-                "cwd_observed": cwd.ok().map(|p| p.display().to_string()),
-                "write_err": write_res.err().map(|e| e.to_string()),
-                "read_len":  read_back.as_ref().map(|b| b.len()),
-            }),
-        })
-        .unwrap(),
+        &result_bytes,
     );
 }
 

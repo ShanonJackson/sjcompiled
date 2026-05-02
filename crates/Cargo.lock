@@ -563,8 +563,11 @@ dependencies = [
 name = "cssnano-postcss-normalize-timing-functions"
 version = "0.0.1"
 dependencies = [
+ "indexmap",
+ "once_cell",
  "postcss-core",
  "postcss-value-parser",
+ "regex",
 ]
 
 [[package]]
@@ -1442,6 +1445,7 @@ dependencies = [
  "cssnano-postcss-discard-comments",
  "cssnano-postcss-normalize-positions",
  "cssnano-postcss-normalize-string",
+ "cssnano-postcss-normalize-timing-functions",
  "postcss-core",
  "postcss-discard-duplicates",
  "postcss-normalize-whitespace",

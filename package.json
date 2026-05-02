@@ -33,6 +33,7 @@
     "postcss-discard-comments": "5.1.2",
     "postcss-normalize-string": "5.1.0",
     "postcss-normalize-positions": "5.1.1",
+    "postcss-normalize-timing-functions": "5.1.0",
     "postcss-selector-parser": "6.0.13",
     "postcss-values-parser": "6.0.2",
     "postcss-discard-duplicates": "6.0.0",

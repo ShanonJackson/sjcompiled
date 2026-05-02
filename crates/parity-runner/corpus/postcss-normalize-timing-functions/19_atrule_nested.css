@@ -1,0 +1,7 @@
+@media (min-width: 700px) {
+  a { transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1); }
+}
+@keyframes pulse {
+  0% { animation-timing-function: cubic-bezier(0, 0, 1, 1); }
+  100% { animation-timing-function: steps(4, end); }
+}

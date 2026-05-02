@@ -1,0 +1,2 @@
+a { transition-timing-function: cubic-bezier(.25, .1, .25, 1.0); }
+b { transition-timing-function: cubic-bezier(0.42, 0.0, 1.0, 1.0); }
