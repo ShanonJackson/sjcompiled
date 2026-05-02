@@ -1,0 +1,3 @@
+a { content: 'foo' 'bar' 'baz'; }
+b { content: "alpha" "beta" 'gamma'; }
+c { font-family: 'Helvetica', "Arial", 'Times'; }

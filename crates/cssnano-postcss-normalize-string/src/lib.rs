@@ -216,16 +216,27 @@ fn scan_word_end(bytes: &[u8], from: usize, len: usize) -> usize {
 // Quote rewrap logic.
 // ---------------------------------------------------------------------------
 
-/// `changeWrappingQuotes(node, ast)` upstream.
+/// `changeWrappingQuotes(node, ast)` — upstream `src/index.js:183-207`.
+///
+/// Each `if` reads `node.quote` freshly so the second branch sees the
+/// post-flip quote (a snapshot would deviate from upstream verbatim
+/// even though the second branch can never fire after a flip — the
+/// first `if` requires the opposite escape count to be zero, so the
+/// second `if`'s precondition is unsatisfiable post-flip).
 fn change_wrapping_quotes(node: &mut VNode, ast: &mut StringAst) {
     if ast.types.single_quote != 0 || ast.types.double_quote != 0 {
         return;
     }
-    let cur_quote = node.quote.unwrap_or('"');
-    if cur_quote == '\'' && ast.types.escaped_single_quote > 0 && ast.types.escaped_double_quote == 0 {
+    if node.quote == Some('\'')
+        && ast.types.escaped_single_quote > 0
+        && ast.types.escaped_double_quote == 0
+    {
         node.quote = Some('"');
     }
-    if cur_quote == '"' && ast.types.escaped_double_quote > 0 && ast.types.escaped_single_quote == 0 {
+    if node.quote == Some('"')
+        && ast.types.escaped_double_quote > 0
+        && ast.types.escaped_single_quote == 0
+    {
         node.quote = Some('\'');
     }
     let new_quote = node.quote.unwrap_or('"');
@@ -381,6 +392,43 @@ mod tests {
         // String body `foo\\\nbar` should collapse to `foobar`.
         let out = run("a { content: \"foo\\\nbar\"; }");
         assert!(out.contains("\"foobar\""), "got: {out:?}");
+    }
+
+    #[test]
+    fn change_wrapping_quotes_post_flip_second_if_inert() {
+        // Regression for the verbatim re-read of `node.quote` between
+        // the two `if`s in `change_wrapping_quotes`. Body is `\'` inside
+        // a `'`-wrapped string: first if flips wrap to `"`. With a stale
+        // snapshot that path would still pass; we cover the OPPOSITE
+        // path here too (body `\"` inside `"`-wrap) where stale-vs-fresh
+        // are equally fine, just to lock in the symmetry.
+        let out_a = run("a { content: '\\''; }");
+        assert!(out_a.contains("\"'\""), "got: {out_a:?}");
+        let out_b = run("a { content: \"\\\"\"; }");
+        assert!(out_b.contains("'\"'"), "got: {out_b:?}");
+    }
+
+    #[test]
+    fn backslash_followed_by_non_special_falls_through() {
+        // Upstream: BACKSLASH branch's missing `break` falls through to
+        // default when the next char is NOT `'`, `"`, or `\n`. The whole
+        // run including the leading backslash becomes a single string
+        // node and stringifies unchanged.
+        let out = run("a { content: \"\\g\"; }");
+        assert!(out.contains("\"\\g\""), "got: {out:?}");
+    }
+
+    #[test]
+    fn cache_key_collision_resistant_with_pipe_in_value() {
+        // Cache key is `original + '|' + preferredQuote`. A value that
+        // already contains `|` must still produce a unique key (default
+        // quote is "double" so the key suffix is constant) — and the
+        // normalized output must equal what we'd get without caching.
+        let css = "a { content: '|||'; } b { content: '|||'; }";
+        let out = run(css);
+        // Both strings get rewrapped to `"|||"`.
+        let count = out.matches("\"|||\"").count();
+        assert_eq!(count, 2, "got: {out:?}");
     }
 
     #[test]

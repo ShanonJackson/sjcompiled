@@ -1,0 +1,3 @@
+a { content: "\'\'\'"; }
+b { content: '\"\"\"'; }
+c { content: "\'\"\'\""; }

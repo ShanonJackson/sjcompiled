@@ -1612,6 +1612,7 @@ dependencies = [
 name = "postcss-values-parser"
 version = "0.0.1"
 dependencies = [
+ "colord",
  "indexmap",
  "once_cell",
  "postcss-core",

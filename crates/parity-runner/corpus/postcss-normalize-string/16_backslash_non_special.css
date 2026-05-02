@@ -1,0 +1,3 @@
+a { content: "\g"; }
+b { content: "\a"; }
+c { content: "foo\bar"; }

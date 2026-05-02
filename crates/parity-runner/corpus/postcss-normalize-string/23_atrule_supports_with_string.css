@@ -1,0 +1,9 @@
+@supports (font-family: 'Inter') {
+  a { color: red; }
+}
+@supports (content: "x") {
+  b { color: blue; }
+}
+@media (min-width: 100px) and (font-family: 'Foo') {
+  c { color: green; }
+}

@@ -1,0 +1,3 @@
+a { content: attr(href, ''); }
+b { background: url(""); }
+c { content: attr(data-x, ""); }

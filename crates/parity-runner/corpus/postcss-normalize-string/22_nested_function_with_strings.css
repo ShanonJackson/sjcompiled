@@ -1,0 +1,3 @@
+a { content: attr(href, 'fallback'); }
+b { background: linear-gradient(url('a.png'), url("b.png")); }
+c { font-family: var(--brand, 'Inter', "Helvetica"); }

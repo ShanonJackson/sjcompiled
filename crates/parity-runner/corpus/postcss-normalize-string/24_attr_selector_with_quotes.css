@@ -1,0 +1,3 @@
+[data-x*='say "hi"'] { color: red; }
+[data-y*="it\'s"] { color: blue; }
+[data-z*='\"escaped\"'] { color: green; }

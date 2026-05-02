@@ -27,6 +27,46 @@ static RE_COLOR_FUNCTIONS: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)^(hsla?|h
 static RE_VAR: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)^var$").unwrap());
 static RE_VAR_PREFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^--[^\s]+$").unwrap());
 
+// Mirror upstream `Func.js:88` and the name validation in `Func.fromTokens`:
+//
+//   const cssFunctions = ['annotation', 'attr', 'blur', ...];
+//   const vendorPrefixes = ['-webkit-', '-moz-', '-ms-', '-o-'];
+//   const reFunctions = new RegExp(`^(${vendorPrefixes.join('|')})?(${cssFunctions.join('|')})`, 'i');
+//
+// And in `fromTokens`:
+//   if (!reFunctions.test(node.name) && !/^[a-zA-Z\-\.]+$/.test(node.name)) {
+//     // re-tokenize the name and back-push as Word + brackets
+//   }
+//
+// `cssFunctions` list copied verbatim from upstream `Func.js:17-86`.
+static RE_FUNCTIONS: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(concat!(
+        r"(?i)^(-webkit-|-moz-|-ms-|-o-)?",
+        r"(annotation|attr|blur|brightness|calc|character-variant|circle|contrast|",
+        r"cubic-bezier|dir|drop-shadow|element|ellipse|grayscale|hsl|hsla|hue-rotate|",
+        r"image|inset|invert|lang|linear-gradient|matrix|matrix3d|minmax|not|nth-child|",
+        r"nth-last-child|nth-last-of-type|nth-of-type|opacity|ornaments|perspective|",
+        r"polygon|radial-gradient|rect|repeat|repeating-linear-gradient|",
+        r"repeating-radial-gradient|rgb|rgba|rotate|rotatex|rotatey|rotatez|rotate3d|",
+        r"saturate|scale|scalex|scaley|scalez|scale3d|sepia|skew|skewx|skewy|steps|",
+        r"styleset|stylistic|swash|symbols|translate|translatex|translatey|translatez|",
+        r"translate3d|url|var)"
+    )).unwrap()
+});
+
+// Upstream `Func.fromTokens` fallback: `^[a-zA-Z\-\.]+$` (letters, dashes, dots).
+// Notably DOES NOT permit digits or underscores.
+static RE_FUNC_NAME_FALLBACK: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z\-.]+$").unwrap());
+
+fn is_valid_func_name(name: &str) -> bool {
+    RE_FUNCTIONS.is_match(name) || RE_FUNC_NAME_FALLBACK.is_match(name)
+}
+
+// Upstream `Operator.js:15` — the 10-char list. The 5 already retagged at the
+// tokenizer layer (`*`, `-`, `%`, `+`, `/`) plus 5 that arrive as plain words:
+// `=`, `<=`, `>=`, `<`, `>`. Used by the unknownWord classifier.
+const OPERATOR_CHARS_FULL: &[&str] = &["+", "-", "/", "*", "%", "=", "<=", ">=", "<", ">"];
+
 pub struct ValuesParser {
     pub input: String,
     pub root: Root,
@@ -153,10 +193,17 @@ impl ValuesParser {
                     idx += 1;
                 }
                 VKind::Word => {
-                    // Word can become: Func (followed by `(`), Numeric, UnicodeRange, or Word.
+                    // Word can become: Func (followed by `(`), Numeric, UnicodeRange,
+                    // Operator (single-char from the 10-element OPERATOR_CHARS_FULL),
+                    // or Word.
                     let v = &tok.value;
                     let next_is_open_paren = tokens.get(idx + 1).map(|t| t.kind == VKind::OpenParen).unwrap_or(false);
-                    if next_is_open_paren {
+                    // Upstream `Func.fromTokens` rejects names not matching either
+                    // `reFunctions` (CSS function whitelist with optional vendor
+                    // prefix) or `^[a-zA-Z\-\.]+$`. Invalid names fall through and
+                    // the word is processed as a plain Word; the `(` is then handled
+                    // by the OpenParen arm as Punctuation.
+                    if next_is_open_paren && is_valid_func_name(v) {
                         let common = common_for(tok);
                         let pending = PendingFunc {
                             common: common.clone(),
@@ -180,16 +227,31 @@ impl ValuesParser {
                         push_into(&mut stack_root, make_node(NodeKind::UnicodeRange(UnicodeRange {
                             common: common_for(tok),
                         }), tok, &mut spaces_before));
+                    } else if OPERATOR_CHARS_FULL.iter().any(|op| *op == v.as_str()) {
+                        // Upstream `unknownWord` step 8: classify single-char (and
+                        // 2-char `<=` / `>=`) words against `Operator.chars`. Tokens
+                        // with these literal values arrive here when the wrapped
+                        // tokenizer didn't retag them (i.e. when the word value
+                        // came from a multi-char split rather than a bare op).
+                        push_into(&mut stack_root, make_node(NodeKind::Operator(Operator {
+                            common: common_for(tok),
+                        }), tok, &mut spaces_before));
                     } else {
-                        // Mirror upstream `Word.js:38`: testHex is `/^#(.+)/`,
-                        // not `startsWith('#')` — bare `"#"` must NOT be is_hex.
+                        // Mirror upstream `Word.js:33-42`: set is_variable / is_hex /
+                        // is_color / is_url at construction time. `is_color` covers
+                        // both hex-color form and the 148 CSS named colors;
+                        // `is_url` mirrors the `is-url-superb` predicate (with the
+                        // protocol-relative `//` → `http://` swap upstream applies).
                         let is_var = Word::is_variable_name(v);
                         let is_hex = Word::test_hex(v);
+                        let is_color = Word::test_color(v);
+                        let is_url = Word::test_url(v);
                         push_into(&mut stack_root, make_node(NodeKind::Word(Word {
                             common: common_for(tok),
                             is_variable: is_var,
                             is_hex,
-                            ..Default::default()
+                            is_color,
+                            is_url,
                         }), tok, &mut spaces_before));
                     }
                     idx += 1;

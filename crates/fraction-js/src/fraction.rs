@@ -113,14 +113,18 @@ fn parse_int_radix10(s: &str) -> Option<f64> {
 }
 
 /// `gcd(a, b)` — line 342.
+///
+/// JS `!a` is true for both `0` and `NaN` (and any other falsy). We must
+/// mirror that to avoid an infinite loop on NaN inputs — e.g. the constructor
+/// invokes `gcd(P.d, P.n)` and `Fraction(NaN)` reaches `gcd(NaN, NaN)`.
 fn gcd(mut a: f64, mut b: f64) -> f64 {
-    if a == 0.0 { return b; }
-    if b == 0.0 { return a; }
+    if a == 0.0 || a.is_nan() { return b; }
+    if b == 0.0 || b.is_nan() { return a; }
     loop {
         a = js_mod(a, b);
-        if a == 0.0 { return b; }
+        if a == 0.0 || a.is_nan() { return b; }
         b = js_mod(b, a);
-        if b == 0.0 { return a; }
+        if b == 0.0 || b.is_nan() { return a; }
     }
 }
 
@@ -202,6 +206,12 @@ fn cycle_start(_n: f64, d: f64, len: u32) -> u32 {
 
 /// JS string -> tokens like `B = p1.match(/\d+|./g)`. Returns digits-runs and
 /// single chars (code units, but ASCII for our purposes).
+///
+/// JS regex `.` (without the `s` flag) matches any code unit EXCEPT the
+/// LineTerminator set: U+000A (\n), U+000D (\r), U+2028, U+2029. Those code
+/// points are silently skipped by `match`, not emitted as tokens. We mirror
+/// that here so that strings like `"1\n2"` produce the same `[\"1\", \"2\"]`
+/// tokenization that JS does and reach the same parse failure path.
 fn match_digits_or_char(s: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let bytes = s.as_bytes();
@@ -214,11 +224,19 @@ fn match_digits_or_char(s: &str) -> Vec<String> {
         } else {
             // Non-digit: consume one UTF-8 char.
             let ch_len = utf8_char_len(bytes[i]);
-            out.push(s[i..i + ch_len].to_string());
+            let slice = &s[i..i + ch_len];
             i += ch_len;
+            if is_js_line_terminator(slice) {
+                continue;
+            }
+            out.push(slice.to_string());
         }
     }
     out
+}
+
+fn is_js_line_terminator(s: &str) -> bool {
+    matches!(s, "\n" | "\r" | "\u{2028}" | "\u{2029}")
 }
 
 fn utf8_char_len(b: u8) -> usize {
@@ -315,7 +333,10 @@ fn parse_input(input: &FractionInput) -> Result<Parsed, FractionError> {
             if b.len() == a + 1 {
                 let tok = b[a].clone(); a += 1;
                 w = assign(&tok, s)?;
-            } else if (a + 1 < b.len() && b[a + 1] == ".") || b[a] == "." {
+            } else if (a + 1 < b.len() && b[a + 1] == ".") || (a < b.len() && b[a] == ".") {
+                // Bounds-guard b[a]: e.g. input "-" reaches here with a == b.len().
+                // JS evaluates `B[A] === '.'` as `undefined === '.'` (false) and
+                // continues; we must not panic.
                 if b[a] != "." {
                     let tok = b[a].clone(); a += 1;
                     v = assign(&tok, s)?;
@@ -339,24 +360,35 @@ fn parse_input(input: &FractionInput) -> Result<Parsed, FractionError> {
                     a += 3;
                 }
             } else if a + 1 < b.len() && (b[a + 1] == "/" || b[a + 1] == ":") {
+                // JS does not bounds-check B[A+2]; if absent it parses
+                // undefined → NaN → throws InvalidParameter via `assign`. We
+                // mirror that error path explicitly to avoid an index panic.
                 let tok = b[a].clone();
                 w = assign(&tok, s)?;
-                let tok2 = b[a + 2].clone();
+                let tok2 = b.get(a + 2).ok_or(FractionError::InvalidParameter)?.clone();
                 y = assign(&tok2, 1.0)?;
                 a += 3;
             } else if a + 3 < b.len() && b[a + 3] == "/" && b[a + 1] == " " {
+                // Same rationale as above for B[A+4] in the complex-fraction branch.
                 let tok = b[a].clone();
                 v = assign(&tok, s)?;
                 let tok2 = b[a + 2].clone();
                 w = assign(&tok2, s)?;
-                let tok3 = b[a + 4].clone();
+                let tok3 = b.get(a + 4).ok_or(FractionError::InvalidParameter)?.clone();
                 y = assign(&tok3, 1.0)?;
                 a += 5;
             }
 
             if b.len() <= a {
                 d = y * z;
+                // Upstream chain-assigns `s = /* void */ n = x + d * v + z * w`
+                // (line 261-262 of fraction.js). The `s = ...` is not a no-op:
+                // it overwrites the sign tracker with the computed numerator,
+                // which matters when the input is negative-zero — `-0` would
+                // otherwise emit Fraction { s: -1, n: 0, d: 1 } instead of the
+                // upstream `{ s: 1, n: 0, d: 1 }`. Mirror that here.
                 n = x + d * v + z * w;
+                s = n;
             } else {
                 return Err(FractionError::InvalidParameter);
             }
@@ -552,6 +584,34 @@ impl Fraction {
         Ok(((0.0 < t) as i32) - ((t < 0.0) as i32))
     }
 
+    /// `simplify(eps)` — line 689. Find the closest continued-fraction
+    /// approximation within `eps` (default `0.001`).
+    pub fn simplify(&self, eps: Option<f64>) -> Result<Self, FractionError> {
+        if self.n.is_nan() || self.d.is_nan() {
+            return Ok(*self);
+        }
+        // `eps = eps || 0.001` — collapses 0 and NaN to default per JS truthiness.
+        let eps = match eps {
+            Some(v) if v != 0.0 && !v.is_nan() => v,
+            _ => 0.001,
+        };
+        let this_abs = self.abs()?;
+        let cont = this_abs.to_continued();
+        for i in 1..cont.len() {
+            let mut s_acc = new_fraction(cont[i - 1], 1.0)?;
+            // JS `for (var k = i - 2; k >= 0; k--)` — descending from i-2 to 0.
+            // For i == 1 the inner loop runs zero times; we mirror with a
+            // 0..(i-1) range reversed (empty when i == 1).
+            for k in (0..(i.saturating_sub(1))).rev() {
+                s_acc = s_acc.inverse()?.add(cont[k])?;
+            }
+            if s_acc.sub(this_abs)?.abs()?.value_of() < eps {
+                return s_acc.mul(self.s);
+            }
+        }
+        Ok(*self)
+    }
+
     pub fn divisible<I: Into<FractionInput>>(&self, other: I) -> Result<bool, FractionError> {
         let p = parse_input(&other.into())?;
         let lhs = p.n * self.d;
@@ -629,7 +689,12 @@ impl Fraction {
         let mut n_val = self.n;
         let d_val = self.d;
         if n_val.is_nan() || d_val.is_nan() { return "NaN".to_string(); }
-        let dec = dec.unwrap_or(15);
+        // Upstream: `dec = dec || 15`. JS truthiness collapses `0` to the
+        // default, so `Some(0)` must also fall back to 15 here.
+        let dec = match dec {
+            Some(0) | None => 15,
+            Some(v) => v,
+        };
         let cyc_len = cycle_len(n_val, d_val);
         let cyc_off = cycle_start(n_val, d_val, cyc_len);
         let mut str_out = if self.s < 0.0 { "-".to_string() } else { String::new() };
@@ -765,5 +830,111 @@ mod tests {
         let a = Fraction::new(6).unwrap();
         let b = Fraction::new(2).unwrap();
         assert!(a.divisible(b.clone_fraction().unwrap()).unwrap());
+    }
+
+    // --- Regressions for the 4.2.0 re-audit ---
+
+    /// JS: `new Fraction("-0")` => { s: 1, n: 0, d: 1 }
+    /// Upstream chain-assigns `s = /* void */ n = ...`, so the sign tracker
+    /// gets overwritten with the (zero) numerator. Without that, our port
+    /// emitted `-0` with `s = -1` and `toString` would print "-0".
+    #[test]
+    fn neg_zero_string_collapses_sign() {
+        let f = Fraction::new("-0").unwrap();
+        assert_eq!(f.s, 1.0);
+        assert_eq!(f.n, 0.0);
+        assert_eq!(f.d, 1.0);
+        assert_eq!(f.to_string_dec(None), "0");
+    }
+
+    #[test]
+    fn neg_zero_decimal_collapses_sign() {
+        let f = Fraction::new("-0.0").unwrap();
+        assert_eq!(f.s, 1.0);
+        assert_eq!(f.n, 0.0);
+        assert_eq!(f.d, 1.0);
+    }
+
+    /// JS: `new Fraction("-")` => { s: 1, n: 0, d: 1 }. Pre-fix, our port
+    /// either panicked on `b[a]` indexing or returned `s = -1`.
+    #[test]
+    fn lone_sign_parses_as_zero() {
+        let f = Fraction::new("-").unwrap();
+        assert_eq!(f.s, 1.0);
+        assert_eq!(f.n, 0.0);
+        assert_eq!(f.d, 1.0);
+
+        let f = Fraction::new("+").unwrap();
+        assert_eq!(f.s, 1.0);
+        assert_eq!(f.n, 0.0);
+        assert_eq!(f.d, 1.0);
+    }
+
+    /// JS: `new Fraction("1/")` throws InvalidArgument (parseInt(undefined)
+    /// → NaN → throw). Pre-fix our port panicked on `b[a + 2]`.
+    #[test]
+    fn truncated_fraction_string_errors() {
+        assert_eq!(Fraction::new("1/"), Err(FractionError::InvalidParameter));
+        assert_eq!(Fraction::new("1:"), Err(FractionError::InvalidParameter));
+    }
+
+    /// Same panic class for the complex-fraction `n n/d` form when truncated.
+    #[test]
+    fn truncated_complex_fraction_errors() {
+        assert_eq!(Fraction::new("1 1/"), Err(FractionError::InvalidParameter));
+    }
+
+    /// JS: `new Fraction(NaN)` => { s: 1, n: NaN, d: NaN }. Pre-fix our port
+    /// hung in `gcd(NaN, NaN)` because `0.0 == NaN` is false but JS `!NaN`
+    /// is true.
+    #[test]
+    fn nan_constructor_does_not_hang() {
+        let f = Fraction::new(f64::NAN).unwrap();
+        assert_eq!(f.s, 1.0);
+        assert!(f.n.is_nan());
+        assert!(f.d.is_nan());
+        assert_eq!(f.to_string_dec(None), "NaN");
+    }
+
+    /// JS `dec || 15` collapses 0 to the default, so `toString(0)` should
+    /// behave like `toString()`.
+    #[test]
+    fn to_string_dec_zero_falls_back_to_default() {
+        let f = Fraction::new("1/3").unwrap();
+        assert_eq!(f.to_string_dec(Some(0)), "0.(3)");
+        assert_eq!(f.to_string_dec(None), "0.(3)");
+    }
+
+    /// `simplify` was missing entirely. JS spec: closest CF approximation
+    /// within `eps`. `(0.1).simplify(0.1)` => `1/10`.
+    #[test]
+    fn simplify_basic() {
+        let f = Fraction::new(0.1).unwrap();
+        let s = f.simplify(Some(0.1)).unwrap();
+        assert_eq!(s.to_fraction(false), "1/10");
+    }
+
+    #[test]
+    fn simplify_default_eps() {
+        // 0.5 is already the simplest 1/2.
+        let f = Fraction::new(0.5).unwrap();
+        let s = f.simplify(None).unwrap();
+        assert_eq!(s.n, 1.0);
+        assert_eq!(s.d, 2.0);
+    }
+
+    #[test]
+    fn simplify_nan_returns_self() {
+        let f = Fraction::new(f64::NAN).unwrap();
+        let s = f.simplify(None).unwrap();
+        assert!(s.n.is_nan());
+    }
+
+    /// JS regex `.` skips line terminators. Either way the input is
+    /// malformed; we just need the SAME error path.
+    #[test]
+    fn line_terminator_in_string_errors_like_js() {
+        assert_eq!(Fraction::new("1\n2"), Err(FractionError::InvalidParameter));
+        assert_eq!(Fraction::new("1\r2"), Err(FractionError::InvalidParameter));
     }
 }

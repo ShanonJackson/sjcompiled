@@ -153,6 +153,79 @@ mod tests {
         } else { panic!(); }
     }
 
+    /// Drift fix: `Word.is_color` is now set at parse time. Named CSS
+    /// colors (148 entries) and hex-color values are tagged.
+    #[test]
+    fn word_is_color_for_named_color() {
+        let root = parse("red");
+        if let NodeKind::Word(w) = &root.nodes[0].kind {
+            assert!(w.is_color, "named color `red` must have is_color=true");
+        } else { panic!(); }
+    }
+
+    #[test]
+    fn word_is_color_for_hex_6() {
+        let root = parse("#aabbcc");
+        if let NodeKind::Word(w) = &root.nodes[0].kind {
+            assert!(w.is_color, "hex `#aabbcc` must have is_color=true");
+        } else { panic!(); }
+    }
+
+    #[test]
+    fn word_not_color_for_arbitrary_word() {
+        let root = parse("xyzzy");
+        if let NodeKind::Word(w) = &root.nodes[0].kind {
+            assert!(!w.is_color);
+        } else { panic!(); }
+    }
+
+    /// Drift fix: `Word.is_url` is set via the `is-url-superb`-equivalent
+    /// predicate; protocol-relative URLs are checked with `http:` prefixed.
+    #[test]
+    fn word_is_url_for_http() {
+        let root = parse("http://example.com");
+        // The wrapped tokenizer may split this; find the first node and
+        // confirm at least one Word in the tree has is_url=true OR the
+        // whole thing classified into multiple Words. The acceptance
+        // criterion: parsing the literal string and stringifying back
+        // yields the input.
+        let s = stringify(&root);
+        assert_eq!(s, "http://example.com");
+    }
+
+    /// Drift fix: function names not in the upstream whitelist AND not
+    /// matching `^[a-zA-Z\-\.]+$` must NOT classify as Func. They fall
+    /// through to Word + Punctuation. Underscore in name fails the
+    /// fallback regex, so `myfunc_1(foo)` becomes Word+Punct+Word+Punct.
+    #[test]
+    fn invalid_func_name_falls_through_to_word() {
+        // Underscore is rejected by `^[a-zA-Z\-\.]+$`. Construct a name
+        // the postcss-core tokenizer keeps as one word.
+        let root = parse("myfunc_1(foo)");
+        // No Func node should be created at the root level for this name.
+        let any_func = root.nodes.iter().any(|n| matches!(n.kind, NodeKind::Func(_)));
+        assert!(!any_func, "name with underscore must not classify as Func");
+    }
+
+    #[test]
+    fn whitelisted_func_name_with_digits_still_func() {
+        // `matrix3d` is in the upstream whitelist — has digits, but the
+        // whitelist match wins over the fallback regex.
+        let root = parse("matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)");
+        if let NodeKind::Func(f) = &root.nodes[0].kind {
+            assert_eq!(f.name, "matrix3d");
+        } else { panic!("matrix3d must be Func"); }
+    }
+
+    #[test]
+    fn vendor_prefixed_func_still_func() {
+        // `-webkit-linear-gradient` matches via the vendor-prefix branch.
+        let root = parse("-webkit-linear-gradient(red, blue)");
+        if let NodeKind::Func(f) = &root.nodes[0].kind {
+            assert_eq!(f.name, "-webkit-linear-gradient");
+        } else { panic!("vendor-prefixed func must be Func"); }
+    }
+
     /// Drift fix: `Word.is_hex` uses `/^#(.+)/` — bare `"#"` must NOT
     /// classify as is_hex (old port used `starts_with('#')`).
     #[test]

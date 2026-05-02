@@ -1,0 +1,3 @@
+a { background-image: url(http://cdn.example.com/img.png); }
+b { background-image: url(//cdn.example.com/img.png); }
+c { content: "http://example.com is just a string"; }

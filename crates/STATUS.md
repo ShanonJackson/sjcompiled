@@ -319,18 +319,29 @@ This is the only test-level change needed for the data swap.
     readers from being serialized behind a write that's doing
     browserslist config I/O, and guarantees no reader ever observes a
     half-applied scope when invoked from multiple NAPI worker threads.
+  - `utils.rs` `parse_caniuse_data` enumeration order: replaced
+    `IndexMap::iter` with `js_for_in_order(stats)` — a spec-conformant
+    `OrdinaryOwnPropertyKeys` helper that visits ECMA-262 array-index
+    keys (`IsArrayIndex`: canonical decimal in `[0, 2^32 - 1)`) in
+    ascending numeric order, then string keys in insertion order.
+    Caniuse-lite stats objects mix integer keys (`"4"`, `"49"`) with
+    string keys (`"4.1"`, `"TP"`, `"12.0-12.5"`); pure IndexMap
+    insertion-order iteration would produce a different first-write
+    order in the returned `IndexMap`, observable to any caller that
+    serializes/iterates/hashes the result.
 - Crate is currently dormant (no consumer wires it yet — five would-be
   consumers in cssnano-* are scaffolded but not invoking the API), so
   none of these surfaced in the existing 20-stage parity corpus. They
   would have caused silent hash divergence once a consumer started
   calling through. Bias-toward-verbatim port applied; bugs preserved.
-- Added 11 in-crate unit tests covering each fixed path (including a
-  concurrent reader-thread test for the RwLock atomic-swap contract
-  and a determinism test for the IndexSet dedup). No parity-runner
+- Added 15 in-crate unit tests covering each fixed path (including a
+  concurrent reader-thread test for the RwLock atomic-swap contract,
+  a determinism test for the IndexSet dedup, and four spec-conformance
+  tests for the JS `for...in` enumeration order). No parity-runner
   stage to extend — when consumers wire up (Phase 6f and onward), their
   parity stages will exercise these paths against the JS oracle.
 - Verification gates rerun: `cargo test --workspace --no-fail-fast` all
-  green (17 caniuse-api tests, 6 → 17); `parity-runner postcss-core-roundtrip`
+  green (21 caniuse-api tests, 6 → 21); `parity-runner postcss-core-roundtrip`
   35/35 byte-clean; both NAPI verifiers 12/12; determinism on
   `postcss-core-roundtrip` (35/35).
 - Full audit document at
@@ -430,16 +441,29 @@ Cleanup is a future cosmetic task — no parity impact.
   `[',', ':', '(', ')', '[', ']', '{', '}']` set. (6) `Word.is_hex`
   tightened from `starts_with('#')` to upstream `^#(.+)`. (7) `Func.is_color`
   and `Func.is_var` now set during parse using upstream regexes.
-- Acknowledged-but-not-ported (no current Rust consumer reads them):
-  `Word.is_color`, `Word.is_url`, `Func.params`. Each is recomputed
-  inline in `compiled-css/expand_shorthands/utils.rs`.
 - 7 Rust files touched; 7 new corpus entries added (4 expand-shorthands,
   3 postcss-core-roundtrip) covering the touched code paths.
-- Verification gates rerun: `cargo test --workspace --no-fail-fast`
-  all green (49 tests in `postcss-values-parser` after fix, was 15);
-  `parity-runner expand-shorthands` 42/42 byte-clean; `parity-runner
-  postcss-core-roundtrip` 35/35 byte-clean; both NAPI verifiers 12/12;
-  determinism on `expand-shorthands` (42/42).
+- **Second pass (same session)** closed five additional latent drifts
+  flagged for the 90GB-monorepo edge cases:
+  (1) `Word.is_color` now set via 148-name CSS color list (added
+  `colord` dep) + hex regex. (2) `Word.is_url` now set via
+  `is-url-superb`-equivalent predicate (`^[^:]+:/{1,2}[^/]`, with
+  `//host` → `http://host` swap upstream uses). (3) Func name
+  validation against `cssFunctions` whitelist (62 entries + 4 vendor
+  prefixes) and the `^[a-zA-Z\-\.]+$` fallback — invalid names fall
+  through to Word + Punctuation. (4) `Operator.chars` classification
+  path emits Operator (not Word) for `=` / `<=` / `>=` / `<` / `>`
+  literals. (5) Bug-not-ported documented: `Operator.tokenize` for
+  `|` / `}` (JS infinite-loops; we emit as Word). 4 more corpus
+  entries added.
+- Acknowledged-but-not-ported: `Func.params` (consumers reconstruct
+  via `stringify_standalone`), unbalanced-bracket throw recovery,
+  optional `interpolation` feature path.
+- Final verification gates: `cargo test --workspace --no-fail-fast`
+  all green (71 tests in `postcss-values-parser` after both passes,
+  was 15); `parity-runner expand-shorthands` 44/44 byte-clean;
+  `parity-runner postcss-core-roundtrip` 37/37 byte-clean; both NAPI
+  verifiers 12/12; determinism on `expand-shorthands` (44/44).
 - Full audit document at
   `crates/_vendor/POSTCSS_VALUES_PARSER_6.0.2_REAUDIT.md`.
 
@@ -467,6 +491,79 @@ Cleanup is a future cosmetic task — no parity impact.
   `postcss-core-roundtrip` (32/32).
 - Full audit document at
   `crates/_vendor/CSSNANO_UTILS_3.1.0_REAUDIT.md`.
+
+**Re-audit findings (postcss-value-parser 4.2.0, port-quality re-check) (2026-05-02):**
+- Pin is `4.2.0` in BOTH `REFERENCE_LOCK_FILE/yarn.lock` and AFM resolution
+  — no version drift. Re-audit was for **port-quality** drift.
+- Walked every line of upstream `lib/{index,parse,stringify,walk,unit}.js`
+  against `crates/postcss-value-parser/src/{lib,parse,stringify,walk,unit}.rs`.
+  Validated each suspected divergence against the live JS oracle (running
+  the AFM-pinned `postcss-value-parser@4.2.0` directly) before patching.
+- **Four real divergences fixed in `parse.rs`:**
+  - **Slash-divider whitespace at root after close-paren.** JS `parent`
+    becomes the truthy-but-typeless root frame `{nodes: tokens}` after
+    a close-paren executes (`parse.js:251`), flipping the `(!parent ||
+    parent.type === "function" && parent.value !== "calc")` clause to
+    false. Prior Rust port produced no space node before a top-level
+    `/` after `(...)`/`var(...)`/`calc(...)`. Added a `parent_assigned`
+    flag mirroring JS `parent` truthiness.
+  - **Closed-url `sourceEndIndex` off-by-one.** `parse.js:230` writes
+    `unclosed ? next : pos` where `pos = next + 1`. Prior Rust wrote
+    `next` for the closed-with-trailing-whitespace case. Now mirrors
+    the JS outer override exactly.
+  - **Div `sourceIndex` read of moved-out `before`.** Prior port called
+    `std::mem::take(&mut before)` before the struct literal then read
+    `before.len()` (= 0). Captures `before_len` upfront now.
+  - **Word slice panic on input ending with `\`.** JS `slice` clamps;
+    Rust `value[pos..next]` panics when `next > value.len()`. Now
+    clamps the slice end with `next.min(value.len())` while preserving
+    raw `next` for `sourceEndIndex` to match JS exactly.
+- Added 7 unit tests in `parse.rs::tests` citing the upstream lines they
+  cover (4 regression, 3 sanity-pin). `crates/postcss-value-parser`
+  total tests: 24 passed, 0 failed.
+- Added 4 adversarial corpus entries (`29..32`) to
+  `corpus/postcss-normalize-whitespace/` covering: slash-after-closed-
+  function, multi-space div separators, url-with-trailing-whitespace,
+  and trailing-backslash words.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast` all
+  green; `parity-runner postcss-core-roundtrip` 35/35 byte-clean;
+  `parity-runner postcss-normalize-whitespace` 32/32 byte-clean
+  (28 existing + 4 new); `parity-runner postcss-normalize-{string,
+  positions,timing-functions,url}` 15/20/21/60 all byte-clean; both
+  NAPI verifiers 12/12; determinism on `postcss-normalize-whitespace`
+  (32/32).
+- Full audit document at
+  `crates/_vendor/POSTCSS_VALUE_PARSER_4.2.0_REAUDIT.md`.
+
+**postcss-normalize-string 5.1.0 re-audit landed (2026-05-02):**
+- Pin is `5.1.0` in BOTH `REFERENCE_LOCK_FILE/yarn.lock` and AFM
+  resolution — no version drift. Re-audit was for **port-quality**
+  drift only; this plugin touches every quoted string value in the
+  AFM corpus, so a latent gap would surface widely.
+- Walked the single upstream source file
+  `node_modules/.bun/postcss-normalize-string@5.1.0+*/src/index.js`
+  (320 lines) against `crates/cssnano-postcss-normalize-string/src/lib.rs`
+  branch-by-branch. **No semantic divergence found.** One micro-stylistic
+  deviation tightened: `change_wrapping_quotes` now reads `node.quote`
+  freshly between its two `if`s (was a `cur_quote` snapshot). Logically
+  equivalent in all valid inputs (the second `if`'s precondition is
+  unsatisfiable post-flip because the first `if` requires the opposite
+  escape-count to be zero) — change is verbatim-tighten only.
+- Three new regression tests added (`change_wrapping_quotes_post_flip_second_if_inert`,
+  `backslash_followed_by_non_special_falls_through`,
+  `cache_key_collision_resistant_with_pipe_in_value`) — crate now 10
+  tests, all green.
+- Twelve adversarial corpus entries added (`16..27`) covering: BACKSLASH
+  fall-through, consecutive escapes, mixed-whitespace runs, `|`-in-value
+  cache keys, single-class escape rewrap (both directions), nested
+  function strings, `@supports`/`@media` params, attribute-selector
+  quotes, empty strings inside functions, sibling string nodes, and
+  Unicode (Latin-1, CJK, astral-plane emoji) bodies.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast` all
+  green; `parity-runner postcss-normalize-string` 27/27 byte-clean
+  (15 existing + 12 new); determinism 27/27; both NAPI verifiers 12/12.
+- Full audit document at
+  `crates/_vendor/POSTCSS_NORMALIZE_STRING_5.1.0_REAUDIT.md`.
 
 ## postcss version pin: `8.4.31` → `8.5.6` (no code changes)
 

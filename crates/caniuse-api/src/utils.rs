@@ -12,7 +12,23 @@ pub fn parse_caniuse_data(feature: &Feature, browsers: &[String]) -> IndexMap<St
     for browser in browsers {
         let mut entry: IndexMap<String, f64> = IndexMap::new();
         if let Some(stats) = feature.stats.get(browser) {
-            for (info, raw) in stats.iter() {
+            // Upstream uses `for...in` over a plain object. Per ECMA-262
+            // `OrdinaryOwnPropertyKeys`, JS visits **array-index keys
+            // first, in ascending numeric order**, then string keys in
+            // insertion order. Caniuse-lite stats objects typically mix
+            // pure-integer keys ("4", "5", "49") with non-integer keys
+            // ("4.1", "12.0-12.5", "TP", "all"); mismatching the visit
+            // order would produce `entry`/`support` IndexMaps with a
+            // different first-write key order — observable by any caller
+            // that serializes or iterates the result.
+            //
+            // Final f64 values are order-invariant (min for "y", max for
+            // others — both commutative/associative), but the **key
+            // insertion order** of `entry` is not. Mirror JS exactly.
+            let visit_order = js_for_in_order(stats);
+            for key in &visit_order {
+                let info = key.as_str();
+                let raw = &stats[key.as_str()];
                 // Upstream utils.js:32:
                 //   letters = ...replace(/#\d+/, "").trim().split(" ");
                 // JS `split(" ")` is literal-space split — preserves empty
@@ -53,6 +69,52 @@ pub fn parse_caniuse_data(feature: &Feature, browsers: &[String]) -> IndexMap<St
         support.insert(browser.clone(), entry);
     }
     support
+}
+
+/// Mirrors ECMA-262 `OrdinaryOwnPropertyKeys` enumeration order for plain
+/// objects: integer-index keys first in ascending numeric order, then
+/// string keys in insertion order.
+///
+/// An "array index" per the spec (`IsArrayIndex`) is a string `P` such that
+/// `ToString(ToUint32(P)) === P` and the value is in `[0, 2^32 - 1)`. So:
+///   - `"0"`, `"1"`, `"42"`, `"4294967294"` → array indices.
+///   - `"01"` (round-trips to `"1"`), `"-1"`, `"4.1"`, `"4294967295"` (the
+///     max bound is exclusive), and anything non-numeric → NOT array
+///     indices, fall into the insertion-order bucket.
+fn js_for_in_order<V>(map: &IndexMap<String, V>) -> Vec<String> {
+    let mut integer_keys: Vec<(u32, String)> = Vec::new();
+    let mut string_keys: Vec<String> = Vec::new();
+    for k in map.keys() {
+        match parse_array_index(k) {
+            Some(idx) => integer_keys.push((idx, k.clone())),
+            None => string_keys.push(k.clone()),
+        }
+    }
+    // Stable sort by numeric value. Multiple entries with the same numeric
+    // value but different string forms cannot occur — by definition, only
+    // the canonical string form qualifies as an array index.
+    integer_keys.sort_by_key(|(idx, _)| *idx);
+    let mut out = Vec::with_capacity(integer_keys.len() + string_keys.len());
+    out.extend(integer_keys.into_iter().map(|(_, k)| k));
+    out.extend(string_keys);
+    out
+}
+
+/// Returns `Some(idx)` iff `s` is the canonical decimal string form of an
+/// integer in `[0, 2^32 - 1)` — matching ECMA-262 `IsArrayIndex`. Returns
+/// `None` otherwise.
+fn parse_array_index(s: &str) -> Option<u32> {
+    if s.is_empty() { return None; }
+    // Reject leading zeros except for the single-digit `"0"` case (since
+    // `"01"` round-trips to `"1"`, not itself).
+    let bytes = s.as_bytes();
+    if bytes.len() > 1 && bytes[0] == b'0' { return None; }
+    // Must be all ASCII digits.
+    if !bytes.iter().all(|b| b.is_ascii_digit()) { return None; }
+    // Parse and bounds-check.
+    let n: u64 = s.parse().ok()?;
+    if n >= (u32::MAX as u64) { return None; } // 2^32 - 1 is excluded
+    Some(n as u32)
 }
 
 /// Mirrors JS `String.prototype.replace(/#\d+/, "")` — replaces the FIRST
@@ -277,6 +339,112 @@ mod tests {
         let chrome_entry = support.get("chrome").unwrap();
         assert_eq!(chrome_entry.get("y"), Some(&49.0)); // min
         assert_eq!(chrome_entry.get("n"), Some(&40.0)); // max
+    }
+
+    #[test]
+    fn parse_array_index_matches_ecma_262() {
+        // Spec-conformant array indices.
+        assert_eq!(parse_array_index("0"), Some(0));
+        assert_eq!(parse_array_index("1"), Some(1));
+        assert_eq!(parse_array_index("42"), Some(42));
+        assert_eq!(parse_array_index("4294967294"), Some(4294967294)); // 2^32 - 2
+
+        // Spec rejections.
+        assert_eq!(parse_array_index(""), None);
+        assert_eq!(parse_array_index("01"), None);     // leading zero
+        assert_eq!(parse_array_index("00"), None);     // leading zero
+        assert_eq!(parse_array_index("-1"), None);     // sign
+        assert_eq!(parse_array_index("+1"), None);     // sign
+        assert_eq!(parse_array_index("1.0"), None);    // not integer string
+        assert_eq!(parse_array_index("4.1"), None);    // version string
+        assert_eq!(parse_array_index("4.4.3"), None);
+        assert_eq!(parse_array_index("12.0-12.5"), None);
+        assert_eq!(parse_array_index("TP"), None);
+        assert_eq!(parse_array_index("4294967295"), None); // 2^32 - 1, excluded
+        assert_eq!(parse_array_index("4294967296"), None); // 2^32, excluded
+        assert_eq!(parse_array_index("99999999999"), None); // > u32
+    }
+
+    #[test]
+    fn js_for_in_order_integers_first_then_insertion() {
+        let mut m: IndexMap<String, ()> = IndexMap::new();
+        // Insertion order: "TP", "12", "4.1", "5", "11", "all", "3"
+        for k in ["TP", "12", "4.1", "5", "11", "all", "3"] {
+            m.insert(k.to_string(), ());
+        }
+        // Expected JS for-in: integer ascending, then string-insertion.
+        // Integer bucket: "3", "5", "11", "12"
+        // String bucket: "TP", "4.1", "all" (insertion order preserved)
+        let order = js_for_in_order(&m);
+        assert_eq!(
+            order,
+            vec!["3", "5", "11", "12", "TP", "4.1", "all"]
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn parse_caniuse_data_visit_order_matches_js_for_in() {
+        // Construct a stats object whose insertion order would PRODUCE a
+        // different `entry` first-write order than JS `for...in` would.
+        // Inserting "12" first means Rust pure-insertion-order would
+        // visit it first; JS visits "11" first (integer-ascending). The
+        // "n" letter is first written by whichever version is visited
+        // first — so the f64 value coincidentally matches (both 11 and
+        // 12 yield the SAME final max via the comm./assoc. property),
+        // but the **key insertion order** of `entry` would still not
+        // diverge here since we only have one letter. To observe the
+        // entry-order drift, mix two different new letters across
+        // integer-vs-string buckets.
+        let mut feature = Feature::default();
+        let mut chrome = IndexMap::new();
+        // Insertion order: "TP" (string bucket), "12" (int bucket),
+        // "11" (int bucket).
+        chrome.insert("TP".to_string(), "x".to_string()); // letter "x"
+        chrome.insert("12".to_string(), "n".to_string()); // letter "n"
+        chrome.insert("11".to_string(), "n".to_string()); // letter "n"
+        feature.stats.insert("chrome".to_string(), chrome);
+
+        // JS visit order: "11" → inserts "n", "12" → updates "n" max,
+        // "TP" → continues (parseFloat("TP") is NaN).
+        // Resulting `entry` keys in first-write order: ["n"].
+        // Final values: n = 12 (max).
+        let support = parse_caniuse_data(&feature, &["chrome".to_string()]);
+        let chrome_entry = support.get("chrome").unwrap();
+        let entry_keys: Vec<&String> = chrome_entry.keys().collect();
+        assert_eq!(entry_keys, vec![&"n".to_string()]);
+        assert_eq!(chrome_entry.get("n"), Some(&12.0));
+    }
+
+    #[test]
+    fn parse_caniuse_data_visit_order_drives_entry_key_order() {
+        // Direct test of entry key insertion order. Construct stats so
+        // that Rust insertion order differs from JS for-in order, and
+        // each version contributes a DIFFERENT new letter — making the
+        // entry-key-order divergence observable.
+        //
+        //   "20" (string-bucket NO — "20" is integer!)   ...let's pick
+        //   non-integer keys that contribute different letters first.
+        //
+        // Better construction:
+        //   Inserted: "12" (int) yields letter "a"
+        //             "5"  (int) yields letter "b"
+        //   Pure-insertion would write "a" first, then "b" → entry: [a, b]
+        //   JS for-in (int-ascending) writes "5" first ("b"), then "12"
+        //   ("a") → entry: [b, a]
+        let mut feature = Feature::default();
+        let mut chrome = IndexMap::new();
+        chrome.insert("12".to_string(), "a".to_string());
+        chrome.insert("5".to_string(), "b".to_string());
+        feature.stats.insert("chrome".to_string(), chrome);
+
+        let support = parse_caniuse_data(&feature, &["chrome".to_string()]);
+        let chrome_entry = support.get("chrome").unwrap();
+        let entry_keys: Vec<String> = chrome_entry.keys().cloned().collect();
+        // JS-faithful order: "5" visited first → "b" inserted first.
+        assert_eq!(entry_keys, vec!["b".to_string(), "a".to_string()]);
     }
 
     #[test]
