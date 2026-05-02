@@ -47,3 +47,9 @@ this is the npm package version pinned at 6.0.0 used by `sort.ts`.
   The right-to-left scan in `dedupeNode(last, nodes)` must walk past
   the middle rule (`equals` returns false on type mismatch) and
   remove the first `@media`. The middle `b { ... }` survives.
+- `19` — same `prop` + `value` but different `raws.value.raw` (one
+  has an inline comment between `:` and value, the other doesn't).
+  JS `equals` only compares the high-level `value` field, NOT the
+  byte-preserving `raws.value.raw`, so the two decls are equal and
+  the EARLIER one is removed. The LATER node's bytes survive —
+  locks in the order-sensitivity of dedupe on raws-preserving inputs.

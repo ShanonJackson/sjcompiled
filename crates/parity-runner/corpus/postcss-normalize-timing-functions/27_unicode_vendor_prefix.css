@@ -1,0 +1,7 @@
+/* Non-ASCII vendor prefix — JS `\w` (no `u` flag) is ASCII, so the
+   property regex does NOT match. The decl must be left alone, no
+   substitution. Rust default `\w` is Unicode-aware; `(?-u:\w)` brings
+   it back to ASCII parity. */
+a { -übér-animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1); }
+b { -ãñ-transition-timing-function: cubic-bezier(0, 0, 1, 1); }
+c { -_x-animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1); }

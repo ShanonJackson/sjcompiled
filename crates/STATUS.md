@@ -452,6 +452,42 @@ Cleanup is a future cosmetic task — no parity impact.
   `crates/_vendor/POSTCSS_DISCARD_DUPLICATES_6.0.0_REAUDIT.md`
   ("Second-pass re-audit (2026-05-02)").
 
+**postcss-discard-duplicates 6.0.0 drift-hardening (2026-05-02):**
+Three latent divergences uncovered after the second-pass audit
+that the byte-equal corpus would not surface but could trip on
+AFM tail inputs. Hardened so they fail loudly rather than silently
+diverge.
+- `nodes_equal` asymmetric-`nodes` case: when `a.nodes()` is `Some`
+  and `b.nodes()` is `None` (reachable via two atrules sharing
+  `name` + `params` but differing `has_block` — e.g. `@foo bar { }`
+  vs `@foo bar;`), Rust silently returned `true` and would
+  mis-dedupe the block atrule against the statement atrule. JS
+  upstream throws `TypeError` on `b.nodes.length` here. Rust now
+  panics with a descriptive message, mirroring JS verbatim. The
+  reverse direction (`a` statement, `b` block) correctly returns
+  `true`.
+- `dedupe()` outer-loop missing `!last.parent` guard: today neither
+  `dedupe_rule` nor `dedupe_node` ever removes `parent.nodes[last_idx]`,
+  but a future refactor could break the invariant silently. Added
+  a `#[cfg(debug_assertions)]` `*const Node` snapshot + assertion
+  around the recursive `dedupe(child)` call — zero release-build
+  cost; debug builds panic immediately if a future edit ever shifts
+  / detaches `last` during recursion.
+- `Declaration.important` tristate collapse: JS has `true|false|undefined`,
+  Rust collapses `false` and `undefined` to `bool::false`. Verified
+  via grep across `node_modules/.bun/**/*.js` and `packages/css/src/**`
+  that NO upstream plugin ever assigns `important = false` (parser
+  only emits `true` or `undefined`), so the collapse is dormant.
+  Documented at the comparison site with the grep evidence; if a
+  future plugin port ever asserts `important = false` deliberately,
+  the field must widen to `Option<bool>`.
+- Two regression tests added (`equals_panics_on_asymmetric_nodes_a_block_b_statement`
+  with `#[should_panic]`, plus `equals_returns_true_on_asymmetric_nodes_a_statement_b_block`).
+  Per-crate test count now 17/17.
+- All gates re-run green: workspace `cargo test` 735/0; parity 18/18
+  byte-clean + 18/18 deterministic; sort 12/12; both NAPI verifiers
+  12/12.
+
 **postcss-values-parser 6.0.2 re-audit landed (2026-05-02):**
 - Version is **not** drifted between REFERENCE_LOCK_FILE and AFM (both
   pin `6.0.2`). Audit ran to close pre-existing transcription gaps in
@@ -691,6 +727,26 @@ Cleanup is a future cosmetic task — no parity impact.
   dep added: `libm = "0.2"`. All gates re-run green: `parity-runner
   postcss-core-roundtrip` 39/39 byte-clean; both NAPI verifiers 12/12;
   determinism 41/41.
+- **Same-session addendum #2 — JS-vs-Rust parity gate (autoprefixer
+  follow-up):** built a true parity oracle. `crates/fraction-js/tests/
+  gen_oracle.cjs` runs every public method through the AFM-pinned
+  `fraction.js@4.2.0` and dumps `s/n/d/toFraction(false)/toFraction(true)/
+  toString()/valueOf()` for 204 cases into `tests/oracle.json`.
+  `crates/fraction-js/tests/parity.rs::js_oracle_parity_all_cases` loads
+  the JSON, replays each case through the Rust port, and asserts every
+  observable byte matches. The corpus is shaped around what
+  `crates/autoprefixer/src/resolution.rs::prefix_query` exercises —
+  including the full `f.mul(2.54).div(96).simplify()` dpcm chain for all
+  8 dpcm media-query base values (72, 96, 120, 144, 192, 240, 288, 384)
+  and the matching dpi chain. Also pinned the `simplify(Infinity)` and
+  `simplify(-1)` truthy-eps edge cases the autoprefixer agent flagged.
+  **One latent serde_json bug surfaced & worked around**: the JSON
+  number parser is not bit-accurate for full-precision f64 decimals
+  (`0.026458333333333334` parses to `...337`, 1 ULP higher), so `valueOf`
+  is stored as a string and parsed via `str::parse::<f64>()` (which IS
+  bit-accurate) — documented inline in the generator. Final test
+  counts: `cargo test -p fraction-js` 26 unit + 1 parity (204 cases).
+  All gates re-run green; `serde_json` added as `[dev-dependencies]`.
 
 **postcss-discard-comments 5.1.2 re-audit landed (2026-05-02):**
 - Pin is `5.1.2` in BOTH `REFERENCE_LOCK_FILE/yarn.lock` and AFM
@@ -737,7 +793,7 @@ Cleanup is a future cosmetic task — no parity impact.
   drift in the existing `crates/cssnano-postcss-normalize-timing-functions/`
   port (single source file: `index.js`).
 - Walked the 147-line upstream `index.js` line-by-line against the
-  Rust port. **Two non-cosmetic divergences fixed:** (1) Plugin entry
+  Rust port. **Three non-cosmetic divergences fixed:** (1) Plugin entry
   unconditionally cleared `node.raws.value = None` after both the
   cache-hit and fresh-transform writes — but postcss's stringifier
   already does the `raws.value.value === decl.value ? raws.value.raw
@@ -750,21 +806,35 @@ Cleanup is a future cosmetic task — no parity impact.
   the `length !== 4` gate fires correctly. Surfaced by
   `cubic-bezier(0.25, 0.1, 0.25, 1, abc)`: JS bails (length 5),
   prior Rust spuriously substituted `ease` (length 4 after dropping NaN).
-- Four regression tests added inside
+  (3) Property regex `/^(-\w+-)?(animation|transition)(-timing-function)?$/i`
+  used Rust's default Unicode-aware `\w`, but JS without the `u` flag
+  treats `\w` as ASCII-only. `-übér-animation-timing-function` matched
+  in Rust but not JS. Fixed by switching to `(?i)^(-(?-u:\w)+-)?...$`
+  to scope ASCII semantics to the prefix.
+- Seven regression tests added inside
   `crates/cssnano-postcss-normalize-timing-functions/src/lib.rs`:
   `cubic_bezier_five_args_with_unparseable_does_not_substitute`,
   `preserves_raws_value_on_noop`,
-  `cubic_bezier_with_calc_inside_does_not_substitute`, plus existing
-  coverage. Crate now 18 tests, all green.
-- Five adversarial corpus entries added to
+  `cubic_bezier_with_calc_inside_does_not_substitute`,
+  `vendor_prefix_with_unicode_word_does_not_match`,
+  `ascii_vendor_prefix_with_underscore_matches`,
+  `value_parser_word_has_no_leading_whitespace` (invariant lock — the
+  `js_parse_float` rejects-leading-whitespace behaviour stays safe iff
+  value-parser never emits Word nodes with leading whitespace), plus
+  existing coverage. Crate now 21 tests, all green.
+- Seven adversarial corpus entries added to
   `crates/parity-runner/corpus/postcss-normalize-timing-functions/`
-  (`22..26`) covering: trailing-comment raws preservation on no-op
+  (`22..28`) covering: trailing-comment raws preservation on no-op
   transform, five-arg cubic-bezier with unparseable trailing arg,
   `calc()`-inside-cubic-bezier NaN-key path, `steps(calc(N), end)`
-  block-3 strip-default fall-through, and cache-hit raws preservation.
+  block-3 strip-default fall-through, cache-hit raws preservation,
+  Unicode-prefixed property no-match, and inline `/* … */` comments
+  inside `cubic-bezier(...)` / `steps(...)` arg lists (invariant lock
+  on value-parser tokenization — no drift surfaced today, but pins
+  oracle behaviour for a future tokenizer change).
 - Verification gates rerun: `cargo test --workspace --no-fail-fast`
-  all green; `parity-runner postcss-normalize-timing-functions` 26/26
-  byte-clean (JS vs Rust); determinism 26/26; both NAPI verifiers 12/12.
+  all green; `parity-runner postcss-normalize-timing-functions` 28/28
+  byte-clean (JS vs Rust); determinism 28/28; both NAPI verifiers 12/12.
 - Full audit document at
   `crates/_vendor/POSTCSS_NORMALIZE_TIMING_FUNCTIONS_5.1.0_REAUDIT.md`.
 

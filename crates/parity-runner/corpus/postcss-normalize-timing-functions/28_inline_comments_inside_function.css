@@ -1,0 +1,15 @@
+/* Inline comments inside `cubic-bezier(...)` / `steps(...)` arg lists.
+   postcss-value-parser tokenizes comments as nodes that occupy a slot
+   in the children vector — the even/odd index filter for cubic-bezier
+   and the `nodes[2]` lookup for steps both shift accordingly.
+   Locks JS oracle behavior so any future tokenizer change is caught. */
+a { transition-timing-function: cubic-bezier(/* a */ 0.25, 0.1, 0.25, 1); }
+b { animation-timing-function: cubic-bezier(0.25, /* b */ 0.1, 0.25, 1); }
+c { transition-timing-function: cubic-bezier(0.25, 0.1, /* c */ 0.25, 1); }
+d { animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1 /* d */); }
+e { transition-timing-function: steps(/* e */ 1, end); }
+f { animation-timing-function: steps(1 /* f */, end); }
+g { transition-timing-function: steps(1, /* g */ end); }
+h { animation-timing-function: steps(1, end /* h */); }
+i { transition-timing-function: steps(/* i */ 4, end); }
+j { animation-timing-function: cubic-bezier(/* x */ 0.42, /* y */ 0, /* z */ 0.58, /* w */ 1); }

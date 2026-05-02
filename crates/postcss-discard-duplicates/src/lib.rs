@@ -49,14 +49,35 @@ fn dedupe(parent: &mut Node) {
     let mut index: isize = parent.nodes().map(|n| n.len() as isize - 1).unwrap_or(-1);
     while index >= 0 {
         let i = index as usize;
-        if i >= parent.nodes().map(|n| n.len()).unwrap_or(0) {
+        let cur_len = parent.nodes().map(|n| n.len()).unwrap_or(0);
+        if i >= cur_len {
             index -= 1;
             continue;
         }
+        // Snapshot the identity of `parent.nodes[i]` before recursing /
+        // dispatching. Upstream's `if (!last || !last.parent) continue;`
+        // (`src/index.js:141`) skips the iteration when `last` was
+        // detached during a sibling's processing. Today neither
+        // `dedupe_rule` nor `dedupe_node` removes `parent.nodes[last_idx]`
+        // (only earlier siblings), so this never trips — but a
+        // `debug_assert!` makes the invariant fail loudly if a future
+        // edit (or a refactor of `remove_at`'s call sites) breaks it,
+        // instead of silently dispatching against a stale `i`.
+        #[cfg(debug_assertions)]
+        let snapshot_ptr = parent.nodes().unwrap().get(i).map(|n| n as *const Node);
         // Recurse into the child first.
         {
             let child = &mut parent.nodes_mut().unwrap()[i];
             dedupe(child);
+        }
+        #[cfg(debug_assertions)]
+        {
+            let after_ptr = parent.nodes().and_then(|n| n.get(i)).map(|n| n as *const Node);
+            debug_assert_eq!(
+                snapshot_ptr, after_ptr,
+                "dedupe: parent.nodes[{i}] mutated during recursive descent — \
+                 upstream's `!last.parent` guard would skip this iteration."
+            );
         }
         let kind = match parent.nodes().unwrap().get(i) {
             Some(n) => kind_tag(n),
@@ -116,6 +137,23 @@ fn dedupe_rule(parent: &mut Node, last_idx: usize) {
             continue;
         }
 
+        // JS `last.each((child) => …)` (`src/index.js:95-99`) iterates
+        // `last.nodes` LIVE; mid-iteration mutation of `last.nodes` would
+        // shift `each`'s index and visit a different set than the snapshot
+        // we built above. The current call graph never mutates `last.nodes`
+        // (the inner `dedupeNode(child, node.nodes)` only touches the
+        // EARLIER rule's body), so snapshot vs live agree. The
+        // `debug_assert_eq!` below traps any future plugin reordering or
+        // call-graph change that violates this invariant in dev/CI.
+        #[cfg(debug_assertions)]
+        let last_nodes_len_before: usize = match parent.nodes().and_then(|n| n.get(last_idx)) {
+            Some(n) => match &n.kind {
+                NodeKind::Rule(r) => r.nodes.len(),
+                _ => 0,
+            },
+            None => 0,
+        };
+
         // For each decl in `last`, walk earlier-rule's body right-to-left.
         for last_decl in &last_decls {
             let earlier_body_len = parent
@@ -146,13 +184,41 @@ fn dedupe_rule(parent: &mut Node, last_idx: usize) {
             }
         }
 
+        #[cfg(debug_assertions)]
+        {
+            let last_nodes_len_after: usize = match parent.nodes().and_then(|n| n.get(last_idx)) {
+                Some(n) => match &n.kind {
+                    NodeKind::Rule(r) => r.nodes.len(),
+                    _ => 0,
+                },
+                None => 0,
+            };
+            debug_assert_eq!(
+                last_nodes_len_before, last_nodes_len_after,
+                "dedupe_rule: last.nodes mutated during inner loop — \
+                 the `last_decls` snapshot would diverge from JS `last.each`'s live iteration."
+            );
+        }
+
         // If earlier rule's body is now "empty" (only comments or zero
         // children), remove the earlier rule.
+        //
+        // Mirrors JS `if (empty(node)) node.remove();` (`src/index.js:101-103`)
+        // where `empty(node) = !node.nodes.filter(c => c.type !== 'comment').length`
+        // throws on `node.nodes.filter` if `node.nodes === undefined`. We
+        // already gated on `Rule` via `same_selector`, so `nodes()` is
+        // structurally `Some`. `.expect()` documents the invariant —
+        // dispatching to `unwrap_or(false)` would silently treat a
+        // malformed node as "non-empty" instead of mirroring JS's crash.
         let earlier_now_empty = match parent.nodes().and_then(|n| n.get(i)) {
-            Some(n) => n
-                .nodes()
-                .map(|body| body.iter().all(|c| matches!(c.kind, NodeKind::Comment(_))))
-                .unwrap_or(false),
+            Some(n) => {
+                let body = n.nodes().expect(
+                    "postcss-discard-duplicates: dedupe_rule — earlier sibling \
+                     identified as Rule by same_selector check must have nodes(). \
+                     Upstream JS would TypeError on `empty(node)` here.",
+                );
+                body.iter().all(|c| matches!(c.kind, NodeKind::Comment(_)))
+            }
             None => false,
         };
         if earlier_now_empty {
@@ -188,10 +254,47 @@ fn dedupe_node(parent: &mut Node, last_idx: usize) {
 }
 
 /// `equals(a, b)` upstream — deep recursive equality.
+///
+/// **Pure-AST invariant.** This function reads `kind`, `raws.before`,
+/// `raws.after_name`, and `Declaration.important`/`prop`/`value`/
+/// `Rule.selector`/`AtRule.name`/`AtRule.params` only. It does NOT
+/// read `node.attrs` (the per-node attribute bag). Callers in this
+/// module (`dedupe_rule`, `dedupe_node`) snapshot some operands by
+/// `clone()` and compare the snapshot against live siblings; the
+/// `attrs` field on the snapshot would be frozen relative to the
+/// live one. Today this is safe because `nodes_equal` ignores `attrs`.
+/// If a future change ever incorporates `attrs` into equality (e.g.
+/// some plugin-specific tagging that affects dedupe), the
+/// snapshot-and-compare pattern in `dedupe_rule` / `dedupe_node`
+/// breaks: clones would compare frozen attrs against potentially-
+/// mutated live attrs. The `debug_assert!` below traps that drift in
+/// dev/CI.
 fn nodes_equal(a: &Node, b: &Node) -> bool {
+    // Load-bearing invariant: `attrs` MUST NOT influence equality, or
+    // the clone+compare pattern in `dedupe_rule` / `dedupe_node`
+    // becomes unsound. Guard fires only when `attrs` is non-empty AND
+    // the rest of equality would otherwise return `true`.
+    debug_assert!(
+        a.attrs.is_empty() && b.attrs.is_empty(),
+        "postcss-discard-duplicates::nodes_equal — `attrs` must not \
+         participate in equality. dedupe_rule / dedupe_node clone operands \
+         and compare against live siblings; if `attrs` ever becomes \
+         load-bearing here, those snapshots will diverge from live state."
+    );
     if kind_tag(a) != kind_tag(b) {
         return false;
     }
+    // JS `a.important !== b.important` (`src/index.js:30-32`).
+    //
+    // Tristate collapse: JS `Declaration.important` can be `true`,
+    // `false`, or `undefined`. Rust collapses to `bool`, mapping
+    // `undefined` and `false` to the same value (`false`). The parser
+    // only ever emits `true` (when `!important` is present) or
+    // `undefined` (when absent) — verified by a node_modules-wide grep
+    // for `.important = false` / `important: false` (zero hits across
+    // every JS plugin AFM consumes). If a future plugin port ever sets
+    // `Declaration.important = false` deliberately, this collapse
+    // becomes load-bearing and the field must widen to `Option<bool>`.
     let a_important = matches!(&a.kind, NodeKind::Declaration(d) if d.important);
     let b_important = matches!(&b.kind, NodeKind::Declaration(d) if d.important);
     if a_important != b_important {
@@ -229,9 +332,27 @@ fn nodes_equal(a: &Node, b: &Node) -> bool {
         _ => {}
     }
 
+    // Mirrors upstream `if (a.nodes) { … a.nodes.length !== b.nodes.length … }`
+    // (`src/index.js:71-81`). Upstream only guards on `a.nodes`; if `b.nodes`
+    // is undefined while `a.nodes` is defined, JS throws `TypeError` on
+    // `b.nodes.length`. The asymmetric case is reachable in real CSS via two
+    // atrules with the same `name` + `params` but different block-form
+    // (e.g. `@foo bar { }` vs `@foo bar;`), which `Node::nodes()` reports
+    // as `Some([…])` vs `None` because `AtRule.has_block` differs.
+    //
+    // Mirror JS verbatim: when `a.nodes()` is `Some` and `b.nodes()` is
+    // `None`, panic instead of silently returning `true`. A silent
+    // return would mis-dedupe the block atrule against the statement
+    // atrule and produce divergent bytes vs JS (which would crash the
+    // pipeline). Loud failure is the byte-equal mirror of JS's TypeError.
     let a_nodes = a.nodes();
     let b_nodes = b.nodes();
-    if let (Some(an), Some(bn)) = (a_nodes, b_nodes) {
+    if let Some(an) = a_nodes {
+        let bn = b_nodes.expect(
+            "postcss-discard-duplicates: equals(a, b) — a has nodes but b does not. \
+             Upstream JS would throw TypeError on b.nodes.length here. \
+             Most likely two atrules with same name+params but different has_block.",
+        );
         if an.len() != bn.len() {
             return false;
         }
@@ -400,5 +521,55 @@ mod tests {
     fn js_trim_strips_zs_category() {
         // U+2003 is "EM SPACE" — Zs category. Both Rust and JS strip these.
         assert_eq!(trim_str(Some("\u{2003}foo\u{2003}")).unwrap(), "foo");
+    }
+
+    // Mirror JS `equals(a, b)` when `a.nodes` is defined and `b.nodes` is
+    // not — JS would `b.nodes.length` → TypeError. The Rust port now panics
+    // with a descriptive message instead of silently returning `true` (the
+    // pre-fix behavior would have wrongly deduped a block atrule against
+    // a statement atrule with the same name + params).
+    #[test]
+    #[should_panic(expected = "a has nodes but b does not")]
+    fn equals_panics_on_asymmetric_nodes_a_block_b_statement() {
+        use postcss_core::at_rule::AtRule;
+        use postcss_core::node::{Node as PNode, NodeKind as PKind};
+
+        let a = PNode::new(PKind::AtRule(AtRule {
+            name: "foo".to_string(),
+            params: "bar".to_string(),
+            has_block: true, // block form: nodes() -> Some(_)
+            nodes: vec![],
+        }));
+        let b = PNode::new(PKind::AtRule(AtRule {
+            name: "foo".to_string(),
+            params: "bar".to_string(),
+            has_block: false, // statement form: nodes() -> None
+            nodes: vec![],
+        }));
+        let _ = nodes_equal(&a, &b);
+    }
+
+    // Reverse direction: a.nodes is None, b.nodes is Some. JS skips the
+    // recursion entirely (no crash) and returns true. Rust must do the
+    // same — DO NOT panic here.
+    #[test]
+    fn equals_returns_true_on_asymmetric_nodes_a_statement_b_block() {
+        use postcss_core::at_rule::AtRule;
+        use postcss_core::node::{Node as PNode, NodeKind as PKind};
+
+        let a = PNode::new(PKind::AtRule(AtRule {
+            name: "foo".to_string(),
+            params: "bar".to_string(),
+            has_block: false,
+            nodes: vec![],
+        }));
+        let b = PNode::new(PKind::AtRule(AtRule {
+            name: "foo".to_string(),
+            params: "bar".to_string(),
+            has_block: true,
+            nodes: vec![],
+        }));
+        // JS: `if (a.nodes)` is false (a.nodes undefined) → skip recursion → true.
+        assert!(nodes_equal(&a, &b));
     }
 }

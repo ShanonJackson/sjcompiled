@@ -179,8 +179,15 @@ fn transform(value: &str) -> String {
 // Plugin entry — mirrors upstream `pluginCreator().OnceExit(css)`.
 // ---------------------------------------------------------------------------
 
+// Mirrors JS upstream `index.js:124-125`:
+//   /^(-\w+-)?(animation|transition)(-timing-function)?$/i
+// JS without the `u` flag treats `\w` as ASCII `[A-Za-z0-9_]`. Rust's
+// `regex` crate makes `\w` Unicode-aware by default, which would match
+// `-übér-animation` but JS would not. The `(?-u:\w+)` group forces
+// ASCII semantics inside the prefix while leaving `(?i)` (ASCII-fold,
+// since `animation`/`transition` are ASCII) on for the rest.
 static TIMING_PROP: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)^(-\w+-)?(animation|transition)(-timing-function)?$").unwrap()
+    Regex::new(r"(?i)^(-(?-u:\w)+-)?(animation|transition)(-timing-function)?$").unwrap()
 });
 
 pub fn postcss_normalize_timing_functions(root: &mut Root) -> PluginResult {
@@ -354,6 +361,77 @@ mod tests {
             out.contains("/* trailing */"),
             "trailing comment must survive no-op normalization; got: {out:?}"
         );
+    }
+
+    #[test]
+    fn vendor_prefix_with_unicode_word_does_not_match() {
+        // Regression for the `\w` Unicode/ASCII drift. JS regex without
+        // the `u` flag treats `\w` as ASCII, so `-übér-animation`
+        // does NOT match the prefix. Rust's default Unicode-aware `\w`
+        // would have matched. With `(?-u:\w)` the port mirrors JS.
+        // Behaviorally: a property the regex doesn't match is left
+        // alone — no transform applied.
+        let css = "a { -übér-animation: cubic-bezier(0.25, 0.1, 0.25, 1); }";
+        let out = run(css);
+        assert!(
+            out.contains("cubic-bezier"),
+            "non-ASCII vendor prefix must not match -> no substitution; got: {out:?}"
+        );
+        assert!(
+            !out.contains(": ease;") && !out.contains(": ease ;"),
+            "must not substitute ease; got: {out:?}"
+        );
+    }
+
+    #[test]
+    fn ascii_vendor_prefix_with_underscore_matches() {
+        // Sanity: ASCII `\w` includes `_`, so a `-_x-animation` prefix
+        // still matches under the `(?-u:\w)` group.
+        let out = run("a { -_x-animation: cubic-bezier(0.25, 0.1, 0.25, 1); }");
+        assert!(out.contains("ease"), "underscore prefix must match; got: {out:?}");
+    }
+
+    #[test]
+    fn value_parser_word_has_no_leading_whitespace() {
+        // Invariant lock: value-parser must NOT emit a Word node whose
+        // `value` field starts with whitespace. If it ever does,
+        // `js_parse_float` (which uses `parse_unit` -> `like_number`)
+        // would return `None` where JS `parseFloat` would trim and
+        // succeed — silent divergence in the `steps(1, ...)` and
+        // `cubic-bezier(...)` numeric paths.
+        use postcss_value_parser::parse::NodeKind as VK;
+        use postcss_value_parser::parse as vp_parse;
+
+        // Inputs with whitespace, tabs, newlines, comments, escapes,
+        // and unbalanced parens around numeric tokens.
+        let inputs = [
+            "steps(  1  ,  end  )",
+            "cubic-bezier(\t0.25\t,\t0.1\t,\t0.25\t,\t1\t)",
+            "cubic-bezier(\n0.25,\n0.1,\n0.25,\n1\n)",
+            "cubic-bezier(/* x */0.25, 0.1, 0.25, 1)",
+            "cubic-bezier( 0.25 , 0.1 , 0.25 , 1 )",
+            "steps(1abc, end)",
+            "steps(1\\32 , end)",
+        ];
+        for src in inputs {
+            let parsed = vp_parse(src);
+            fn check(nodes: &[postcss_value_parser::parse::Node], src: &str) {
+                for n in nodes {
+                    if n.kind == VK::Word {
+                        assert!(
+                            !n.value.starts_with(|c: char| c.is_ascii_whitespace()),
+                            "value-parser emitted Word with leading whitespace: \
+                             value={:?}, source={src:?}",
+                            n.value
+                        );
+                    }
+                    if !n.nodes.is_empty() {
+                        check(&n.nodes, src);
+                    }
+                }
+            }
+            check(&parsed, src);
+        }
     }
 
     #[test]
