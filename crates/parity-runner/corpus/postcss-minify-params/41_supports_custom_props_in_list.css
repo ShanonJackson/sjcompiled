@@ -1,0 +1,1 @@
+@supports (--foo: red), (--bar:) { a { color: red; } }

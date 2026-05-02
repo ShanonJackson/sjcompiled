@@ -1,0 +1,2 @@
+@layer base, components, utilities;
+@layer base { a { color: red; } }

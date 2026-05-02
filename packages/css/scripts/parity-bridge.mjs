@@ -42,10 +42,14 @@ import postcssNormalizeTimingFunctions from 'postcss-normalize-timing-functions'
 import postcssNormalizeUrl from 'postcss-normalize-url';
 // npm `postcss-minify-selectors@5.2.1` — cssnano sub-plugin (Phase 6c).
 import postcssMinifySelectors from 'postcss-minify-selectors';
+// npm `postcss-minify-params@5.1.4` — cssnano sub-plugin (Phase 6f).
+import postcssMinifyParams from 'postcss-minify-params';
 // npm `postcss-ordered-values@5.1.3` — cssnano sub-plugin (Phase 6d).
 import postcssOrderedValues from 'postcss-ordered-values';
 // npm `postcss-reduce-initial@5.1.2` — cssnano sub-plugin (Phase 6e).
 import postcssReduceInitial from 'postcss-reduce-initial';
+// npm `postcss-colormin@5.3.1` — cssnano sub-plugin (Phase 6g).
+import postcssColormin from 'postcss-colormin';
 // npm `postcss-calc@8.2.4` — cssnano sub-plugin (Phase 6d).
 import postcssCalc from 'postcss-calc';
 
@@ -229,6 +233,18 @@ const STAGES = {
     return result.css;
   },
 
+  // parse → npm postcss-minify-params@5.1.4 (no opts) → stringify. Phase 6f.
+  // OnceExit walks every AtRule. Filters to @media/@supports. Bubble-walks
+  // value-parser params, normalizes whitespace around Div tokens, drops the
+  // `all` keyword for media queries (legacy gating via browserslist; with
+  // workspace's 4.24.2 defaults — no IE 10/11 — `legacy=false`), reduces
+  // aspect-ratio pairs by integer GCD. Then sortAndDedupe on stringified
+  // top-level arguments. Empty result clears raws.afterName.
+  'postcss-minify-params': (css) => {
+    const result = postcss([postcssMinifyParams()]).process(css, { from: undefined });
+    return result.css;
+  },
+
   // parse → npm postcss-ordered-values@5.1.3 (no opts) → stringify.
   // OnceExit walker. Reorders multi-value parts of border / box-shadow /
   // animation / transition / flex-flow / outline / column-rule / columns /
@@ -249,6 +265,27 @@ const STAGES = {
   'postcss-reduce-initial': (css) => {
     const result = postcss([postcssReduceInitial()]).process(css, { from: undefined });
     return result.css;
+  },
+
+  // parse → npm postcss-colormin@5.3.1 (default opts, browserslist
+  // pinned to "chrome 100") → stringify. Phase 6g — highest-risk cssnano
+  // plugin. Browserslist is pinned via process.env.BROWSERSLIST so both
+  // engines see the same browser list (otherwise upstream
+  // `browserslist(null, {path: __dirname})` would walk up from
+  // `node_modules/postcss-colormin/src/` and find no config, falling
+  // through to defaults; the Rust side passes "chrome 100" explicitly.
+  // Pinning here keeps the parity contract tight against browserslist
+  // default drift over time).
+  'postcss-colormin': (css) => {
+    const previous = process.env.BROWSERSLIST;
+    process.env.BROWSERSLIST = 'chrome 100';
+    try {
+      const result = postcss([postcssColormin()]).process(css, { from: undefined });
+      return result.css;
+    } finally {
+      if (previous === undefined) delete process.env.BROWSERSLIST;
+      else process.env.BROWSERSLIST = previous;
+    }
   },
 
   // parse → npm postcss-calc@8.2.4 (default opts) → stringify. Phase 6d.

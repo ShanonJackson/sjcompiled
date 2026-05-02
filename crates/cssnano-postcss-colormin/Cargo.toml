@@ -12,5 +12,6 @@ postcss-value-parser = { workspace = true }
 colord = { workspace = true }
 browserslist-shim = { workspace = true }
 caniuse-api = { workspace = true }
+indexmap = { workspace = true }
 once_cell = { workspace = true }
 regex = { workspace = true }

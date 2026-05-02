@@ -3,6 +3,355 @@
 End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 `PARITY_VERSIONS.md`.
 
+## Phase 6f ship — `cssnano-postcss-minify-params@5.1.4` byte-clean (2026-05-03)
+
+Browserslist-aware media/supports param minifier. Now byte-clean
+end-to-end against the AFM-pinned JS oracle on a 42-entry corpus.
+
+### What landed this session
+
+1. `crates/_vendor/postcss-minify-params-5.1.4/` — vendored upstream
+   `src/index.js` + `types/` + `package.json` + `LICENSE` + `README.md`.
+2. `crates/_vendor/POSTCSS_MINIFY_PARAMS_5.1.4_REAUDIT.md` — full audit:
+   `transform(legacy, rule)` per-line, `params.walk(cb, true)` bubble
+   semantics, the `else` branch's `params.nodes[index ± k]` ROOT-read
+   bug-for-bug behavior, the positional `-aspect-ratio` match
+   (`indexOf === 3`, NOT `startsWith`), `getArguments` leading-space-
+   on-second-arg, `Set` insertion-order dedupe + UTF-16-default sort,
+   the `Number(...)` / `(n).toString()` numeric path, and the
+   `raws.afterName = ''` cleanup for empty params.
+3. `crates/cssnano-postcss-minify-params/src/lib.rs` (~330 LOC) — full
+   port of `src/index.js`. The bubble walk uses an index-path stack
+   (`Vec<usize>` of parent indices) to satisfy Rust borrow rules: the
+   `else` branch's ROOT mutations (`removeNode` of next-word + spaces
+   at index+1/+2/+3) re-borrow `root` after the per-frame mutation
+   block ends — short-lived borrows, no aliasing. Numeric path uses
+   `js_number_coerce(s)` (JS `Number()`-style trim + Infinity / hex /
+   octal / binary literal handling) feeding `js_number_to_string` so
+   integer-pair aspect ratios round-trip byte-identically.
+4. `crates/cssnano-postcss-minify-params/Cargo.toml` already declared
+   `browserslist-shim` + `postcss-value-parser` deps from the scaffold;
+   no Cargo additions needed.
+5. `Stage::PostcssMinifyParams` wired through parity-runner's three
+   coordinated additions (`stages.rs` variant + handler, `main.rs` CLI
+   mapping, `parity-bridge.mjs` JS counterpart). New devDependency
+   `postcss-minify-params: 5.1.4` added to root `package.json`.
+6. New corpus `crates/parity-runner/corpus/postcss-minify-params/` —
+   42 fixtures covering: blank, no-at-rules pass-through, bare
+   `@media all`, `@media all and (...)`, dimension function whitespace,
+   simple comma-list dedupe, dimension-arg dedupe, aspect-ratio
+   reduction (`4/2 → 2/1`, `8/5 → 8/5`, `1920/1080 → 16/9`), already-
+   reduced (`16/9`, `7/3`), `max-aspect-ratio`, custom-prop empty
+   (`(--foo:)`) and populated (`(--foo: red)`), `@supports (a) and (b)`
+   root-level `and` preservation, `@supports not (...)`, `@supports
+   ... or ...`, nested-not, uppercase variants (`@MEDIA`, `@SUPPORTS`,
+   `MIN-WIDTH`), `not all and (...)`, `only screen and (...)`,
+   pass-through for `@import`/`@keyframes`/`@font-face`/`@layer`/
+   `@page`/`@charset`/`@namespace`, multi-arm media lists with
+   `screen` / `print`, prefers-color-scheme / prefers-reduced-motion,
+   `min-resolution: 2dppx`, aspect-ratio combined with other terms,
+   custom-props inside list, realistic atomic-CSS pattern.
+
+### Verification gates run
+
+| Gate                                                                | Result |
+|---------------------------------------------------------------------|--------|
+| `cargo test --workspace --no-fail-fast`                             | **951 pass / 0 fail / 3 ignored** |
+| `cargo test -p cssnano-postcss-minify-params`                       | 14/14 |
+| `parity-runner postcss-minify-params`                               | 42/42 byte-clean |
+| `parity-runner postcss-minify-params --determinism`                 | 42/42 JS deterministic across two spawns |
+| `parity-runner postcss-core-roundtrip`                              | 41/41 (no regression) |
+| `parity-runner discard-empty-rules`                                 | 16/16 (no regression) |
+| `parity-runner discard-duplicates`                                  | 11/11 (no regression) |
+| `parity-runner extract-stylesheets`                                 | 12/12 (no regression) |
+| `parity-runner parent-orphaned-pseudos`                             | 13/13 (no regression) |
+| `parity-runner increase-specificity`                                | 12/12 (no regression) |
+| `parity-runner merge-duplicate-at-rules`                            | 8/8 (no regression) |
+| `parity-runner normalize-current-color`                             | 10/10 (no regression) |
+| `parity-runner sort-atomic-style-sheet`                             | 17/17 (no regression) |
+| `parity-runner atomicify-rules`                                     | 24/24 (no regression) |
+| `parity-runner expand-shorthands`                                   | 45/45 (no regression) |
+| `parity-runner postcss-nested`                                      | 41/41 (no regression) |
+| `parity-runner postcss-normalize-whitespace`                        | 32/32 (no regression) |
+| `parity-runner postcss-discard-comments`                            | 27/27 (no regression) |
+| `parity-runner postcss-normalize-string`                            | 39/39 (no regression) |
+| `parity-runner postcss-normalize-positions`                         | 41/41 (no regression) |
+| `parity-runner postcss-normalize-timing-functions`                  | 28/28 (no regression) |
+| `parity-runner postcss-normalize-url`                               | 60/60 (no regression) |
+| `parity-runner postcss-minify-selectors`                            | 30/30 (no regression) |
+| `parity-runner postcss-ordered-values`                              | 36/36 (no regression) |
+| `parity-runner postcss-reduce-initial`                              | 30/30 (no regression) |
+| `parity-runner postcss-calc`                                        | 40/40 (no regression) |
+| `parity-runner npm-postcss-discard-duplicates`                      | 20/20 (no regression) |
+| `parity-runner sort` (end-to-end)                                   | 12/12 (no regression) |
+
+### Bug-for-bug parity preserved
+
+The `else`-branch ROOT-read pattern (`params.nodes[index ± k]` reads the
+root array even from inside a function recursion, where `index` is local
+to the function's children) is preserved verbatim — implemented via the
+index-path stack. In practice the `'all'` keyword never matches inside
+a function body in real CSS, so the bug rarely fires; preserving it
+costs nothing and keeps a future divergent input from regressing.
+
+The aspect-ratio match is **positional, not prefix-based**:
+`value.toLowerCase().indexOf('-aspect-ratio') === 3` — exactly when the
+first child's lowercased name is `min-aspect-ratio` (dash at index 3),
+`max-aspect-ratio`, or any 3-character-prefix-then-`-aspect-ratio`
+identifier. CSS only ships the two real properties, but the test
+matches the literal upstream check.
+
+`getArguments` keeps top-level Space tokens in adjacent groups (the
+"leading-space-on-second-arg" pattern observed in `postcss-minify-
+selectors`). For value-parser-tokenized media lists, this rarely
+materializes since `, ` lexes the space into the Div token's `after`
+field — but when the parse does produce a top-level Space, our split
+preserves it bit-equivalently.
+
+### Drift candidates flagged (NOT fixed here per CLAUDE.md mandate)
+
+- **`Array.prototype.sort()` (UTF-16) vs Rust `Vec<String>::sort()` (UTF-8)
+  on non-ASCII params.** Same mode of divergence as
+  `compiled-css::sort_at_rules::locale_compare_en`. CSS media/supports
+  conditions are practically always ASCII; binding ICU costs ~10 MB
+  (banned by CLAUDE.md WASI section). Parity holds for the corpus we
+  actually exercise. Same root cause as the existing entry for
+  `sort_at_rules` in `POSSIBLE_DRIFT_CAUSES.md`.
+
+- **`hasAllBug` browserslist resolution does not honor `path` opt.** The
+  upstream `pluginCreator(options)` passes `path: __dirname` to
+  `browserslist(null, { path })`, which walks up to find config. Our
+  shim's `resolve("", true)` skips this. AFM-pinned default query
+  (browserslist@4.24.2 / caniuse-lite@1.0.30001766) puts no IE 10/11
+  in the resolved list → `legacy = false` for both engines. If a
+  future consumer ships an explicit `ie 10` / `ie 11` query, parity
+  would drift. Same shape of gap flagged for `postcss-reduce-initial`
+  (Phase 6e); not exercised by any AFM consumer we've audited.
+
+## Cross-cutting fixes — `js_number_to_string` scientific notation + parity-runner wire-up (2026-05-03)
+
+Two follow-ups landed after the parallel Phase 6 agents (postcss-calc /
+postcss-ordered-values / postcss-colormin) finished.
+
+### 1. `postcss-core::js_number_to_string` — scientific-notation drift fixed
+
+The drift the postcss-calc agent flagged (see "Drift detected —
+`postcss-core::js_number_to_string` boundary cases" further down this
+file) is now resolved.
+
+**Edit:** `crates/postcss-core/src/js_number.rs` — added the ECMA-262
+§6.1.6.1.13 scientific-notation branches at thresholds `|n| < 1e-6` and
+`|n| >= 1e21`. New `format_js_scientific(n)` helper uses Rust's
+`{:e}` (Ryu-shortest mantissa) and patches the missing `+` sign on
+positive exponents that JS requires. Examples now matching JS:
+
+- `js_number_to_string(1e-7)` → `"1e-7"` (was `"0.0000001"`)
+- `js_number_to_string(1e21)` → `"1e+21"` (was `"1e21"` or `"1000…000"`)
+- `js_number_to_string(-1.5e21)` → `"-1.5e+21"`
+- `js_number_to_string(5e-324)` → `"5e-324"` (smallest subnormal)
+
+Boundary cases stay decimal — `1e-6` → `"0.000001"`, `1e20` →
+`"100000000000000000000"`.
+
+**Tests added** to `js_number::tests` (4 new, 9 total in module, all
+pass): `scientific_small_threshold`, `scientific_large_threshold`,
+`scientific_postcss_calc_cases` (the two concrete failing inputs from
+the drift report), `boundary_values_stay_decimal`.
+
+**Regression sweep:** every consumer of `js_number_to_string`
+(`postcss-core`, `colord`, `cssnano-postcss-normalize-timing-functions`,
+`fraction-js`, `postcss-calc`) cargo-tests green. All 20 functional
+parity-runner stages re-run byte-clean, no regressions. `parity-runner
+postcss-calc --determinism` → 40/40 stable across two JS spawns.
+
+**Outstanding (separately scoped, not fixed here):**
+`crates/fraction-js/src/fraction.rs:781` carries its own private
+`pub(crate) fn js_number_to_string` copy that does NOT delegate to the
+postcss-core canonical helper. Comment claims it's "only invoked from
+non-hashing paths"; even so it's drift-shaped and should re-export the
+postcss-core version. Flagged for follow-up.
+
+### 2. `parity-runner` CLI — `postcss-ordered-values` reachable from `--stage`
+
+The ordered-values agent landed `Stage::PostcssOrderedValues` in
+`crates/parity-runner/src/stages.rs` (variant + handler) and the JS
+counterpart in `packages/css/scripts/parity-bridge.mjs`, but missed the
+third coordinated edit: the CLI string→Stage match arm in
+`crates/parity-runner/src/main.rs`. So the stage was implemented and
+unit-tested but unreachable from `parity-runner --stage
+postcss-ordered-values` (errored "unknown stage").
+
+**Edit:** `crates/parity-runner/src/main.rs:60` — added
+`"postcss-ordered-values" => Stage::PostcssOrderedValues,`.
+
+**Verification:** `parity-runner --stage postcss-ordered-values`
+→ 36/36 byte-clean. `--determinism` → 36/36 stable.
+
+(The colormin agent's wire-up additions for `postcss-minify-params`
+and `postcss-colormin` arrived in the same area and are now also
+reachable — verified by grepping main.rs for matching arms.)
+
+### Process note
+
+Future plugin-port agents must remember the **three coordinated
+additions** the minify-selectors landing established as the wire-up
+checklist:
+
+1. `crates/parity-runner/src/stages.rs` — Stage variant + handler arm.
+2. `crates/parity-runner/src/main.rs` — CLI string → Stage match arm.
+3. `packages/css/scripts/parity-bridge.mjs` — JS counterpart import + dispatch.
+
+Missing #2 makes the stage technically functional (cargo tests pass)
+but invisible to the parity-runner CLI, which is the primary
+verification gate. Reviewers: grep for the new `Stage::Foo` variant
+across all three files before signing off.
+
+## Phase 6g ship — `cssnano-postcss-colormin@5.3.1` byte-clean (2026-05-03)
+
+The highest-risk cssnano plugin per EXECUTION_PLAN.md §6g. Now byte-clean
+end-to-end against the AFM-pinned oracle on a 30-input corpus, building
+on the colord drift fix from the foundation session below.
+
+### What landed this session
+
+1. `crates/cssnano-postcss-colormin/src/lib.rs` — full port of
+   `index.js`. Ports `walk(parent, callback)` (custom — distinct from
+   `postcss_value_parser::walk`), `transform(value, options)`, and
+   three plugin-entry shapes:
+   - `postcss_colormin(root)` — zero-config (browserslist defaults).
+   - `postcss_colormin_with_query(root, opts, query)` — explicit query.
+   - `postcss_colormin_with_browsers(root, opts, resolved, query)` —
+     pre-resolved list (avoids double-resolving when callers already
+     resolved for other plugins).
+2. `walk_with_parent` mirrors `Array.prototype.forEach`'s
+   length-snapshot semantics — captures `parent_nodes.len()` before
+   the loop, iterates `cached_len` times even after splices grow the
+   vec. Cardinal for the rgb→word splice path: when the callback
+   inserts a Space at `index+1`, JS forEach still terminates at
+   cached_len; live-length iteration would visit one element more
+   than upstream and diverge on bytes.
+3. `transform()` value-parser walk:
+   - Function with name matching `^(rgb|hsl)a?$/i`: stringify, run
+     through `minify_color`, mutate `kind: Function → Word`, splice
+     `Space{value:" "}` at `index+1` if changed AND next sibling is
+     Word/Function (so `rgb(...)blue` doesn't concatenate into
+     `redblue`). The post-callback `still_function` check skips
+     recursion into the now-empty children of the rewritten node,
+     matching upstream `if (node.type === 'function' && bubble !== false)`.
+   - Math function (`calc`/`min`/`max`/`clamp`): return `Some(false)`
+     to skip recursion. Children stay opaque.
+   - Word: rewrite via `minify_color`.
+4. `postcss_colormin_with_browsers` plugin entry — `walk_decls_mut`,
+   skip via `SKIP_PROP_RE` regex, bail on empty value, `IndexMap`
+   cache keyed by `(value, options, browsers)` triple via U+001F
+   delimiter (cache shape doesn't have to match upstream's
+   `JSON.stringify` output byte-for-byte — collision-injectivity over
+   the same axes is sufficient since both engines walk identical
+   inputs in the same order). `decl.value` set in place; raws
+   untouched (postcss-core stringifier handles the
+   `raws.value.value === decl.value ? raw : value` fallback —
+   preserves trailing comments on no-op transforms).
+5. `Stage::PostcssColormin` wired through parity-runner: variant +
+   handler in `stages.rs`, CLI mapping in `main.rs`, `'postcss-colormin'`
+   stage in `parity-bridge.mjs`. The bridge handler temporarily sets
+   `process.env.BROWSERSLIST = 'chrome 100'` around the JS plugin
+   invocation so both engines see the same browser list (otherwise
+   upstream's `browserslist(null, {path: __dirname})` would walk up
+   from `node_modules/postcss-colormin/src/`, find no config, and
+   fall through to whatever the workspace defaults resolve to —
+   browserslist default drift over time would silently break the
+   gate). `previous` snapshot + `finally` restore so the env mutation
+   doesn't leak across stages within a single bridge process.
+6. New corpus `crates/parity-runner/corpus/postcss-colormin/` — 30
+   fixtures. Coverage map below in "Corpus design".
+7. `parity-runner/Cargo.toml` gains `cssnano-postcss-colormin`
+   workspace dep.
+
+### Verification gates run
+
+| Gate | Result |
+|---|---|
+| `cargo test -p cssnano-postcss-colormin` | **30/30 pass** (lib unit tests) |
+| `cargo test -p colord` (regression) | 55/55 + 1/1 (minify_parity integration with 392 vectors — no regression from foundation) |
+| `cargo test --workspace --no-fail-fast --exclude parity-runner --exclude compiled-css-napi` | **919/0/3** pass/fail/ignored |
+| `parity-runner postcss-colormin` | **30/30 byte-clean** (JS vs Rust) |
+| `parity-runner postcss-colormin --determinism` | 30/30 deterministic JS oracle |
+| `parity-runner postcss-core-roundtrip` | 41/41 (no regression) |
+| `parity-runner postcss-nested` | 41/41 (no regression) |
+| `parity-runner postcss-minify-selectors` | 30/30 (no regression) |
+| `parity-runner postcss-ordered-values` | 36/36 (no regression) |
+| `parity-runner postcss-reduce-initial` | 30/30 (no regression) |
+| `parity-runner sort` (end-to-end) | 12/12 (no regression) |
+
+### Corpus design (30 fixtures)
+
+| File | Tests |
+|---|---|
+| 01_blank.css | empty input round-trip |
+| 02_simple_hex.css | `#ff0000` → `red` |
+| 03_hex_collapse.css | `#aabbcc` → `#abc`, `#112233` not collapsible |
+| 04_rgb_to_name.css | `rgb(255,0,0)` → `red`, `rgb(0,128,0)` → `green` |
+| 05_rgba_fractional.css | `rgba(...,0.5)` round-trips through 2dp; `rgba(...,0.25)` |
+| 06_hsl.css | `hsl(0,100%,50%)` → `red` |
+| 07_hsla.css | `hsla(...,0.5)` → shortest of `#f008`/rgba/hsla |
+| 08_named_color.css | `red`/`blue`/`rebeccapurple` passthrough |
+| 09_uppercase_word.css | `RED`/`BLUE` → lowercased |
+| 10_transparent_shortcut.css | `rgba(0,0,0,0)` → `#0000` (4ch beats `transparent`) |
+| 11–15 | skip-prop regex coverage: `composes`, `font*`, `filter*`, `src` (in @font-face), `-webkit-tap-highlight-color` |
+| 16_math_function_opaque.css | `calc`/`min`/`max`/`clamp` opaque (no inner rewrite) |
+| 17_var_recurses.css | `var(--x, #aabbcc)` recurses to `var(--x, #abc)` |
+| 18_multiple_in_one_value.css | gradient with multiple colors all rewritten |
+| 19_alphahex_short.css | `#aabbcccc` → `#abcc` (alpha pair round-trips) |
+| 20_invalid_color_passthrough.css | `not-a-color` and unknown function unchanged |
+| 21_cache_hit_dup_value.css | three decls with same `#ff0000` exercise the IndexMap cache |
+| 22_no_op_already_short.css | `red`/`#abc` round-trip stable |
+| 23_at_rule_decls.css | decls inside `@media`/`@supports` walked |
+| 24_currentcolor_passthrough.css | `currentcolor`/`currentColor` not minified |
+| 25_calc_with_color_arg_opaque.css | even `calc(rgb(255,0,0))` opaque (math bail) |
+| 26_modern_rgb.css | `rgb(255 0 0)` and `rgb(255 0 0 / 0.5)` modern syntax |
+| 27_modern_hsl.css | `hsl(0deg 100% 50%)` modern syntax |
+| 28_zero_alpha_nonzero_rgb.css | `rgba(255,0,0,0)` — alpha 0 but RGB non-zero (transparent shortcut MUST NOT fire) |
+| 29_realistic_atomic.css | `._abcd { color: ...; }`-style atomic CSS shape |
+| 30_value_with_comment.css | trailing-comment raws preservation on rewrite (decl.value differs from raws.value.value, comment correctly drops) |
+
+### Lessons from Phase 6g — apply to every future port
+
+1. **`forEach` length-snapshot semantics matter when the callback can
+   splice.** Live-length iteration in Rust visits one extra element
+   per splice; cached-length matches upstream. Lock this in via
+   `let cached_len = vec.len();` outside the `while k < cached_len`
+   loop. Documented inline in `walk_with_parent`.
+2. **Mutating `kind: Function → Word` requires post-callback gate
+   re-check.** Upstream's `if (node.type === 'function' && bubble !== false)`
+   re-reads `node.type` AFTER the callback so the rgb→word path
+   skips recursion. Our walk does the same via `still_function`
+   re-check. Without it, recursion into the now-empty children list
+   would happen, harmless for colormin (no children to walk) but
+   bug-bait for any future plugin that mutates kind.
+3. **Browserslist parity in the bridge** — for any browserslist-aware
+   plugin (colormin, reduce-initial, minify-params, convert-values,
+   normalize-unicode), pin the BROWSERSLIST env var inside the bridge
+   handler so JS sees the same query the Rust side passes. Without
+   this, upstream `browserslist(null, {path: __dirname})` walks up
+   from the npm package's directory and resolves whatever's reachable
+   from `node_modules/<plugin>/src/`, which is path-dependent and not
+   what the Rust side resolves.
+4. **Cache key shape doesn't have to mirror upstream's
+   `JSON.stringify`.** What matters is collision-injectivity over the
+   same input axes. A simple delimiter-joined key is faster to build
+   and easier to reason about than a hand-rolled
+   `JSON.stringify`-compatible serializer.
+5. **`raws.value.value === decl.value` fallback in the postcss-core
+   stringifier means we shouldn't clear raws on no-op transforms.**
+   Same lesson as Phase 6b's normalize-string. Set `decl.value` in
+   place; let the stringifier decide whether to emit the raw form.
+6. **Color parser's hex path rounds alpha to 2dp.** Test inputs that
+   exercise the lossy-alpha skip path (where `hex_short` returns
+   `None`) must enter via `rgba(...)` syntax, not `#xxxxxxxx`. The
+   hex parser pre-normalizes alpha to 2dp at parse time, which makes
+   any hex input round-trip cleanly through the 2dp check inside
+   `hex_short`. Documented in `hex_short_alpha_lossy_skips_form`.
+
 ## Phase 6d ship — `postcss-calc@8.2.4` byte-clean (2026-05-03)
 
 `calc()` expression evaluator — the high-risk float-math plugin from
@@ -1832,9 +2181,9 @@ header. **No code changes required** — all 489 tests still green.
 | 6e | postcss-normalize-unicode@5.1.1 | **SCAFFOLDED** — browserslist-aware. |
 | 6e | postcss-reduce-initial@5.1.2 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. 12 unit tests. |
 | 6f | postcss-convert-values@5.1.3 | **SCAFFOLDED** — uses fraction-js. |
-| 6f | postcss-minify-params@5.1.4 | **SCAFFOLDED** — caniuse-aware. |
+| 6f | postcss-minify-params@5.1.4 | **DONE** — byte-clean across 42-entry corpus, deterministic JS oracle. 14 unit tests. Browserslist-aware (`legacy = false` under default 4.24.2 query — no IE 10/11). See "Phase 6f ship — postcss-minify-params" below. |
 | 6g | postcss-minify-gradients@5.1.1 | **SCAFFOLDED** — uses colord. |
-| 6g | postcss-colormin@5.3.1 | **PARTIAL** (multi-session) — `colord` minify drift FIXED with 392-vector JS-parity gate; `minifyColor.js` ported byte-for-byte; helper constants/`add_plugin_defaults`/`SKIP_PROP_RE` ported; `transform()` body + `OnceExit` walkDecls + parity-runner stage remain for next session. See "Phase 6g foundation" entry above. |
+| 6g | postcss-colormin@5.3.1 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. Required `colord` minify drift fix + 392-vector JS-parity gate (see "Phase 6g foundation" entry). The highest-risk cssnano plugin is now complete. |
 | 6h | cssnano-preset-default@5.2.14 (orchestrator) | **SCAFFOLDED** |
 | 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **All base classes fully ported:** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs`, `browsers.rs`, `at_rule.rs`, `value.rs`, `selector.rs`, `declaration.rs`, `resolution.rs`, plus `prefixes.rs` registry skeleton with `register_hacks(reg)` append-only block. **`data/prefixes.rs` byte-clean** — 183 entries, codegen via `build.rs` from vendored JS through `bun`, 4 parity gates (canonical-JSON byte-equal, entry count, key order, caniuse-lite version pin). **59 tests passing (53 unit + 4 data parity + 2 browserslist parity active; 1 browserslist parity gate ignored, see "Phase 7 ship — browserslist-shim parity gate" below).** (Latest: `+1` active test `browserslist_shim_firefox_esr_matches_js_oracle` pinning the `rewrite_firefox_esr` shim path against `browserslist@4.24.2` JS oracle; `+1` active test `workspace_browserslist_pin_is_424_2` pinning `require('browserslist').version === '4.24.2'` after fixing the missing devDependency entry that was floating workspace resolution to 4.28.2 (root `package.json` now lists browserslist in BOTH `overrides` AND `devDependencies`); `+1 ignored` omnibus gate test `browserslist_shim_matches_js_oracle_for_canonical_queries` documenting the open caniuse-lite snapshot drift between `oxc_browserslist`'s bundled snapshot and the workspace pin 1.0.30001766. Prior: regression test in `resolution.rs::prefix_query_o_dpcm_uses_simplify` pinning the JS `value.simplify()` call after dpcm/dpi unit conversion — was a latent byte-divergence in the `-o-` resolution branch; fixed via `f.simplify(None)` after fraction-js audit surfaced the missing call.) Hacks agent **unblocked**. Still stubbed: `supports.rs`, `transition.rs` (heavy, hacks rarely subclass), `processor.rs`, `info.rs`, `autoprefixer.rs`, all 58 hacks, `Prefixes::new` orchestrator body. Split contract: see "Phase 7 split contract" section below. See also "Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix". |
 | 8a | `sort()` NAPI bridge + sort.ts engine flag | **DONE** — 12/12 corpus byte-clean end-to-end on win32-x64-msvc. See "Phase 8a ship" section below. |
@@ -2392,59 +2741,69 @@ darwin-arm64 once `transformCss` is byte-clean.
 
 ## What's left to port (full source-faithful Rust ports)
 
-9 crates. Listed in roughly ascending complexity:
+> The phase-progress table earlier in this file is the authoritative
+> per-row state. This section gives the same picture as a roadmap.
 
-1. `postcss-ordered-values` — moderate. Reorders multi-value
-   shorthand parts.
-2. `postcss-minify-selectors` — moderate. Selector minification using
-   postcss-selector-parser.
-3. `postcss-normalize-unicode` — moderate, browserslist-aware.
-4. `postcss-reduce-initial` — moderate, caniuse-aware.
-5. `postcss-convert-values` — hard, uses fraction-js, browserslist.
-6. `postcss-minify-params` — hard, caniuse-aware.
-7. `postcss-minify-gradients` — hard, colord-heavy.
-8. `postcss-calc` — VERY hard. Effectively a small expression compiler.
-9. `postcss-colormin` — HARDEST cssnano plugin. Color downgrade
-   decisions hinging on caniuse + colord rounding + byte-length
-   comparison.
-10. `postcss-nested` (Phase 5a) — VERY hard. Recursive selector
-    merging with bubble/unwrap config.
-11. `cssnano-preset-default` — moderate orchestrator (depends on
-    1-9 being byte-clean first).
+**3 cssnano plugins still scaffolded** (Phase 6 band):
 
-Plus Phase 7 (autoprefixer — 8+ weeks of its own) and Phase 8
-(NAPI assembly + the `transformCss` / `sort` end-to-end gates).
+1. `postcss-normalize-unicode@5.1.1` — moderate. Browserslist-aware.
+2. `postcss-convert-values@5.1.3` — hard. Uses fraction-js + browserslist.
+3. `postcss-minify-gradients@5.1.1` — hard. colord-heavy.
+
+**Orchestrator (blocked on the 3 above):**
+
+4. `cssnano-preset-default@5.2.14` — moderate. Replicates the plugin
+   tuple list + source order from upstream `src/index.js` so the
+   `normalize-css.ts` filter-then-execute behavior matches.
+
+**Phase 7 (in progress, parallel agents):**
+
+5. `autoprefixer@10.4.14` — single largest port. Base classes +
+   `data/prefixes.rs` byte-clean; still stubbed: `supports.rs`,
+   `transition.rs`, `processor.rs`, `info.rs`, `autoprefixer.rs`,
+   `Prefixes::new` body, all 58 hacks. See "Phase 7 split contract"
+   for the agent split.
+
+**Phase 8b (blocks on Phase 6 + 7):**
+
+6. `transformCss` NAPI export + `transform.ts` engine flag, mirroring
+   the Phase 8a (`sort()`) pattern. The full `transform.ts` plugin
+   chain composition + lifecycle ordering classification (see Phase 8a
+   "Lifecycle ordering — load-bearing" — applies to every plugin in
+   `transform.ts`).
+
+**Already DONE** across previous sessions (do not re-port):
+postcss-nested, postcss-normalize-whitespace, postcss-discard-duplicates,
+postcss-discard-comments, postcss-normalize-string, postcss-normalize-
+positions, postcss-normalize-timing-functions, postcss-normalize-url,
+postcss-minify-selectors, postcss-ordered-values, postcss-reduce-initial,
+postcss-calc, postcss-colormin, postcss-minify-params.
 
 ## Recommended order for the next session
 
-`sort()` is now byte-clean end-to-end through NAPI (Phase 8a) and
-Phase 5b (`postcss-normalize-whitespace`) is byte-clean across a
-20-entry corpus. The remaining work is all `transformCss`-bound. The
-cardinal-rule guidance remains: **a session must take a unit from 0%
-→ 100% byte-clean**. Half-done ports become silent byte-drift hazards
-across agent handoffs.
+`sort()` is byte-clean end-to-end through NAPI (Phase 8a). The
+remaining work is all `transformCss`-bound. The cardinal-rule guidance
+holds: **a session must take a unit from 0% → 100% byte-clean**.
+Half-done ports become silent byte-drift hazards across agent handoffs.
 
-The Phase 6b "simple band" (discard-comments, normalize-string,
-normalize-positions, normalize-timing-functions, normalize-url) is **fully
-byte-clean**. The remaining cssnano work is moderate-to-hard.
-
-1. **Phase 6 moderate band** — pick one of:
-   - `minify-selectors@5.2.1` (uses postcss-selector-parser; moderate).
-   - `ordered-values@5.1.3` (multi-value reordering; moderate).
-   Finish one before starting the next.
-2. **Phase 5a** (`postcss-nested`) — multi-day commitment. Recursive
-   selector merging. Don't start unless you have time to finish.
-3. **Phase 6 hard band** — `ordered-values`, `minify-selectors`,
-   `normalize-url`, `normalize-unicode`, `reduce-initial`,
-   `convert-values`, `minify-params`, `minify-gradients`. Each
-   multi-day.
-4. **Phase 6h** — `postcss-calc` (small expression compiler) and
-   `postcss-colormin` (HARDEST cssnano plugin). Each multi-week.
-5. **Phase 7** — `autoprefixer@10.4.14`. ~8 weeks for one engineer.
-7. **Phase 6h orchestrator** — `cssnano-preset-default` once 1–6
-   are byte-clean.
-8. **Phase 8b** — `transformCss` NAPI export + `transform.ts` engine
-   flag, mirroring the Phase 8a pattern below.
+1. **Finish the Phase 6 cssnano band** — pick whichever fits the
+   session's time box:
+   - `postcss-normalize-unicode@5.1.1` (browserslist-aware; moderate).
+   - `postcss-convert-values@5.1.3` (fraction-js + browserslist; hard).
+   - `postcss-minify-gradients@5.1.1` (colord-heavy; hard).
+   One per session. Land byte-clean before starting the next.
+2. **Phase 6h orchestrator** — `cssnano-preset-default@5.2.14` once
+   the three above are byte-clean. Source-order replication of the
+   upstream plugin tuple list is the byte-affecting detail (Anomaly #7
+   in `PARITY_VERSIONS.md`).
+3. **Phase 7 — autoprefixer** — runs in parallel with the cssnano band
+   under the existing two-agent split. See "Phase 7 split contract".
+4. **Phase 8b — `transformCss` NAPI export** — mirrors Phase 8a's
+   `sort()` pattern. Blocks on Phase 6h + Phase 7 finishing. Every
+   plugin in `transform.ts` must be classified by its postcss
+   lifecycle hooks before composition (see Phase 8a "Lifecycle
+   ordering — load-bearing"); the mistake is trivial to make and
+   produces silent byte drift.
 
 ## Phase 5a ship — `postcss-nested@5.0.6` byte-clean
 

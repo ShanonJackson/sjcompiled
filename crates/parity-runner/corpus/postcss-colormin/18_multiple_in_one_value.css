@@ -1,0 +1,4 @@
+a {
+  border: 1px solid #ff0000;
+  background: linear-gradient(to right, #ff0000, #00ff00, #0000ff);
+}

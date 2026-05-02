@@ -1,0 +1,4 @@
+a {
+  color: not-a-color;
+  background: somefunc(arg);
+}

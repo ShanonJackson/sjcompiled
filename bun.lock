@@ -22,6 +22,7 @@
         "postcss-calc": "8.2.4",
         "postcss-colormin": "5.3.1",
         "postcss-discard-comments": "5.1.2",
+        "postcss-minify-params": "5.1.4",
         "postcss-minify-selectors": "5.2.1",
         "postcss-normalize-positions": "5.1.1",
         "postcss-normalize-string": "5.1.0",

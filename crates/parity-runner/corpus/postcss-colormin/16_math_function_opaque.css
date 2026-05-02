@@ -1,0 +1,6 @@
+a {
+  width: calc(1px + 2px);
+  height: min(100%, 50vh);
+  margin: max(10px, 5%);
+  padding: clamp(1px, 2vw, 3px);
+}

@@ -110,3 +110,52 @@ false (decl kept); Rust returns true (decl dropped).
 produced `a { color: red; }` while JS preserved `padding: \u{85};`.
 
 **First flagged:** `crates/_vendor/COMPILED_CSS_LOCAL_PLUGINS_AFM_REAUDIT.md` (2026-05-03).
+
+
+## `postcss-core::js_number_to_string` scientific-notation thresholds *(FIXED — kept here for triage)*
+
+**Status:** **Fixed** in `crates/postcss-core/src/js_number.rs` on
+2026-05-03 (see STATUS.md "Cross-cutting fixes" entry). Listed here so
+that if a future divergence near f64 stringification comes up, this
+helper is the first place to audit.
+
+**What was wrong:** the helper covered the integer fast path,
+`-0`→`"0"`, `NaN`/`Infinity`, and shortest-roundtrip decimals — but
+fell through to `format!("{}", n)` for the entire f64 range. Rust's
+default `Display` for f64 never switches to scientific notation, so
+values JS prints as `"1e-7"` / `"1e+21"` came out as `"0.0000001"` /
+`"1000000000000000000000"`. ECMA-262 §6.1.6.1.13 specifies scientific
+notation when `|n| < 1e-6` or `|n| >= 1e21`; the boundary values
+themselves stay decimal (`1e-6` → `"0.000001"`, `1e20` →
+`"100000000000000000000"`).
+
+**The fix:** added explicit thresholds and a `format_js_scientific`
+helper that uses Rust's `{:e}` (Ryu-shortest mantissa) and patches the
+missing `+` sign on positive exponents (`1e21` → `1e+21`).
+
+**How a regression would surface here:** any plugin that emits an f64
+with magnitude `< 1e-6` or `>= 1e21` to a CSS string. The current
+parity corpus does not exercise these magnitudes (postcss-calc's
+default `precision: 5` floors outputs at `1e-5`; cssnano numeric
+plugins clamp to typical CSS-value ranges). Future inputs that *would*
+hit it:
+
+```css
+.a { width: calc(1e-2px / 1e5); }     /* 1e-7px */
+.a { width: calc(1e+10px * 1e+11); }  /* 1e21px */
+```
+
+If a parity-runner stage suddenly diffs on a long decimal vs a short
+scientific form, audit `js_number_to_string` first — and check that
+new consumers haven't gone back to `format!("{}", n)` directly.
+
+**Adjacent drift still standing:** `crates/fraction-js/src/fraction.rs:781`
+carries its own private `pub(crate) fn js_number_to_string` copy that
+does NOT delegate to the postcss-core helper. Comment claims it's
+"only invoked from non-hashing paths"; the copy lacks the
+scientific-notation branches. If a fraction-js consumer ever reaches
+output bytes with extreme-magnitude numerators or denominators, this
+will diff. Should be replaced with `pub use postcss_core::js_number_to_string`.
+
+**First flagged:** postcss-calc 8.2.4 ship STATUS entry (2026-05-03,
+"Drift detected — `postcss-core::js_number_to_string` boundary cases").

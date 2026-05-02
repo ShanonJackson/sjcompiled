@@ -1,0 +1,11 @@
+@media (max-width: 600px) {
+  a {
+    color: #ff0000;
+  }
+}
+
+@supports (display: grid) {
+  b {
+    background: rgb(0, 255, 0);
+  }
+}

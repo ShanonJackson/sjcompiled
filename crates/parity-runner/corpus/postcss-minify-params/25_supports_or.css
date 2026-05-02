@@ -1,0 +1,1 @@
+@supports (display: grid) or (display: flex) { a { x: 1; } }

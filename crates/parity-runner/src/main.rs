@@ -56,7 +56,10 @@ fn main() -> ExitCode {
         "postcss-normalize-timing-functions" => Stage::PostcssNormalizeTimingFunctions,
         "postcss-normalize-url" => Stage::PostcssNormalizeUrl,
         "postcss-minify-selectors" => Stage::PostcssMinifySelectors,
+        "postcss-minify-params" => Stage::PostcssMinifyParams,
+        "postcss-ordered-values" => Stage::PostcssOrderedValues,
         "postcss-reduce-initial" => Stage::PostcssReduceInitial,
+        "postcss-colormin" => Stage::PostcssColormin,
         "postcss-calc" => Stage::PostcssCalc,
         "sort" => Stage::Sort,
         s => {

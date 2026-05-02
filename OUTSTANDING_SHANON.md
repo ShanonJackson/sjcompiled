@@ -66,3 +66,14 @@ Other audit notes (no drift, no fix needed):
 ### THIS DRIFT SHANON
 Drift flagged but not mine to fix: parallel ordered-values agent's untracked crates/postcss-calc/src/lib/transform.rs references attribute_payload which doesn't exist on postcss-selector-parser::Node. They'll need to address  
 it.
+
+
+### THIS IS THE FULL THING
+- ❌ Open gate (Task #2): oxc_browserslist's bundled caniuse-lite is ~2 chrome releases newer than the workspace pin — multi-day fix. Blocks byte-testing Prefixes::new against JS oracle.
+- ⬜ Parity-runner Stage::Autoprefixer not wired
+- ⬜ NAPI bridge into crates/css/src/transform.rs not wired
+
+
+One stale doc — broader than this port, flagging not fixing: the legacy ## What's left to port (line 2747) and ## Recommended order for the next session (line 2767) sections still list minify-selectors, ordered-values,        
+reduce-initial, minify-params, postcss-calc, postcss-colormin as pending — all shipped across the last several sessions. The phase-progress table (line 2184) is the authoritative current state. A separate housekeeping pass to
+delete or rewrite those two stale sections would be cleaner than letting them drift further; I haven't touched them since it's cross-phase doc maintenance, not specific to 6f.

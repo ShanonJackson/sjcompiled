@@ -1,0 +1,3 @@
+@media (min-width: 768px) { ._foo { color: red; } ._bar { color: blue; } }
+@media (min-width: 1024px) { ._foo { color: green; } }
+@media (max-width: 767px) { ._foo { color: yellow; } }

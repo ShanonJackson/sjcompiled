@@ -490,6 +490,7 @@ dependencies = [
  "browserslist-shim",
  "caniuse-api",
  "colord",
+ "indexmap",
  "once_cell",
  "postcss-core",
  "postcss-value-parser",
@@ -1466,7 +1467,9 @@ version = "0.0.1"
 dependencies = [
  "compiled-css",
  "css",
+ "cssnano-postcss-colormin",
  "cssnano-postcss-discard-comments",
+ "cssnano-postcss-minify-params",
  "cssnano-postcss-minify-selectors",
  "cssnano-postcss-normalize-positions",
  "cssnano-postcss-normalize-string",

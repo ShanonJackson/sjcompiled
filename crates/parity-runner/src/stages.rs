@@ -106,6 +106,18 @@ pub enum Stage {
     /// post-clear), and lex-sorts the surviving Selectors.
     PostcssMinifySelectors,
 
+    /// `parse → postcss-minify-params@5.1.4 (no opts) → stringify`. Phase 6f.
+    /// `OnceExit` walks every AtRule. Filters to `@media` / `@supports`
+    /// (case-insensitive). Bubble-walks the value-parsed params to
+    /// normalize whitespace around Div tokens, function `before`/`after`,
+    /// collapse Space tokens, drop the `all` keyword for media queries
+    /// (legacy-IE-aware via browserslist), and reduce aspect-ratio pairs
+    /// by integer GCD. Then `getArguments(params).map(stringify)` →
+    /// `[...new Set(...)].sort().join(',')`. Empty result clears
+    /// `raws.afterName`. Default opts; browserslist resolves to
+    /// `4.24.2` defaults — no `ie 10` / `ie 11` → `legacy = false`.
+    PostcssMinifyParams,
+
     /// `parse → postcss-ordered-values@5.1.3 (no opts) → stringify`. Phase 6d.
     /// OnceExit walker. Reorders multi-value parts of `border` /
     /// `box-shadow` / `animation` / `transition` / `flex-flow` / `outline`
@@ -125,6 +137,19 @@ pub enum Stage {
     /// `defaultIgnoreProps = ['writing-mode', 'transform-box']` are
     /// always skipped (cssnano#905). `opts.ignore` extends that set.
     PostcssReduceInitial,
+
+    /// `parse → postcss-colormin@5.3.1 (default opts, browserslist
+    /// `chrome 100`) → stringify`. Phase 6g — **highest-risk cssnano
+    /// plugin**. Browserslist+caniuse-aware: `addPluginDefaults` resolves
+    /// `transparent` (true unless IE 8/9 in target) and `alphaHex`
+    /// (caniuse `css-rrggbbaa`). Walks every Decl, skips
+    /// `composes`/`font*`/`src`/`filter*`/`-webkit-tap-highlight-color`,
+    /// then value-parser-walks each value rewriting rgb/rgba/hsl/hsla
+    /// functions and bare-word colors via `colord(input).minify(opts)`
+    /// with the `< input.length` strict-shorter check (else
+    /// `input.toLowerCase()`). Math functions opaque. Caches by
+    /// (value, options, browsers).
+    PostcssColormin,
 
     /// `parse → postcss-calc@8.2.4 (default opts) → stringify`. Phase 6d.
     /// OnceExit walks every Decl, transforms `value` through value-parser
@@ -168,8 +193,10 @@ impl Stage {
             Stage::PostcssNormalizeTimingFunctions => "postcss-normalize-timing-functions",
             Stage::PostcssNormalizeUrl => "postcss-normalize-url",
             Stage::PostcssMinifySelectors => "postcss-minify-selectors",
+            Stage::PostcssMinifyParams => "postcss-minify-params",
             Stage::PostcssOrderedValues => "postcss-ordered-values",
             Stage::PostcssReduceInitial => "postcss-reduce-initial",
+            Stage::PostcssColormin => "postcss-colormin",
             Stage::PostcssCalc => "postcss-calc",
             Stage::Sort => "sort",
         }
@@ -327,6 +354,12 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
+        Stage::PostcssMinifyParams => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            cssnano_postcss_minify_params::postcss_minify_params(&mut root)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
         Stage::PostcssOrderedValues => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             cssnano_postcss_ordered_values::postcss_ordered_values(&mut root)
@@ -337,6 +370,17 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             let opts = cssnano_postcss_reduce_initial::PostcssReduceInitialOpts::default();
             cssnano_postcss_reduce_initial::postcss_reduce_initial(&mut root, &opts)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssColormin => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            // Pin the browserslist query to "chrome 100" for the parity
+            // gate. Both engines must see the same browsers — the JS
+            // bridge passes the same string to `browserslist()`. Default
+            // (empty) query would resolve to the workspace default which
+            // can drift; an explicit pin makes the contract explicit.
+            cssnano_postcss_colormin::postcss_colormin_with_query(&mut root, None, "chrome 100")
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
