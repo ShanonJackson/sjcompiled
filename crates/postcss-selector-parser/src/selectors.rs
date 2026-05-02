@@ -83,7 +83,61 @@ fn write_node(node: &Node, out: &mut String) {
         }
         NodeKind::Attribute => {
             out.push_str(&node.spaces.before);
-            out.push_str(&node.value);
+            // Payload-aware branch: when a plugin (e.g. cssnano-postcss-
+            // minify-selectors) mutates `quote_mark`, `operator`, the
+            // attribute name, value, or any of the four `attribute_spaces`
+            // sub-pairs, it sets `payload.dirty = true` and we rebuild
+            // the bracket form from the typed payload — mirroring upstream
+            // `attribute.js::toString` (lines 289-306 in 6.1.2). For
+            // un-mutated nodes we keep emitting `node.value` (raw bracket
+            // text) so byte-identity round-trip is preserved.
+            let dirty = node.attribute.as_ref().map_or(false, |p| p.dirty);
+            if dirty {
+                let payload = node.attribute.as_ref().unwrap();
+                let attr_spaces = node.attribute_spaces.clone().unwrap_or_default();
+                out.push('[');
+                out.push_str(&attr_spaces.attribute.before);
+                if let Some(ns) = &payload.namespace {
+                    out.push_str(ns);
+                    out.push('|');
+                }
+                out.push_str(&payload.attribute);
+                out.push_str(&attr_spaces.attribute.after);
+                if let Some(op) = &payload.operator {
+                    out.push_str(&attr_spaces.operator.before);
+                    out.push_str(op);
+                    out.push_str(&attr_spaces.operator.after);
+                    out.push_str(&attr_spaces.value.before);
+                    if let Some(v) = &payload.value {
+                        match payload.quote_mark {
+                            Some(q) => {
+                                out.push(q);
+                                out.push_str(v);
+                                out.push(q);
+                            }
+                            None => out.push_str(v),
+                        }
+                    }
+                    out.push_str(&attr_spaces.value.after);
+                    if payload.case_insensitive {
+                        // Upstream defaultAttrConcat injects a single
+                        // leading space when value is non-empty, the
+                        // value is unquoted, and `attr_spaces.before`
+                        // is empty (attribute.js:296-300). Plugins that
+                        // explicitly clear all spaces and run with
+                        // `insensitive: true` rely on
+                        // `attr_spaces.value.after = " "` to provide
+                        // that gap — so we emit no extra space here;
+                        // the consumer controls separation via spaces.
+                        out.push_str(&attr_spaces.insensitive.before);
+                        out.push('i');
+                        out.push_str(&attr_spaces.insensitive.after);
+                    }
+                }
+                out.push(']');
+            } else {
+                out.push_str(&node.value);
+            }
             out.push_str(&node.spaces.after);
         }
     }

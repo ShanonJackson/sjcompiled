@@ -3,6 +3,68 @@
 End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 `PARITY_VERSIONS.md`.
 
+## postcss-selector-parser API extension for cssnano-postcss-minify-selectors@5.2.1 (2026-05-02)
+
+The original `crates/postcss-selector-parser` port was scoped to the 4
+existing in-tree consumers (`parent-orphaned-pseudos`,
+`increase-specificity`, `atomicify-rules`, `discard-duplicates`). The
+6.0.13 → 6.1.2 audit (above) was a version-delta audit, not a
+completeness audit — neither pass purported to port the full upstream
+API. `cssnano-postcss-minify-selectors@5.2.1` (Phase 6c) requires
+additional surface that lived outside the original scope.
+
+**Additions (purely additive, no field renames, no signature changes):**
+
+- `nodes.rs`: `AttributeSpaces { attribute, operator, value, insensitive }`
+  struct mirroring `attribute.js::_spacesFor`. Attached to `Node` as
+  `attribute_spaces: Option<AttributeSpaces>` (None on every non-Attribute
+  kind — zero memory cost).
+- `nodes.rs`: `AttributePayload.dirty: bool` (default `false`). When set,
+  the stringifier rebuilds the bracket form from the typed payload + the
+  per-name spaces; default preserves byte-identity round-trip.
+- `nodes.rs`: `walk_all<F>(parent, f)` — generic walker that visits every
+  descendant including container kinds (Selector, Pseudo). Mirrors
+  upstream `container.js::walk` semantics. Used by minify-selectors's
+  `pseudo()` reducer for sibling Selector dedup.
+- `selectors.rs`: payload-aware Attribute stringifier branch. When
+  `payload.dirty == true`, emits `[ns|name op "value" i]` from the typed
+  fields; otherwise emits raw `node.value` (existing behavior).
+- `processor.rs`: `Processor::process_sync(&str) -> Result<String,
+  TokenizeError>` — no-closure form. Used by `processor.processSync(
+  selector)` in minify-selectors's `OnceExit` hook.
+- Header / Cargo.toml description bumped from `6.0.13` → `6.1.2` (was
+  stale from the original scaffold; the 6.1.2 version-delta audit
+  updated the implementation but not the headers).
+
+**Explicitly NOT in this extension** (kept in their correct crate):
+
+- `canUnquote` — upstream JS source is at `postcss-minify-selectors/src/
+  lib/canUnquote.js`, not `postcss-selector-parser`. Will be ported to
+  `crates/cssnano-postcss-minify-selectors/src/lib/canUnquote.rs` when
+  the minify-selectors port itself lands.
+- `stringify_node` for siblings — already exists. `selectors::stringify(
+  &Node)` is generic over every `NodeKind` (calls `write_node`); the
+  earlier audit misread it as Root-only.
+
+**Verification:**
+
+- `cargo test -p postcss-selector-parser` → 31/31 pass (26 existing +
+  5 new for: payload-dirty unquoted attribute round-trip,
+  payload-dirty namespace + insensitive flag, `walk_all` visit count
+  vs filtered `walk_each`, `process_sync` no-closure round-trip,
+  un-dirty Attribute emits raw bracket text).
+- `cargo test -p postcss-nested` → 112/112 pass (consumes
+  `Node`/`stringify`/`Processor`).
+- `cargo test -p compiled-css` → 6/6 pass (consumes via
+  `parent-orphaned-pseudos` + `increase-specificity`).
+- All consumer `Node` initialization sites updated for the new
+  `attribute_spaces: None` field (`postcss-nested`: 2 sites;
+  `postcss-selector-parser`: 6 sites within `parser.rs`).
+- Parity-runner gate not re-run in this session — the binary fails to
+  build in this environment due to a pre-existing LTO/proc-macro
+  config issue unrelated to selector-parser. Crate-level tests cover
+  the affected code paths.
+
 ## AFM repin — coordinate the parity contract with JIRA's actual install (CRITICAL)
 
 The `REFERENCE_LOCK_FILE/yarn.lock` we forked from the upstream `compiled`
@@ -952,7 +1014,7 @@ header. **No code changes required** — all 489 tests still green.
 | 6g | postcss-minify-gradients@5.1.1 | **SCAFFOLDED** — uses colord. |
 | 6g | postcss-colormin@5.3.1 | **SCAFFOLDED** — highest-risk cssnano plugin. |
 | 6h | cssnano-preset-default@5.2.14 (orchestrator) | **SCAFFOLDED** |
-| 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **All base classes fully ported:** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs`, `browsers.rs`, `at_rule.rs`, `value.rs`, `selector.rs`, `declaration.rs`, `resolution.rs`, plus `prefixes.rs` registry skeleton with `register_hacks(reg)` append-only block. **`data/prefixes.rs` byte-clean** — 183 entries, codegen via `build.rs` from vendored JS through `bun`, 4 parity gates (canonical-JSON byte-equal, entry count, key order, caniuse-lite version pin). **56 tests passing (52 unit + 4 parity).** Hacks agent **unblocked**. Still stubbed: `supports.rs`, `transition.rs` (heavy, hacks rarely subclass), `processor.rs`, `info.rs`, `autoprefixer.rs`, all 58 hacks, `Prefixes::new` orchestrator body. Split contract: see "Phase 7 split contract" section below. See also "Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix". |
+| 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **All base classes fully ported:** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs`, `browsers.rs`, `at_rule.rs`, `value.rs`, `selector.rs`, `declaration.rs`, `resolution.rs`, plus `prefixes.rs` registry skeleton with `register_hacks(reg)` append-only block. **`data/prefixes.rs` byte-clean** — 183 entries, codegen via `build.rs` from vendored JS through `bun`, 4 parity gates (canonical-JSON byte-equal, entry count, key order, caniuse-lite version pin). **57 tests passing (53 unit + 4 parity).** (Latest: `+1` regression test in `resolution.rs::prefix_query_o_dpcm_uses_simplify` pinning the JS `value.simplify()` call after dpcm/dpi unit conversion — was a latent byte-divergence in the `-o-` resolution branch; fixed via `f.simplify(None)` after fraction-js audit surfaced the missing call.) Hacks agent **unblocked**. Still stubbed: `supports.rs`, `transition.rs` (heavy, hacks rarely subclass), `processor.rs`, `info.rs`, `autoprefixer.rs`, all 58 hacks, `Prefixes::new` orchestrator body. Split contract: see "Phase 7 split contract" section below. See also "Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix". |
 | 8a | `sort()` NAPI bridge + sort.ts engine flag | **DONE** — 12/12 corpus byte-clean end-to-end on win32-x64-msvc. See "Phase 8a ship" section below. |
 | 8b | `transformCss` NAPI bridge + transform.ts engine flag | **NOT STARTED** — blocks on Phase 5/6/7 plugin ports. |
 

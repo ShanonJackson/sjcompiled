@@ -34,12 +34,34 @@ against the preopen at plugin entry; fail loudly if outside.
 **Prerequisites met:** all of Phase 0 except probes 9 and audit
 (both Phase 5 gates, not Phase 1).
 
-**Last completed:** §1.0 (partial) — 30 fixture JSON files committed
-under `parity-harness/strip-runtime/fixtures/`, generator script at
-`parity-harness/strip-runtime/generate-fixtures.mjs`, harness extended
-to handle `expectsError` fixtures and route `extractStylesToDirectory`
-fs-writes through `_scratch/`. `bun test parity-harness/strip-runtime/harness.test.ts`
-→ 66 / 66 pass at the Phase-0/1-pre-port `expectedToFail` baseline.
+**Last completed:** §1.4. Phase 1 §1.0–§1.4 are all ☑. Final state on
+sign-off: `RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib`
+→ 44/44 pass; `bun test parity-harness/strip-runtime/harness.test.ts`
+→ 82/82 pass (41 determinism + 41 parity, with 13 fixtures gated
+`expectedToFail` via `generate-fixtures.mjs`'s `EXPECTED_TO_FAIL` map
+and explicit `failureReason` strings naming the phase that graduates
+each: 4 on §1.5, 3 on Phase 2, 6 on Phase 7).
+
+**End-of-session notes for next pickup:**
+
+- Architect re-pinned the upstream `packages/babel-plugin-strip-runtime`
+  source. Audited every file (`index.ts`, `types.ts`, all five
+  `utils/*.ts`) against the existing port — byte-identical. No
+  re-port needed.
+- Two upstream JS-side fixes applied while resolving the audit-blocked
+  harness: (a) `packages/css/src/index.ts` now uses
+  `export { type AfterInterpolation, type BeforeInterpolation }`
+  (interfaces aren't runtime values); (b)
+  `packages/babel-plugin-strip-runtime/src/__tests__/{strip-runtime-source-code,strip-runtime-transpiled-code}.test.ts`
+  had a stale `regexToFindRequireStatements` literal — `@compiled\/`
+  bumped to `@sjcompiled\/` to match the renamed constants.
+- Side-effect of the rename: `DEFAULT_IMPORT_SOURCES` is
+  `['@sjcompiled/react', '@atlaskit/css']`. Fixtures driven from any
+  source string still using `@compiled/react` go untransformed (no
+  CC/CS wrappers, every `expectsError` fixture's throw-path is dead).
+  `generate-fixtures.mjs` was updated accordingly. **If you regenerate
+  fixtures or write new ones, use `@sjcompiled/react` as the import
+  source.**
 
 ---
 

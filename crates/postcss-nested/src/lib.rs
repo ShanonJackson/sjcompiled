@@ -180,6 +180,7 @@ fn selectors_of(
                     nodes: Vec::new(),
                     raw_value: None,
                     attribute: None,
+                    attribute_spaces: None,
                     source_index: None,
                 };
                 node.nodes.insert(0, combinator);
@@ -741,6 +742,7 @@ mod tests {
             nodes: Vec::new(),
             raw_value: None,
             attribute: None,
+            attribute_spaces: None,
             source_index: None,
         });
         let parent = Processor::new()

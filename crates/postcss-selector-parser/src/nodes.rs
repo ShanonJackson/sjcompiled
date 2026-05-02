@@ -185,6 +185,36 @@ where
     }
 }
 
+/// `walk(callback)` upstream — visits every descendant of `parent`
+/// (including container kinds: Selector, Pseudo) in pre-order. Mirrors
+/// `container.js::walk` semantics: callback fires on EVERY descendant,
+/// not filtered by kind. Used by `cssnano-postcss-minify-selectors`'s
+/// `pseudo()` reducer to dedup sibling Selector containers
+/// (`selector.walk((child) => ...)`).
+///
+/// Mutation-during-walk follows `walk_each`'s rules: visitor returns
+/// nothing, walker re-reads `parent.nodes.len()` each iteration, and
+/// inserts BEFORE the visited node shift the cursor forward.
+pub fn walk_all<F>(parent: &mut Node, f: &mut F)
+where
+    F: FnMut(&mut Node, usize),
+{
+    let mut i = 0usize;
+    loop {
+        let len = parent.nodes.len();
+        if i >= len { break; }
+        let pre_len = parent.nodes.len();
+        f(parent, i);
+        let len_after_f = parent.nodes.len();
+        let inserted_before = len_after_f.saturating_sub(pre_len);
+        let new_i = i + inserted_before;
+        if new_i < parent.nodes.len() {
+            walk_all(&mut parent.nodes[new_i], f);
+        }
+        i = new_i + 1;
+    }
+}
+
 /// `walkPseudos` upstream — depth-first walk of every Pseudo descendant,
 /// callback receives `(parent, index)` so the visitor can mutate the
 /// parent's child Vec around the matched Pseudo.

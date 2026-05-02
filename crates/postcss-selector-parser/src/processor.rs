@@ -30,6 +30,19 @@ impl Processor {
         let mut p = Parser::new(selector.to_string(), ProcessorOptions::default());
         Ok(p.parse()?.clone())
     }
+
+    /// `processor.processSync(selector)` upstream — no-closure form.
+    /// Parses the selector and returns its stringified form. Used by
+    /// `cssnano-postcss-minify-selectors@5.2.1` (`processor.processSync(
+    /// selector)` in its `OnceExit` hook) where the mutation is performed
+    /// inside the parser-callback that the consumer registers via the
+    /// builder; for our flat API, callers compose `ast_sync` + manual
+    /// mutation + `stringify` instead.
+    pub fn process_sync(&self, selector: &str) -> Result<String, TokenizeError> {
+        let mut p = Parser::new(selector.to_string(), ProcessorOptions::default());
+        let root = p.parse()?;
+        Ok(stringify(root))
+    }
 }
 
 impl Default for Processor { fn default() -> Self { Self::new() } }

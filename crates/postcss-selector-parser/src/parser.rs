@@ -102,6 +102,7 @@ impl Parser {
                     nodes: Vec::new(),
                     spaces: Spaces::default(),
                     attribute: None,
+                    attribute_spaces: None,
                     source_index: None,
                 };
                 apply_pending_space(&mut node, pending_space.take(), true);
@@ -115,6 +116,7 @@ impl Parser {
                     nodes: Vec::new(),
                     spaces: Spaces::default(),
                     attribute: None,
+                    attribute_spaces: None,
                     source_index: None,
                 };
                 apply_pending_space(&mut node, pending_space.take(), true);
@@ -135,6 +137,7 @@ impl Parser {
                     nodes: Vec::new(),
                     spaces: Spaces { before, after },
                     attribute: None,
+                    attribute_spaces: None,
                     source_index: None,
                 });
                 i += 1;
@@ -200,6 +203,7 @@ impl Parser {
                     nodes,
                     spaces: Spaces::default(),
                     attribute: None,
+                    attribute_spaces: None,
                     source_index: None,
                 };
                 apply_pending_space(&mut node, pending_space.take(), true);
@@ -217,6 +221,7 @@ impl Parser {
                         nodes: Vec::new(),
                         spaces: Spaces::default(),
                         attribute: Some(payload),
+                        attribute_spaces: None,
                         source_index: None,
                     };
                     apply_pending_space(&mut node, pending_space.take(), true);
@@ -231,6 +236,7 @@ impl Parser {
                         nodes: Vec::new(),
                         spaces: Spaces::default(),
                         attribute: Some(AttributePayload::default()),
+                        attribute_spaces: None,
                         source_index: None,
                     });
                     i = tokens.len();
@@ -244,6 +250,7 @@ impl Parser {
                     nodes: Vec::new(),
                     spaces: Spaces::default(),
                     attribute: None,
+                    attribute_spaces: None,
                     source_index: None,
                 });
                 i += 1;
@@ -296,6 +303,7 @@ fn parse_word_compound(word: &str) -> Vec<Node> {
             nodes: Vec::new(),
             spaces: Spaces::default(),
             attribute: None,
+            attribute_spaces: None,
             source_index: None,
         });
         i = end;
@@ -333,6 +341,7 @@ fn parse_word_compound(word: &str) -> Vec<Node> {
             nodes: Vec::new(),
             spaces: Spaces::default(),
             attribute: None,
+            attribute_spaces: None,
             source_index: None,
         });
         i = end;

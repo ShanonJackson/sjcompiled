@@ -28,8 +28,8 @@ pub mod processor;
 pub use parser::Parser;
 pub use processor::{Processor, ProcessorOptions};
 pub use nodes::{
-    walk_attributes, walk_classes, walk_each, walk_pseudos,
-    AttributePayload, Node, NodeKind,
+    walk_all, walk_attributes, walk_classes, walk_each, walk_pseudos,
+    AttributePayload, AttributeSpaces, Node, NodeKind,
 };
 pub use selectors::stringify;
 
@@ -186,5 +186,90 @@ mod typed_ast_tests {
         root.raw_value = None;
         let out = stringify(&root);
         assert_eq!(out, ".bar");
+    }
+
+    // ----------------------------------------------------------------
+    // postcss-selector-parser surface for cssnano-postcss-minify-selectors
+    // (added 2026-05-02). All tests below exercise additions that are
+    // purely additive on top of the existing 6.1.2 port.
+    // ----------------------------------------------------------------
+
+    #[test]
+    fn payload_dirty_rebuilds_unquoted_attribute() {
+        // Mirrors `cssnano-postcss-minify-selectors`'s `attribute()`
+        // reducer: trim attribute name + operator, clear quoteMark when
+        // canUnquote, then zero out sub-spaces. Expected output:
+        // `[data-x=hi]` — no quotes, no spaces.
+        let mut root = parse(r#"[ data-x = "hi" ]"#);
+        let sel = &mut root.nodes[0];
+        let attr = &mut sel.nodes[0];
+        attr.raw_value = None;
+        sel.raw_value = None;
+        let payload = attr.attribute.as_mut().unwrap();
+        // Replicate the minify-selectors mutations.
+        payload.attribute = payload.attribute.trim().to_string();
+        if let Some(op) = payload.operator.take() {
+            payload.operator = Some(op.trim().to_string());
+        }
+        payload.quote_mark = None;
+        payload.dirty = true;
+        attr.attribute_spaces = Some(AttributeSpaces::default());
+        root.raw_value = None;
+        let out = stringify(&root);
+        assert_eq!(out, "[data-x=hi]");
+    }
+
+    #[test]
+    fn payload_dirty_preserves_namespace_and_insensitive() {
+        // `[ns|x="hi" i]` with case_insensitive — verify each sub-space
+        // is honored. Set value.after = " " to match upstream's
+        // defaultAttrConcat injection rule.
+        let mut root = parse(r#"[ns|x="hi" i]"#);
+        let sel = &mut root.nodes[0];
+        let attr = &mut sel.nodes[0];
+        attr.raw_value = None;
+        sel.raw_value = None;
+        attr.attribute.as_mut().unwrap().dirty = true;
+        let mut spaces = AttributeSpaces::default();
+        spaces.value.after = " ".to_string();
+        attr.attribute_spaces = Some(spaces);
+        root.raw_value = None;
+        let out = stringify(&root);
+        assert_eq!(out, r#"[ns|x="hi" i]"#);
+    }
+
+    #[test]
+    fn walk_all_visits_every_descendant() {
+        // walk_each filters by NodeKind; walk_all visits every descendant.
+        // For `.a:not(.b, .c)` the descendants are: Selector, ClassName(.a),
+        // Pseudo(:not), Selector, ClassName(.b), Selector, ClassName(.c) — 7.
+        let mut root = parse(".a:not(.b, .c)");
+        let mut walk_all_count = 0usize;
+        nodes::walk_all(&mut root, &mut |_, _| { walk_all_count += 1; });
+        let mut filtered_count = 0usize;
+        nodes::walk_each(&mut root, &[NodeKind::ClassName], &mut |_, _| {
+            filtered_count += 1;
+        });
+        assert!(walk_all_count > filtered_count,
+            "walk_all should hit container kinds too (got {} vs filtered {})",
+            walk_all_count, filtered_count);
+        assert_eq!(filtered_count, 3, ".a/.b/.c → three ClassName matches");
+    }
+
+    #[test]
+    fn process_sync_no_closure_round_trip() {
+        let proc = Processor::new();
+        let out = proc.process_sync(".foo > .bar").expect("parse ok");
+        assert_eq!(out, ".foo > .bar");
+    }
+
+    #[test]
+    fn un_dirty_attribute_emits_raw_text() {
+        // dirty=false (default) → bracket text on `node.value` round-trips
+        // verbatim, including unusual whitespace inside the brackets.
+        let input = r#"[ data-x = "hi" ]"#;
+        let proc = Processor::new();
+        let out = proc.process_sync(input).expect("parse ok");
+        assert_eq!(out, input);
     }
 }
