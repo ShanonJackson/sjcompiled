@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
-description = "Vendored data tables: caniuse-lite@1.0.30001690, electron-to-chromium@1.5.76, node-releases@2.0.19"
+description = "Vendored data tables: caniuse-lite@1.0.30001766, electron-to-chromium@1.5.41, node-releases@2.0.18"
 build = "build.rs"
 
 [dependencies]

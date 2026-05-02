@@ -12,7 +12,7 @@
 //! `data/prefixes.js` calls `require('caniuse-lite/dist/unpacker/feature')`
 //! at module load and unpacks compressed caniuse data at runtime. Static
 //! AST-walking it is harder than just letting bun evaluate it. The
-//! caniuse-lite version is pinned to 1.0.30001690 via the root
+//! caniuse-lite version is pinned to 1.0.30001766 via the root
 //! `package.json` `overrides` block, so the resolution is stable.
 //!
 //! # Pre-condition
@@ -59,7 +59,7 @@ fn main() {
     }
 
     // Sanity-check the workspace pin. `caniuse-lite` is a direct
-    // devDependency on the root `package.json` (with override 1.0.30001690),
+    // devDependency on the root `package.json` (with override 1.0.30001766),
     // which causes bun to symlink it at the workspace's top-level
     // `node_modules/caniuse-lite/`. That, in turn, makes Node-style module
     // resolution from inside `crates/_vendor/...` find the workspace pin
@@ -77,7 +77,7 @@ fn main() {
             "autoprefixer build.rs: workspace caniuse-lite not found at {}.\n\
              Pre-condition: `bun install` must have run at the workspace root \
              with the package.json devDependency + override pinning \
-             caniuse-lite to 1.0.30001690. Run `bun install` and retry.",
+             caniuse-lite to 1.0.30001766. Run `bun install` and retry.",
             pinned_caniuse_dir.display()
         );
     }
@@ -108,7 +108,7 @@ fn main() {
             "autoprefixer build.rs: `bun -e` exited non-zero ({:?}).\n\
              stderr: {stderr}\n\
              Pre-condition: `bun install` must have run at the workspace root \
-             so that node_modules/caniuse-lite (pinned to 1.0.30001690 via \
+             so that node_modules/caniuse-lite (pinned to 1.0.30001766 via \
              package.json overrides) is populated. Run `bun install` and retry.",
             output.status.code()
         );

@@ -2,11 +2,11 @@
 //!
 //! Folder/file mapping (1:1):
 //!   - `parsers.ts`          -> `parsers.rs`
-//!   - `parse-media-query.ts`-> `parse_media_query.rs`
+//!   - `parse-at-rule.ts`    -> `parse_at_rule.rs`
 //!   - `sort-at-rules.ts`    -> `sort_at_rules.rs`
 //!   - `types.ts`            -> `types.rs`
 
 pub mod parsers;
-pub mod parse_media_query;
+pub mod parse_at_rule;
 pub mod sort_at_rules;
 pub mod types;

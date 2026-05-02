@@ -33,7 +33,7 @@
 
 use postcss_core::{Node, NodeKind, PluginResult, Root};
 
-use super::at_rules::parse_media_query::parse_media_query;
+use super::at_rules::parse_at_rule::parse_at_rule;
 use super::at_rules::sort_at_rules::sort_at_rules;
 use super::at_rules::types::{AtRuleInfo, ParsedAtRule};
 use super::sort_shorthand_declarations::sort_shorthand_declarations;
@@ -69,8 +69,10 @@ pub fn sort_atomic_style_sheet(root: &mut Root, opts: &SortAtomicStyleSheetOpts)
                 // `node.first?.type === 'atrule'`.
                 let first_kind = node.nodes().and_then(|c| c.first()).map(|c| c.kind.clone());
                 if let Some(NodeKind::AtRule(at)) = first_kind {
-                    let parsed = if sort_at_rules_enabled && at.name == "media" {
-                        parse_media_query(&at.params)
+                    // 0.19.0: parseAtRule runs on ANY at-rule when
+                    // sortAtRulesEnabled — not gated by name == "media".
+                    let parsed = if sort_at_rules_enabled {
+                        parse_at_rule(&at.params)
                     } else {
                         Vec::<ParsedAtRule>::new()
                     };
@@ -85,8 +87,8 @@ pub fn sort_atomic_style_sheet(root: &mut Root, opts: &SortAtomicStyleSheetOpts)
                 }
             }
             NodeKind::AtRule(at) => {
-                let parsed = if sort_at_rules_enabled && at.name == "media" {
-                    parse_media_query(&at.params)
+                let parsed = if sort_at_rules_enabled {
+                    parse_at_rule(&at.params)
                 } else {
                     Vec::<ParsedAtRule>::new()
                 };

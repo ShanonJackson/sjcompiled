@@ -1,0 +1,5 @@
+@media (max-width: 400px) {
+  .a:is(.x):where(.y) { color: red; }
+  .b:not(.q):is(.r) { color: blue; }
+  .c:hover:is(.s) { color: green; }
+}

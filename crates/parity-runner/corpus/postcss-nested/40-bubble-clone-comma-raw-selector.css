@@ -1,0 +1,6 @@
+a /*x*/ , b {
+  color: red;
+  @media (max-width: 1px) {
+    color: blue;
+  }
+}

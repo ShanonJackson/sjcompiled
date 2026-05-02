@@ -1,0 +1,3 @@
+.a:hover :is(.x, .y) { color: red; }
+.b:focus :is(.z) { color: blue; }
+.c:active :is(.q, .r ) { color: green; }

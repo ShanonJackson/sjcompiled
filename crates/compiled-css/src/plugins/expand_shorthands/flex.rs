@@ -1,9 +1,12 @@
-//! Port of `packages/css/src/plugins/expand-shorthands/flex.ts`.
+//! Port of `packages/css/src/plugins/expand-shorthands/flex.ts` at
+//! `@compiled/css@0.19.0` (commit `40a4548`).
 //!
-//! Three-arg destructure on `value.nodes`. Eight branches:
-//! - 1 arg keyword: `auto` / `none` / `initial` / `revert` /
-//!   `revert-layer` / `unset` / `inherit` (inherit-family returns
-//!   `[{value: …}]` no-op).
+//! Three-arg destructure on `value.nodes`. Branches mirror upstream 0.19.0
+//! exactly — DO NOT add `auto`/`initial`/`revert`/`revert-layer`/`unset`/
+//! `inherit` keyword handling here. Those branches were added in the 0.20+
+//! line and are NOT part of the AFM-pinned source surface.
+//!
+//! - 1 arg `none` keyword → `0 0 auto`.
 //! - 1 arg unitless number → flex-grow.
 //! - 1 arg basis (numeric `0` / `0%`-default / width / `content`).
 //! - 2 args: grow + shrink (number/number) OR grow + basis (number/basis).
@@ -57,38 +60,13 @@ pub fn flex(value: &Root) -> Vec<Longform> {
         1 => {
             let left = &nodes[0];
             if let NodeKind::Word(w) = &left.kind {
-                let v = w.common.value.as_str();
-                match v {
-                    "auto" => {
-                        // `flex: auto` ↔ `flex: 1 1 auto`
-                        return vec![
-                            Longform::new("flex-grow", "1"),
-                            Longform::new("flex-shrink", "1"),
-                            Longform::new("flex-basis", "auto"),
-                        ];
-                    }
-                    "none" => {
-                        return vec![
-                            Longform::new("flex-grow", "0"),
-                            Longform::new("flex-shrink", "0"),
-                            Longform::new("flex-basis", "auto"),
-                        ];
-                    }
-                    "initial" => {
-                        return vec![
-                            Longform::new("flex-grow", "0"),
-                            Longform::new("flex-shrink", "1"),
-                            Longform::new("flex-basis", "auto"),
-                        ];
-                    }
-                    "revert" | "revert-layer" | "unset" | "inherit" => {
-                        // No-op. Upstream returns `[{ value: left.value }]`
-                        // — a single Longform with prop=undefined. The
-                        // caller's early-exit branch leaves the decl
-                        // unchanged.
-                        return vec![Longform::no_op(v)];
-                    }
-                    _ => {}
+                if w.common.value == "none" {
+                    // `flex: none` ↔ `flex: 0 0 auto`
+                    return vec![
+                        Longform::new("flex-grow", "0"),
+                        Longform::new("flex-shrink", "0"),
+                        Longform::new("flex-basis", "auto"),
+                    ];
                 }
             }
             if is_flex_number(left) {

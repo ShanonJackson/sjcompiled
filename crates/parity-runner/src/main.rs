@@ -41,7 +41,6 @@ fn main() -> ExitCode {
         "discard-duplicates" => Stage::DiscardDuplicates,
         "extract-stylesheets" => Stage::ExtractStylesheets,
         "parent-orphaned-pseudos" => Stage::ParentOrphanedPseudos,
-        "flatten-multiple-selectors" => Stage::FlattenMultipleSelectors,
         "increase-specificity" => Stage::IncreaseSpecificity,
         "merge-duplicate-at-rules" => Stage::MergeDuplicateAtRules,
         "normalize-current-color" => Stage::NormalizeCurrentColor,

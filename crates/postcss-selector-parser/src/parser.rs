@@ -41,12 +41,19 @@ impl Parser {
 
         // Split top-level selectors on `,`.
         let groups = split_top_level_groups(&self.tokens);
-        for (start, end) in groups {
+        for (group_idx, (start, end)) in groups.iter().copied().enumerate() {
             let mut selector = Node::selector();
             let source_start = if start < self.tokens.len() { self.tokens[start].start_pos } else { 0 };
             let source_end = if end > 0 && end <= self.tokens.len() {
                 self.tokens[end - 1].end_pos
             } else { self.input.len() };
+            // 6.1.0: `Selector.sourceIndex`. Upstream parser.js spawns the
+            // first selector in the constructor with `sourceIndex: 0`
+            // (line 120 in 6.1.2) regardless of leading whitespace, then
+            // every comma-spawned sibling gets the start_pos of the token
+            // *after* the comma (line 582). We replicate that exactly:
+            // first group → 0; subsequent groups → first-token start_pos.
+            selector.source_index = Some(if group_idx == 0 { 0 } else { source_start });
             let raw = self.input[source_start..source_end].to_string();
             selector.raw_value = Some(raw.clone());
             selector.value = raw.clone();
@@ -95,6 +102,7 @@ impl Parser {
                     nodes: Vec::new(),
                     spaces: Spaces::default(),
                     attribute: None,
+                    source_index: None,
                 };
                 apply_pending_space(&mut node, pending_space.take(), true);
                 selector.nodes.push(node);
@@ -107,6 +115,7 @@ impl Parser {
                     nodes: Vec::new(),
                     spaces: Spaces::default(),
                     attribute: None,
+                    source_index: None,
                 };
                 apply_pending_space(&mut node, pending_space.take(), true);
                 selector.nodes.push(node);
@@ -126,6 +135,7 @@ impl Parser {
                     nodes: Vec::new(),
                     spaces: Spaces { before, after },
                     attribute: None,
+                    source_index: None,
                 });
                 i += 1;
             } else if tok.kind == t::colon {
@@ -151,6 +161,25 @@ impl Parser {
                             let mut child_sel = Node::selector();
                             let cs_start = if !absolute_slice.is_empty() { absolute_slice[0].start_pos } else { inner_start };
                             let cs_end = if !absolute_slice.is_empty() { absolute_slice[absolute_slice.len() - 1].end_pos } else { inner_end };
+                            // 6.1.0: `Selector.sourceIndex` for inner
+                            // pseudo-arg selectors. parser.js
+                            // `parentheses()` (line 653 in 6.1.2) spawns
+                            // the first inner selector with start_pos of
+                            // the token after `(`; comma-split arms come
+                            // through `comma()` (line 582) using start_pos
+                            // of the token after the comma. Both reduce
+                            // to "start_pos of this group's first token,"
+                            // falling back to inner_start for an empty
+                            // group like `:is(,.a)`. 6.1.0 also shifted
+                            // `source.start` from tokens[position-1] to
+                            // tokens[position] on the parens-spawned
+                            // selector — Rust doesn't track source.start
+                            // line/column, so no byte impact.
+                            child_sel.source_index = Some(if !absolute_slice.is_empty() {
+                                absolute_slice[0].start_pos
+                            } else {
+                                inner_start
+                            });
                             child_sel.raw_value = Some(self.input[cs_start..cs_end].to_string());
                             child_sel.value = child_sel.raw_value.clone().unwrap();
                             self.build_selector_children(&absolute_slice, &mut child_sel);
@@ -171,6 +200,7 @@ impl Parser {
                     nodes,
                     spaces: Spaces::default(),
                     attribute: None,
+                    source_index: None,
                 };
                 apply_pending_space(&mut node, pending_space.take(), true);
                 selector.nodes.push(node);
@@ -187,6 +217,7 @@ impl Parser {
                         nodes: Vec::new(),
                         spaces: Spaces::default(),
                         attribute: Some(payload),
+                        source_index: None,
                     };
                     apply_pending_space(&mut node, pending_space.take(), true);
                     selector.nodes.push(node);
@@ -200,6 +231,7 @@ impl Parser {
                         nodes: Vec::new(),
                         spaces: Spaces::default(),
                         attribute: Some(AttributePayload::default()),
+                        source_index: None,
                     });
                     i = tokens.len();
                 }
@@ -212,6 +244,7 @@ impl Parser {
                     nodes: Vec::new(),
                     spaces: Spaces::default(),
                     attribute: None,
+                    source_index: None,
                 });
                 i += 1;
             }
@@ -219,6 +252,14 @@ impl Parser {
 
         if let Some(s) = pending_space {
             if let Some(last) = selector.nodes.last_mut() {
+                // 6.1.2: trailing whitespace before `)` (or end of group)
+                // attaches to the last node's `spaces.after`, NOT as a
+                // standalone descendant combinator. Mirrors upstream
+                // parser.js `combinator()` line 488 — the close-condition
+                // gained `closeParenthesis` alongside `comma`. The Rust
+                // port reaches the same end state structurally because
+                // inner-pseudo slices exclude `)` and this tail block
+                // folds residual whitespace into the previous node.
                 last.spaces.after.push_str(&s);
             }
         }
@@ -255,6 +296,7 @@ fn parse_word_compound(word: &str) -> Vec<Node> {
             nodes: Vec::new(),
             spaces: Spaces::default(),
             attribute: None,
+            source_index: None,
         });
         i = end;
     }
@@ -291,6 +333,7 @@ fn parse_word_compound(word: &str) -> Vec<Node> {
             nodes: Vec::new(),
             spaces: Spaces::default(),
             attribute: None,
+            source_index: None,
         });
         i = end;
     }

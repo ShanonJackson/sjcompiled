@@ -18,7 +18,6 @@ import { discardEmptyRules } from '../src/plugins/discard-empty-rules.ts';
 import { discardDuplicates } from '../src/plugins/discard-duplicates.ts';
 import { extractStyleSheets } from '../src/plugins/extract-stylesheets.ts';
 import { parentOrphanedPseudos } from '../src/plugins/parent-orphaned-pseudos.ts';
-import { flattenMultipleSelectors } from '../src/plugins/flatten-multiple-selectors.ts';
 import { increaseSpecificity } from '../src/plugins/increase-specificity.ts';
 import { mergeDuplicateAtRules } from '../src/plugins/merge-duplicate-at-rules.ts';
 import { normalizeCurrentColor } from '../src/plugins/normalize-current-color.ts';
@@ -87,12 +86,6 @@ const STAGES = {
   // parse → parentOrphanedPseudos → stringify.
   'parent-orphaned-pseudos': (css) => {
     const result = postcss([parentOrphanedPseudos()]).process(css, { from: undefined });
-    return result.css;
-  },
-
-  // parse → flattenMultipleSelectors → stringify.
-  'flatten-multiple-selectors': (css) => {
-    const result = postcss([flattenMultipleSelectors()]).process(css, { from: undefined });
     return result.css;
   },
 

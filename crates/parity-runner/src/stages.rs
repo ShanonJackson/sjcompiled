@@ -32,9 +32,6 @@ pub enum Stage {
     /// `parse → parentOrphanedPseudos → stringify`. Phase 4b.
     ParentOrphanedPseudos,
 
-    /// `parse → flattenMultipleSelectors → stringify`. Phase 4b.
-    FlattenMultipleSelectors,
-
     /// `parse → increaseSpecificity → stringify`. Phase 4b.
     IncreaseSpecificity,
 
@@ -117,7 +114,6 @@ impl Stage {
             Stage::DiscardDuplicates => "discard-duplicates",
             Stage::ExtractStylesheets => "extract-stylesheets",
             Stage::ParentOrphanedPseudos => "parent-orphaned-pseudos",
-            Stage::FlattenMultipleSelectors => "flatten-multiple-selectors",
             Stage::IncreaseSpecificity => "increase-specificity",
             Stage::MergeDuplicateAtRules => "merge-duplicate-at-rules",
             Stage::NormalizeCurrentColor => "normalize-current-color",
@@ -168,12 +164,6 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
         Stage::ParentOrphanedPseudos => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             compiled_css::plugins::parent_orphaned_pseudos::parent_orphaned_pseudos(&mut root)
-                .map_err(|e| format!("rust plugin error: {e:?}"))?;
-            Ok(stringify(&root))
-        }
-        Stage::FlattenMultipleSelectors => {
-            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            compiled_css::plugins::flatten_multiple_selectors::flatten_multiple_selectors(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }

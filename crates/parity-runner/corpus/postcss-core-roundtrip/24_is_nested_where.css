@@ -1,0 +1,2 @@
+:is(:where(.c, .d)) { color: red; }
+:is(.a, :where(.c, .d), .e) { color: blue; }

@@ -1,0 +1,2 @@
+:is(.a):where(.b) { color: red; }
+:not(.x):is(.y):where(.z) { color: blue; }

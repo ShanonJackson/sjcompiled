@@ -1,0 +1,3 @@
+:not(.x, .y, .z ) { color: red; }
+:not(.a   ) { color: blue; }
+:not(.a,.b ) { color: green; }

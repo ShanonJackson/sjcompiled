@@ -1,0 +1,2 @@
+.outer :is(.a ) .inner { color: red; }
+.parent :is( .a, .b ) { color: blue; }

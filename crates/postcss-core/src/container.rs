@@ -357,11 +357,13 @@ pub fn insert_before_with_normalize(parent: &mut Node, exist_index: usize, mut a
     }
 }
 
-/// JS `value.replace(/\S/g, '')` — strips every non-whitespace character.
-/// Used by `super.normalize` when copying raws.before from sample.
+/// JS `value.replace(/\S/g, '')` — keep only chars matching JS `\s`.
+/// Delegates to [`crate::stringifier::is_js_regex_whitespace`] so the
+/// definition lives in one place. **NOT** `char::is_whitespace` — see
+/// the helper for the Rust↔JS Unicode-set mismatch.
 fn strip_non_whitespace(s: &str) -> String {
     s.chars()
-        .filter(|c| c.is_whitespace() || *c == '\u{FEFF}')
+        .filter(|c| crate::stringifier::is_js_regex_whitespace(*c))
         .collect()
 }
 

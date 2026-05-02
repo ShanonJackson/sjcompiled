@@ -34,6 +34,12 @@ pub struct Node {
     pub raw_value: Option<String>,
     /// Attribute payload (operator, value, quote, etc.) when [`kind`] is Attribute.
     pub attribute: Option<AttributePayload>,
+    /// 6.1.0: zero-based byte offset into the original source where this
+    /// Selector node begins. Mirrors upstream `Selector.sourceIndex`
+    /// (parser.js lines 120, 582, 653 in 6.1.2). Currently only set on
+    /// Selector nodes; diagnostic-only — not consulted by `stringify`,
+    /// but downstream plugin ports may read it.
+    pub source_index: Option<usize>,
 }
 
 #[derive(Debug, Clone, Default)]

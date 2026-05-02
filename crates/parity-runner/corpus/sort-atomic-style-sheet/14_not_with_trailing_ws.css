@@ -1,0 +1,3 @@
+.a:hover:not(.disabled ) { color: red; }
+.b:focus:not(.x, .y ) { color: blue; }
+.c:active:not(.q ) { color: green; }

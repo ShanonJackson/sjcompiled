@@ -1,0 +1,3 @@
+.outer:is(:not(:where(.a, .b))) { color: red; }
+.inner:has(.x:is(.y, .z) > .q) { color: blue; }
+.target:is(.x, /* note */ .y ) { color: green; }

@@ -7,7 +7,7 @@
 //! the silent transcription drift risk of typing 183 entries by hand.
 //!
 //! Pre-condition: `bun install` must have populated `node_modules/caniuse-lite`
-//! at version 1.0.30001690 (pinned via root `package.json` `overrides`). See
+//! at version 1.0.30001766 (pinned via root `package.json` `overrides`). See
 //! `crates/PARITY_VERSIONS.md` Anomaly #3.
 
 use indexmap::IndexMap;
@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 /// - `feature` absent → `None` (kept defensive — every observed entry in
 ///   v10.4.14 sets `feature`; absence would indicate caniuse-lite drift)
 ///
-/// `transition` is unused in the v10.4.14 / caniuse-lite 1.0.30001690 data
+/// `transition` is unused in the v10.4.14 / caniuse-lite 1.0.30001766 data
 /// snapshot but kept on the struct for forward-compat with future caniuse-lite
 /// versions. If a future snapshot emits it, deserialization continues to work.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -38,7 +38,7 @@ pub struct PrefixEntry {
     pub feature: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub props: Vec<String>,
-    /// Unused in the v10.4.14 / caniuse-lite 1.0.30001690 snapshot but
+    /// Unused in the v10.4.14 / caniuse-lite 1.0.30001766 snapshot but
     /// kept for forward-compat. JS only sets this when truthy.
     #[serde(default, skip_serializing_if = "is_false")]
     pub transition: bool,

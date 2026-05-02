@@ -12,7 +12,6 @@
 //!   - `discard-duplicates.ts`         -> `src/plugins/discard_duplicates.rs`
 //!   - `discard-empty-rules.ts`        -> `src/plugins/discard_empty_rules.rs`
 //!   - `extract-stylesheets.ts`        -> `src/plugins/extract_stylesheets.rs`
-//!   - `flatten-multiple-selectors.ts` -> `src/plugins/flatten_multiple_selectors.rs`
 //!   - `increase-specificity.ts`       -> `src/plugins/increase_specificity.rs`
 //!   - `merge-duplicate-at-rules.ts`   -> `src/plugins/merge_duplicate_at_rules.rs`
 //!   - `normalize-css.ts`              -> `src/plugins/normalize_css.rs`

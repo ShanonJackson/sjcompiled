@@ -3,6 +3,299 @@
 End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 `PARITY_VERSIONS.md`.
 
+## AFM repin — coordinate the parity contract with JIRA's actual install (CRITICAL)
+
+The `REFERENCE_LOCK_FILE/yarn.lock` we forked from the upstream `compiled`
+repo does NOT match what JIRA's monorepo actually resolves for
+`@compiled/css@0.19.0` (commit `40a4548`). Per
+`AFM_MONOREPO_DEPENDENCIES_MORE.md`, AFM resolves the following
+**byte-affecting** packages to different versions than the reference
+lockfile we'd been targeting:
+
+| Package | Reference lockfile (was) | AFM (now) | Action taken |
+|---|---|---|---|
+| postcss | 8.4.31 | **8.5.6** | repinned; postcss-core agent confirmed cosmetic-only diff (no code changes — see "postcss version pin" section above) |
+| postcss-selector-parser | 6.0.13 | **6.1.2** | repinned in `PARITY_VERSIONS.md` + root `package.json` overrides; `crates/postcss-selector-parser` audit pending |
+| browserslist | 4.24.4 | **4.24.2** | repinned; `crates/browserslist-shim` headers/docstrings updated; defaults audit pending |
+| caniuse-lite | 1.0.30001690 | **1.0.30001766** | re-vendored at `crates/_vendor/caniuse-lite-1.0.30001766/`; `data/features.snapshot.json` regenerated (582 features); `caniuse-db` rebuilds clean |
+| electron-to-chromium | 1.5.76 | **1.5.41** | repinned in overrides; vendor refresh pending if cssnano/autoprefixer reach it |
+| node-releases | 2.0.19 | **2.0.18** | repinned in overrides; vendor refresh pending |
+| colord | 2.9.1 | **2.9.3** | repinned (crate still scaffolded — header/Cargo.toml updated only) |
+
+**Source-code drift fix.** `packages/css/src/` was tracking `compiled@HEAD`
+(0.21.0). Overlaid with `git show 40a4548:packages/css/src/...` so the JS
+oracle now matches AFM's installed `@compiled/css@0.19.0`. Concrete
+deltas applied:
+
+- **Deleted** `packages/css/src/plugins/flatten-multiple-selectors.ts`
+  (added in 0.20+ — not in AFM's pipeline).
+- **Deleted** `packages/css/src/plugins/__tests__/flatten-multiple-selectors.test.ts`.
+- **Deleted** `packages/css/src/plugins/at-rules/parse-media-query.ts`
+  (renamed back to its 0.19.0 name).
+- **Restored** `packages/css/src/plugins/at-rules/parse-at-rule.ts`.
+- **Reverted** `transform.ts`: dropped the `flattenMultipleSelectors`
+  pipeline branch + opts field.
+- **Reverted** `sort-atomic-style-sheet.ts`: uses `parseAtRule` (not
+  `parseMediaQuery`); calls it on **any** at-rule when
+  `sortAtRulesEnabled` (no `name === 'media'` gate).
+- **Reverted** `expand-shorthands/flex.ts`: only handles `none` keyword
+  in the 1-arg word case (drops `auto`/`initial`/`revert`/`revert-layer`/
+  `unset`/`inherit` branches added in 0.20+).
+- All `@compiled/utils` imports translated to `@sjcompiled/utils`.
+- `sort.ts` re-wrapped with the `COMPILED_CSS_ENGINE=rust` engine flag
+  (Phase 8a wiring preserved on top of the 0.19.0 source).
+
+**Rust-side reverts to match the new oracle:**
+
+- `crates/compiled-css/src/plugins/flatten_multiple_selectors.rs` —
+  **deleted**. Module declaration removed from `plugins.rs`. Doc-mapping
+  line removed from `lib.rs`. Stage variant + dispatch removed from
+  `crates/parity-runner/src/{main.rs,stages.rs}`. Integration test +
+  corpus directory deleted.
+- `crates/css/src/transform.rs` — `flatten_multiple_selectors` field
+  removed from `TransformOpts`; pipeline doc-comment updated.
+- `crates/compiled-css/src/plugins/at_rules/parse_media_query.rs` →
+  **renamed** to `parse_at_rule.rs`; `parse_media_query` function →
+  `parse_at_rule`; module declaration in `at_rules.rs` updated.
+- `crates/compiled-css/src/plugins/sort_atomic_style_sheet.rs` — calls
+  `parse_at_rule(&at.params)` on any at-rule when `sort_at_rules_enabled`
+  (no `name == "media"` gate). 5/5 unit tests still pass.
+- `crates/compiled-css/src/plugins/expand_shorthands/flex.rs` — 1-arg
+  word case simplified to only `none`; rebuild is byte-clean (112/112
+  compiled-css tests pass).
+
+**Documentation updates:**
+
+- `crates/PARITY_VERSIONS.md` — Source-of-Truth section now points at
+  `AFM_MONOREPO_DEPENDENCIES_MORE.md`; Anomaly #3/#4 versions updated;
+  Crate Ownership Map versions updated; `flattenMultipleSelectors`
+  excluded from `crates/compiled-css` plugin list.
+- Root `package.json` overrides updated to AFM pins; `bun install`
+  re-resolved successfully (verified via `bun pm ls --all`).
+- `crates/colord/{Cargo.toml,src/lib.rs}` — header bumped to 2.9.3.
+- `crates/browserslist-shim/{Cargo.toml,src/{lib,index,node}.rs}` —
+  bumped to 4.24.2.
+- `crates/caniuse-db/{Cargo.toml,src/lib.rs,build.rs,scripts/snapshot.js}`
+  — bumped to 1.0.30001766; constant `CANIUSE_LITE_VERSION` updated.
+- `crates/autoprefixer/{build.rs,tests/data_parity.rs,src/data/prefixes.rs}`
+  — caniuse-lite pin string updated to 1.0.30001766.
+
+**Verification gates run after the AFM repin (all green):**
+
+| Gate | Result |
+|---|---|
+| `parity-runner --stage X --corpus crates/parity-runner/corpus/X` × 20 stages (JS-vs-Rust) | **20/20 byte-clean** |
+| `parity-runner --stage X --corpus crates/parity-runner/corpus/X --determinism` × 20 stages (JS-vs-JS oracle stability) | **20/20 deterministic** |
+| `bun run packages/css/scripts/verify-napi-sort.mjs` | 12/12 OK |
+| `bun run packages/css/scripts/verify-engine-flag.mjs` | 12/12 OK |
+| `cargo test --workspace --no-fail-fast` (RUSTFLAGS="") | **all targets green** (after fixing `caniuse-db::list_returns_579` → `list_returns_582` and `caniuse-api::features_lists_all` from 579 → 582 to match the new caniuse-lite snapshot) |
+
+**Audit findings (postcss-selector-parser 6.0.13 → 6.1.2):**
+- `parser.js` adds `sourceIndex: …` field on a few AST node initializations
+  (commas, pseudos). Diagnostic surface only; not stringified.
+- `parser.js` line 487: new clause treats `closeParenthesis` as a
+  comma-like terminator alongside `comma` — affects boundary detection
+  in selectors with parenthesized content (e.g. `:is()`, `:where()`,
+  `:not()`).
+- All 20 parity stages (including `sort` and `sort-atomic-style-sheet`,
+  which exercise selectors) are byte-clean against the 6.1.2 oracle, so
+  the practical impact on the AFM corpus is **nil**.
+
+**postcss-selector-parser 6.0.13 → 6.1.2 audit landed (2026-05-02):**
+- Full source-tree diff confirmed only `parser.js` differs — four hunks
+  total, matching the upstream changelog (6.1.0 added `Selector.sourceIndex`,
+  6.1.2 fixed trailing combinators in pseudos).
+- Rust port updates in `crates/postcss-selector-parser/src/`:
+  - `nodes.rs`: added `Node::source_index: Option<usize>`.
+  - `parser.rs`: set `source_index` at the three upstream sites — root
+    selector, comma-spawned selectors, and pseudo inner-arg selectors.
+    Added an inline comment at the trailing-whitespace tail handler
+    documenting that the existing fold-into-`spaces.after` behavior
+    matches upstream's 6.1.2 `closeParenthesis` close-condition fix.
+- `crates/postcss-nested/src/lib.rs` updated to include the new field
+  on its synthesized descendant-Combinator node (cosmetic).
+- Adversarial corpus added: 10 entries to `postcss-core-roundtrip/`
+  (`23..32`) and 5 to `sort-atomic-style-sheet/` (`13..17`) — covering
+  trailing whitespace before `)`, mixed combinators inside parens,
+  comments in parens, adjacent pseudos, empty-arm edges, deep nesting.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast` all
+  green; six selector-touching parity stages byte-clean (32/17/13/12/24/12);
+  both NAPI verifiers 12/12; determinism on `postcss-core-roundtrip`
+  (32/32) and `sort-atomic-style-sheet` (17/17).
+- Full audit document at
+  `crates/_vendor/POSTCSS_SELECTOR_PARSER_6.0.13_TO_6.1.2_AUDIT.md`.
+
+**Audit findings (browserslist 4.24.4 → 4.24.2):**
+- Default query string is **identical** (`> 0.5%, last 2 versions,
+  Firefox ESR, not dead`).
+- `index.js`: 4.24.4 added a `parseCache` layer + `needsPath` plumbing.
+  Caching only — no semantic difference for our deterministic pipeline.
+- `index.js` Firefox ESR resolution: 4.24.4 returns `['firefox 128']`,
+  4.24.2 returns `['firefox 115', 'firefox 128']`. **Byte-affecting** for
+  any consumer that hits the `Firefox ESR` query — but autoprefixer
+  prefix decisions feed off our `crates/caniuse-db` snapshot via
+  `oxc_browserslist`. Once Phase 7 (autoprefixer) parity gates land,
+  add a Firefox-ESR-targeted corpus entry to confirm `oxc_browserslist`
+  v3 returns the 4.24.2-style two-version list (NOT just `firefox 128`).
+- `node.js`: significant cache-infra changes (4.24.4 added stat /
+  config-path / parsed-config caches, `eachParent` signature changed).
+  Internal only — does not affect the resolved query result.
+
+**JS bridge fix during verification.** `packages/css/scripts/parity-bridge.mjs`
+still imported `flatten-multiple-selectors.ts` after the overlay. Removed
+the import and the `'flatten-multiple-selectors'` STAGE entry. Without
+the fix, every `--determinism` run failed (the bridge crashed on import
+before serving requests).
+
+**`caniuse-db` test pin update.** `caniuse-lite@1.0.30001690` had 579
+features; `1.0.30001766` has 582. Updated `caniuse-db::list_returns_579`
+→ `list_returns_582` and `caniuse-api::features_lists_all` (579 → 582).
+This is the only test-level change needed for the data swap.
+
+**Audit findings (caniuse-lite 1.0.30001690 → 1.0.30001766) (2026-05-02):**
+- Data-only package — no JS source code to port. `dist/` (unpacker) and
+  `data/browsers.js` are byte-identical between the two versions, so the
+  packed-encoding shape is unchanged.
+- Net feature delta: 579 → 582. Three added (`cross-document-view-transitions`,
+  `css-grid-lanes`, `css-if`); zero removed. None of the three are
+  referenced by `crates/_vendor/autoprefixer-10.4.14/package/data/prefixes.js`
+  (verified by enumerating the 63 distinct `feature` strings in that
+  table), so they don't affect prefix decisions on AFM input today.
+- All 579 existing feature files have refreshed support tables; all 19
+  agents have refreshed `usage_global` / `release_date` / `version_list`
+  data. **Schema-only deltas: none.**
+- `crates/caniuse-db/data/features.snapshot.json` already at
+  `caniuseLiteVersion: "1.0.30001766"` with 582 features. Spot-checked
+  13 high-traffic features (flexbox, css-grid, css-sticky, css-masks,
+  css-gradients, css-transitions, transforms2d, transforms3d,
+  css-filters, css-clip-path, css-backdrop-filter, object-fit,
+  css-logical-props) and the 3 net-new features against the unpacker
+  output of the vendored 1.0.30001766 source — all 16/16 byte-clean.
+- **No Rust source changes were required.** Autoprefixer's
+  `data/prefixes.rs` is regenerated by `build.rs` evaluating upstream
+  `prefixes.js` against the workspace-pinned `caniuse-lite` (verified
+  `node_modules/caniuse-lite@1.0.30001766`), so the new data flows in
+  on `cargo build` automatically. The `data_parity` test stayed green.
+- Verification gates (re-run): `cargo test --workspace --no-fail-fast`
+  all green; `parity-runner postcss-core-roundtrip` 32/32 byte-clean;
+  determinism 32/32; both NAPI verifiers 12/12.
+- No new corpus entries added — the package is data-only, no new code
+  path was introduced to need an adversarial input.
+- **Drift flagged (pre-existing, not introduced by AFM repin):**
+  `oxc-browserslist@3.0.2` bundles its OWN caniuse-lite snapshot —
+  see `crates/POSSIBLE_DRIFT_CAUSES.md` for the full write-up.
+- Full audit document at
+  `crates/_vendor/CANIUSE_LITE_1.0.30001690_TO_1.0.30001766_AUDIT.md`.
+
+**Re-audit findings (postcss-normalize-whitespace 5.1.1, port-quality re-check) (2026-05-02):**
+- Pin is `5.1.1` in BOTH `REFERENCE_LOCK_FILE/yarn.lock` and AFM resolution
+  — no version drift. Re-audit was for **port-quality** drift, not version
+  drift.
+- Walked every line of upstream `src/index.js` (109 lines, single file)
+  against `crates/postcss-normalize-whitespace/src/lib.rs`. Verified every
+  control-flow branch, regex (ECMAScript `\s` vs Rust `\p{White_Space}`
+  divergence at U+FEFF / U+0085 — port hand-rolls the spec set correctly),
+  cache key/value handling (`IndexMap`, insertion-ordered), `prev()`
+  resolution by index-before-mutation, and the `valueParser.walk` calc /
+  variableFunctions exemptions.
+- **No source-code changes required.** Port is 1:1.
+- Added 6 adversarial corpus entries (`23..28`) to
+  `corpus/postcss-normalize-whitespace/` covering: multiple-IE9-hacks
+  (no-`g`-flag invariant), mixed-case `VAR`/`CALC` (`toLowerCase`), the
+  third variable function `constant()`, decl-after-comment semicolon
+  strip, `--*` walks-to-empty, and pure-whitespace `raws.before`.
+- Added 7 unit tests in `lib.rs` citing the upstream lines they cover.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast` all
+  green; `parity-runner postcss-normalize-whitespace` 28/28 byte-clean;
+  `parity-runner postcss-core-roundtrip` 32/32; both NAPI verifiers 12/12;
+  determinism on `postcss-normalize-whitespace` (28/28).
+- Full audit document at
+  `crates/_vendor/POSTCSS_NORMALIZE_WHITESPACE_5.1.1_REAUDIT.md`.
+
+**browserslist 4.24.4 → 4.24.2 port landed (2026-05-02):**
+- Full source-tree diff (`diff -r`) confirms only three files differ:
+  `package.json` (version + dep range tweaks — cosmetic for the Rust
+  port), `index.js`, and `node.js`. `parse.js`, `error.js`, `browser.js`,
+  `cli.js`, all `.d.ts` files, `LICENSE`, and `README.md` are
+  byte-identical between the two versions.
+- **Non-cosmetic deltas ported into `crates/browserslist-shim/`:**
+  - `index.rs` — added `rewrite_firefox_esr()` that intercepts comma-
+    separated query atoms matching `(?i)^\s*(not\s+)?(?:firefox|ff|fx)\s+esr\s*$`
+    and rewrites them to the explicit pair `firefox 115, firefox 128`
+    (or two `not firefox <ver>` atoms). Necessary because
+    `oxc-browserslist@3.0.2` bundles its own snapshot and returns just
+    `firefox 140` for `Firefox ESR` (`src/queries/firefox_esr.rs:4`),
+    diverging from BOTH 4.24.4 (`firefox 128`) and 4.24.2
+    (`firefox 115, firefox 128`). 4.24.2 reference: `index.js` ~1018-1025.
+  - `node.rs::parse_package` — bubble `serde_json` parse failures as
+    `BrowserslistError` instead of silently returning `Ok(None)`. 4.24.2
+    JSON.parses unconditionally (`node.js` ~106-119); 4.24.4 short-circuited
+    on `text.indexOf('"browserslist"')`. The new behavior matches 4.24.2.
+- **Cosmetic / no-port-needed deltas (documented for future readers):**
+  cache-infra changes in 4.24.4 (`parseCache` in index.js;
+  `statCache`/`configPathCache`/`parseConfigCache` ↔ `filenessCache`/
+  `configCache` in node.js; `eachParent` signature change; `needsPath`
+  plumbing) are absent from 4.24.2. Our Rust shim has no caches, so
+  these collapse to a no-op.
+- **Adversarial coverage**: 6 new unit tests in
+  `crates/browserslist-shim/src/{index,node}.rs` (`firefox_esr_returns_two_versions`,
+  `firefox_esr_aliases`, `firefox_esr_combined_with_other_query`,
+  `rewrite_firefox_esr_unit`, `parse_package_invalid_json_errors`,
+  `parse_package_no_browserslist_key_returns_none`). The 20-stage
+  parity-runner corpus does not invoke browserslist resolution, so no
+  new corpus entries were added — none of those stages exercise the
+  changed code paths. Browserslist-driven prefix decisions are
+  exercised transitively by the `crates/autoprefixer/tests/data_parity.rs`
+  test, which stays green.
+- `Cargo.toml` description bumped from `4.24.4` → `4.24.2`.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast` all
+  green (15/15 in `browserslist-shim`, no regressions across the
+  workspace); `parity-runner postcss-core-roundtrip` 32/32 byte-clean;
+  `parity-runner sort` 12/12 byte-clean; both NAPI verifiers 12/12;
+  determinism on `postcss-core-roundtrip` (32/32).
+- Full audit document at
+  `crates/_vendor/BROWSERSLIST_4.24.4_TO_4.24.2_AUDIT.md`.
+
+**Stale `_vendor/` directories** (kept, not deleted):
+`caniuse-lite-1.0.30001690`, `browserslist-4.24.4`, `colord-2.9.1`,
+`electron-to-chromium-1.5.76`, `node-releases-2.0.19`,
+`postcss-selector-parser-6.0.13`. Useful for "what changed?" diffs.
+Cleanup is a future cosmetic task — no parity impact.
+
+**JS oracle source pin**: `packages/css/src/` mirrors
+`@compiled/css@0.19.0` at upstream commit
+`40a45489eaaacc023110c3f107d702a389232892`. `packages/utils/src/` mirrors
+`@compiled/utils@0.13.2` at commit `130ed3b4ae8a48926892939679c2f1479375f2a8`
+(byte-identical to `compiled@HEAD` — no overlay needed).
+
+**postcss-nested 5.0.6 re-audit landed (2026-05-02):**
+- Version is **not** drifted between REFERENCE_LOCK_FILE and AFM (both
+  pin `5.0.6`). The audit closed two semantic gaps in the existing
+  port that the 38-entry corpus had not been exercising.
+- Rust port updates in `crates/postcss-nested/src/lib.rs`:
+  - `replace_nesting`: switched `nesting_value.replace('&', ...)` →
+    `nesting_value.replacen('&', ..., 1)` to match JS
+    `String.prototype.replace(string, ...)` first-only semantics.
+    Defensive — the in-tree selector parser always emits
+    `Nesting.value == "&"`, so the fix only matters for
+    consumer-mutated values, but the contract is upstream-fidelity.
+  - `clone_rule_with_empty_nodes`: removed the unconditional
+    `clone.raws.selector = None` clear. Upstream `clone({ nodes: [] })`
+    deep-copies all raws verbatim; preserving raws.selector is what
+    keeps byte-equality on `a/*c*/ { @media ... { } }`-style inputs
+    where the selector raw form encodes a trailing comment.
+- Adversarial corpus added: 3 entries to
+  `crates/parity-runner/corpus/postcss-nested/` (`39..41`) — bubble
+  with selector-raw comment, comma list with mid-comment, and
+  trailing-spaces selector under @supports.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast`
+  all green (6/6 in `postcss-nested`); `parity-runner postcss-nested`
+  41/41 byte-clean; `parity-runner postcss-core-roundtrip` 32/32
+  byte-clean; both NAPI verifiers 12/12; determinism on
+  `postcss-nested` (41/41).
+- Full audit document at
+  `crates/_vendor/POSTCSS_NESTED_5.0.6_REAUDIT.md`.
+
 ## postcss version pin: `8.4.31` → `8.5.6` (no code changes)
 
 The consuming monorepo's actual postcss version is `8.5.6`, not `8.4.31`
@@ -31,7 +324,7 @@ header. **No code changes required** — all 489 tests still green.
 | 2 | postcss-selector-parser / postcss-value-parser / postcss-values-parser / browserslist-shim / cssnano-utils | **DONE** |
 | 3 | caniuse-api | **DONE** |
 | 4a | discard-empty-rules / discard-duplicates (LOCAL) / extract-stylesheets | **DONE** — all byte-clean |
-| 4b | parent-orphaned-pseudos / flatten-multiple-selectors / increase-specificity | **DONE** — all byte-clean |
+| 4b | parent-orphaned-pseudos / increase-specificity | **DONE** — byte-clean (provisional pending oracle re-bake). `flatten-multiple-selectors` was deleted in the AFM repin — not part of the 0.19.0 surface. |
 | 4c | merge-duplicate-at-rules / normalize-current-color / sort-atomic-style-sheet (+ at-rules helpers, sort-pseudo-selectors, sort-shorthand-declarations) | **DONE** — all byte-clean |
 | 4d | atomicify-rules (CRITICAL hash plugin) | **DONE** — byte-clean across 24-entry corpus |
 | 4e | expand-shorthands (11 conversion functions) | **DONE** — byte-clean across 38-entry corpus |

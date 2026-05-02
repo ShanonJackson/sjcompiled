@@ -567,14 +567,47 @@ fn walk_for_semicolon_sample(n: &Node, out: &mut Option<bool>) {
     }
 }
 
-/// JS `value.replace(/\S/g, '')` — strip every non-whitespace character.
-/// `\S` is the JS regex shorthand for "any non-whitespace", whose
-/// definition matches `\s` (ECMAScript's WhiteSpace + LineTerminator,
-/// which is roughly Unicode `White_Space` plus U+FEFF). Rust
-/// `char::is_whitespace` covers `White_Space`; we additionally treat
-/// U+FEFF as whitespace to match JS exactly.
+/// JS `value.replace(/\S/g, '')` — keep only chars matching JS `\s`.
+///
+/// ECMAScript `\s` is defined precisely as:
+///   WhiteSpace      = { U+0009 TAB, U+000B VT, U+000C FF, U+0020 SP,
+///                       U+00A0 NBSP, U+FEFF ZWNBSP }
+///                     ∪ Unicode `Space_Separator` general category
+///   LineTerminator  = { U+000A LF, U+000D CR, U+2028 LS, U+2029 PS }
+///
+/// **This is NOT the same as Rust's `char::is_whitespace`**, which
+/// returns the Unicode `White_Space` property. The two differ in:
+///   - U+0085 (NEL): IN Rust `is_whitespace`, NOT in JS `\s`.
+///   - U+FEFF: IN JS `\s`, NOT in Rust `is_whitespace`.
+///
+/// We enumerate the JS spec set directly. Don't replace this with
+/// `is_whitespace` "for clarity" — a CSS input containing U+0085 in
+/// a raws-before position would diverge byte-for-byte.
+pub(crate) fn is_js_regex_whitespace(c: char) -> bool {
+    match c {
+        '\u{0009}'           // TAB
+        | '\u{000A}'         // LF
+        | '\u{000B}'         // VT
+        | '\u{000C}'         // FF
+        | '\u{000D}'         // CR
+        | '\u{0020}'         // SP
+        | '\u{00A0}'         // NBSP
+        | '\u{2028}'         // LS
+        | '\u{2029}'         // PS
+        | '\u{FEFF}'         // ZWNBSP
+            => true,
+        // Unicode `Space_Separator` (Zs) — exhaustive list as of Unicode 16.
+        // (NBSP U+00A0 already covered above.)
+        '\u{1680}'
+        | '\u{2000}'..='\u{200A}'
+        | '\u{202F}'
+        | '\u{205F}'
+        | '\u{3000}'
+            => true,
+        _ => false,
+    }
+}
+
 fn strip_non_whitespace(s: &str) -> String {
-    s.chars()
-        .filter(|c| c.is_whitespace() || *c == '\u{FEFF}')
-        .collect()
+    s.chars().filter(|c| is_js_regex_whitespace(*c)).collect()
 }

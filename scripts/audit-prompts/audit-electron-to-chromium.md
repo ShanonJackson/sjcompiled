@@ -1,0 +1,188 @@
+# Audit & Port: `electron-to-chromium` 1.5.76 → 1.5.41
+
+> **DATA-ONLY PACKAGE.** This is a JSON/data dependency, not JS source. There is no `<file>.js` → `<file>.rs` mapping. The audit verifies the **vendored data tables** match AFM's installed snapshot, NOT that any Rust source matches an upstream JS file.
+
+> **NOT YET CONSUMED BY ANY RUST CODE.** `grep -rn "electron-to-chromium\|electron_to_chromium" crates/` returns hits only in `Cargo.toml` description strings, not in any `*.rs` source. The Rust port has nothing to update today; this audit is a documentation/forward-pin sanity check. **Consider deferring this prompt entirely** unless a downstream port (autoprefixer, browserslist-aware cssnano plugins) is about to land that will consume it. If you proceed, the deliverable shrinks to (a) re-vendor under `crates/_vendor/electron-to-chromium-1.5.41/`, (b) bump pin docstrings, (c) write a one-page report, (d) flag the hand-off in STATUS.md. Skip the source diff. Skip the Rust port. Skip the corpus additions.
+
+
+## Background — why this exists
+
+The Rust ports under `crates/` were originally written against the
+versions pinned in `REFERENCE_LOCK_FILE/yarn.lock` (the upstream
+`compiled` repo's lockfile). We later discovered that the **AFM/JIRA
+monorepo** — the actual consumer of the Rust port — installs
+`@compiled/css@0.19.0` resolved against a different dependency graph.
+AFM resolution wins; see `AFM_MONOREPO_DEPENDENCIES_MORE.md` and
+`crates/PARITY_VERSIONS.md` "Source of Truth" section.
+
+The contract for this project is **byte-equality** for hash output.
+Any non-cosmetic source change between the two pinned versions must
+be replicated in the Rust port. The 20-stage parity corpus in
+`crates/parity-runner/corpus/` is a SMOKE gate (~430 hand-crafted
+inputs total); the real consumer is **~60GB of AFM source** where
+every selector/value/at-rule edge case will surface. **Do not assume
+a change is cosmetic just because the existing corpus passes.** Bias
+toward replicating upstream verbatim. The cost of a needless port is
+low; the cost of a missed semantic change is a silent hash divergence
+in production that is effectively impossible to debug.
+
+
+## Specific to `electron-to-chromium`
+
+We originally ported the Rust crate `crates/caniuse-db/` against
+**1.5.76**. AFM resolves to **1.5.41**. The pin has been bumped
+in `PARITY_VERSIONS.md`, root `package.json` overrides, and the
+crate's docstrings — **but the port itself has not been audited against
+1.5.41 source yet**.
+
+**LOW PRIORITY** — `grep -rn "electron-to-chromium\|electron_to_chromium" crates/` returns ONE hit, in `crates/caniuse-db/Cargo.toml`'s description string. Nothing actually reads the data. The audit task is reduced to: (1) re-vendor `crates/_vendor/electron-to-chromium-1.5.41/` for future use; (2) document in the report that no Rust consumer exists yet so no port is required; (3) flag the hand-off point — when autoprefixer's `Browsers::new` call site lands, it WILL need this data, and the future agent should re-run this audit then.
+
+### Where this is consumed in the Rust port
+
+**Currently NOT consumed by any Rust code.** Mentioned only in `crates/caniuse-db/Cargo.toml` description string and `crates/PARITY_VERSIONS.md` table. The package is vendored as a forward-compatibility pin for future browserslist/autoprefixer work that resolves `electron N` queries — `oxc_browserslist` v3 wraps its own bundled mappings today, so we don't reach the JS data tables.
+
+### Known non-cosmetic deltas (anchors — find more in your full diff)
+
+- Patch DOWN direction (1.5.76 → 1.5.41). 35 patch versions removed — likely Chromium-version mappings for releases that did not exist when 1.5.41 was published.
+- No Rust source consumes this data today. The audit is a documentation/forward-pin sanity check, not a port.
+
+## Source locations
+
+- **Old (1.5.76)**: `crates/_vendor/electron-to-chromium-1.5.76/`
+- **New (1.5.41)**: `node_modules/.bun/electron-to-chromium@1.5.41/node_modules/electron-to-chromium/`
+- **Rust port**: `crates/caniuse-db/`
+- **Headline files** (in the root of the package): `chromium-versions.js`, `chromium-versions.json`, `versions.js`, `versions.json`, `full-chromium-versions.js`, `full-chromium-versions.json`, `full-versions.js`, `full-versions.json`
+
+If `node_modules/.bun/electron-to-chromium@1.5.41*/` is missing, run
+`bun install` from the workspace root first. If you want a vendored
+copy for permanence:
+`mkdir -p crates/_vendor/electron-to-chromium-1.5.41/package && cp -r node_modules/.bun/electron-to-chromium@1.5.41/node_modules/electron-to-chromium/. crates/_vendor/electron-to-chromium-1.5.41/package/`.
+
+## Your task
+
+### 1. Confirm the new vendored snapshot reflects the AFM pin
+
+```bash
+diff -r \
+  crates/_vendor/electron-to-chromium-1.5.76/ \
+  node_modules/.bun/electron-to-chromium@1.5.41/node_modules/electron-to-chromium/
+```
+
+Walk every file in the diff. Categorize each delta:
+
+- **Data-only changes** (new browser version added, support flag flipped,
+  feature added/removed) — record in your report. These reach output
+  bytes ONLY through downstream consumers (autoprefixer, caniuse-api,
+  the browserslist-aware cssnano plugins).
+- **Schema changes** (field added/removed at the JSON level) — these
+  break the unpacker / parser. Update `crates/caniuse-db/scripts/snapshot.js`
+  and `crates/caniuse-db/src/features.rs` / `agents.rs` if hit.
+
+### 2. Re-run the snapshot regeneration if needed
+
+```bash
+node crates/caniuse-db/scripts/snapshot.js
+RUSTFLAGS="" cargo build --manifest-path crates/caniuse-db/Cargo.toml
+```
+
+The snapshot file (`crates/caniuse-db/data/features.snapshot.json`)
+has already been regenerated as part of the AFM repin. Verify that file
+contains the new version string at the head and the expected feature
+count. Do NOT re-vendor on top of work already done.
+
+### 3. Spot-check downstream consumers
+
+For caniuse-lite specifically: pick 5–10 high-traffic features (flexbox,
+grid, position-sticky, mask, aspect-ratio, container queries, :has,
+transforms, gradients, css-variables) and confirm Rust-side
+`caniuse_db::feature("X")` returns the same support matrix as
+Node-side `require("caniuse-lite/data/features/X.js")` post-unpack.
+Add unit tests under `crates/caniuse-db/src/lib.rs` or
+`crates/caniuse-api/src/lib.rs` for any spot-check that surfaces
+unexpected drift.
+
+For electron-to-chromium / node-releases: there is no current Rust
+consumer. Skip this step. Your report's "future hand-off" section
+substitutes for it.
+
+### 4. (skip if not-yet-consumed)
+
+For `electron-to-chromium`, this step does not apply — no Rust code reads the data.
+
+
+## Verification gates (must all pass before declaring done)
+
+Run each command from the workspace root. If any fails, that's a
+regression — investigate before declaring complete.
+
+```bash
+# Build the parity-runner if it isn't already built.
+RUSTFLAGS="" cargo build --manifest-path crates/parity-runner/Cargo.toml
+
+# Full Rust test suite — must stay green.
+RUSTFLAGS="" cargo test --manifest-path crates/Cargo.toml --workspace --no-fail-fast
+
+# Parity gates — ALL must remain byte-clean (JS-vs-Rust).
+crates/target/debug/parity-runner --stage postcss-core-roundtrip --corpus crates/parity-runner/corpus/postcss-core-roundtrip
+
+# NAPI sort + engine flag verifiers — must stay 12/12.
+bun run packages/css/scripts/verify-napi-sort.mjs
+bun run packages/css/scripts/verify-engine-flag.mjs
+
+# Determinism on at least one stage you touched (JS-vs-JS oracle stability).
+crates/target/debug/parity-runner --stage postcss-core-roundtrip --corpus crates/parity-runner/corpus/postcss-core-roundtrip --determinism
+```
+
+If `cargo build` complains about `lto cannot be used for proc-macro`,
+prefix the command with `RUSTFLAGS=""`. The repo's user-level
+RUSTFLAGS conflicts with proc-macro builds — clearing it is the standard
+workaround.
+
+
+## Report
+
+Write a concise audit document at `crates/_vendor/ELECTRON_TO_CHROMIUM_1.5.76_TO_1.5.41_AUDIT.md` containing:
+
+- A table of every file in the package source with a column for
+  "cosmetic / non-cosmetic / no diff" and a one-line explanation per
+  non-cosmetic entry.
+- The list of Rust files you modified and a one-line description of
+  what changed in each.
+- The corpus entries you added and which code path each exercises.
+- Verification gate results (paste the actual final-line output of
+  each command in the verification block).
+
+Update `crates/STATUS.md` "AFM repin" section: append a single
+sub-section recording the change. **Do not** touch other STATUS sections.
+
+
+## Constraints (do NOT break these)
+
+- **Do not modify** `packages/css/src/`. That tree is the JS oracle
+  pinned at `@compiled/css@0.19.0` (commit 40a4548) — touching it
+  invalidates parity for every other agent.
+- **Do not modify** the "Pinned Versions" tables in
+  `crates/PARITY_VERSIONS.md`. The pin is already correct. You're
+  closing the gap between the pin and the implementation, not changing
+  the pin itself.
+- **Do not modify** any `crates/_vendor/<pkg>-<old-version>/` directory.
+  Those are read-only historical references.
+- **Do not delete** any existing corpus entry, even if it looks
+  redundant. Only add new ones.
+- **Do not bypass** `RUSTFLAGS=""` by adjusting workspace
+  `Cargo.toml` or `compiled-css-napi`'s `[profile.release]`.
+  The clearing is the correct workaround for the proc-macro/LTO conflict.
+- **Do not skip** any verification gate. Even gates that look unrelated
+  to your package may exercise it transitively (e.g. `postcss-core-roundtrip`
+  depends on every postcss-touching plugin's AST shape).
+- If you find a delta that's ambiguous — could be cosmetic, could be
+  semantic — **port it**. Bias toward replicating upstream verbatim.
+- **Do not "improve" anything along the way.** Bugs are features. If the
+  newer version has a regression vs the older one, port the regression.
+- **HashMap is banned** in any code path that produces output bytes.
+  Use `IndexMap` (insertion-order is byte-affecting downstream).
+- **Do not run `bun install`** unless you genuinely need to refresh
+  `node_modules`. The AFM-pinned versions are already resolved; an
+  unprompted `bun install` can churn the lockfile and confuse other
+  concurrent agents.
+

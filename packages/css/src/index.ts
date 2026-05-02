@@ -1,7 +1,7 @@
 export { addUnitIfNeeded } from './utils/css-property';
 export { transformCss } from './transform';
-export { cssAffixInterpolation } from './utils/css-affix-interpolation';
-export type {
+export {
+  cssAffixInterpolation,
   AfterInterpolation,
   BeforeInterpolation,
 } from './utils/css-affix-interpolation';

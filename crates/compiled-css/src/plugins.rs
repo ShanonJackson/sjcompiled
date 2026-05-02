@@ -7,7 +7,6 @@ pub mod atomicify_rules;
 pub mod discard_duplicates;
 pub mod discard_empty_rules;
 pub mod extract_stylesheets;
-pub mod flatten_multiple_selectors;
 pub mod increase_specificity;
 pub mod merge_duplicate_at_rules;
 pub mod normalize_css;

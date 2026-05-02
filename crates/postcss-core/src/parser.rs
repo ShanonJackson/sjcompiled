@@ -43,7 +43,9 @@ pub struct Parser {
     current: CurrentPath,
     spaces: String,
     semicolon: bool,
-    custom_property: bool,
+    // NOTE: upstream had a `customProperty: bool` field on the parser
+    // through 8.4.31; 8.5.6 removed it because the value was never read.
+    // We dropped it here too (was generating an unused-field warning).
     /// We hold the tokenizer behind an `Option` so we can take ownership of
     /// it while we walk the AST (the tokenizer borrows the input's `&str`).
     tokens: Vec<Token>,
@@ -59,7 +61,6 @@ impl Parser {
             current: CurrentPath::root(),
             spaces: String::new(),
             semicolon: false,
-            custom_property: false,
             tokens: Vec::new(),
             tok_pos: 0,
             end_offset: 0,

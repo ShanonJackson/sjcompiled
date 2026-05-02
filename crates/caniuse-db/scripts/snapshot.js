@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 // Caniuse-lite snapshot: unpacks every feature in
-// `crates/_vendor/caniuse-lite-1.0.30001690/package/data/features/`
+// `crates/_vendor/caniuse-lite-1.0.30001766/package/data/features/`
 // using the upstream unpacker, then writes a single JSON file at
 // `crates/caniuse-db/data/features.snapshot.json`.
 //
-// Re-run only when `crates/_vendor/caniuse-lite-1.0.30001690` is refreshed
+// Re-run only when `crates/_vendor/caniuse-lite-1.0.30001766` is refreshed
 // (which per `crates/PARITY_VERSIONS.md` we never do — caniuse-lite is
-// frozen at 1.0.30001690 forever).
+// frozen at 1.0.30001766 forever).
 
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..', '_vendor',
-  'caniuse-lite-1.0.30001690', 'package');
+  'caniuse-lite-1.0.30001766', 'package');
 const featureUnpacker = require(path.join(ROOT, 'dist', 'unpacker', 'feature.js'));
 const agentUnpackerMod = require(path.join(ROOT, 'dist', 'unpacker', 'agents.js'));
 
@@ -37,7 +37,7 @@ for (const name of Object.keys(featuresIndex)) {
 const out = path.resolve(__dirname, '..', 'data', 'features.snapshot.json');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify({
-  caniuseLiteVersion: '1.0.30001690',
+  caniuseLiteVersion: '1.0.30001766',
   browsers,
   agents,
   features,

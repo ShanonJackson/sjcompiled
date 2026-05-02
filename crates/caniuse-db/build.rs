@@ -4,7 +4,7 @@
 //! `once_cell::Lazy`.
 //!
 //! Per `crates/PARITY_VERSIONS.md` Anomaly #3, the snapshot is frozen at
-//! caniuse-lite@1.0.30001690 and must not be regenerated unless every
+//! caniuse-lite@1.0.30001766 and must not be regenerated unless every
 //! consumer is signed off on a hash rotation.
 
 use std::env;

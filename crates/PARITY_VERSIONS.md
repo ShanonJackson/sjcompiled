@@ -29,19 +29,44 @@ in scope.
 
 ## Source of Truth
 
-The authoritative version pin for every dependency is:
+The authoritative version pin for every dependency is the **AFM/JIRA monorepo
+resolution** as captured in `AFM_MONOREPO_DEPENDENCIES_MORE.md` (the
+fully-resolved 61-item dependency manifest of `@compiled/css@0.19.0` as it is
+actually installed inside Atlassian's Frontend Monorepo).
 
-```
-REFERENCE_LOCK_FILE/yarn.lock
-```
+`REFERENCE_LOCK_FILE/yarn.lock` is the **upstream `compiled` repo's**
+lockfile — it differs from AFM resolution for several byte-affecting
+packages: `postcss` (8.4.31 vs 8.5.6), `postcss-selector-parser`
+(6.0.13 vs 6.1.2), `browserslist` (4.24.4 vs 4.24.2), `caniuse-lite`
+(1.0.30001690 vs 1.0.30001766), `colord` (2.9.1 vs 2.9.3),
+`electron-to-chromium` (1.5.76 vs 1.5.41), `node-releases` (2.0.19 vs
+2.0.18). **AFM wins**; the reference lockfile is retained only as a
+historical artifact of the original fork.
 
-This file was copied from the upstream monorepo at the moment the source files
-in `packages/` were forked. **Treat it as immutable.** Do not regenerate it. Do
-not bump it. Do not "refresh." Any change to that file invalidates every hash
-the consuming codebase has ever produced.
+The Rust port targets the **AFM-resolved** versions because byte-equality
+is measured against the bytes that JIRA's installed `@compiled/css@0.19.0`
+emits — not against the bytes that `compiled@HEAD` would emit.
 
-When in doubt about any package version not listed in the table below, look it
-up in `REFERENCE_LOCK_FILE/yarn.lock`. That answer is final.
+### JS oracle source pin (the source code we port from)
+
+`packages/css/src/` mirrors `@compiled/css@0.19.0` at upstream commit
+`40a45489eaaacc023110c3f107d702a389232892` (`Version Packages (#1787)`,
+2025-01-28). **Do not** overlay this directory with `compiled@HEAD`
+source — HEAD is at `0.21.0`, which adds `flatten-multiple-selectors`
+to the pipeline (changes hashes), changes `expand-shorthands/flex.ts`
+(47-line delta), `sort-atomic-style-sheet.ts` (10-line delta), and
+renames `parse-at-rule.ts` → `parse-media-query.ts`. None of those
+exist in the 0.19.0 line that AFM consumes.
+
+`packages/utils/src/` mirrors `@compiled/utils@0.13.2` at upstream
+commit `130ed3b4ae8a48926892939679c2f1479375f2a8`. The source is
+byte-identical between `130ed3b` and `compiled@HEAD` (no diff in
+`packages/utils/src`), so the hash function is unaffected by the
+version-coordination issue described above.
+
+When in doubt about any package version not listed in the table
+below, look it up in `AFM_MONOREPO_DEPENDENCIES_MORE.md`. That answer
+is final.
 
 ---
 
@@ -84,7 +109,7 @@ must run on the same prettier version, otherwise the oracle drifts.
 | `postcss` | `^8.4.31` | **8.5.6** | `crates/postcss-core` | `transform.ts`, `sort.ts`, every plugin. Bumped from 8.4.31 → 8.5.6 after empirical diff confirmed identical byte-output for `parse(css).toString()` and for full plugin pipelines (26/26 raw round-trips + 30/30 plugin × input pairs). See `crates/_vendor/test-postcss-versions/` for the diff harness. Changes between versions are diagnostic/sourcemap surface only — none reach the hashing path. |
 | `postcss-nested` | `^5.0.6` | **5.0.6** | `crates/postcss-nested` | `transform.ts:48` |
 | `postcss-normalize-whitespace` | `^5.1.1` | **5.1.1** | `crates/postcss-normalize-whitespace` | `transform.ts:76` |
-| `postcss-selector-parser` | `^6.0.13` | **6.0.13** | `crates/postcss-selector-parser` | local selector-touching plugins |
+| `postcss-selector-parser` | `^6.0.13` | **6.1.2** | `crates/postcss-selector-parser` | local selector-touching plugins. AFM-resolved version (compiled@HEAD lockfile pins 6.0.13; AFM resolves 6.1.2). Diff in upstream `dist/` between 6.0.13 and 6.1.2 is small and must be re-audited against `crates/postcss-selector-parser`. |
 | `postcss-discard-duplicates` | `^6.0.0` | **6.0.0** | `crates/postcss-discard-duplicates` | **`sort.ts:2`** (second hashing entry point) |
 | `postcss-values-parser` | `^6.0.2` | **6.0.2** | `crates/postcss-values-parser` | every file in `plugins/expand-shorthands/` |
 | `autoprefixer` | `^10.4.14` | **10.4.14** | `crates/autoprefixer` | `transform.ts:75` |
@@ -95,13 +120,13 @@ must run on the same prettier version, otherwise the oracle drifts.
 | npm package | Resolved version | Why it matters | Rust crate |
 |---|---|---|---|
 | `postcss-value-parser` | **4.2.0** | Used by `autoprefixer` and many cssnano plugins | `crates/postcss-value-parser` |
-| `browserslist` | **4.24.4** | Resolves browser targets for `autoprefixer` AND for several cssnano plugins (see below) | `crates/browserslist-shim` (wraps `oxc_browserslist`) |
-| `caniuse-lite` | **1.0.30001690** | **The silent invariant.** Drives `autoprefixer` AND `caniuse-api` (which `postcss-colormin` etc. use). Vendor the JSON snapshot from `node_modules/caniuse-lite/data/` and codegen Rust tables via `build.rs`. | `crates/caniuse-db` |
+| `browserslist` | **4.24.2** | Resolves browser targets for `autoprefixer` AND for several cssnano plugins (see below). AFM-resolved (compiled@HEAD lockfile pins 4.24.4 — AFM is one patch *behind*). | `crates/browserslist-shim` (wraps `oxc_browserslist`) |
+| `caniuse-lite` | **1.0.30001766** | **The silent invariant.** Drives `autoprefixer` AND `caniuse-api` (which `postcss-colormin` etc. use). Vendor the JSON snapshot from `node_modules/caniuse-lite/data/` and codegen Rust tables via `build.rs`. AFM-resolved (compiled@HEAD lockfile pins 1.0.30001690; ~76 monthly snapshots later). | `crates/caniuse-db` |
 | `caniuse-api` | **3.0.0** | Wrapper used by cssnano plugins (`postcss-colormin`, etc.) to query caniuse-lite via browserslist targets | `crates/caniuse-api` |
-| `colord` | **2.9.1** | Color manipulation; used by `postcss-colormin` and `postcss-minify-gradients` | `crates/colord` |
+| `colord` | **2.9.3** | Color manipulation; used by `postcss-colormin` and `postcss-minify-gradients`. AFM-resolved (compiled@HEAD lockfile pins 2.9.1). | `crates/colord` |
 | `cssnano-utils` | **3.1.0** | Shared helpers used by ~every cssnano plugin we run | `crates/cssnano-utils` |
-| `electron-to-chromium` | **1.5.76** | Feeds browserslist resolution | `crates/caniuse-db` (vendored alongside) |
-| `node-releases` | **2.0.19** | Feeds browserslist resolution | `crates/caniuse-db` (vendored alongside) |
+| `electron-to-chromium` | **1.5.41** | Feeds browserslist resolution. AFM-resolved (compiled@HEAD lockfile pins 1.5.76). | `crates/caniuse-db` (vendored alongside) |
+| `node-releases` | **2.0.18** | Feeds browserslist resolution. AFM-resolved (compiled@HEAD lockfile pins 2.0.19). | `crates/caniuse-db` (vendored alongside) |
 | `fraction.js` | **4.2.0** | Used in autoprefixer's grid math AND `postcss-convert-values` | `crates/fraction-js` |
 | `nanoid` | **3.3.6** | Source-id generation in postcss | port inline into `crates/postcss-core` (only if reachable from output bytes) |
 | `picocolors` | **1.1.1** | Error formatting in postcss | port inline into `crates/postcss-core` (errors are user-visible — match strings) |
@@ -170,7 +195,7 @@ There are **two** public functions whose outputs must be byte-exact:
 
 1. **`transformCss(css, opts)`** in `packages/css/src/transform.ts:33`.
    Runs the full pipeline:
-   `discardDuplicates (local) → discardEmptyRules (local) → parentOrphanedPseudos (local) → postcss-nested@5.0.6 → normalizeCSS (cssnano subset + normalizeCurrentColor) → expandShorthands (local, uses postcss-values-parser@6.0.2) → atomicifyRules (local) → flattenMultipleSelectors + discardDuplicates (local) → increaseSpecificity (local, conditional) → sortAtomicStyleSheet (local) → autoprefixer@10.4.14 → postcss-normalize-whitespace@5.1.1 → extractStyleSheets (local)`.
+   `discardDuplicates (local) → discardEmptyRules (local) → parentOrphanedPseudos (local) → postcss-nested@5.0.6 → normalizeCSS (cssnano subset + normalizeCurrentColor) → expandShorthands (local, uses postcss-values-parser@6.0.2) → atomicifyRules (local) → increaseSpecificity (local, conditional) → sortAtomicStyleSheet (local) → autoprefixer@10.4.14 → postcss-normalize-whitespace@5.1.1 → extractStyleSheets (local)`.
 
 2. **`sort(stylesheet, opts)`** in `packages/css/src/sort.ts:13`.
    Runs:
@@ -190,7 +215,7 @@ the JS implementation as part of the parity gate.
    has different whitespace rules. v5 is what the JS pipeline runs. Anything
    else changes output bytes.
 
-3. **`caniuse-lite@1.0.30001690`** is the silent invariant.
+3. **`caniuse-lite@1.0.30001766`** is the silent invariant.
    `caniuse-lite` updates monthly, and autoprefixer's vendor-prefix decisions
    depend entirely on this DB. The Rust crate `crates/caniuse-db/` MUST vendor
    the JSON snapshot from this exact version. Do not let it auto-update.
@@ -199,11 +224,14 @@ the JS implementation as part of the parity gate.
    `postcss-convert-values`, `postcss-normalize-unicode`) also gate decisions
    on browser support. Same DB, multiple consumers.
 
-4. **`browserslist@4.24.4` defaults** are version-specific (default query,
+4. **`browserslist@4.24.2` defaults** are version-specific (default query,
    "dead browser" list, evaluation semantics). `oxc_browserslist` may default
    to a newer version's behavior. The shim crate must override defaults to
-   match 4.24.4 exactly. Browserslist is consumed by autoprefixer **and** by
+   match 4.24.2 exactly. Browserslist is consumed by autoprefixer **and** by
    every "browserslist-aware" cssnano plugin in the manifest above.
+   **Note:** AFM is one patch *behind* the upstream `compiled` lockfile
+   (which pins 4.24.4). Verify the 4.24.4 → 4.24.2 patch direction with the
+   AFM dependency engineer before assuming defaults are equivalent.
 
 5. **Two versions of `postcss-discard-duplicates` are present in the tree.**
    - **v6.0.0** is a direct dep, used by `sort.ts` — port this.
@@ -268,7 +296,7 @@ in its `Cargo.toml` description and at the top of its `lib.rs`. Example:
 | Rust crate | Ports | At version | Upstream source location |
 |---|---|---|---|
 | `crates/postcss-core` | `postcss` | 8.5.6 | `node_modules/postcss/lib/*.js` |
-| `crates/postcss-selector-parser` | `postcss-selector-parser` | 6.0.13 | `node_modules/postcss-selector-parser/` |
+| `crates/postcss-selector-parser` | `postcss-selector-parser` | 6.1.2 | `node_modules/postcss-selector-parser/` |
 | `crates/postcss-value-parser` | `postcss-value-parser` | 4.2.0 | `node_modules/postcss-value-parser/lib/` |
 | `crates/postcss-values-parser` | `postcss-values-parser` (plural — distinct package) | 6.0.2 | `node_modules/postcss-values-parser/` |
 
@@ -276,8 +304,8 @@ in its `Cargo.toml` description and at the top of its `lib.rs`. Example:
 
 | Rust crate | Ports | At version | Upstream source location |
 |---|---|---|---|
-| `crates/browserslist-shim` | `browserslist` config resolution + defaults (wraps `oxc_browserslist`) | 4.24.4 | `node_modules/browserslist/node.js`, `index.js` |
-| `crates/caniuse-db` | `caniuse-lite` + `electron-to-chromium` + `node-releases` data tables (codegen via `build.rs`) | 1.0.30001690 / 1.5.76 / 2.0.19 | `node_modules/caniuse-lite/data/`, `node_modules/electron-to-chromium/`, `node_modules/node-releases/data/` |
+| `crates/browserslist-shim` | `browserslist` config resolution + defaults (wraps `oxc_browserslist`) | 4.24.2 | `node_modules/browserslist/node.js`, `index.js` |
+| `crates/caniuse-db` | `caniuse-lite` + `electron-to-chromium` + `node-releases` data tables (codegen via `build.rs`) | 1.0.30001766 / 1.5.41 / 2.0.18 | `node_modules/caniuse-lite/data/`, `node_modules/electron-to-chromium/`, `node_modules/node-releases/data/` |
 | `crates/caniuse-api` | `caniuse-api` query helper used by cssnano plugins | 3.0.0 | `node_modules/caniuse-api/` |
 
 ### Pipeline plugins (transformCss)
@@ -301,7 +329,7 @@ in its `Cargo.toml` description and at the top of its `lib.rs`. Example:
 |---|---|---|---|
 | `crates/cssnano-preset-default` | preset orchestrator (plugin tuple list + source order) | 5.2.14 | `node_modules/cssnano-preset-default/src/index.js` |
 | `crates/cssnano-utils` | `cssnano-utils` shared helpers | 3.1.0 | `node_modules/cssnano-utils/` |
-| `crates/colord` | `colord` color manipulation | 2.9.1 | `node_modules/colord/` |
+| `crates/colord` | `colord` color manipulation | 2.9.3 | `node_modules/colord/` |
 | `crates/cssnano-postcss-minify-selectors` | `postcss-minify-selectors` | 5.2.1 | `node_modules/postcss-minify-selectors/` |
 | `crates/cssnano-postcss-minify-params` | `postcss-minify-params` | 5.1.4 | `node_modules/postcss-minify-params/` |
 | `crates/cssnano-postcss-ordered-values` | `postcss-ordered-values` | 5.1.3 | `node_modules/postcss-ordered-values/` |
@@ -321,7 +349,7 @@ in its `Cargo.toml` description and at the top of its `lib.rs`. Example:
 
 | Rust crate | Ports | Source |
 |---|---|---|
-| `crates/compiled-css` | every plugin under `packages/css/src/plugins/` not covered above (atomicifyRules, discardDuplicates-local, discardEmptyRules, expandShorthands, extractStyleSheets, flattenMultipleSelectors, increaseSpecificity, mergeDuplicateAtRules, normalizeCurrentColor, parentOrphanedPseudos, sortAtomicStyleSheet) | `packages/css/src/plugins/` |
+| `crates/compiled-css` | every plugin under `packages/css/src/plugins/` not covered above (atomicifyRules, discardDuplicates-local, discardEmptyRules, expandShorthands, extractStyleSheets, increaseSpecificity, mergeDuplicateAtRules, normalizeCurrentColor, parentOrphanedPseudos, sortAtomicStyleSheet). **`flattenMultipleSelectors` is NOT in this list** — it was added post-0.19.0 (in the 0.20+ series) and is not part of the AFM-pinned pipeline. | `packages/css/src/plugins/` |
 
 ### Bridge + tooling
 
@@ -338,8 +366,10 @@ in its `Cargo.toml` description and at the top of its `lib.rs`. Example:
 1. **Bytes are the contract.** Not behavior. Not semantics. **Bytes.**
 2. **Bugs are features.** If `autoprefixer@10.4.14` emits a "wrong" prefix, the
    Rust port emits the same "wrong" prefix.
-3. **`REFERENCE_LOCK_FILE/yarn.lock` is immutable.** Do not regenerate, refresh,
-   or update.
-4. **Caniuse-lite is frozen at `1.0.30001690`.** Forever.
+3. **`AFM_MONOREPO_DEPENDENCIES_MORE.md` is the source of truth** — not the
+   reference lockfile, not what `bun install` happens to resolve, not
+   "current latest". Every pin in this document mirrors AFM resolution.
+4. **Caniuse-lite is frozen at `1.0.30001766`.** Forever (until a coordinated
+   rotation with AFM).
 5. **No version bumps without a hash-rotation plan.** And that plan takes
    months, not days.

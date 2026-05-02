@@ -1,0 +1,2 @@
+:is(:not(:where(.a, .b)), .c) { color: red; }
+:has(.a:is(.b, .c) > .d) { color: blue; }

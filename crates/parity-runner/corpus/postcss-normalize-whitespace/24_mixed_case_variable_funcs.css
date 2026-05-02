@@ -1,0 +1,7 @@
+a {
+  color: VAR(  --x ,  red );
+  background: Env(   safe-area-inset-top ,   0 );
+  border-color: CONSTANT(  safe-area-inset-bottom  );
+  width: CALC(  1px  +  2px );
+  height: Calc(  10%  +   var( --y ,  0 ) );
+}

@@ -1,0 +1,3 @@
+.parent:has(.a > .b) { color: red; }
+.parent:has(.x + .y, .z ~ .w) { color: blue; }
+.parent:has(.a > .b > .c ) { color: green; }

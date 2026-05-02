@@ -12,7 +12,7 @@ const transform = (css: TemplateStringsArray) => {
 
 describe('flex property expander', () => {
   describe('has one parameter', () => {
-    it('should expand flex=none', () => {
+    it('should expand flex none', () => {
       const result = transform`
         flex: none;
       `;
@@ -26,52 +26,7 @@ describe('flex property expander', () => {
       `);
     });
 
-    it('should expand flex=initial', () => {
-      const result = transform`
-        flex: initial;
-      `;
-
-      expect(result).toMatchInlineSnapshot(`
-        "
-                flex-grow: 0;
-                flex-shrink: 1;
-                flex-basis: auto;
-              "
-      `);
-    });
-
-    it('should expand flex=auto', () => {
-      const result = transform`
-        flex: auto;
-      `;
-
-      expect(result).toMatchInlineSnapshot(`
-        "
-                flex-grow: 1;
-                flex-shrink: 1;
-                flex-basis: auto;
-              "
-      `);
-    });
-
-    it('should not expand flex=revert', () => {
-      const result = transform`flex: revert;`;
-      expect(result).toMatchInlineSnapshot(`"flex: revert;"`);
-    });
-    it('should not expand flex=revert-layer', () => {
-      const result = transform`flex: revert-layer;`;
-      expect(result).toMatchInlineSnapshot(`"flex: revert-layer;"`);
-    });
-    it('should not expand flex=unset', () => {
-      const result = transform`flex: unset;`;
-      expect(result).toMatchInlineSnapshot(`"flex: unset;"`);
-    });
-    it('should not expand flex=inherit', () => {
-      const result = transform`flex: inherit;`;
-      expect(result).toMatchInlineSnapshot(`"flex: inherit;"`);
-    });
-
-    it('should expand flex numbers', () => {
+    it('should expand flex single', () => {
       const result = transform`
         flex: 2;
       `;
@@ -81,6 +36,20 @@ describe('flex property expander', () => {
                 flex-grow: 2;
                 flex-shrink: 1;
                 flex-basis: 0%;
+              "
+      `);
+    });
+
+    it('should expand flex auto', () => {
+      const result = transform`
+        flex: auto;
+      `;
+
+      expect(result).toMatchInlineSnapshot(`
+        "
+                flex-grow: 1;
+                flex-shrink: 1;
+                flex-basis: auto;
               "
       `);
     });

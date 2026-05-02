@@ -1,18 +1,18 @@
 //! crates/caniuse-db
-//! Vendored data tables for `caniuse-lite@1.0.30001690`.
+//! Vendored data tables for `caniuse-lite@1.0.30001766`.
 //!
 //! Per `crates/PARITY_VERSIONS.md` Anomaly #3, this version is frozen
 //! forever for the parity port.
 //!
 //! The actual JSON snapshot is produced by `scripts/snapshot.js` (Node.js,
 //! one-shot) which uses upstream's bundled unpacker against the vendored
-//! `crates/_vendor/caniuse-lite-1.0.30001690` tarball. The result lives at
+//! `crates/_vendor/caniuse-lite-1.0.30001766` tarball. The result lives at
 //! `data/features.snapshot.json` and is `include_str!`'d at compile time.
 
 pub mod features;
 pub mod agents;
 
-pub const CANIUSE_LITE_VERSION: &str = "1.0.30001690";
+pub const CANIUSE_LITE_VERSION: &str = "1.0.30001766";
 
 #[cfg(test)]
 mod tests {
@@ -43,9 +43,11 @@ mod tests {
     }
 
     #[test]
-    fn list_returns_579() {
-        // Pinned snapshot has exactly 579 features. Drift here means the
-        // vendored data has been regenerated — investigate before merging.
-        assert_eq!(features::list().len(), 579);
+    fn list_returns_582() {
+        // Pinned snapshot (caniuse-lite@1.0.30001766) has exactly 582
+        // features. Drift here means the vendored data has been
+        // regenerated — investigate before merging.
+        // (Was 579 at caniuse-lite@1.0.30001690; AFM repin bumped to 582.)
+        assert_eq!(features::list().len(), 582);
     }
 }

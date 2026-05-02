@@ -7,7 +7,7 @@
 //! gate.
 //!
 //! Pre-condition: `bun install` must have been run with the workspace
-//! `caniuse-lite: 1.0.30001690` devDependency + override active. That
+//! `caniuse-lite: 1.0.30001766` devDependency + override active. That
 //! causes bun to symlink `node_modules/caniuse-lite` to the pinned copy
 //! so resolution from the vendored `_vendor/...` path lands on the pin.
 //!
@@ -179,9 +179,9 @@ fn caniuse_lite_pin_matches_parity_versions() {
     assert!(output.status.success());
     let version = String::from_utf8(output.stdout).unwrap().trim().to_string();
     assert_eq!(
-        version, "1.0.30001690",
-        "workspace caniuse-lite resolved to {version}, expected 1.0.30001690 \
-         (PARITY_VERSIONS.md Anomaly #3, REFERENCE_LOCK_FILE/yarn.lock). \
+        version, "1.0.30001766",
+        "workspace caniuse-lite resolved to {version}, expected 1.0.30001766 \
+         (PARITY_VERSIONS.md Anomaly #3, AFM_MONOREPO_DEPENDENCIES_MORE.md). \
          Update root package.json devDependencies + overrides and re-run \
          `bun install`."
     );

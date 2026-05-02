@@ -2,7 +2,7 @@
 //! package.json `browserslist` field, `.browserslistrc` discovery.
 //!
 //! Per `crates/PARITY_VERSIONS.md` Anomaly #4, defaults match the exact
-//! `browserslist@4.24.4` defaults.
+//! `browserslist@4.24.2` defaults.
 
 use crate::error::BrowserslistError;
 use indexmap::IndexMap;
@@ -11,7 +11,7 @@ use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// `browserslist@4.24.4` line 477: `['> 0.5%', 'last 2 versions', 'Firefox ESR', 'not dead']`.
+/// `browserslist@4.24.2` line 477: `['> 0.5%', 'last 2 versions', 'Firefox ESR', 'not dead']`.
 pub static DEFAULT_QUERIES: &[&str] = &["> 0.5%", "last 2 versions", "Firefox ESR", "not dead"];
 
 pub fn default_query() -> String { DEFAULT_QUERIES.join(", ") }
@@ -52,11 +52,18 @@ pub fn parse_config(input: &str) -> Result<IndexMap<String, Vec<String>>, Browse
 
 /// `parsePackage(file)` upstream — pulls `browserslist` field from a
 /// package.json text body.
+///
+/// 4.24.2 always JSON.parses the body unconditionally (node.js ~106-119);
+/// 4.24.4 short-circuited on `text.indexOf('"browserslist"')` to avoid the
+/// parse when neither key was present. Match 4.24.2: bubble JSON parse
+/// failures as `BrowserslistError` instead of swallowing them.
 pub fn parse_package(text: &str, file_label: &str) -> Result<Option<IndexMap<String, Vec<String>>>, BrowserslistError> {
     let stripped: String = if let Some(s) = text.strip_prefix('\u{FEFF}') { s.to_string() } else { text.to_string() };
     let parsed: Value = match serde_json::from_str(&stripped) {
         Ok(v) => v,
-        Err(_) => return Ok(None),
+        Err(e) => return Err(BrowserslistError {
+            message: format!("Failed to parse {}: {}", file_label, e),
+        }),
     };
     if let Some(bl) = parsed.get("browserlist") {
         if !parsed.get("browserslist").is_some() && !bl.is_null() {
@@ -195,6 +202,21 @@ mod tests {
         let txt = r#"{ "browserlist": ["> 1%"] }"#;
         let err = parse_package(txt, "package.json").unwrap_err();
         assert!(err.message.contains("`browserlist` key instead of `browserslist`"));
+    }
+
+    #[test]
+    fn parse_package_invalid_json_errors() {
+        // 4.24.2 throws on bad JSON (unconditional JSON.parse). Rust shim
+        // historically swallowed parse errors as Ok(None); now bubbles them.
+        let err = parse_package("not json at all", "package.json").unwrap_err();
+        assert!(err.message.contains("Failed to parse"), "got {}", err.message);
+    }
+
+    #[test]
+    fn parse_package_no_browserslist_key_returns_none() {
+        // Valid JSON without either key should still return Ok(None).
+        let cfg = parse_package(r#"{ "name": "pkg" }"#, "package.json").unwrap();
+        assert!(cfg.is_none());
     }
 
     #[test]

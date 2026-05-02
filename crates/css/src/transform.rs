@@ -18,7 +18,6 @@
 //! ...normalizeCSS(opts)            // cssnano preset subset
 //! expandShorthands (local)
 //! atomicifyRules (local)            // populates classNames
-//! [flattenMultipleSelectors + discardDuplicates] when flattenMultipleSelectors enabled
 //! [increaseSpecificity] when opts.increaseSpecificity
 //! sortAtomicStyleSheet (local)
 //! [autoprefixer] unless AUTOPREFIXER=off
@@ -47,7 +46,10 @@ use postcss_core::{parse, stringify};
 /// | `sortAtRules?`             | `sort_at_rules`               | forwarded to `sortAtomicStyleSheet` |
 /// | `sortShorthand?`           | `sort_shorthand`              | forwarded to `sortAtomicStyleSheet` |
 /// | `classHashPrefix?`         | `class_hash_prefix`           | |
-/// | `flattenMultipleSelectors?`| `flatten_multiple_selectors`  | defaults to `true` (line 41 upstream) |
+///
+/// `flattenMultipleSelectors` was added in @compiled/css 0.20+ and is
+/// **not** part of the AFM-pinned 0.19.0 surface (see PARITY_VERSIONS.md
+/// "JS oracle source pin"). Do not re-add this field.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TransformOpts {
     #[serde(rename = "optimizeCss", default)]
@@ -62,8 +64,6 @@ pub struct TransformOpts {
     pub sort_shorthand: Option<bool>,
     #[serde(rename = "classHashPrefix", default)]
     pub class_hash_prefix: Option<String>,
-    #[serde(rename = "flattenMultipleSelectors", default)]
-    pub flatten_multiple_selectors: Option<bool>,
 }
 
 /// Mirrors upstream return shape: `{ sheets: string[]; classNames: string[] }`.

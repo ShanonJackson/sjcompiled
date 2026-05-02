@@ -1,7 +1,9 @@
 //! crates/browserslist-shim
-//! Wraps `oxc_browserslist` to mirror `browserslist@4.24.4` defaults +
-//! config resolution. See `crates/PARITY_VERSIONS.md` Anomaly #4 — defaults
-//! are version-specific.
+//! Wraps `oxc_browserslist` to mirror `browserslist@4.24.2` defaults +
+//! config resolution + Firefox ESR override. See `crates/PARITY_VERSIONS.md`
+//! Anomaly #4 — defaults are version-specific. The `Firefox ESR` query
+//! returns `['firefox 115', 'firefox 128']` per 4.24.2 (oxc returns just
+//! `firefox 140`); rewrite happens in `index::resolve_with`.
 //!
 //! Folder/file mapping (1:1 with `node_modules/browserslist/`):
 //!   - `index.js`        -> `src/index.rs`

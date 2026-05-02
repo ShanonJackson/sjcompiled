@@ -884,33 +884,5 @@ describe('sort at-rules', () => {
               "
       `);
     });
-
-    it("shouldn't crash when height property is in a non-media query", () => {
-      const actual = transform(`
-        @supports not (height: 1lh) {
-          height: 1lh;
-        }
-        @media (width > 200px) {
-          color: abc;
-        }
-        @media (width > 26.1ch) {
-          color: abc;
-        }
-      `);
-
-      expect(actual).toMatchInlineSnapshot(`
-        "
-                @media (width > 200px) {
-                  color: abc;
-                }
-                @media (width > 26.1ch) {
-                  color: abc;
-                }
-                @supports not (height: 1lh) {
-                  height: 1lh;
-                }
-              "
-      `);
-    });
   });
 });

@@ -1,5 +1,5 @@
 //! crates/colord
-//! Byte-for-byte Rust port of `colord@2.9.1`.
+//! Byte-for-byte Rust port of `colord@2.9.3`.
 //! See `crates/PARITY_VERSIONS.md`.
 //!
 //! Folder/file mapping (1:1 with `node_modules/colord/`):

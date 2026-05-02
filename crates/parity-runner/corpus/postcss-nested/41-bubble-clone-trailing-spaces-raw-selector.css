@@ -1,0 +1,6 @@
+.foo  {
+  color: red;
+  @supports (display: grid) {
+    color: blue;
+  }
+}

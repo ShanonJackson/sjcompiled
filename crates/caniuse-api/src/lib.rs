@@ -47,6 +47,7 @@ mod tests {
 
     #[test]
     fn features_lists_all() {
-        assert_eq!(features().len(), 579);
+        // 582 at caniuse-lite@1.0.30001766 (was 579 at 1.0.30001690).
+        assert_eq!(features().len(), 582);
     }
 }

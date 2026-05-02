@@ -110,7 +110,12 @@ fn replace_nesting(nodes: &mut SelNode, parent: &SelNode) -> bool {
             let mut new_node = if nesting_value != "&" {
                 let cloned_parent = parent.clone();
                 let parent_str = sel_stringify(&cloned_parent);
-                let new_value = nesting_value.replace('&', &parent_str);
+                // Upstream `index.js:26` uses `i.value.replace('&', ...)` —
+                // JS String.prototype.replace with a string pattern only
+                // replaces the FIRST occurrence. Rust's `str::replace`
+                // would replace ALL — use `replacen` with count=1 to
+                // match JS exactly. Affects nesting values like `&-&`.
+                let new_value = nesting_value.replacen('&', &parent_str, 1);
                 match Processor::new().ast_sync(&new_value) {
                     Ok(root) => root
                         .nodes
@@ -175,6 +180,7 @@ fn selectors_of(
                     nodes: Vec::new(),
                     raw_value: None,
                     attribute: None,
+                    source_index: None,
                 };
                 node.nodes.insert(0, combinator);
                 node.nodes.insert(0, parent_node.clone());
@@ -348,13 +354,18 @@ fn atrule_childs(
 
 /// Clone a Rule node with `nodes: []` and the supplied selector. Mirrors
 /// `rule.clone({ nodes: [] })` upstream.
+///
+/// Upstream `cloneNode` deep-copies every own property including `raws`,
+/// then the `{ nodes: [] }` override replaces nodes with an empty array.
+/// `raws.selector` is preserved verbatim — when the selector value
+/// matches `raws.selector.value`, the postcss stringifier emits the
+/// raw form, preserving byte-fidelity. Do NOT clear raws.selector.
 fn clone_rule_with_empty_nodes(rule_node: &Node, selector: &str) -> Node {
     let mut clone = rule_node.clone();
     if let NodeKind::Rule(r) = &mut clone.kind {
         r.nodes.clear();
         r.selector = selector.to_string();
     }
-    clone.raws.selector = None;
     clone
 }
 
@@ -713,5 +724,65 @@ mod tests {
         let out = run("a { @media (max-width: 100px) { color: red } }");
         assert!(out.contains("@media"), "got: {out}");
         assert!(out.contains("color: red"), "got: {out}");
+    }
+
+    /// Regression: `replace_nesting` uses `replacen('&', ..., 1)` to match
+    /// JS `String.prototype.replace('&', ...)` first-only semantics. The
+    /// in-tree selector parser always produces `Nesting.value == "&"`, so
+    /// this is defensive — it only diverges when a consumer hand-mutates
+    /// `i.value` to contain multiple `&`. Direct unit test on the helper.
+    #[test]
+    fn replace_nesting_first_only_when_value_has_two_ampersands() {
+        let mut nesting = SelNode::selector();
+        nesting.nodes.push(SelNode {
+            kind: SelKind::Nesting,
+            value: "&-&".to_string(),
+            spaces: SelSpaces::default(),
+            nodes: Vec::new(),
+            raw_value: None,
+            attribute: None,
+            source_index: None,
+        });
+        let parent = Processor::new()
+            .ast_sync(".foo")
+            .unwrap()
+            .nodes
+            .into_iter()
+            .next()
+            .unwrap();
+        let replaced = replace_nesting(&mut nesting, &parent);
+        assert!(replaced);
+        // After the call, the Nesting at index 0 was replaced with a
+        // parsed Selector whose raw stringified form contains `.foo-&`
+        // — first `&` substituted, second `&` left literal. If the bug
+        // were present the output would contain `.foo-.foo`.
+        let out = sel_stringify(&nesting);
+        assert!(
+            out.contains(".foo-&"),
+            "first-only replacement violated, got: {out}"
+        );
+        assert!(
+            !out.contains(".foo-.foo"),
+            "second & was wrongly replaced, got: {out}"
+        );
+    }
+
+    /// Regression: `clone_rule_with_empty_nodes` must NOT clear
+    /// `raws.selector`. Upstream `clone({ nodes: [] })` preserves all
+    /// raws verbatim. When raws.selector.value matches the cloned
+    /// rule's selector, the raw form is emitted byte-for-byte.
+    #[test]
+    fn bubble_clone_preserves_raw_selector_form() {
+        // Selector raws capture the trailing comment via raw_record;
+        // the cloned wrapper inside @media must re-emit it. The outer
+        // `a/*x*/` rule is removed (empty after bubble extraction), so
+        // the only remaining occurrence is in the cloned wrapper.
+        let css = "a/*x*/ { @media (max-width: 1px) { color: red } }";
+        let out = run(css);
+        assert!(out.contains("@media"), "got: {out}");
+        assert!(
+            out.contains("a/*x*/"),
+            "raws.selector not preserved on clone, got: {out}"
+        );
     }
 }

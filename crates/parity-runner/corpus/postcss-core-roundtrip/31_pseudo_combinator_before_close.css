@@ -1,0 +1,3 @@
+:is(.a > ) { color: red; }
+:is(.a + ) { color: blue; }
+:has(.a ~ ) { color: green; }
