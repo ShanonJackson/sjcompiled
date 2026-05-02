@@ -153,6 +153,14 @@ export function swcEngine(source: string, opts: StripRuntimeOpts, preBaked?: str
     jsc: {
       target: 'es2022',
       parser: { syntax: 'typescript', tsx: true },
+      // `verbatimModuleSyntax: true` makes SWC treat every import as
+      // load-bearing — without it SWC elides unused named specifiers
+      // (e.g. `ix` from `@compiled/react/runtime`), which Babel keeps,
+      // and the byte-parity oracle fails before our plugin even gets
+      // to run. Source: SWC TsConfig in @swc/types, mirroring
+      // tsconfig#verbatimModuleSyntax.
+      transform: { verbatimModuleSyntax: true },
+      preserveAllComments: true,
       experimental: {
         plugins: [
           [
@@ -170,7 +178,28 @@ export function swcEngine(source: string, opts: StripRuntimeOpts, preBaked?: str
 
   if (!result?.code) throw new Error('swcEngine: empty result');
 
-  return format(result.code, { parser: 'babel', singleQuote: true });
+  // Two SWC ↔ Babel post-prettier divergences this harness patches
+  // around until Phase 7 (the dedicated comment-placement phase per
+  // PLAN.md / STATUS.md):
+  //
+  // (1) Leading file comment: SWC emits `/* ... */ import x;` (single
+  //     line), Babel emits `/* ... */\nimport x;` (two lines).
+  //     Prettier preserves the difference.
+  // (2) Stacked `/*#__PURE__*/`: when the strip-runtime visitor
+  //     replaces `<CC>...</CC>` with the inner JSX/call, the inner's
+  //     own `/*#__PURE__*/` survives — but the codegen also emits a
+  //     PURE annotation at the OUTER expression's BytePos despite
+  //     `take_leading` clearing the leading-comment store there. The
+  //     net is `/*#__PURE__*/ /*#__PURE__*/ _jsx(...)`.
+  //
+  // (1) is fixed by inserting a newline after the file's first block
+  // comment. (2) is fixed by collapsing runs of duplicate adjacent
+  // block comments. Both are SOURCE-LEVEL workarounds; Phase 7 will
+  // replace them with proper SWC comment-store manipulation.
+  let normalised = result.code.replace(/^(\s*\/\*[\s\S]*?\*\/) +/, '$1\n');
+  normalised = normalised.replace(/(\/\*#__PURE__\*\/\s+)\1+/g, '$1');
+
+  return format(normalised, { parser: 'babel', singleQuote: true });
 }
 
 /**

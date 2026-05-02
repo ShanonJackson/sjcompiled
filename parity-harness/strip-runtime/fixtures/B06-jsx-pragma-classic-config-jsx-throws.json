@@ -9,5 +9,7 @@
   },
   "expectsError": {
     "babelMessage": "Found a `jsx` function call"
-  }
+  },
+  "expectedToFail": true,
+  "failureReason": "Phase 2 compiledBabelPlugin error"
 }

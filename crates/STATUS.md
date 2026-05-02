@@ -3,6 +3,25 @@
 End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 `PARITY_VERSIONS.md`.
 
+## postcss version pin: `8.4.31` → `8.5.6` (no code changes)
+
+The consuming monorepo's actual postcss version is `8.5.6`, not `8.4.31`
+as we'd been targeting. Empirical diff harness at
+`crates/_vendor/test-postcss-versions/` confirmed byte-identical
+`parse → stringify` output across both versions:
+
+- 5 of 13 source files byte-identical (`stringifier.js`, `root.js`,
+  `at-rule.js`, `comment.js`, `list.js`).
+- Remaining 8 files differ only in declaration order, getters/setters
+  reordered, defensive null-checks, sourcemap/diagnostic surface — none
+  reach the hashing path.
+- 26/26 raw round-trips byte-identical between versions.
+- 30/30 plugin × input pairs byte-identical (covers visitor + OnceExit
+  lifecycle, raws preservation, walks).
+
+Pin bumped in `PARITY_VERSIONS.md`, `Cargo.toml` description, `lib.rs`
+header. **No code changes required** — all 489 tests still green.
+
 ## Phase progress
 
 | Phase | Description | Status |
@@ -34,7 +53,7 @@ End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 | 6g | postcss-minify-gradients@5.1.1 | **SCAFFOLDED** — uses colord. |
 | 6g | postcss-colormin@5.3.1 | **SCAFFOLDED** — highest-risk cssnano plugin. |
 | 6h | cssnano-preset-default@5.2.14 (orchestrator) | **SCAFFOLDED** |
-| 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **Fully ported (byte-clean):** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs` (incl. `parent_prefix` via `walk_up_with` + `Node.attrs` cache + `clone_without` strip), `at_rule.rs` (full `add` + `process`). **20 unit tests passing.** Stubbed (signature-only): `browsers.rs`, `declaration.rs`, `value.rs`, `selector.rs`, `resolution.rs`, `supports.rs`, `transition.rs`, `prefixes.rs`, `processor.rs`, `info.rs`, `autoprefixer.rs`, `data/prefixes.rs`, all 58 hacks. Split contract: see "Phase 7 split contract" section below. |
+| 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **All base classes fully ported:** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs`, `browsers.rs`, `at_rule.rs`, `value.rs`, `selector.rs`, `declaration.rs`, `resolution.rs`, plus `prefixes.rs` registry skeleton with `register_hacks(reg)` append-only block. **`data/prefixes.rs` byte-clean** — 183 entries, codegen via `build.rs` from vendored JS through `bun`, 4 parity gates (canonical-JSON byte-equal, entry count, key order, caniuse-lite version pin). **56 tests passing (52 unit + 4 parity).** Hacks agent **unblocked**. Still stubbed: `supports.rs`, `transition.rs` (heavy, hacks rarely subclass), `processor.rs`, `info.rs`, `autoprefixer.rs`, all 58 hacks, `Prefixes::new` orchestrator body. Split contract: see "Phase 7 split contract" section below. See also "Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix". |
 | 8a | `sort()` NAPI bridge + sort.ts engine flag | **DONE** — 12/12 corpus byte-clean end-to-end on win32-x64-msvc. See "Phase 8a ship" section below. |
 | 8b | `transformCss` NAPI bridge + transform.ts engine flag | **NOT STARTED** — blocks on Phase 5/6/7 plugin ports. |
 
@@ -196,6 +215,110 @@ the existing corpus. Future sessions: **always run `bun install` and
 verify `node_modules/.bun/` resolves the reference pins before
 declaring byte-clean.**
 
+## Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix
+
+`crates/autoprefixer/src/data/prefixes.rs` is the 183-entry static prefix
+table that drives every `add_table` / `remove_table` decision in the
+orchestrator. Now byte-clean against the JS oracle, codegen'd via
+`build.rs`. Foundation task #12 from the autoprefixer split contract.
+
+### What landed this session
+
+1. `crates/autoprefixer/build.rs` — codegen. Spawns `bun <file>`
+   (Windows shim-aware) on a tmp script that `require()`s the vendored
+   `crates/_vendor/autoprefixer-10.4.14/package/data/prefixes.js`,
+   dumps the resulting object as JSON, parses via `serde_json` with
+   `preserve_order` (load-bearing — `Object.keys` insertion order
+   reaches downstream `add_table` iteration), and emits a series of
+   `m.insert(...)` statements wrapped in a single block expression at
+   `$OUT_DIR/prefixes_table.rs`.
+2. `crates/autoprefixer/src/data/prefixes.rs` — `PrefixEntry` struct
+   with `#[serde(skip_serializing_if = "...")]` matching JS's
+   "omit-when-falsy" convention (`mistakes`/`props`/`feature` skip
+   when empty, `selector`/`transition` skip when false). Lazy
+   `IndexMap<&'static str, PrefixEntry>` includes the codegen output.
+3. `crates/autoprefixer/Cargo.toml` — `[build-dependencies]` and
+   `[dev-dependencies]` declare `serde_json` with `preserve_order`.
+4. `crates/autoprefixer/tests/data_parity.rs` — 4 parity gates:
+   - `data_table_matches_js_oracle` — recursive canonical-JSON
+     (sorted keys at every nesting level) byte-equal between Rust
+     `PREFIXES` and the JS oracle.
+   - `entry_count_matches_js_oracle` — `PREFIXES.len() ==
+     Object.keys(prefixes).length`.
+   - `key_order_matches_js_oracle` — `IndexMap` insertion order
+     equals JS `Object.keys` order. Catches the `serde_json`
+     alphabetization regression hit during port.
+   - `caniuse_lite_pin_matches_parity_versions` — explicit assertion
+     that `require('caniuse-lite/package.json').version ==
+     "1.0.30001690"`. Belt-and-braces against future `bun.lock` drift.
+5. **caniuse-lite pin fix in root `package.json`.** PARITY_VERSIONS.md
+   Anomaly #3 + REFERENCE_LOCK_FILE/yarn.lock both pin caniuse-lite at
+   1.0.30001690, but the previous "Parity-contract drift — RESOLVED"
+   override block missed it (and electron-to-chromium / node-releases).
+   Symptom: data/prefixes.js generated table contained chrome 135 /
+   edge 135 / samsung 28 — versions that don't exist in the pinned
+   snapshot. Fix landed:
+   - Added `caniuse-lite: "1.0.30001690"`, `electron-to-chromium:
+     "1.5.76"`, `node-releases: "2.0.19"` to root `package.json`
+     `overrides`.
+   - Added `caniuse-lite: "1.0.30001690"` to root `package.json`
+     `devDependencies`. **Load-bearing** — without the direct-dep
+     declaration, bun's isolated install layout leaves no top-level
+     `node_modules/caniuse-lite/` symlink, and the vendored JS's
+     `require('caniuse-lite')` walks UP the filesystem and resolves
+     to whatever `node_modules/caniuse-lite` lives in a parent project
+     (observed during port: a parent dir at 1.0.30001754).
+   - `bun install` re-resolved. `node_modules/caniuse-lite` is now a
+     symlink to the pinned `.bun/caniuse-lite@1.0.30001690/...` install.
+
+### Verification gates run
+
+| Gate | Status |
+|---|---|
+| `cargo test -p autoprefixer` | 56/56 (52 unit + 4 parity) |
+| `cargo build -p autoprefixer` | clean |
+| Generated table entry count | 183 (matches JS) |
+| Last-entry max chrome | 134 (matches caniuse-lite 1.0.30001690) |
+| Last-entry max samsung | 27 (matches caniuse-lite 1.0.30001690) |
+| `samsung 28` in table | 0 occurrences (was 1+ pre-pin) |
+
+### Lessons from Phase 7 `data/prefixes.rs` — apply to every future build.rs
+
+- **Pin the runtime, not just the lockfile.** The previous "Parity-
+  contract drift — RESOLVED" pinned 8 direct deps via root
+  `package.json` overrides. But caniuse-lite is a transitive — and
+  also the silent invariant per Anomaly #3. Override-only is not
+  enough: if no workspace package has the transitive as a direct
+  dep, bun's isolated layout leaves no top-level `node_modules/<pkg>`
+  and parent-directory shadows can resolve. The fix is BOTH override
+  AND direct devDependency.
+- **Audit transitives flagged in PARITY_VERSIONS.md the same way.**
+  electron-to-chromium / node-releases / picocolors / source-map-js /
+  fraction.js / nanoid all sit in similar position. The autoprefixer
+  port doesn't touch these directly yet, but `processor.rs` /
+  `Browsers::new` / cssnano plugins will. The
+  `caniuse_lite_pin_matches_parity_versions` test pattern can be
+  copied for each (~5 LOC per dep).
+- **`bun -e <script>` is fragile under Windows arg-quoting.** During
+  port, `process.stdout.write(...)` was truncated to `ss.stdout.write`
+  in the spawned subprocess because Windows mangled the JS string.
+  Always write the script to a file and invoke `bun <file>`.
+- **`serde_json` defaults to alphabetized object iteration.** Enable
+  `preserve_order` for any codegen that translates JS `Object.keys`
+  order into Rust `IndexMap` order. The codegen looked correct in
+  initial review; the `key_order_matches_js_oracle` test caught it.
+- **Test-script tmpdir matters for resolution.** Bun's CommonJS
+  resolver walks UP from the script file's directory, NOT cwd. Tests
+  that write dumpers to `std::env::temp_dir()` (outside the workspace)
+  resolve `require('caniuse-lite')` against random parent-directory
+  projects. Anchor under `target/` (inside the workspace).
+- **`include!()` expects a single expression.** Wrap codegen output
+  in a `{ ... }` block expression so the include site sees one
+  expression containing N `m.insert(...)` statements.
+- **`bun.cmd` shim resolution on Windows.** `Command::new("bun")`
+  doesn't walk PATHEXT. Always try the bare name then fall back to
+  `bun.cmd` / `bun.exe` candidates.
+
 ## Phase 7 split contract — autoprefixer parallel agents
 
 `crates/autoprefixer/` is being ported by two agents in parallel. The
@@ -223,27 +346,30 @@ registration contract.
 2. ✅ Scaffold crate + module tree (compiles cleanly).
 3. ✅ Port leaf utilities (`utils`, `vendor`, `brackets`, `old_value`,
    `old_selector`).
-4. ✅ Port `prefixer.rs` — full. `parent_prefix` walks ancestors via
-   `postcss_core::walk_up_with`, caches answers via `Node.attrs`
-   (`_autoprefixerPrefix`), `clone_node` delegates to
-   `Node::clone_without(CLONE_STRIP_KEYS)`. Tests pin all 5 cases.
-5. ✅ Port `at_rule.rs` — full `add` + `process`. Uses
-   `parent_some` for the sibling-existence guard,
-   `insert_before_at_path` for the clone insert.
-6. ⬜ Port `browsers.rs` (browserslist-shim integration).
-7. ⬜ Port `data/prefixes.rs` (~1100 LOC static data table — codegen
-   from `data/prefixes.js`).
-8. ⬜ Port mid-tier base classes: `value.rs`, `selector.rs`,
-   `resolution.rs` (signature-only stubs in place; trait surface
-   locked).
-9. ⬜ Port heavier base classes: `declaration.rs`, `supports.rs`,
-   `transition.rs`.
-10. ⬜ Port `prefixes.rs` (registry — wires hacks → declaration types).
-11. ⬜ Port `processor.rs` + `info.rs` + `autoprefixer.rs` (entry
-    point).
-12. ⬜ Add `Stage::Autoprefixer` parity-runner gate (requires
+4. ✅ Port `prefixer.rs` — full.
+5. ✅ Port `at_rule.rs` — full.
+6. ✅ Port `browsers.rs` — full (caniuse-db agents + browserslist-shim).
+7. ✅ Port `value.rs` — full.
+8. ✅ Port `selector.rs` — full (incl. `already()` backward sibling walk
+   via `parent_nodes` + `sibling_at`).
+9. ✅ Port `declaration.rs` — full (incl. cascade via
+   `_autoprefixerCascade`/`_autoprefixerMax` memos and `process` with
+   path-shift cursor handling).
+10. ✅ Port `resolution.rs` — full (uses `fraction_js`).
+11. ✅ Port `prefixes.rs` skeleton — `HackRegistry` + `register_hacks`
+    append-only block. `Prefixes` orchestrator method bodies still
+    `unimplemented!()` pending `data/prefixes.rs` and `processor.rs`.
+12. ✅ Port `data/prefixes.rs` — 183 entries codegen'd via `build.rs` +
+    `bun`, 4 parity gates byte-clean. See "Phase 7 ship —
+    `data/prefixes.rs`" section above.
+13. ⬜ Port `supports.rs` (302 LOC — `@supports` query rewriting).
+14. ⬜ Port `transition.rs` (329 LOC — `transition` shorthand).
+15. ⬜ Fill `Prefixes` orchestrator body (depends on `data/prefixes.rs`).
+16. ⬜ Port `processor.rs` (718 LOC — main walk).
+17. ⬜ Port `info.rs` + `autoprefixer.rs` (entry point).
+18. ⬜ Add `Stage::Autoprefixer` parity-runner gate (requires
     parity-runner edits + parity-bridge.mjs — re-ask permission).
-13. ⬜ Wire into `crates/css/src/transform.rs` (re-ask permission).
+19. ⬜ Wire into `crates/css/src/transform.rs` (re-ask permission).
 
 ### Path-shift gotcha — load-bearing for every base class
 
@@ -275,14 +401,17 @@ base class's `add`, follow the same pattern.
 
 ### Hacks agent's responsibilities
 
-1. **Wait for foundation tasks #7 + #8 to land before starting.**
-   The base-class trait surface isn't final until then; starting
-   earlier guarantees rework.
-2. Pick a hack from the table in `HACKS_PORT.md`. Take it 0 → 100%
+**Status: UNBLOCKED.** All five base classes (`Prefixer`,
+`AtRuleBase`, `ValueBase`, `SelectorBase`, `DeclarationBase`,
+`ResolutionBase`) plus `Browsers` plus the `HackRegistry` are
+ported with full method bodies + passing unit tests. The trait
+surface for hacks-by-composition is locked.
+
+1. Pick a hack from the table in `HACKS_PORT.md`. Take it 0 → 100%
    byte-clean (per cardinal rule).
-3. Register it in `crates/autoprefixer/src/prefixes.rs::register_hacks`
-   in alphabetical-by-JS-filename order.
-4. Mark the row in `HACKS_PORT.md` Done.
+2. Register it in `crates/autoprefixer/src/prefixes.rs::register_hacks`
+   in alphabetical-by-JS-filename order (BEGIN/END markers).
+3. Mark the row in `HACKS_PORT.md` Done.
 
 ### What the hacks agent must NOT do
 

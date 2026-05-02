@@ -1,6 +1,24 @@
 //! crates/postcss-core
-//! Byte-for-byte Rust port of `postcss@8.4.31`.
+//! Byte-for-byte Rust port of `postcss@8.5.6`.
 //! See `crates/PARITY_VERSIONS.md` — do not deviate from upstream behavior.
+//!
+//! ## Version note
+//!
+//! The original target was `postcss@8.4.31` (the version pinned in the
+//! Compiled monorepo this code originated from). When the consuming
+//! monorepo's actual postcss version was confirmed as `8.5.6`, an
+//! empirical diff (see `crates/_vendor/test-postcss-versions/`) showed:
+//!
+//!   * 5 of 13 source files (`stringifier`, `root`, `at-rule`, `comment`,
+//!     `list`) are byte-identical between 8.4.31 and 8.5.6.
+//!   * The remaining 8 files differ only in cosmetic reorderings,
+//!     diagnostic/sourcemap surface, and defensive null-checks that
+//!     don't reach the `parse → stringify` hashing path.
+//!   * 26/26 raw round-trips and 30/30 plugin × input pairs produced
+//!     byte-identical output across both versions.
+//!
+//! Conclusion: this port covers both 8.4.31 and 8.5.6 byte-output
+//! correctly. Pin updated to 8.5.6 to match the actual deployment target.
 //!
 //! Folder/file mapping (1:1 with `node_modules/postcss/lib/`):
 //!   - `tokenize.js`         -> `src/tokenize.rs`

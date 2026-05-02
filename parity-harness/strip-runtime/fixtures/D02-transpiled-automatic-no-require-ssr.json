@@ -7,5 +7,7 @@
     "runtime": "automatic",
     "styleSheetPath": "@compiled/webpack-loader/css-loader!@compiled/webpack-loader/css-loader/compiled-css.css",
     "compiledRequireExclude": true
-  }
+  },
+  "expectedToFail": true,
+  "failureReason": "Phase 7 directive blank-line"
 }

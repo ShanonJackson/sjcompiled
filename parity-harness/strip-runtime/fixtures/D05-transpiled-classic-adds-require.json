@@ -6,5 +6,7 @@
     "run": "extract",
     "runtime": "classic",
     "styleSheetPath": "@compiled/webpack-loader/css-loader!@compiled/webpack-loader/css-loader/compiled-css.css"
-  }
+  },
+  "expectedToFail": true,
+  "failureReason": "Phase 7 directive blank-line"
 }

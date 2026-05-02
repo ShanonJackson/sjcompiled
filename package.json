@@ -24,6 +24,7 @@
     "@types/babel__core": "^7.20.5",
     "@types/bun": "^1.1.13",
     "@types/node": "^22.7.0",
+    "caniuse-lite": "1.0.30001690",
     "prettier": "2.8.8",
     "typescript": "^5.6.3"
   },
@@ -41,6 +42,9 @@
     "postcss-values-parser": "6.0.2",
     "postcss-discard-duplicates": "6.0.0",
     "autoprefixer": "10.4.14",
+    "caniuse-lite": "1.0.30001690",
+    "electron-to-chromium": "1.5.76",
+    "node-releases": "2.0.19",
     "@swc/core": "1.15.8",
     "prettier": "2.8.8",
     "cssnano-preset-default": {

@@ -81,7 +81,7 @@ must run on the same prettier version, otherwise the oracle drifts.
 
 | npm package | Range in `packages/css/package.json` | Resolved version | Rust crate | Used in |
 |---|---|---|---|---|
-| `postcss` | `^8.4.31` | **8.4.31** | `crates/postcss-core` | `transform.ts`, `sort.ts`, every plugin |
+| `postcss` | `^8.4.31` | **8.5.6** | `crates/postcss-core` | `transform.ts`, `sort.ts`, every plugin. Bumped from 8.4.31 → 8.5.6 after empirical diff confirmed identical byte-output for `parse(css).toString()` and for full plugin pipelines (26/26 raw round-trips + 30/30 plugin × input pairs). See `crates/_vendor/test-postcss-versions/` for the diff harness. Changes between versions are diagnostic/sourcemap surface only — none reach the hashing path. |
 | `postcss-nested` | `^5.0.6` | **5.0.6** | `crates/postcss-nested` | `transform.ts:48` |
 | `postcss-normalize-whitespace` | `^5.1.1` | **5.1.1** | `crates/postcss-normalize-whitespace` | `transform.ts:76` |
 | `postcss-selector-parser` | `^6.0.13` | **6.0.13** | `crates/postcss-selector-parser` | local selector-touching plugins |
@@ -259,7 +259,7 @@ in its `Cargo.toml` description and at the top of its `lib.rs`. Example:
 
 ```rust
 //! crates/postcss-core
-//! Byte-for-byte Rust port of `postcss@8.4.31`.
+//! Byte-for-byte Rust port of `postcss@8.5.6`.
 //! See `crates/PARITY_VERSIONS.md` — do not deviate from upstream behavior.
 ```
 
@@ -267,7 +267,7 @@ in its `Cargo.toml` description and at the top of its `lib.rs`. Example:
 
 | Rust crate | Ports | At version | Upstream source location |
 |---|---|---|---|
-| `crates/postcss-core` | `postcss` | 8.4.31 | `node_modules/postcss/lib/*.js` |
+| `crates/postcss-core` | `postcss` | 8.5.6 | `node_modules/postcss/lib/*.js` |
 | `crates/postcss-selector-parser` | `postcss-selector-parser` | 6.0.13 | `node_modules/postcss-selector-parser/` |
 | `crates/postcss-value-parser` | `postcss-value-parser` | 4.2.0 | `node_modules/postcss-value-parser/lib/` |
 | `crates/postcss-values-parser` | `postcss-values-parser` (plural — distinct package) | 6.0.2 | `node_modules/postcss-values-parser/` |

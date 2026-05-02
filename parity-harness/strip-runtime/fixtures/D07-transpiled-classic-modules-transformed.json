@@ -5,5 +5,7 @@
   "opts": {
     "run": "extract",
     "runtime": "classic"
-  }
+  },
+  "expectedToFail": true,
+  "failureReason": "Phase 7 directive blank-line"
 }

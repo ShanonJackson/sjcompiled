@@ -25,10 +25,34 @@ single `register::<MyHack>()` line. Add yours in the **alphabetical
 position matching the JS source** (preserves byte-for-byte registration
 order, which affects `Object.keys` iteration order downstream).
 
+## Status — base classes are READY
+
+As of this checkpoint, all five base classes have real method bodies
+and passing unit tests:
+
+| Base class    | File                | Tests | Notes |
+|---------------|---------------------|------:|-------|
+| `Prefixer`    | `prefixer.rs`       |     5 | `parent_prefix` walks via `walk_up_with`, caches via `Node.attrs`, `clone_node` strips via `clone_without` |
+| `AtRuleBase`  | `at_rule.rs`        |     4 | full `add` + `process` (incl. path-shift handling) |
+| `ValueBase`   | `value.rs`          |     7 | full `check` / `regexp` / `replace` / `value` / `add` / `old`; `_autoprefixerValues` cache via `AttrValue::StringMap` |
+| `SelectorBase`| `selector.rs`       |     6 | full `prefixed` / `regexp` / `replace` / `prefixeds` / `already` (sibling-walk via `parent_nodes`) / `add` / `old` |
+| `DeclarationBase` | `declaration.rs` |    7 | full `prefixed` / `set` / `otherPrefixes` / `needCascade` / `maxPrefixed` / `calcBefore` / `insert` / `add` / `process`; cascade memoised via `_autoprefixerCascade` / `_autoprefixerMax` |
+| `ResolutionBase` | `resolution.rs`  |    4 | full `prefixName` / `prefixQuery` / `clean` / `process` (uses `fraction_js`) |
+| `Browsers`    | `browsers.rs`       |     4 | full static `prefixes()` / `withPrefix` / instance `prefix(browser)` / `isSelected` |
+
+**Hacks agent: you can start now.** Pick a hack, port it, register it in
+`crates/autoprefixer/src/prefixes.rs::register_hacks` (the BEGIN/END
+block), tick the row below.
+
+Still-stubbed (NOT base-class — won't affect hacks): `supports.rs`,
+`transition.rs` (heavy classes hacks rarely subclass), `processor.rs`,
+`info.rs`, `autoprefixer.rs`, `data/prefixes.rs`. These don't need to
+exist before you can write a hack.
+
 ## Trait surface
 
-Every hack is a struct that owns a `PrefixerBase` and implements the
-appropriate base trait. Pattern (mirroring JS `class AlignContent
+Every hack is a struct that owns a `*Base` and implements the
+appropriate base type. Pattern (mirroring JS `class AlignContent
 extends Declaration`):
 
 ```rust

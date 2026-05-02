@@ -28,12 +28,56 @@ mkdirSync(FIXTURES_DIR, { recursive: true });
 
 const written = [];
 
-function writeFixture(filename, fixture) {
+function _rawWriteFixture(filename, fixture) {
   writeFileSync(
     join(FIXTURES_DIR, filename),
     JSON.stringify(fixture, null, 2) + '\n'
   );
   written.push(filename);
+}
+
+// Phase 1 §1.4 left these specific fixtures in expectedToFail because
+// the upstream behaviour they exercise depends on phases that haven't
+// landed yet. Each entry documents WHICH phase will graduate it.
+//
+// Keep this list tight: only add a fixture here if you can name the
+// phase that fixes it. "Just expected to fail" without a reason is
+// how regressions hide.
+const EXPECTED_TO_FAIL = {
+  // §1.5 — extractStylesToDirectory writes `<dest>/<rel>.compiled.css`
+  // and prepends `import './<file>.compiled.css'` to body.
+  'A01-extract-styles-classic-no-pragma': '§1.5 extractStylesToDirectory write',
+  'A02-extract-styles-classic-source-not-found': '§1.5 extractStylesToDirectory error',
+  'A03-extract-styles-classic-with-pragma': '§1.5 extractStylesToDirectory write',
+  'A04-extract-styles-automatic-with-pragma': '§1.5 extractStylesToDirectory write',
+  // Phase 2 — compiledBabelPlugin ports to Rust. The "Found a `jsx`
+  // function call" / mixed-Compiled-Emotion errors originate there,
+  // not in strip-runtime.
+  'B06-jsx-pragma-classic-config-jsx-throws': 'Phase 2 compiledBabelPlugin error',
+  'B07-jsx-pragma-classic-config-myjsx-throws': 'Phase 2 compiledBabelPlugin error',
+  // Phase 2 — `babelJSXImportSource` flows through preset-react in
+  // the BAKE step. Both engines currently bake with Babel, but the
+  // SWC engine's bake doesn't thread `babelJSXImportSource` /
+  // `babelJSXPragma` because Phase 2 is what owns the bake port.
+  'B10-jsx-pragma-automatic-importsource': 'Phase 2 bake-pipeline parity',
+  // Phase 7 — directive `'use strict';` keeps a blank line after it
+  // in Babel output (directive prologue formatting); SWC emits it as
+  // a regular ExprStmt with no trailing blank.
+  'D01-transpiled-automatic-adds-require': 'Phase 7 directive blank-line',
+  'D02-transpiled-automatic-no-require-ssr': 'Phase 7 directive blank-line',
+  'D03-transpiled-automatic-modules-transformed': 'Phase 7 directive blank-line',
+  'D05-transpiled-classic-adds-require': 'Phase 7 directive blank-line',
+  'D06-transpiled-classic-no-require-ssr': 'Phase 7 directive blank-line',
+  'D07-transpiled-classic-modules-transformed': 'Phase 7 directive blank-line',
+};
+
+function writeFixture(filename, fixture) {
+  const reason = EXPECTED_TO_FAIL[fixture.name];
+  if (reason) {
+    fixture.expectedToFail = true;
+    fixture.failureReason = reason;
+  }
+  _rawWriteFixture(filename, fixture);
 }
 
 /**

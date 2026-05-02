@@ -171,19 +171,26 @@ mod tests {
     }
 
     #[test]
-    fn replace_inserts_prefix_at_word_boundary() {
+    fn replace_inserts_prefix_on_bare_value() {
+        // `value()` returns the bare decl value (no `display: ` prefix,
+        // no trailing `;`). So `replace` is always called with strings
+        // matching `^name($|[\s(,])`.
         let v = ValueBase::new("flex".into(), vec!["-webkit-".into()], 0);
-        let out = v.replace("display: flex;", "-webkit-");
-        assert!(out.contains("-webkit-flex"));
+        assert_eq!(v.replace("flex", "-webkit-"), "-webkit-flex");
+    }
+
+    #[test]
+    fn replace_inserts_prefix_with_leading_boundary() {
+        let v = ValueBase::new("flex".into(), vec!["-webkit-".into()], 0);
+        // Group 1 = `(^|[\s,(])` — leading space matches.
+        assert_eq!(v.replace("inline flex", "-webkit-"), "inline -webkit-flex");
     }
 
     #[test]
     fn replace_does_not_match_inside_word() {
         let v = ValueBase::new("flex".into(), vec!["-webkit-".into()], 0);
-        // `inflex` should not match — name is preceded by `n`, not a
-        // boundary char. utils::regexp's group 1 is `^|[\s,(]`.
-        let out = v.replace("display: inflex;", "-webkit-");
-        assert_eq!(out, "display: inflex;");
+        // `inflex` — name is preceded by `n`, not a boundary char.
+        assert_eq!(v.replace("inflex", "-webkit-"), "inflex");
     }
 
     #[test]

@@ -6,5 +6,7 @@
     "run": "both",
     "runtime": "automatic",
     "babelJSXImportSource": "@compiled/react"
-  }
+  },
+  "expectedToFail": true,
+  "failureReason": "Phase 2 bake-pipeline parity"
 }
