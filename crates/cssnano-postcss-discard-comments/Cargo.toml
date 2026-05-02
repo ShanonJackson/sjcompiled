@@ -8,3 +8,4 @@ description = "Byte-for-byte Rust port of postcss-discard-comments@5.1.2 (cssnan
 
 [dependencies]
 postcss-core = { workspace = true }
+indexmap = { workspace = true }

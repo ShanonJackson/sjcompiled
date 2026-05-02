@@ -152,9 +152,39 @@ pub fn walk_comments<F: FnMut(&Node) -> Visit>(node: &Node, f: &mut F) {
 // --------------------------------------------------------------------------
 
 /// `Container.prototype.append(child)` — push to end.
+///
+/// Mirrors upstream `Container.append → this.normalize(child, this.last)
+/// → push`. For a `Root` parent, this triggers the Root.normalize override
+/// (`postcss/lib/root.js::normalize`):
+///
+/// > if (sample) { ... else if (this.first !== sample) {
+/// >   for (let node of nodes) { node.raws.before = sample.raws.before }
+/// > } }
+///
+/// In plain English: when root already has at least 2 children, the
+/// to-be-appended child's `raws.before` is overwritten with the *current
+/// last* child's `raws.before`. (`sample` is `this.last`; the inner branch
+/// only fires when `this.first !== sample`, i.e. root has ≥2 children.)
+///
+/// For non-Root parents, base `Container.normalize` does no raws transfer,
+/// so we just push.
 pub fn append(parent: &mut Node, children: Vec<Node>) {
+    let is_root = matches!(parent.kind, NodeKind::Root(_));
     if let Some(nodes) = parent.nodes_mut() {
-        for c in children { nodes.push(c); }
+        for mut c in children {
+            // For Root parents: upstream does `this.normalize(child, this.last)`
+            // PER child, re-reading `this.last` each iteration. The
+            // raws-transfer fires only when `this.first !== this.last` —
+            // i.e., when root already has ≥2 children. After our first
+            // push, root has more children, so subsequent pushes may also
+            // trigger the transfer based on the new last.
+            if is_root && nodes.len() >= 2 {
+                if let Some(last) = nodes.last() {
+                    c.raws.before = last.raws.before.clone();
+                }
+            }
+            nodes.push(c);
+        }
     }
 }
 

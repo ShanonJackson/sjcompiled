@@ -12,10 +12,10 @@ postcss-selector-parser = { workspace = true }
 postcss-value-parser = { workspace = true }
 postcss-values-parser = { workspace = true }
 # `postcss-nested@5.0.6`, `postcss-normalize-whitespace@5.1.1`,
-# `postcss-discard-duplicates@6.0.0`, `autoprefixer@10.4.14`,
-# `cssnano-preset-default@5.2.14`: NOT yet declared as path-deps because the
-# crates haven't been created. Phase 5/6/7 will add them; transform.rs and
-# sort.rs will pick them up via workspace deps at that point.
+# `autoprefixer@10.4.14`, `cssnano-preset-default@5.2.14`: NOT yet
+# declared as path-deps because those crates are still scaffolds.
+# Phase 5a/5b/6/7 will add them as `transform.rs` consumes them.
+postcss-discard-duplicates = { workspace = true }
 compiled-css = { workspace = true }
 indexmap = { workspace = true }
 serde = { workspace = true }

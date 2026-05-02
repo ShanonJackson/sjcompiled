@@ -10,3 +10,5 @@ description = "Byte-for-byte Rust port of postcss-normalize-whitespace@5.1.1."
 postcss-core = { workspace = true }
 postcss-value-parser = { workspace = true }
 regex = { workspace = true }
+once_cell = { workspace = true }
+indexmap = { workspace = true }

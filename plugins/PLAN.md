@@ -1,11 +1,11 @@
 # Plan: `@sjcompiled/babel-plugin` + `@sjcompiled/babel-plugin-strip-runtime` → Rust SWC plugins
 
 > **Audience.** An engineer or agent picking this up cold. Read this in
-> order. Read `plugins/INSTRUCTIONS.md` and `plugins/PARCEL_USAGE_EXAMPLE.md`
-> first — they are the source of truth for hard constraints and the
-> production call site we must satisfy. This file tells you **what to build**,
-> **in what order**, **with what verification**, and **why** every decision
-> below is the way it is.
+> order. This file is the source of truth for hard constraints, the verification
+> oracle, and the production call site we must satisfy. Read
+> `plugins/PARCEL_USAGE_EXAMPLE.md` alongside §8 — that's the consumer shape
+> we slot into. This file tells you **what to build**, **in what order**,
+> **with what verification**, and **why** every decision below is the way it is.
 >
 > **The non-negotiable.** Every input file must produce output that is
 > byte-identical between Babel and SWC **after** running both outputs through
@@ -37,22 +37,50 @@ invalidation, `styleRules` for the optimizer), same edge-case behavior.
 
 ---
 
-## 1. Hard constraints (from `plugins/INSTRUCTIONS.md`)
+## 1. Hard constraints
 
 These are constraints, not preferences. They override every other decision in
-this document. Quoted from `INSTRUCTIONS.md`:
+this document.
 
-1. **`opts.resolver` (custom JS resolver function) is out of scope.** Cannot
-   be ported 1:1. The user will give specific guidance later. Until then,
-   plugin config-time error if a function is passed.
-2. **Module resolution uses `oxc_resolver`.** When the Babel plugin uses
-   `webpack-enhanced-resolve`-style logic, port to the
-   [`oxc_resolver`](https://crates.io/crates/oxc_resolver) crate. It has
-   matching semantics.
-3. **`packages/css/src/transform.ts` is called via NAPI from Rust.** A
-   parallel agent is rewriting it to Rust; until that lands, the SWC plugin
-   reaches it through a temporary NAPI bridge. The Rust replacement will be
-   bit-identical, so swapping is zero-behaviour.
+1. **`opts.resolver` (custom JS resolver function) is out of scope.** The
+   plugin runs inside a WASI sandbox and cannot synchronously call back into
+   JS. Production callers today pass `opts.resolver` as a JS object with a
+   `.resolveSync(filename, request)` method (see `createDefaultResolver` in
+   `packages/parcel-transformer/src/utils.ts`, which wraps
+   `enhanced-resolve@5.x`). Constraint #2 covers the replacement; the plugin
+   no longer accepts `opts.resolver` and emits a config-time error if a
+   function or wrapper is passed.
+2. **Module resolution is in-plugin via `oxc_resolver`.**
+   `oxc_resolver` is the Rust analogue of webpack's `enhanced-resolve` and
+   covers the same surface (extensions, `package.json#main` / `#exports` /
+   `#imports` / conditional exports, `tsconfig` paths, symlink realpath, the
+   browser field). Two distinct JS code paths must be replaced in Rust:
+   - **JS-injected `state.resolver.resolveSync(...)`** at
+     `packages/babel-plugin/src/utils/resolve-binding.ts:191-193` — what
+     production callers (Parcel, webpack) wire up. This is the
+     `enhanced-resolve` path that `oxc_resolver` directly replaces.
+   - **Fallback `resolve.sync(...)` from the npm `resolve` package** at
+     `resolve-binding.ts:185-189` — used when no resolver is injected. This
+     path also collapses into `oxc_resolver`; configure
+     `oxc_resolver` with `opts.extensions` (default `['.js','.jsx','.ts',
+     '.tsx']`) so its behaviour matches the npm-`resolve` fallback as well.
+   Phase 0 produces a difference matrix between
+   `enhanced-resolve@5.x` (as used by `createDefaultResolver`),
+   the npm `resolve.sync()` fallback, and `oxc_resolver`. Any divergence
+   on a real path becomes a class-name divergence — this matrix is a hard
+   gate before Phase 5 starts.
+3. **`packages/css/src/transform.ts` ships in Rust *before* this plugin
+   starts Phase 4.** A parallel agent is porting `transform.ts` to Rust;
+   their crate (`crates/sjcompiled-utils` plus the CSS crates already
+   scaffolded under `crates/`) exposes a synchronous Rust function we link
+   in directly. **No NAPI bridge. No two-pass scan/apply protocol.**
+   Earlier drafts of this plan described a two-pass workaround because
+   the WASI sandbox forbids host callbacks; landing the Rust CSS port
+   first eliminates that whole class of complexity (no scan-pass marker
+   tokens, no `css-requests.json` sidecar, no second `transformSync`
+   call per file). Phase 4 cannot start until the Rust CSS port is
+   stable and its hash function is byte-identical to the JS version
+   (see Phase 3).
 4. **File/folder structure is identical.** Every file in
    `packages/babel-plugin/src/<path>.ts` maps to
    `crates/babel-plugin/src/<path>.rs` (or `<path>/mod.rs`). Same for
@@ -63,7 +91,10 @@ this document. Quoted from `INSTRUCTIONS.md`:
    Where SWC has no analogue (e.g. `@babel/generator` for one node subtree),
    build a complete impl in `compat/` matching the Babel one byte-for-byte.
    No half-bakes — there are 10K+ call sites in production code; missing
-   features will be discovered at integration.
+   features will be discovered at integration. For each `compat/*.rs`
+   shim, an explicit *coverage manifest* lists every input shape that can
+   reach it, derived from the consuming monorepo (see Phase 4 entry gate
+   for the `compat/generator.rs` instance). Half-bakes are a port defect.
 6. **Replicate Babel bugs.** This is a drop-in replacement. Existing bugs,
    quirks, even "wrong" CSS output stay. Fixing bugs changes hashes, which
    renames every class in production. Bugs are features.
@@ -71,6 +102,13 @@ this document. Quoted from `INSTRUCTIONS.md`:
    The matching `swc_core` Rust crate version is locked in
    `crates/PARITY_VERSIONS.md`. Bumping `@swc/core` requires a coordinated
    `swc_core` bump and a full corpus rerun.
+8. **Plugin in/out is 1:1; the Parcel transformer can be modified
+   freely.** The plugin's input (source string + `PluginOptions`) and
+   output (transformed code + sidecar JSON) are fixed. The host wrapper
+   in `packages/parcel-transformer/` may be modified arbitrarily to
+   adapt to SWC's calling conventions (e.g. it can drop its upstream
+   Babel parse and feed source straight to `swc.transformSync`); only
+   the plugin contract is the parity surface.
 
 If you hit anything you cannot replicate 1:1, **stop and escalate.** Do not
 guess. Do not improvise. The cost of a wrong substitution is months of
@@ -179,13 +217,12 @@ resolution.
 This collapses the architecture:
 
 - **No host pre-walker** (no `swc-plugin-host` package).
-- **No two-pass scan/apply protocol** for binding resolution.
+- **No two-pass scan/apply protocol** of any kind.
 - The plugin walks the import graph itself, reading files via the `/cwd`
   preopen, parsing them with `swc_ecma_parser`, caching results in a
   `Mutex<LruCache>`.
-- The two-pass model is retained **only** for the temporary
-  `transformCss` NAPI bridge (§3.5), which is unrelated to the sandbox and
-  collapses naturally when the Rust CSS port lands.
+- `transform_css` is a direct synchronous Rust call (§3.5), not a
+  host bridge. The plugin runs in a single pass per file.
 
 ### 3.4 Out-of-band data uses sidecar JSON manifests
 
@@ -207,42 +244,40 @@ Why sidecar files vs comment sentinels in the output JS:
   both sides — an extra layer of fragility.
 - File I/O in the WASI preopen is reliable and well-bounded.
 
-### 3.5 The `transformCss` bridge is two-pass until the CSS port lands
+### 3.5 `transformCss` is a direct synchronous Rust call
 
-The plugin cannot synchronously call JS from inside WASI. While the parallel
-Rust CSS port is in flight, the plugin uses this protocol:
+Per constraint 3 in §1, the Rust port of `packages/css/src/transform.ts`
+ships **before** Phase 4 starts. That eliminates the WASI host-callback
+problem entirely: the plugin links the CSS port as a normal Rust crate
+(`crates/sjcompiled-utils` plus the CSS crates already scaffolded in
+`crates/`) and calls `transform_css(css, &opts)` synchronously inside
+the visitor. No NAPI, no two-pass scan/apply, no marker tokens, no
+`css-requests.json` sidecar, no second `transformSync` per file.
 
-1. **Scan pass.** Plugin runs in `mode: 'scan'`, traverses normally, but
-   every site that needs a `transformCss` call records `{ id, css, opts }`
-   into `<scratch>/css-requests.json` instead of substituting a result. The
-   plugin emits placeholder string literals (`__compiled_css_marker_<id>__`)
-   to keep the AST shape correct.
-2. **Host bridges.** Caller reads `css-requests.json`, runs the existing JS
-   `transformCss` (via NAPI from inside the host wrapper, OR via a synchronous
-   call from the JS layer wrapping SWC), builds
-   `Map<id, { sheets, classNames }>`.
-3. **Apply pass.** Plugin runs again with `{ mode: 'apply', cssResults }`
-   threaded into plugin config. It traverses identically, but on hitting a
-   `transformCss` call site, looks up the precomputed result by id and emits
-   the real strings.
+Phase 4 cannot start until two preconditions hold:
 
-Stable id derivation: pure function of `(filename, byte_offset, css_content)`
-— no clocks, no counters, so scan and apply produce the same ids
-deterministically.
+1. The Rust `transform_css` is callable as a sync Rust function and its
+   public signature matches what `utils/css-builders.ts` expects (the
+   same call shape as the JS `transformCss({ css, opts })`).
+2. The hash function used for keyframe names / CSS variable names /
+   cache keys is byte-identical between JS and Rust (Phase 3 gates this
+   independently and is consumed from the same shared crate).
 
-When the Rust CSS port lands (see constraint 3 in §1), the bridge becomes a
-direct synchronous Rust function call, the two-pass scaffolding is removed
-in a single PR, and consumers see no behaviour change.
+If either precondition is not yet met when Phase 3 exits, Phase 4
+blocks until it is. Do not stand up a temporary scaffold — the
+two-pass design was exactly that scaffold and it has been removed
+deliberately.
 
-**Why two passes and not single-pass-with-string-fixup?** A single pass that
-emits placeholders and post-processes the output JS string would force the
-host to re-parse SWC's output to safely substitute. Two passes keep all
-substitution inside the AST.
+**Why this matters for perf.** A two-pass design would have doubled
+SWC parse + visit cost for every transformed file until the CSS port
+landed. Single-pass + direct Rust call keeps the per-file cost at one
+parse + one visit, which is the floor below which the plugin cannot
+go and is what the §3.9.16 perf targets assume.
 
 ### 3.6 No shared `swc-plugin-host` JS package
 
 Each `@swc/core` integration point inlines a ~30-line wrapper that creates a
-scratch dir, invokes SWC (twice if two-pass), drains sidecars, returns
+scratch dir, invokes SWC once via `transformSync`, drains sidecars, returns
 results. Today there's exactly one integration: the Parcel transformer in
 `packages/parcel-transformer/`. Future integrations (webpack, jest, bun-test)
 duplicate the snippet, not abstract it. Re-evaluate if the wrapper grows past
@@ -291,8 +326,25 @@ The Wasm plugin instance is torn down per `transform()` call (verified
 empirically against `swc_plugin_runner@23.0.0` — see Phase 0 ABI gate),
 so plugin-static memory cannot persist a cache across files. Instead,
 the **host (the Parcel transformer wrapper) owns a worker-scoped scratch
-directory**, the plugin reads/writes a cache file inside it via WASI
-sync I/O, and mtime-based invalidation keeps the cache safe under HMR.
+directory under `<projectRoot>/node_modules/.cache/sjcompiled-swc/`**
+(reachable from inside the WASI cwd preopen — see §3.9.5), the plugin
+reads/writes a **single compact binary cache file** (postcard-encoded,
+hard-capped at 5 MB / 500 entries) inside it via WASI sync I/O, and
+mtime-based invalidation keeps the cache safe under HMR.
+
+The cache is **Layer 2 only on disk** (evaluated values + state diffs;
+small entries, big payoff). Layer 1 (parsed ASTs) is in-memory only,
+scoped to a single `transform()` call. Re-parsing across files is
+cheap (SWC parses at ~50 MB/s; OS page cache holds source bytes);
+re-evaluating an imported `theme.ts` 1000× across consumers is what
+actually hurt Babel, and that's exactly what Layer 2 eliminates.
+
+This redesign is deliberate: an earlier draft persisted Layer 1 (full
+serde-JSON of `swc_ecma_ast::Module`) to disk per-transform. On a
+60-90 GB monorepo with deep transitive deps, the per-file
+read/parse/serialize/write of a multi-megabyte JSON file would have
+dwarfed the parse cost it tried to save. Binary format + Layer-2-only
++ size cap keeps the cache *bounded* and *cheap to touch*.
 
 #### 3.9.1 What Babel does today (and why the SWC port can do better)
 
@@ -403,18 +455,46 @@ The host owns scratch directory creation, lifetime, and cleanup. The
 plugin only reads/writes files inside paths the host hands it via
 plugin config.
 
+**Critical: scratch must be inside the WASI cwd preopen.** §3.2 says
+the SWC plugin host preopens *only* `std::env::current_dir()`. An
+earlier draft of this plan put scratch at
+`mkdtempSync(join(tmpdir(), 'compiled-swc-worker-'))`, but `/tmp` (or
+`%TEMP%` on Windows) is *not* under the project root, so the plugin
+literally could not open any file there. The corrected location:
+
 ```
-<workerScratchDir>/                            # mkdtemp at worker init
-  resolution-cache.json                        # persistent across transforms
-  call-<uuid>/                                 # mkdtemp per transform()
-    included-files.json                        # written by plugin on Program::exit
-    style-rules.json                           # written by strip-runtime plugin
-    css-requests.json                          # scan-pass output (Phase 4 bridge)
+<projectRoot>/node_modules/.cache/sjcompiled-swc/    # gitignored by convention
+  worker-<pid>/                                      # mkdir at worker init
+    cache.bin                                        # Layer 2 only, postcard, capped 5 MB
+    call-<uuid>/                                     # mkdir per transform()
+      included-files.json                            # written by plugin on Program::exit
+      style-rules.json                               # written by strip-runtime plugin
 ```
 
+If `node_modules/.cache/` does not exist or is not writable (rare —
+some sandboxed CI configs), the host falls back in this order:
+
+1. `<projectRoot>/.sjcompiled-swc-cache/worker-<pid>/`
+2. `<projectRoot>/.cache/sjcompiled-swc/worker-<pid>/`
+3. Hard error: emit a clear diagnostic naming both attempted paths
+   and the resolved cwd. Do **not** silently fall back to `/tmp` —
+   the plugin will appear to work but every cache lookup will fail
+   with `EACCES`/`ENOENT` from inside the WASI sandbox.
+
+The chosen `<projectRoot>` is the directory the worker process was
+spawned with (`process.cwd()` at module load). For Parcel, that must
+be the monorepo root or a subtree containing every source file the
+plugin will need to read; see §3.9.13.7. The Phase 0 location probe
+(§3.9.14 #6) verifies the chosen path is reachable from inside WASI
+*before any plugin code runs*.
+
 **`workerScratchDir`:** created exactly once per worker process by the
-Parcel transformer wrapper at module load. Lives at
-`mkdtempSync(join(tmpdir(), 'compiled-swc-worker-'))`. Cleaned up via
+Parcel transformer wrapper at module load. Path is
+`<projectRoot>/node_modules/.cache/sjcompiled-swc/worker-<pid>/` (or a
+fallback per above). Created via `mkdirSync(..., { recursive: true })`
+— not `mkdtempSync`, because we want a stable per-pid path so a
+crashed worker leaves a deterministically-named directory the next
+worker can clean up. Cleaned up via
 `process.on('exit', () => rmSync(workerScratchDir, { recursive: true,
 force: true }))`. Same path passed into every `transform()` call this
 worker makes.
@@ -422,12 +502,14 @@ worker makes.
 **`call-<uuid>/`:** created per-transform by the wrapper, passed in
 via plugin config as `callScratch`. Cleaned up in the wrapper's
 `finally` block. Holds disposable per-call sidecars (`included-files`,
-`style-rules`, `css-requests`); never holds cache state.
+`style-rules`); never holds cache state.
 
-**`resolution-cache.json`:** lives in `workerScratchDir`, persists for
-the worker's lifetime. Plugin reads on `Program::enter`, writes on
-`Program::exit`. The plugin is the only writer — host never touches
-the file directly except to delete it on worker shutdown.
+**`cache.bin`:** lives in `workerScratchDir`, persists for the
+worker's lifetime. Postcard-encoded, single compact binary file (see
+§3.9.10). Plugin reads on `Program::enter`, writes on `Program::exit`
+**only if mutated** during this transform. The plugin is the only
+writer — host never touches the file directly except to delete the
+worker scratch dir on worker shutdown.
 
 #### 3.9.6 Plugin config contract (what the host passes per call)
 
@@ -441,12 +523,14 @@ the file directly except to delete it on worker shutdown.
 }
 ```
 
-- `workerScratchDir`: where `resolution-cache.json` lives.
+- `workerScratchDir`: where `cache.bin` lives (postcard binary;
+  Layer 2 only). Stable across calls in this worker.
 - `callScratch`: where per-call sidecars go.
 - `cacheLevel`:
-  - `"value"`: Layer 1 + Layer 2 (default; max perf).
-  - `"ast"`: Layer 1 only (rip-cord; matches Babel's effective hit
-    rate but skips re-parse).
+  - `"value"`: Layer 1 (in-memory) + Layer 2 (persisted) (default; max perf).
+  - `"ast"`: Layer 1 (in-memory) only (rip-cord; matches Babel's
+    effective hit rate within a transform but loses the cross-file
+    evaluated-value win).
   - `"off"`: no caching, every lookup live (debug aid; equivalent to
     Babel `cache: false`).
 
@@ -459,12 +543,18 @@ cost.
 
 ```
 Program::enter:
-  1. Read <workerScratchDir>/resolution-cache.json. Empty map if missing.
-  2. Validate `version` and `schema_hash` fields. Mismatch -> wipe
-     entire cache (treat as missing). Mismatch happens on plugin
-     version bump, swc_core bump, or cacheable-shape change.
-  3. Build in-memory HashMap<u64, Layer1Entry> and
-     HashMap<u64, Layer2Entry>.
+  1. Read <workerScratchDir>/cache.bin. Empty map if missing or read
+     fails (corruption is regenerable; never crash the build).
+  2. Postcard-deserialize. Validate `version` and `schema_hash`
+     fields. Mismatch -> wipe entire cache (treat as missing).
+     Mismatch happens on plugin version bump, swc_core bump, or
+     cacheable-shape change.
+  3. Build in-memory HashMap<u64, Layer2Entry> from the file.
+     Initialize an empty in-memory HashMap<u64, Layer1Entry>; Layer 1
+     is *not* persisted to disk (see §3.9.8). Set
+     `cache_dirty = false` and `mtime_observed: HashMap<PathBuf, u128>
+     = HashMap::new()` (per-transform mtime memo to dedupe stats —
+     see step 6).
   4. **Lazy invalidation, not eager.** Do NOT stat every cached file
      up front (O(cache_size) syscalls per transform). Instead,
      stat-on-hit (see traversal step).
@@ -472,70 +562,136 @@ Program::enter:
 During traversal:
   5. cache.load() hits the in-memory maps; logic identical to Babel's
      cache.ts (LRU eviction at maxSize, move-to-end on hit).
-  6. On Layer 1 hit:
-       - std::fs::metadata(source_canonical_path).mtime
+  6. On Layer 1 hit (in-memory only, never persisted):
+       - mtime_observed memoizes per-transform stats: first lookup of
+         a path issues `std::fs::metadata(path).mtime`; subsequent
+         lookups in the same transform reuse the memoized value.
        - matches entry.source_mtime_ns -> hit valid
        - mismatch -> evict this entry AND any Layer 2 entries whose
-         transitiveDeps include this path; fall through to value()
+         transitiveDeps include this path (set `cache_dirty = true`);
+         fall through to live read+parse
   7. On Layer 2 hit:
        - validate entry.source_mtime_ns AND every transitiveDeps[i]
-         mtime via stat
-       - any mismatch -> evict; fall through to Layer 1 lookup +
-         live evaluation
+         mtime via the memoized stat (step 6 mechanism)
+       - any mismatch -> evict (set `cache_dirty = true`); fall
+         through to Layer 1 lookup + live evaluation
        - all match -> replay stateDiffs against the consumer's
-         meta.state, return entry.evaluatedAst
-  8. New entries written into in-memory maps with current mtime
-     captured at write time.
+         meta.state, return entry.evaluatedAst (no dirty bit; reads
+         don't mutate disk state)
+  8. New Layer 2 entries written into the in-memory map with current
+     mtime captured at write time. Set `cache_dirty = true` on every
+     Layer 2 insert/evict/touch-LRU. Layer 1 inserts do NOT set the
+     dirty bit (Layer 1 is in-memory only).
 
 Program::exit:
-  9. Serialize both layers to <workerScratchDir>/resolution-cache.json
-     (full overwrite). Single writer guaranteed by §3.9.4.
-  10. Sidecars (included-files, style-rules, css-requests) go to
+  9. If `cache_dirty == false`, skip the write entirely. (Most
+     transforms are pure cache hits or pure misses against unchanged
+     entries; skipping no-op writes is the dominant case for warm
+     workers.)
+  10. Otherwise, postcard-serialize Layer 2 only. Enforce size cap:
+      if `serialized.len() > MAX_CACHE_BYTES (5 MiB)`, evict by LRU
+      until it fits. Atomic write: `cache.bin.tmp` ->
+      `fd_sync` -> `path_rename` to `cache.bin`. Single writer
+      guaranteed by §3.9.4.
+  11. Sidecars (included-files, style-rules) go to
       callScratch as before.
 ```
 
-The lazy-invalidation choice (step 4) keeps per-transform overhead
-proportional to *lookups performed*, not *cache size*. Cold paths in
-the cache cost nothing.
+The lazy-invalidation choice (step 4) plus the per-transform mtime
+memo (step 6) keeps per-transform overhead proportional to *unique
+paths touched*, not *cache size or hit count*. Cold paths in the
+cache cost nothing.
+
+The `cache_dirty` short-circuit (step 9) is important: a worker that
+processes 10000 files where 9990 are pure cache hits writes the cache
+file ~10 times instead of 10000.
 
 #### 3.9.8 Two-layer cache structure
 
-**Layer 1 — source AST cache** (mirrors Babel's existing
-`utils/cache.ts` call sites exactly):
+**Layer 1 — source AST cache (in-memory only, per `transform()`):**
 
 | Key namespace | Key payload | Cached value |
 |---|---|---|
 | `read-file` | `modulePath` | file content `String` |
-| `parse-module` | `modulePath` | `swc_ecma_ast::Module` (serde-serialized) |
-| `find-default-export-module-node` | `modulePath` | `{ found_node: ModuleItem, found_parent_byte_pos: BytePos }` |
+| `parse-module` | `modulePath` | `Arc<swc_ecma_ast::Module>` |
+| `find-default-export-module-node` | `modulePath` | `{ found_node_ref, found_parent_byte_pos }` |
 | `find-named-export-module-node` | `modulePath=...&exportName=...` | same shape |
 
-Skips: `fs.read` + parse + AST traversal to locate export.
-Pays: live evaluation against the cached AST per consumer.
+Layer 1 is **never persisted to disk**. It exists only inside a single
+`transform()` call's `Program` lifecycle and is dropped at
+`Program::exit`. Mirrors Babel's existing `utils/cache.ts` call sites
+exactly (so the `cache.load()` API surface is unchanged), but gives up
+cross-file persistence.
 
-**Layer 2 — evaluated-value cache** (new; not in Babel):
+Skips (within one transform): redundant `fs.read` + parse + AST
+traversal when the same module is referenced multiple times during one
+file's evaluation. Pays: re-parses each module on the first transform
+that touches it, then keeps the parse for the rest of *that* transform.
+
+**Why not persist Layer 1?**
+- `swc_ecma_ast::Module` does not have a stable, supported
+  serde-Serialize/Deserialize impl that survives `swc_core` version
+  bumps. Roll-our-own serialization is a maintenance liability.
+- Serialized AST is typically 5–20× the source byte size. Persisting
+  500 entries of large modules across a 60-90 GB monorepo blows the
+  cache size cap immediately.
+- SWC parsing is fast (~50 MB/s on commodity hardware). Reading from
+  warm OS page cache + re-parsing is competitive with deserializing a
+  binary AST blob, and avoids the version-stability problem.
+- The real win is Layer 2 — re-evaluating an imported `theme.ts` 1000×
+  is what hurt Babel. Re-parsing it 1000× is a smaller cost we can
+  swallow in exchange for design simplicity.
+
+**Layer 2 — evaluated-value cache (persisted to disk):**
 
 ```rust
 struct Layer2Entry {
-    evaluated_ast: serde_json::Value,         // SWC AST node, e.g. NumericLit(2)
+    evaluated_ast: SerializedExpr,           // bounded subset; see §3.9.10
     state_diffs: Vec<StateDiff>,
-    transitive_deps: Vec<TransitiveDep>,
+    transitive_deps: Vec<TransitiveDep>,     // capped at MAX_TDEPS_PER_ENTRY
     source_mtime_ns: u128,
     lru_seq: u64,
+    byte_size_estimate: u32,                 // for size-cap eviction
 }
 
 enum StateDiff {
     IncludedFilesPush { path: String },
-    CompiledImportsSet { key: String, value: serde_json::Value },
-    SheetsAdd { value: String },
-    CssMapAdd { key: String, value: serde_json::Value },
+    CompiledImportsAppend { api: ApiKind, local_name: String },
+    SheetsInsert { sheet_text: String, hoisted_name: String },
+    CssMapInsert { binding: String, sheets: Vec<String> },
+    IgnoreMemberExprMark { name: String },
 }
+
+enum ApiKind { ClassNames, Css, Keyframes, Styled, CssMap }
+// Reconciled against actual mutation-site enumeration in
+// crates/babel-plugin/STATE_MUTATIONS.md (Phase 0 artefact).
+// 5 variants, not 4 — `IgnoreMemberExprMark` was missing from
+// earlier sketches and would have caused silent perf regressions
+// + transitive-dep-miss risk on Layer 2 hits.
 
 struct TransitiveDep {
     path: String,
     mtime_ns: u128,
 }
 ```
+
+`SerializedExpr` and `SerializedValue` are *bounded* shapes — only the
+AST node kinds in §3.9.9's "cacheable Layer 2" table can appear. We do
+NOT cache arbitrary `swc_ecma_ast::Expr`. Bounded shapes give us a
+stable wire format under postcard.
+
+Layer 2 entry size is bounded by construction:
+- `MAX_TDEPS_PER_ENTRY = 32` — if an evaluation pulls in more than 32
+  distinct files, mark `cacheable_at_layer2 = false` and don't cache.
+  Such evaluations are rare (theme/token files transitively reach a
+  small set of constants) and the long tail isn't worth caching.
+- `evaluated_ast` is bounded by §3.9.9; large object literals
+  (>4 KiB serialized) are not cached.
+- `state_diffs` length is bounded by `MAX_STATE_DIFFS = 64`; longer
+  diff logs decline caching.
+
+These bounds are sentries, not normal cases. If a real input regularly
+trips them, retune in `crates/PARITY_VERSIONS.md` (perf-only knobs).
 
 Skips: everything Layer 1 skips PLUS `evaluateExpression`'s walk
 through bindings, recursive resolution, and the live mutation of
@@ -551,11 +707,51 @@ log is stored as the entry's `state_diffs`. On a future Layer 2 hit,
 the plugin replays diffs against the consumer's state without running
 evaluation.
 
+**Compiler-enforced state encapsulation (added to remediate
+"missed-mutation" risk).** Earlier drafts described `MutationRecorder`
+as a wrapper that *should* be used at every state-write site. That is
+a vibes check — easy to miss one write during the port, easy to
+regress one in a future change. The remediation:
+
+1. **Make `State` fields private.** The struct's mutable fields
+   (`included_files`, `compiled_imports`, `sheets`, `css_map`,
+   `ignore_member_expressions`) are `pub(self)` only. `pub fn` getters
+   are read-only.
+2. **Mutation is impossible without a `MutationRecorder`.** `State`
+   exposes no public mutators. The only path that writes into the
+   private fields is `MutationRecorder::apply(diff: StateDiff,
+   state: &mut State)`, which lives in the same module as `State` and
+   has the only `pub(super)` mutator. Outside `state.rs`, there is
+   no syntactic way to mutate state without going through a diff.
+3. **Pre-commit lint gate:** before any port code lands, run a
+   pre-commit lint that fails on any `state\.[a-z_]+\.(push|set|
+   add|insert|remove|extend)` regex match outside `state.rs` and
+   `mutation_recorder.rs`. Document the gate in
+   `crates/PARITY_VERSIONS.md`.
+4. **Enumerate every Babel-side mutation site as a Phase 0 task.**
+   Run `grep -nE 'state\.(includedFiles|compiledImports|sheets|cssMap|
+   ignoreMemberExpressions)\b'` over
+   `packages/babel-plugin/src/utils/evaluate-expression.ts` (and the
+   `traverse_expression/` subtree) and write the count + path list into
+   `crates/babel-plugin/STATE_MUTATIONS.md`. For each, record the
+   corresponding `StateDiff` variant. Phase 5 task 0 is the
+   reconciliation step that re-runs the enumeration and confirms it's
+   still current (see §5). Any unaccounted mutation = port defect, fix
+   before merging.
+
+Together (1)+(2) make *missed mutation captures* a Rust compile error,
+not a silent runtime divergence. (3)+(4) make *new* mutations
+(introduced post-port) impossible to merge without explicit
+StateDiff-variant work.
+
 **Transitive-dep capture:** the resolver hooks every `fs::read` (or
 parse-module/find-export lookup) during evaluation and appends to the
 current evaluation's `transitive_deps` set. Centralized capture; cannot
 be missed because the only way to read a file from inside the plugin
-is through this resolver.
+is through this resolver. Same encapsulation pattern as state above:
+the resolver type's `read()` and `parse_module()` are the *only*
+public ways to ingest source bytes, and both unconditionally append to
+the active dep set.
 
 #### 3.9.9 What is and is NOT a Layer 2 candidate
 
@@ -579,57 +775,102 @@ flag set by traversers as they build up the result. Conservative
 default: `false`. Only flip to `true` when every step of the build is
 itself Layer 2-safe.
 
-#### 3.9.10 Cache file schema (`resolution-cache.json`)
+#### 3.9.10 Cache file schema (`cache.bin`)
 
-```jsonc
-{
-  "version": 1,
-  "schema_hash": "<hex>",                 // see §3.9.3 cross-build invalidation
-  "layer1": {
-    "<u64 key hex>": {
-      "namespace": "parse-module",        // for debug only; not used at lookup
-      "value": <serde JSON>,              // shape depends on namespace
-      "source_canonical_path": "<absPath>",
-      "source_mtime_ns": "<u128 string>",
-      "lru_seq": <u64>
-    }
-    /* ... */
-  },
-  "layer2": {
-    "<u64 key hex>": {
-      "evaluated_ast": <serde JSON>,
-      "state_diffs": [
-        { "op": "includedFiles.push", "path": "<absPath>" },
-        { "op": "compiledImports.set", "key": "...", "value": <...> },
-        { "op": "sheets.add", "value": "<...>" },
-        { "op": "cssMap.add", "key": "...", "value": <...> }
-      ],
-      "transitive_deps": [
-        { "path": "<absPath>", "mtime_ns": "<u128 string>" }
-      ],
-      "source_mtime_ns": "<u128 string>",
-      "lru_seq": <u64>
-    }
-    /* ... */
-  }
+Format: **postcard** (compact, deterministic, schema-stable Rust serde
+binary format — `postcard` crate). NOT JSON. Rationale:
+
+- 5–10× faster encode/decode than serde-JSON for the same data.
+- 3–6× smaller on disk (no field names, no whitespace).
+- u128 round-trips natively (no string-encoding workaround).
+- Stable byte layout under a fixed schema — combined with
+  `schema_hash` validation, version drift is detected at load time.
+
+JSON was tempting for human-readable debugging; the cache file is
+plugin-internal scratch state, debug-readability is a non-goal,
+and `cache_inspect.rs` (CLI in `crates/babel-plugin/src/bin/`)
+provides a `--dump-as-json` flag for the rare case we need to look.
+
+```rust
+// crates/babel-plugin/src/cache_schema.rs
+// Frozen wire format. Bumping any field => bump CACHE_VERSION
+// AND recompute SCHEMA_HASH (constant inputs in a build.rs).
+
+const CACHE_VERSION: u32 = 1;
+const MAX_CACHE_BYTES: usize = 5 * 1024 * 1024;       // 5 MiB hard cap
+const MAX_ENTRIES: usize = 500;                       // matches Babel maxSize
+const MAX_TDEPS_PER_ENTRY: usize = 32;                // §3.9.8
+const MAX_STATE_DIFFS: usize = 64;                    // §3.9.8
+
+#[derive(Serialize, Deserialize)]
+struct CacheFile {
+    version: u32,                 // == CACHE_VERSION
+    schema_hash: [u8; 32],        // BLAKE3 of (plugin_version,
+                                  //          swc_core_version,
+                                  //          sorted parser_babel_plugins,
+                                  //          sorted extensions,
+                                  //          classHashPrefix)
+    layer2: Vec<(u64, Layer2Entry)>,   // sorted by key for determinism
+    // NB: Layer 1 is in-memory only (§3.9.8). Not in this struct.
 }
 ```
 
 Versioned + schema-hashed. Mismatch on either is a hard wipe, not an
 error — cache is regenerable.
 
-`u128` mtimes serialize as strings (JSON numbers don't safely hold
-128-bit integers).
+**On size cap:** the 5 MiB cap is enforced at write time
+(§3.9.7 step 10). If serialized output exceeds the cap, evict by LRU
+until it fits, then re-serialize. The combination of `MAX_ENTRIES`,
+per-entry size bounds (§3.9.8), and the 5 MiB cap ensures the cache
+file is always small enough to read+decode in <5 ms even on slow
+filesystems — critical when running on a 60-90 GB monorepo where
+hundreds of worker processes may touch their cache files
+concurrently.
+
+**On corruption recovery:** if `postcard::from_bytes()` returns an
+error (truncated write, partial filesystem corruption, version drift
+that schema_hash didn't catch), treat the file as missing. Wipe and
+proceed. Never crash the build over a regenerable scratch file.
+
+**On atomic writes:** `cache.bin.tmp` is written, fsynced, then
+`path_rename`'d over `cache.bin`. WASI supports both `fd_sync` and
+`path_rename`. A worker crash mid-write leaves the tmp file behind;
+the next worker startup deletes any stale `*.tmp` siblings before
+reading `cache.bin`.
 
 #### 3.9.11 Eviction
 
-LRU at `maxSize: 500` per layer (matches Babel's `cache.ts:11`
-`maxSize` exactly for parity of *which entries survive*). Eviction
-order does not affect output bytes (cache hit value === cache miss
-value when source unchanged), so this is the one place a perf-only
-divergence is acceptable: profiling may show `maxSize: 5000` is right
-for large monorepos. **Document any deviation in
+**Two simultaneous caps; eviction by LRU until both are satisfied:**
+
+1. **Entry-count cap:** `MAX_ENTRIES = 500` per layer (matches Babel's
+   `cache.ts:11` `maxSize` exactly for parity of *which entries
+   survive* under the same access pattern).
+2. **Byte cap (Layer 2 only):** `MAX_CACHE_BYTES = 5 MiB` on the
+   serialized postcard file. This is the load-bearing cap on a 60-90 GB
+   monorepo — a single misbehaving evaluation that produces a
+   2 MiB cached object literal cannot poison the cache; it just gets
+   evicted on the next write.
+
+Eviction order:
+- On in-memory mutation: drop by `lru_seq` ascending until count <=
+  `MAX_ENTRIES`.
+- On `Program::exit` write: serialize, check byte size, drop by
+  `lru_seq` ascending until serialized size <= `MAX_CACHE_BYTES`,
+  re-serialize. (At most 2-3 iterations in practice; entries are
+  bounded.)
+
+Eviction order does not affect output bytes (cache hit value === cache
+miss value when source unchanged), so this is the one place a
+perf-only divergence is acceptable: profiling may show
+`MAX_ENTRIES: 5000` and `MAX_CACHE_BYTES: 50 MiB` are right for very
+large monorepos. **Document any deviation in
 `crates/PARITY_VERSIONS.md` as perf-only.**
+
+**Disk pressure on large monorepos.** Per worker, the cache file is
+capped at 5 MiB. Per-project total disk use scales with worker count:
+e.g., 16 workers = 80 MiB peak, well within
+`node_modules/.cache/` budgets. The cleanup-on-worker-exit pattern
+keeps stale dirs from accumulating across builds.
 
 #### 3.9.12 Filesystem and platform constraints
 
@@ -640,47 +881,67 @@ for large monorepos. **Document any deviation in
   `swc_plugin_runner@23`. Verified by Phase 0 probe (write→read
   round-trip and metadata mtime read).
 - **Cap-std preopen scope.** The plugin can only access files under
-  `std::env::current_dir()` of the host process. The host MUST set
-  cwd such that `workerScratchDir` and the consuming workspace's
-  source files all fall under that preopen. For Parcel this means
-  spawning workers with cwd at the project root, not the package
-  directory — verify in Phase 1 with a probe that asserts
-  `workerScratchDir` is readable from inside the plugin.
+  `std::env::current_dir()` of the host process. **Therefore
+  `workerScratchDir` MUST be a path under that cwd
+  (§3.9.5).** `/tmp` is unreachable from inside the plugin at
+  `@swc/core@1.15.8` — there is no preopen knob exposed on the JS
+  side at this version. The host MUST set cwd such that the chosen
+  scratch dir AND the consuming workspace's source files all fall
+  under one preopen. For Parcel this means spawning workers with cwd
+  at the monorepo root, not the package directory. The Phase 0
+  scratch-dir reachability probe (§3.9.14 #6) is a *hard* gate before
+  any plugin code lands.
 - **mtime resolution.** Linux/macOS = nanosecond on most filesystems;
   Windows NTFS = 100ns; FAT32/exFAT = 2s (rare on dev machines).
   Network filesystems and Docker bind mounts can have unreliable
   mtime. For these cases, expose `opts.cacheInvalidation: 'mtime' |
   'content-hash'` (default `'mtime'`). `'content-hash'` recomputes a
   fast non-cryptographic hash (xxhash3) of the source on each lookup
-  — slower but mtime-resolution-independent.
+  — slower but mtime-resolution-independent. The per-transform mtime
+  memo (§3.9.7 step 6) applies to both modes.
 - **u128 mtime representation.** `std::fs::Metadata::modified()`
   returns `SystemTime`; convert to `u128` nanoseconds since UNIX
-  epoch. Serialize as decimal string in JSON.
+  epoch. Postcard encodes u128 natively as 16 bytes — no string
+  workaround needed (this is one of the reasons we dropped JSON).
 - **Atomic writes.** Cache file writes use the standard
-  write-temp-then-rename pattern: write `resolution-cache.json.tmp`,
-  fsync, rename over `resolution-cache.json`. This survives a worker
-  crash mid-write without corrupting the cache. WASI `fd_sync` is
-  available; rename via `path_rename`. Both work in
-  `wasm32-wasip1`.
+  write-temp-then-rename pattern: write `cache.bin.tmp`, fsync,
+  rename over `cache.bin`. This survives a worker crash mid-write
+  without corrupting the cache. WASI `fd_sync` is available; rename
+  via `path_rename`. Both work in `wasm32-wasip1`. Worker startup
+  deletes any stale `*.tmp` siblings before reading.
 
 #### 3.9.13 What lives outside `@swc/core` (the host's job)
 
 The host (Parcel transformer wrapper) is responsible for:
 
-1. **Worker-scoped scratch dir creation and teardown.**
+1. **Worker-scoped scratch dir creation and teardown.** Path MUST be
+   under the WASI cwd preopen (§3.9.5, §3.9.12). `mkdtempSync` in
+   `os.tmpdir()` is **forbidden** — that path is unreachable from
+   inside the plugin sandbox. Use a stable per-pid path under
+   `node_modules/.cache/`:
    ```ts
    // module-load (worker init), once per worker process
-   const workerScratchDir = mkdtempSync(
-     join(tmpdir(), 'compiled-swc-worker-')
-   );
+   import { mkdirSync, rmSync, existsSync } from 'fs';
+   import { join } from 'path';
+   const projectRoot = process.cwd();   // see §3.9.13.7
+   const cacheRoot   = pickCacheRoot(projectRoot); // node_modules/.cache/...
+                                                   // with documented fallbacks
+   const workerScratchDir = join(cacheRoot, `worker-${process.pid}`);
+   mkdirSync(workerScratchDir, { recursive: true });
+   // sweep stale tmp files from a prior crashed worker with this pid
+   for (const f of readdirSync(workerScratchDir)) {
+     if (f.endsWith('.tmp')) rmSync(join(workerScratchDir, f), { force: true });
+   }
    process.on('exit', () =>
      rmSync(workerScratchDir, { recursive: true, force: true })
    );
    ```
 2. **Per-call sub-scratch dir creation and teardown.**
    ```ts
-   // inside async transform({ asset, ... })
-   const callScratch = mkdtempSync(join(workerScratchDir, 'call-'));
+   // inside transform({ asset, ... }) — synchronous block
+   import { randomUUID } from 'crypto';
+   const callScratch = join(workerScratchDir, `call-${randomUUID()}`);
+   mkdirSync(callScratch);
    try {
      /* invoke swc.transformSync ... */
    } finally {
@@ -699,10 +960,11 @@ The host (Parcel transformer wrapper) is responsible for:
 7. **Setting cwd correctly when spawning workers.** Project root, not
    package root, so the WASI preopen covers all source files the
    resolver may walk.
-8. **Never reading or writing `resolution-cache.json` from JS.** It's
+8. **Never reading or writing `cache.bin` from JS.** It's
    plugin-owned. The host's only contact with the file is `rmSync`
    on worker exit. Reading/writing from JS would race with the
-   plugin and is unnecessary.
+   plugin and is unnecessary. Postcard binary format is also not
+   trivially parseable from JS, which is by design.
 
 What the host is NOT responsible for:
 
@@ -737,6 +999,42 @@ Before Phase 1 can begin, Phase 0 must include:
    isn't a feature; it's a guardrail proving why §3.9.4's
    `transformSync` mandate exists. Document the failure mode for
    future readers.
+6. **Scratch-dir reachability probe (HARD GATE before any plugin
+   code lands).** Host creates the scratch dir at the path chosen
+   per §3.9.5 / §3.9.13.1. JS test invokes `transformSync` with a
+   probe plugin that:
+   - opens `<workerScratchDir>/probe.bin` for write,
+   - writes 8 known bytes,
+   - reads them back,
+   - opens `<callScratch>/probe.bin` for write+read,
+   - asserts both round-trip equal.
+   If any open returns `EACCES`/`ENOENT`, the chosen path is outside
+   the WASI cwd preopen — the test reports the resolved cwd, the
+   attempted path, and exits non-zero. **No plugin development
+   begins until this passes on Linux, macOS, and Windows.**
+7. **Postcard round-trip probe.** Probe plugin postcard-encodes a
+   fixture `CacheFile { version: 1, schema_hash: [42; 32], layer2:
+   vec![] }`, writes to `<workerScratchDir>/probe.bin`, reads it
+   back, deserializes, asserts `version == 1`. Confirms postcard +
+   WASI binary I/O works as designed.
+8. **Byte-cap eviction probe.** Construct an in-memory
+   `CacheFile` with 1000 fake Layer 2 entries, call the eviction
+   routine with `MAX_CACHE_BYTES = 64 KiB`, assert the result
+   serializes to <= 64 KiB and contains the most-recently-touched
+   entries. Pure unit-test — no WASI needed — but lives in the same
+   harness so failures here gate plugin work the same way the
+   sandbox probes do.
+9. **Resolver difference matrix.** Run a corpus of representative
+   resolution requests through (a) `enhanced-resolve@5.x` configured
+   the same way `createDefaultResolver(config)` configures it, (b)
+   the npm `resolve.sync()` fallback path with `opts.extensions =
+   ['.js','.jsx','.ts','.tsx']`, and (c) `oxc_resolver` with
+   matching options. Inputs cover: `package.json#main`,
+   `package.json#exports` with conditions (`import`, `require`,
+   `node`, `default`), `tsconfig` `paths`, symlink realpath via
+   pnpm-style stores, browser-field, file extensions, directory
+   index resolution. Failures = port defects to fix in `oxc_resolver`
+   configuration before Phase 5. **Hard gate before Phase 5 starts.**
 
 #### 3.9.15 Phase 5 parity tests (gate Layer 2 before enabling by default)
 
@@ -796,7 +1094,7 @@ disabled by default.
 | Output bytes diverge under HMR | Layer 2 missed a transitive dep, or state-diff replay is incomplete | Set `cacheLevel: "ast"` in Parcel config; corpus diff should clear immediately. Open a defect ticket against §3.9.8 / §3.9.15-shadow-eval. |
 | Output bytes diverge in cold build | Layer 1 invalidation missed a source change; or `schema_hash` didn't bump on a cache-shape change | Set `cacheLevel: "off"`; bytes must clear. Investigate which schema input changed. |
 | Wall-time worse than Babel | `transformSync` not used; or cache file thrashing; or LRU eviction churn | Confirm `transformSync` per §3.9.4; raise `maxSize`; profile with `cacheLevel: "off"` to isolate. |
-| Worker crashes loop | Atomic-rename pattern not used and a partial write is being read | Wipe `resolution-cache.json` manually; confirm §3.9.12 atomic-write pattern is in place. |
+| Worker crashes loop | Atomic-rename pattern not used and a partial write is being read | Wipe `<workerScratchDir>/cache.bin` (and any `*.tmp` siblings) manually; confirm §3.9.12 atomic-write pattern + worker-startup tmp-sweep are in place. |
 | Cross-worker test inconsistency | Two workers somehow see the same scratch dir | Each worker calls `mkdtempSync` independently — verify the wrapper is module-scoped, not import-cached at a higher level. |
 
 In all cases, `cacheLevel: "off"` is the universal kill switch:
@@ -883,8 +1181,6 @@ crates/
         declare.rs                           # @babel/helper-plugin-utils
         scope.rs                             # path.scope.getBinding
         # add more as discovered
-      napi/                                  # NAPI bridge for transformCss
-        mod.rs                               # temporary; deleted when CSS port lands
     tests/
       parity.rs                              # runs Babel + SWC + prettier diff
       fixtures/                              # mirrors packages/babel-plugin/src/__tests__
@@ -907,9 +1203,8 @@ crates/
     tests/parity.rs
 
 plugins/
-  INSTRUCTIONS.md                            # source of truth for constraints
   PARCEL_USAGE_EXAMPLE.md                    # production call site we satisfy
-  PLAN.md                                    # this file
+  PLAN.md                                    # this file — source of truth for constraints
   SIDECAR_SCHEMA.md                          # cross-language interface (created Phase 1)
 ```
 
@@ -949,16 +1244,43 @@ Tasks:
    `onIncludedFiles` instrumented. Realpath-canonicalizes every included
    path. Fails if any path escapes the invocation cwd. This becomes a CI
    guardrail post-Phase 5.
-7. Stand up the temporary NAPI bridge for `transformCss`. Lives in
-   `crates/babel-plugin/src/napi/` (constraint 3, §1). Confirms a Rust → JS
-   sync call works at the host process level (host calls JS, not the plugin
-   directly — the plugin only emits scan-pass requests).
+7. **State-mutation enumeration (architecture-discovery gate).**
+   Produce `crates/babel-plugin/STATE_MUTATIONS.md` listing every
+   site in `packages/babel-plugin/src/utils/evaluate-expression.ts`
+   and the `traverse_expression/` subtree where
+   `state.includedFiles`, `state.compiledImports`, `state.sheets`,
+   `state.cssMap`, or `state.ignoreMemberExpressions` is mutated.
+   For each, record the proposed `StateDiff` variant that captures it
+   (§3.9.8). Why this is in Phase 0, not Phase 5: the StateDiff enum
+   shape is a *load-bearing architectural decision* — if real Babel
+   has 30 distinct mutation kinds rather than the 5 sketched in
+   §3.9.8, the cache replay design changes. Discover the count
+   before architecture commits, not after. The enumeration also
+   validates that compiler-enforced encapsulation is tractable (no
+   mutation site is hidden inside an external library that we can't
+   route through `MutationRecorder::apply`).
+8. **Run all nine §3.9.14 probes** (WASI sync I/O, mtime,
+   `transformSync` ABI, instance-teardown, race, scratch-dir
+   reachability, postcard round-trip, byte-cap eviction,
+   resolver difference matrix). Each is a hard gate; failures block
+   Phase 1 (probes 1-8) or Phase 5 (probe 9).
 
 **Exit gate.** Babel-against-itself round-trip is byte-stable across all
 fixtures and across at least three machines (CI + two dev machines). The
 audit script reports its raw count for every workspace using Compiled
 (target: ≤100 outliers, refactor list captured). Pass-through SWC plugin
-produces byte-equal output through the prettier oracle.
+produces byte-equal output through the prettier oracle. **All nine
+§3.9.14 probes pass on Linux, macOS, and Windows** — the
+scratch-reachability probe (§3.9.14 #6) is the cheapest of the nine
+and the most expensive to discover failing later, so it must be
+landing-blocked. **`STATE_MUTATIONS.md` is complete and reviewed**;
+the StateDiff enum shape in §3.9.8 has been reconciled with the actual
+Babel mutation-site enumeration (any new variants needed are added to
+this PLAN before Phase 2 starts). **Resolver difference matrix
+(§3.9.14 #9)** captures every divergence between
+`enhanced-resolve@5.x` / npm-`resolve` / `oxc_resolver` and
+documents how the plugin's `oxc_resolver` configuration closes each
+gap (or escalates if it can't).
 
 **Effort.** 1–2 weeks.
 
@@ -1040,12 +1362,17 @@ Tasks:
    visited" in a debug log and leaves the AST unchanged.
 5. State struct (`State` in Rust) with `IndexMap` everywhere —
    `compiled_imports`, `css_map`, `sheets`, `ignore_member_expressions`.
+   **All these fields are `pub(self)`; the only public mutator is
+   `MutationRecorder::apply` (§3.9.8).** Layer 5 of this scaffold is
+   compiler-enforced state encapsulation; subsequent phases never
+   touch these fields directly.
    **Cache lifetime is governed by §3.9, not by Babel's `opts.cache`
    flag.** Plugin-static state is impossible at this SWC version
    (instance teardown per call, see §3.9.0). The per-call `State`
-   carries an in-memory `HashMap` populated from
-   `<workerScratchDir>/resolution-cache.json` on `Program::enter`
-   and serialized back on `Program::exit`. `cacheLevel: "ast" |
+   carries an in-memory Layer 2 `HashMap` populated from
+   `<workerScratchDir>/cache.bin` (postcard) on `Program::enter`
+   and serialized back on `Program::exit` *only if mutated*. Layer 1
+   is in-memory only (never persisted). `cacheLevel: "ast" |
    "value" | "off"` controls which layers are active; "value" is the
    default and is the mode that beats Babel's effective behaviour.
 
@@ -1059,64 +1386,140 @@ state setup, scope traversal, comment preservation in pass-through.
 
 ### Phase 3 — Hash compatibility (`@sjcompiled/utils.hash`)
 
-**Goal.** Port the hash function used for keyframe names, CSS variables, and
-cache keys, with bit-identical output. **This gates everything downstream.**
+**Goal.** Adopt the Rust `hash` function the parallel CSS-port agent
+ships in `crates/sjcompiled-utils`, and prove it is byte-identical to
+the JS `@sjcompiled/utils.hash` from this plugin's perspective. **This
+gates everything downstream.**
+
+Per the user's direction, the parallel CSS port lands its `hash`
+implementation **before** this plugin starts Phase 3. That collapses
+the scope of this phase from "port the hash function" to "consume the
+shared crate and prove parity from the consuming side." Both ports
+must depend on exactly the same crate symbol — there is no per-port
+copy of the hash.
 
 Tasks:
 
-- Identify the hash impl in `packages/utils/src/`. It is a custom hash, not a
-  stock library. Read the source.
-- Port to Rust. Add to `crates/sjcompiled-utils/` (already scaffolded per
-  `crates/STATUS.md`).
-- Build a corpus of `(input string, expected hash)` test vectors covering
-  at minimum: ASCII, UTF-8 multibyte, empty string, string with embedded
-  NUL, very long strings (>4KB), strings with leading/trailing whitespace.
-- Test vectors come from running the JS `hash` against the inputs in CI;
-  freeze the results.
+- Confirm `crates/sjcompiled-utils` exports `pub fn hash(input:
+  &str) -> String` (or the matching signature) and that the
+  CSS-port crate already depends on it. **Single source of truth;
+  no per-plugin reimplementation.**
+- Confirm the JS `@sjcompiled/utils.hash` source has not drifted vs
+  what the Rust port replicates; if it has, the parallel agent owns
+  closing the gap before Phase 3 exits.
+- Build a corpus of `(input string, expected hash)` test vectors
+  covering at minimum: ASCII, UTF-8 multibyte, empty string, string
+  with embedded NUL, very long strings (>4KB), strings with
+  leading/trailing whitespace, and the exact inputs we see in
+  practice for keyframe expressions and CSS variable names. Test
+  vectors come from running the JS `hash` against the inputs in
+  CI; freeze the results.
+- Add the corpus as a parity test in `crates/babel-plugin/tests/`
+  (NOT in `crates/sjcompiled-utils/` — we want this plugin's own
+  consumer-side guarantee, independent of the parallel agent's
+  internal tests).
 
-**Exit gate.** Rust `hash` produces byte-identical output for 100% of the
-test-vector corpus, plus 10K random inputs generated by `cargo-fuzz` and
-diffed against a Node subprocess running JS `hash`. **Zero divergence.**
+**Exit gate.** The shared Rust `hash` produces byte-identical output
+for 100% of the test-vector corpus, plus 10K random inputs generated
+by `cargo-fuzz` and diffed against a Node subprocess running JS
+`hash`. **Zero divergence.** If divergence is found, Phase 3 cannot
+exit until the parallel agent has fixed the shared crate.
 
-**Effort.** 1 week.
+**Effort.** 2–3 days (was 1 week — the actual port work is already
+done by the parallel agent; this phase is now a parity-check on a
+shared dependency).
 
 ---
 
-### Phase 4 — `buildCss` and the `transformCss` two-pass bridge
+### Phase 4 — `buildCss` with direct synchronous `transformCss` Rust call
 
 **Goal.** Port the CSS extraction subsystem (`utils/css-builders.ts`,
-~1145 LOC) and stand up the two-pass `transformCss` bridge described in §3.5.
+~1145 LOC) and wire it to the parallel-agent's Rust `transform_css`
+implementation as a direct synchronous Rust call (§3.5). One pass, one
+visit, no scan/apply scaffolding.
 
-Tasks (load-bearing):
+**Hard preconditions (do not start Phase 4 without all four):**
 
-1. Port `utils/css_builders.rs` line-for-line. Hot spots:
+1. Phase 3 hash parity is green and the shared `crates/sjcompiled-utils`
+   crate exposes the hash function as a `pub fn` consumable by this
+   plugin.
+2. The parallel CSS port has shipped a `pub fn transform_css(css: &str,
+   opts: &TransformCssOpts) -> TransformCssResult` callable as a normal
+   Rust function. Output must be byte-identical to the JS `transformCss`
+   for the entire fixture corpus the parallel agent uses; the
+   integration parity test (Phase 4 task 0 below) confirms this from
+   the babel-plugin's vantage point.
+3. `compat/generator.rs` coverage manifest is complete (Phase 4 task 1
+   below).
+4. Cardinal rule: **no temporary scaffold.** If a precondition is not
+   ready, Phase 4 blocks. Do not add a NAPI bridge "just for now" —
+   that path was deliberately removed from this plan.
+
+Tasks (load-bearing, in order):
+
+0. **`transform_css` integration parity.** Wire the Rust
+   `transform_css` into a small driver in `crates/babel-plugin/tests/`
+   that calls it for every input the JS `transformCss` is run against
+   in the existing test corpus. Diff outputs byte-for-byte (sheets,
+   class names, rules, embedded hash strings). Zero divergence. This
+   gate is Phase 4's first commit; it confirms precondition #2 holds
+   from this plugin's perspective and *not* just from the parallel
+   agent's.
+
+1. **`compat/generator.rs` coverage manifest (entry gate).** Build
+   `crates/babel-plugin/COMPAT_GENERATOR_COVERAGE.md` enumerating
+   every AST node type that can legitimately appear inside an
+   expression we feed into `generate(...)`. The two consumers are:
+   - **Keyframe name input:** `hash(generate(expression).code)` —
+     `expression` is whatever the user puts inside `keyframes(...)`.
+     Grep the consuming monorepo's `keyframes(...)` call sites and
+     classify the AST shapes: identifiers, member chains, calls,
+     tagged templates, conditionals, arrow functions, JSX (yes, it
+     happens), template literals, object/array literals, binary
+     ops, sequence ops, `as` / `satisfies` casts, parenthesized
+     expressions.
+   - **Any other call sites in `css-builders.ts` that route through
+     `generate(...)`** — enumerate them all and add to the manifest.
+   For each node kind: record the Babel printer output for a
+   representative sample, the corresponding port in
+   `compat/generator.rs`, and a parity fixture under
+   `tests/compat-generator/`. The manifest is an exhaustive checklist;
+   any node kind reached at corpus time that is not on the list is a
+   port defect, not a missing-feature ticket.
+
+2. Port `utils/css_builders.rs` line-for-line. Hot spots:
    - **Keyframe name generation:** `k${hash(generate(expression).code)}`.
-     Build `compat/generator.rs` for the relevant subtree. The whole-file
-     printer can differ; only the subtree printout must match Babel byte-for-byte.
+     Implementation lives in `compat/generator.rs` per task 1.
    - **CSS variable names:** `--_${hash(name)}`.
    - **`invalidDynamicIndirectSelectorRegex`** — replace with `regex` crate
      equivalent and corpus-test.
    - **`contentValuePattern`** for CSS `content` property normalization.
-2. Port `utils/transform_css_items.rs` and `utils/build_css_variables.rs`.
-3. Build the `CssRequest` collector. Every `transformCss` call site pushes
-   `{ id, css, opts }` into a per-pass `Vec<CssRequest>` keyed by stable id
-   (`hash(filename + byte_offset + css_content)`).
-4. Scan/apply pass plumbing in `lib.rs`: read `mode` from plugin config; in
-   `scan` mode write `<scratch>/css-requests.json` and emit placeholder
-   string literals; in `apply` mode read `cssResults` from config and
-   substitute.
-5. Update the Parcel wrapper to drive the two-pass loop:
-   - First SWC call with `{ mode: 'scan', scratchDir }`.
-   - Read `<scratch>/css-requests.json`.
-   - For each request, call NAPI `transformCss(css, opts)` (constraint 3).
-   - Second SWC call with `{ mode: 'apply', scratchDir, cssResults }`.
+   - **`transformCss` call sites:** call the Rust `transform_css`
+     directly. Any reshaping of inputs/outputs to match Babel's exact
+     call shape stays in this plugin (do not modify the parallel
+     agent's API to suit this plugin).
 
-**Exit gate.** A subset of fixtures that exercise only `keyframes` and
-`css` APIs (the simplest call sites) pass the parity harness end-to-end.
-Two-pass roundtrip is correct: same `cssResults` map produces same output
-across multiple invocations.
+3. Port `utils/transform_css_items.rs` and `utils/build_css_variables.rs`.
 
-**Effort.** 3–4 weeks.
+4. Update `lib.rs` so the visitor performs both extraction and
+   substitution in a single traversal. No `mode: 'scan' | 'apply'`,
+   no css-requests.json, no marker tokens. The visitor's call sequence
+   on hitting a `css({...})` site is: build CSS string → call
+   `transform_css` → splice the resulting sheets/classNames into the
+   output AST.
+
+5. Update the Parcel wrapper (§8) to a single `transformSync` call.
+   The wrapper modifications can be invasive — the host is not part of
+   the parity surface (constraint 8).
+
+**Exit gate.** All fixtures exercising `keyframes`, `css`, and `cssMap`
+APIs (the call sites that route through `transform_css`) pass the parity
+harness end-to-end with a single `transformSync` call per file. The
+`compat/generator.rs` coverage manifest is reviewed and signed off; the
+parity-harness keyframe-name corpus is byte-clean.
+
+**Effort.** 3–4 weeks (was already 3–4 weeks; saving the two-pass work
+is offset by the explicit `compat/generator.rs` enumeration).
 
 ---
 
@@ -1128,13 +1531,29 @@ preopen and statically evaluates imported values.
 
 Tasks:
 
+0. **Confirm `STATE_MUTATIONS.md` is current.** The artefact was
+   produced in Phase 0 (architecture-discovery gate). Re-run its
+   underlying enumeration (`grep -nE 'state\.(includedFiles|
+   compiledImports|sheets|cssMap|ignoreMemberExpressions)\b'` over
+   `packages/babel-plugin/src/utils/evaluate-expression.ts` and the
+   `traverse_expression/` subtree) and confirm every match is still
+   accounted for. If upstream Babel has mutated since Phase 0,
+   amend `STATE_MUTATIONS.md` and any new `StateDiff` variants
+   *before* porting touches the affected files. Pair with the §3.9.8
+   compiler-enforced encapsulation (`State` fields private; mutation
+   only via `MutationRecorder::apply`); together they make
+   missed-mutation-capture a Rust compile error rather than a silent
+   runtime divergence. Any port commit that introduces a state
+   mutation not enumerated here is rejected at review.
 1. **Land the ~100-file refactor in the consuming monorepo.** Until it's
    merged, the in-plugin resolver cannot replace Babel safely. Block this
    phase on it.
 2. `utils/cache.rs` — port the LRU cache. JS uses a `Map`-based LRU keyed by
    `hash(namespace + cacheKey)`. Rust impl: `lru::LruCache` wrapped in
    `Mutex`, plus an `IndexMap` for `'file-pass'` mode. Match eviction order
-   and key derivation exactly.
+   and key derivation exactly. Layer 1 is in-memory only (§3.9.8); Layer 2
+   persists to disk via §3.9.10's postcard format. Enforce both
+   `MAX_ENTRIES` and `MAX_CACHE_BYTES` caps (§3.9.11).
 3. `utils/resolve_binding.rs`:
    - Use `oxc_resolver` (constraint 2, §1) for module resolution against the
      WASI preopen. Configure with `ResolveOptions { extensions: ... }`
@@ -1169,6 +1588,15 @@ Tasks:
 explicitly skipped with a recorded TODO referencing constraint 1).
 `included-files.json` content matches what Babel's `onIncludedFiles` would
 have reported, after realpath canonicalization. CI guardrail is green.
+**STATE_MUTATIONS.md is complete and the
+`grep -nE 'state\.[a-z_]+\.(push|set|add|insert|remove|extend)' \
+   crates/babel-plugin/src --include '*.rs' \
+   | grep -v 'src/state.rs\|src/mutation_recorder.rs'`
+pre-commit lint returns zero matches** — i.e., every state mutation in
+the Rust port goes through `MutationRecorder::apply`. The
+`MutationRecorder` test suite shadows live evaluation against
+diff-replay for the full `expression-evaluation` corpus and reports
+zero replay/live divergences before the phase exits.
 
 **Effort.** 4 weeks.
 
@@ -1280,27 +1708,6 @@ of continuous runtime.
 
 ---
 
-### Phase 10 — Collapse the `transformCss` bridge (when CSS port lands)
-
-**Goal.** Remove the two-pass scaffolding when the parallel agent ships the
-Rust `transformCss`.
-
-Tasks:
-
-- Delete `crates/babel-plugin/src/napi/`.
-- Delete `mode: 'scan' | 'apply'` from plugin config.
-- Replace scan-pass marker emission with direct synchronous Rust call.
-- Delete two-pass loop from Parcel wrapper.
-- Run full corpus diff. Must remain zero-divergence.
-
-**Exit gate.** Full corpus stays byte-clean post-collapse. Production
-hash-shadow continues to show zero divergence.
-
-**Effort.** 1 week (assuming the CSS port is byte-identical, which is its
-contract).
-
----
-
 ## 6. Hazard register
 
 | Hazard | Why it bites | Mitigation |
@@ -1318,14 +1725,17 @@ contract).
 | **`process.env.TEST_PKG_VERSION` and version banner** | Banner contains plugin name + version. SWC plugin has a different name. | Plugin emits the **same** banner string Babel does (`@sjcompiled/babel-plugin v…`), reading the version from a shared workspace constant. Bit-parity over self-identification. |
 | **Parallel test workers and scratch dirs** | Multiple SWC compiles in flight per process. | `mkdtemp` per-compile; never share. |
 | **Cross-platform path canonicalization** | cap-std on Windows handles symlinks/junctions differently than POSIX. | All sandbox-bound logic tests run on both Linux and Windows in CI. |
-| **Plugin config size** | `cssResults` from a large file's apply pass can be large. | Cap config JSON at 1MB; if exceeded, write to `<scratch>/large-config.json` and pass the path. |
-| **Two-pass `transformCss` non-determinism** | Scan pass and apply pass must produce the same `CssRequest` ids. | Ids are pure functions of `(filename, byte_offset, css_content)` — no clocks, no counters. |
-| **`opts.cache` semantics vs Wasm instance lifetime** | Babel's `globalCache` is misnamed; reassigned per-pre-hook, never read elsewhere — effectively per-file. Wasm instance is torn down per `transform()` call (verified `swc_plugin_runner@23.0.0`). Plugin-static cross-file state is impossible. | §3.9 fully specifies the resolution: per-worker scratch dir + `resolution-cache.json` + `swc.transformSync` mandate + mtime invalidation + two-layer (AST / evaluated-value) design. Output bytes never change with cache hit/miss; cache is perf-only. |
+| **`opts.cache` semantics vs Wasm instance lifetime** | Babel's `globalCache` is misnamed; reassigned per-pre-hook, never read elsewhere — effectively per-file. Wasm instance is torn down per `transform()` call (verified `swc_plugin_runner@23.0.0`). Plugin-static cross-file state is impossible. | §3.9 fully specifies the resolution: per-worker scratch dir + `cache.bin` + `swc.transformSync` mandate + mtime invalidation + two-layer (AST / evaluated-value) design. Output bytes never change with cache hit/miss; cache is perf-only. |
+| **`enhanced-resolve` ↔ `oxc_resolver` divergence** | Production callers wrap `enhanced-resolve@5.x` in `createDefaultResolver`; this plugin replaces it with in-plugin `oxc_resolver`. Any divergence on `package.json#exports`, `tsconfig` paths, symlink realpath, or extension order = class names diverge in production. | §3.9.14 #9 resolver difference matrix is a hard Phase 0 gate. The plugin's `oxc_resolver` configuration must close every gap the matrix surfaces, or the gap is escalated. Phase 5 cannot start until the matrix is green. |
 | **Layer 2 state-diff replay incompleteness** | `evaluateExpression` mutates `state.includedFiles`, `state.compiledImports`, `state.sheets`, `state.cssMap`. Caching the evaluated value but missing a mutation = silent HMR breakage. | §3.9.8 `MutationRecorder` pattern centralizes capture; §3.9.15 shadow-eval parity test runs for ≥1 month post-ship; `cacheLevel: "ast"` rip-cord falls back to Layer 1 only. |
 | **Layer 2 transitive-dep miss** | Cached entry's value depends on a deeper file that mtime-check didn't cover. Stale hit → wrong output. | §3.9.8 resolver-hooked transitive-dep capture: every `fs::read` during eval auto-appends to the entry's `transitive_deps`. §3.9.15 transitive-dep test gates the design. |
 | **mtime unreliable on some filesystems** | Docker bind mounts, networked drives, FAT32. | `opts.cacheInvalidation: 'mtime' \| 'content-hash'` (§3.9.12) — content-hash uses xxhash3 of source bytes, slower but resolution-independent. |
 | **`swc.transformSync` removed in a future SWC release** | §3.9.4 is a hard contract; if `transformSync` disappears the cache strategy breaks. | Phase 0 ABI gate (§3.9.14) imports `transformSync` and asserts it's a function — fails loudly at version-bump time. |
 | **Babel bug compatibility** | "Fixing" a bug while porting renames classes in production. | Constraint 6 (§1): **bugs are features.** Every behavioural difference under the parity harness is a port defect, not a bug fix opportunity. |
+| **Scratch dir outside WASI cwd preopen** | An earlier draft put `workerScratchDir` under `os.tmpdir()`; the WASI sandbox at `@swc/core@1.15.8` only preopens `current_dir()`, so that path is unreachable from inside the plugin. Cache + sidecar I/O would silently fail. | §3.9.5 puts scratch at `<projectRoot>/node_modules/.cache/sjcompiled-swc/worker-<pid>/`. §3.9.14 #6 is a hard Phase 0 probe. Documented fallback chain. JS host MUST NOT use `mkdtempSync(tmpdir(), ...)`. |
+| **Cache file size unbounded on 60-90 GB monorepo** | An earlier draft persisted Layer 1 (full `swc_ecma_ast::Module` serde-JSON) per-file. Worker reading/writing tens of MB of JSON per `transform()` would dwarf any saved parse cost. | §3.9.0/§3.9.8/§3.9.10 redesign: Layer 2 only on disk, postcard binary format, 5 MiB hard cap, 500-entry cap, 32-tdep-per-entry cap, dirty-bit short-circuits no-op writes. Layer 1 stays in-memory per transform. |
+| **`compat/generator.rs` coverage gap** | Keyframe-name input is `hash(generate(expression).code)`. SWC's printer differs from Babel's; we port a Babel-equivalent printer. If a single AST node kind reachable via `keyframes(...)` is missing or wrong, that one keyframe renames in production — the kind of bug that's individually low-blast-radius but collectively erodes confidence. | Phase 4 entry gate produces `COMPAT_GENERATOR_COVERAGE.md` enumerating every node kind reachable from `keyframes(...)` call sites in the consuming monorepo, plus parity fixtures per kind. Any node kind reached in the corpus that is not on the list = port defect. No half-bakes (constraint 5). |
+| **State mutation site missed by `MutationRecorder`** | A single `state.compiledImports.set(...)` not routed through the recorder = silent HMR breakage; bytes match (state isn't in the AST), corpus diff is clean, production is wrong. | §3.9.8: make `State` fields `pub(self)`; only public mutator is `MutationRecorder::apply`. Phase 0 produces `STATE_MUTATIONS.md`; Phase 5 task 0 reconciles it; pre-commit grep lint catches new sites. §3.9.15 shadow-eval gates the rip-cord removal. Together: missed mutation = compile error or pre-commit reject. |
 
 ---
 
@@ -1351,38 +1761,29 @@ the plan stands alone.
   "rules": ["<css rule string>", ...]
 }
 
-// <callScratch>/css-requests.json
-// Written by: babel-plugin in scan mode
-// When: Program::exit
-{
-  "version": 1,
-  "requests": [
-    { "id": "<stable hash>", "css": "<raw CSS>", "opts": { ... } },
-    ...
-  ]
-}
-
-// <workerScratchDir>/resolution-cache.json
+// <workerScratchDir>/cache.bin
 // Written by: babel-plugin
-// When: Program::exit (every transform — full overwrite, atomic via temp+rename)
+// When: Program::exit, ONLY IF cache_dirty == true (atomic via temp+rename)
 // Lifetime: worker process; see §3.9 for full spec
+// Format: postcard (NOT JSON). Layer 2 only; Layer 1 is in-memory
+// per-transform. Hard caps: 500 entries, 5 MiB serialized.
 // (full schema in §3.9.10)
-{
-  "version": 1,
-  "schema_hash": "<hex>",
-  "layer1": { /* AST cache; see §3.9.10 */ },
-  "layer2": { /* evaluated-value cache; see §3.9.10 */ }
-}
+//
+// Pseudo-shape (Rust struct, postcard-encoded):
+// CacheFile {
+//   version: u32,
+//   schema_hash: [u8; 32],
+//   layer2: Vec<(u64, Layer2Entry)>,
+// }
 
 // Plugin config (in-memory, passed via @swc/core experimental.plugins[i][1])
-// Read by: babel-plugin in apply mode
+// Read by: babel-plugin
 {
-  "scratchDir": "<absPath>",
-  "mode": "scan" | "apply",
-  "cssResults": {                    // present iff mode === "apply"
-    "<id>": { "sheets": [...], "classNames": [...] }
-  },
-  // ... rest matches packages/babel-plugin types.PluginOptions ...
+  "workerScratchDir": "<absPath>",   // §3.9.6 — stable per worker, holds cache.bin
+  "callScratch":      "<absPath>",   // §3.9.6 — fresh per call, holds sidecars
+  "cacheLevel":       "value" | "ast" | "off",  // default "value"
+  // ... rest matches packages/babel-plugin types.PluginOptions
+  // (minus opts.resolver, which is unsupported per constraint 1) ...
 }
 ```
 
@@ -1424,53 +1825,47 @@ worker-scoped persistent cache, per-call disposable sidecars,
 
 ```ts
 import { transformSync } from '@swc/core';   // §3.9.4 — sync, NOT async
-import { mkdtempSync, rmSync } from 'fs';
-import { tmpdir } from 'os';
+import { mkdirSync, readdirSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
+import { randomUUID } from 'crypto';
 
 // Module-load (worker init), once per worker process.
 // Lives for the entire worker lifetime; NEVER re-created per transform.
-// §3.9.5 + §3.9.13.1
-const workerScratchDir = mkdtempSync(join(tmpdir(), 'compiled-swc-worker-'));
+// §3.9.5 + §3.9.13.1.
+//
+// CRITICAL: workerScratchDir must live UNDER projectRoot so it falls
+// inside the WASI cwd preopen. tmpdir() is unreachable from the plugin.
+const projectRoot = process.cwd();   // §3.9.13.7 — must be monorepo root
+const cacheRoot = pickCacheRoot(projectRoot);
+  // → <projectRoot>/node_modules/.cache/sjcompiled-swc/  (preferred)
+  // fallback: <projectRoot>/.sjcompiled-swc-cache/
+  // fallback: <projectRoot>/.cache/sjcompiled-swc/
+  // hard error otherwise (do NOT silently fall back to tmpdir).
+const workerScratchDir = join(cacheRoot, `worker-${process.pid}`);
+mkdirSync(workerScratchDir, { recursive: true });
+// Sweep stale tmp files from any prior crashed worker that reused this pid.
+for (const f of readdirSync(workerScratchDir).filter(n => n.endsWith('.tmp'))) {
+  rmSync(join(workerScratchDir, f), { force: true });
+}
 process.on('exit', () => {
   try { rmSync(workerScratchDir, { recursive: true, force: true }); } catch {}
 });
 // (also wire SIGINT/SIGTERM handlers if Parcel's worker harness requires it)
 
 // Inside transform({ asset, config, ... }):
-const callScratch = mkdtempSync(join(workerScratchDir, 'call-'));   // §3.9.13.2
+const callScratch = join(workerScratchDir, `call-${randomUUID()}`);   // §3.9.13.2
+mkdirSync(callScratch);
 try {
-  // Two-pass while the JS transformCss bridge is in place (§3.5).
-  // Both calls are SYNC — required by §3.9.4.
-  const scanResult = transformSync(code, {
+  // Single-pass: the Rust transformCss is linked into the plugin
+  // directly, so one transformSync call covers extraction +
+  // substitution + (optionally) strip-runtime. SYNC required by §3.9.4.
+  const result = transformSync(code, {
     filename: asset.filePath,
     jsc: { experimental: { plugins: [
       ['@sjcompiled/swc-plugin', {
         ...config,
-        mode: 'scan',
-        workerScratchDir,                  // §3.9.6 — stable per worker
+        workerScratchDir,                  // §3.9.6 — stable per worker, holds cache.bin
         callScratch,                       // §3.9.6 — fresh per call
-        cacheLevel: config.cacheLevel ?? 'value',
-      }],
-      // strip-runtime is single-pass; runs in the apply call only.
-    ]}},
-  });
-
-  const cssRequests =
-    readJsonIfExists(join(callScratch, 'css-requests.json'))?.requests ?? [];
-  const cssResults = Object.fromEntries(
-    cssRequests.map(r => [r.id, jsTransformCss(r.css, r.opts)]) // NAPI->JS for now
-  );
-
-  const applyResult = transformSync(code, {
-    filename: asset.filePath,
-    jsc: { experimental: { plugins: [
-      ['@sjcompiled/swc-plugin', {
-        ...config,
-        mode: 'apply',
-        workerScratchDir,
-        callScratch,
-        cssResults,
         cacheLevel: config.cacheLevel ?? 'value',
       }],
       extract && ['@sjcompiled/swc-plugin-strip-runtime', {
@@ -1481,7 +1876,7 @@ try {
     ].filter(Boolean)}},
   });
 
-  // Drain disposable sidecars. resolution-cache.json is plugin-owned — DO NOT TOUCH IT. §3.9.13.5/8
+  // Drain disposable sidecars. cache.bin is plugin-owned — DO NOT TOUCH IT. §3.9.13.5/8
   const includedFiles =
     readJsonIfExists(join(callScratch, 'included-files.json'))?.files ?? [];
   const styleRules =
@@ -1495,31 +1890,41 @@ try {
     ];
   }
 
-  return { code: applyResult.code, map: applyResult.map };
+  return { code: result.code, map: result.map };
 } finally {
   // Per-call scratch only. workerScratchDir survives until worker exit.
   rmSync(callScratch, { recursive: true, force: true });
 }
 ```
 
+Note: per constraint 8 in §1, this wrapper can be modified freely —
+the existing Parcel transformer already calls `parseAsync` upstream
+and feeds a Babel AST to `transformFromAstAsync`, which SWC does not
+consume. The migration drops the upstream `parseAsync` and feeds
+source bytes (`asset.getCode()`) directly to `swc.transformSync`.
+The plugin is the parity surface; the wrapper is not.
+
 Things the host wrapper MUST get right (recap of §3.9.13, surfaced
 here because the wrapper is where bugs of this kind hide):
 
-- `workerScratchDir` is module-scoped — created once per worker
+- **`workerScratchDir` is module-scoped** — created once per worker
   process, NOT once per transform. Re-creating it per call wipes the
   cache between every file and silently degrades perf to
   `cacheLevel: "off"` while looking healthy.
-- `transformSync`, not `transform`. Using async releases libuv
-  threads to race on `resolution-cache.json` (§3.9.4).
-- The host never reads or writes `resolution-cache.json` itself
-  (§3.9.13.8). Plugin-owned. Host's only contact is the `process.on('exit')`
-  cleanup.
+- **`workerScratchDir` lives under `<projectRoot>/node_modules/.cache/`**
+  — never under `os.tmpdir()`. `/tmp` is outside the WASI cwd preopen
+  at `@swc/core@1.15.8` and the plugin cannot open files there. The
+  Phase 0 reachability probe (§3.9.14 #6) is the gate that catches
+  this; if it fails, fix the path, do not try to widen the preopen
+  (no JS knob exists to do so at this version).
+- **`transformSync`, not `transform`.** Using async releases libuv
+  threads to race on `cache.bin` (§3.9.4).
+- The host never reads or writes `cache.bin` itself
+  (§3.9.13.8). Plugin-owned, postcard binary format. Host's only
+  contact is the `process.on('exit')` cleanup.
 - Worker spawn cwd must cover both `workerScratchDir` and the
   consuming workspace's source tree under one preopen
-  (§3.9.13.7) — typically project root, not package root.
-
-Phase 10 collapses the two `transformSync` calls into one when the
-Rust CSS port lands.
+  (§3.9.13.7) — typically monorepo root, not package root.
 
 ---
 
@@ -1527,21 +1932,28 @@ Rust CSS port lands.
 
 | Phase | Description | Calendar weeks (1 strong eng) |
 |---|---|---|
-| 0 | Parity harness + audit + version pins + NAPI bridge | 1–2 |
+| 0 | Parity harness + audit + version pins + STATE_MUTATIONS.md + resolver matrix | 2 |
 | 1 | strip-runtime end-to-end | 2 |
 | 2 | babel-plugin scaffold + dispatcher | 1 |
-| 3 | hash function bit-parity | 1 |
-| 4 | css-builders + transformCss bridge | 3–4 |
+| 3 | consume shared Rust hash + parity tests | 0.5 |
+| 4 | css-builders + compat/generator coverage manifest + direct Rust transformCss call | 3–4 |
 | 5 | resolver + traverse-expression subtree | 4 |
 | 6 | per-API handlers (keyframes → styled) | 4–5 |
 | 7 | comment placement debug | 1–2 |
 | 8 | corpus diff at scale + fuzz | 2–3 |
 | 9 | rollout (mostly calendar) | 6+ |
-| 10 | collapse transformCss bridge | 1 |
-| **Total** | | **~26–31 weeks**, with 6+ being calendar wait |
+| **Total** | | **~25–30 weeks**, with 6+ being calendar wait |
 
-Compresses with parallelization: Phases 3, 4, 5 are partly independent and
-can run alongside one another with two engineers.
+Compresses with parallelization: Phases 4, 5 are partly independent and
+can run alongside one another with two engineers. Phase 3 is now small
+enough to fold into Phase 2's tail rather than running as a standalone
+phase if calendar pressure is high.
+
+**Dependency on the parallel CSS port:** Phase 4 cannot start until the
+parallel agent ships (a) the Rust `hash` function and (b) the Rust
+`transform_css` function as consumable crate exports (§3.5
+preconditions). Phases 0–3 are independent of the CSS port and can
+run in parallel with it.
 
 ---
 
@@ -1599,9 +2011,10 @@ Cardinal rules from `crates/PARITY_VERSIONS.md` apply. Additionally:
 
 ## 12. What to do when stuck
 
-From `plugins/INSTRUCTIONS.md`: *"If you cannot replicate something 1:1 you
-need to stop your work immediately and raise the issue with me and i'll
-make a decision on what to do."*
+**Hard rule.** *If you cannot replicate something 1:1, stop your work
+immediately and raise the issue. Do not invent a workaround silently.*
+The cost of a wrong substitution at 10M-LOC monorepo scale dwarfs the
+cost of a few hours of clarification.
 
 Concretely:
 

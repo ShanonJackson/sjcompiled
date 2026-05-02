@@ -17,10 +17,10 @@ End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 | 4d | atomicify-rules (CRITICAL hash plugin) | **DONE** — byte-clean across 24-entry corpus |
 | 4e | expand-shorthands (11 conversion functions) | **DONE** — byte-clean across 38-entry corpus |
 | 5a | postcss-nested@5.0.6 | **SCAFFOLDED** — `unimplemented!()`. Largest single port; budget multi-day. |
-| 5b | postcss-normalize-whitespace@5.1.1 | **SCAFFOLDED** — `unimplemented!()`. Walks via postcss-value-parser. |
+| 5b | postcss-normalize-whitespace@5.1.1 | **DONE** — byte-clean across 22-entry corpus, deterministic JS oracle |
 | 5c | postcss-discard-duplicates@6.0.0 (npm — used by sort.ts) | **DONE** — byte-clean across 8-entry corpus |
-| 6a | postcss-discard-comments@5.1.2 | **SCAFFOLDED** |
-| 6b | postcss-normalize-string@5.1.0 | **SCAFFOLDED** |
+| 6a | postcss-discard-comments@5.1.2 | **DONE** — byte-clean across 15-entry corpus, deterministic JS oracle |
+| 6b | postcss-normalize-string@5.1.0 | **DONE** — byte-clean across 15-entry corpus, deterministic JS oracle |
 | 6b | postcss-normalize-positions@5.1.1 | **SCAFFOLDED** |
 | 6b | postcss-normalize-timing-functions@5.1.0 | **SCAFFOLDED** |
 | 6b | postcss-normalize-url@5.1.0 | **SCAFFOLDED** |
@@ -34,13 +34,235 @@ End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 | 6g | postcss-minify-gradients@5.1.1 | **SCAFFOLDED** — uses colord. |
 | 6g | postcss-colormin@5.3.1 | **SCAFFOLDED** — highest-risk cssnano plugin. |
 | 6h | cssnano-preset-default@5.2.14 (orchestrator) | **SCAFFOLDED** |
-| 7 | autoprefixer@10.4.14 | **NOT STARTED** — largest single port (~50 files). |
-| 8 | NAPI bridge + transformCss / sort assembly | **NOT STARTED** |
+| 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs` (partial — `parent_prefix` walk-parent TODO) ported. 11 unit tests passing. Split contract: see "Phase 7 split contract" section below. |
+| 8a | `sort()` NAPI bridge + sort.ts engine flag | **DONE** — 12/12 corpus byte-clean end-to-end on win32-x64-msvc. See "Phase 8a ship" section below. |
+| 8b | `transformCss` NAPI bridge + transform.ts engine flag | **NOT STARTED** — blocks on Phase 5/6/7 plugin ports. |
 
 ## Test totals
 
 `RUSTFLAGS="" cargo test --workspace --no-fail-fast`:
-- **354 tests pass / 0 fail / 1 ignored / 0 failed suites.**
+- **398 tests pass / 0 fail / 1 ignored / 0 failed suites.**
+  (12 from Phase 5b `postcss-normalize-whitespace`,
+  12 from Phase 6a `postcss-discard-comments`,
+  7 from Phase 6b `postcss-normalize-string`.)
+
+## Phase 8a ship — `sort()` end-to-end byte-clean through NAPI
+
+**The smaller of the two hashing entry points is now production-ready
+behind a feature flag.** Consumers opt in via:
+
+```bash
+COMPILED_CSS_ENGINE=rust   # use Rust NAPI backend
+# unset / any other value  # use existing JS pipeline (default, parity oracle)
+```
+
+The flag is read at module-load time of `packages/css/src/sort.ts:32`
+(see `requireFromHere` lazy-load gate). Other env values fall through to
+the unchanged JS pipeline — no behavior change for unflagged consumers.
+
+### What landed this session
+
+1. `crates/css/src/sort.rs` is no longer an identity passthrough — it
+   composes the three real plugins in **postcss lifecycle order**, not
+   array order (see "Lifecycle ordering — load-bearing" below).
+2. `crates/compiled-css-napi/` — new crate. cdylib + rlib, napi-rs 2.x,
+   exports `sort(stylesheet, opts?)`. Phase 8b will add `transformCss`.
+3. `packages/css-native/` — new npm workspace package wrapping the
+   prebuilt `.node` binary. Platform-binary loader follows napi-rs
+   naming convention (`sjcompiled-css.<triple>.node`).
+4. `packages/css/src/sort.ts` — env-flag gate via `createRequire` +
+   lazy import. Default path unchanged; oracle JS pipeline preserved.
+5. `Stage::Sort` added to parity-runner + JS bridge counterpart in
+   `packages/css/scripts/parity-bridge.mjs`.
+6. New corpus `crates/parity-runner/corpus/sort/` — 12 fixtures
+   covering: blank input, single rule, dup decls, dup at-rules with
+   pseudo sort, at-rule reordering, shorthand buckets, full-combo
+   (all three stages), comments, decls-at-root, three min-width / two
+   max-width, important-vs-not, realistic atomic CSS.
+7. `merge_duplicate_at_rules` refactored: split into `visit()` (the
+   AtRule visitor pass) + `finalize()` (the OnceExit pass) + a
+   combined `merge_duplicate_at_rules()` wrapper. The split is required
+   for `sort()` to interleave `postcss-discard-duplicates`'s OnceExit
+   between merge's visit and merge's exit, matching postcss lifecycle.
+8. `container::append` fixed: now applies `Root.normalize`'s
+   raws-before transfer when appending to a Root with ≥2 existing
+   children (mirrors `postcss/lib/root.js::normalize` lines 24-28).
+   Without this, `finalize()` emitted concatenated rules with the
+   wrong leading whitespace.
+
+### Verification gates run
+
+| Gate                                                                | Status |
+|---------------------------------------------------------------------|--------|
+| `cargo test --workspace --no-fail-fast`                             | 356/356 pass |
+| `parity-runner --stage sort --corpus crates/parity-runner/corpus/sort` | 12/12 byte-clean |
+| `parity-runner --stage sort ... --determinism`                      | 12/12 deterministic |
+| `parity-runner --stage merge-duplicate-at-rules ...`                | 7/7 byte-clean (no regression from refactor) |
+| `parity-runner --stage npm-postcss-discard-duplicates ...`          | 8/8 byte-clean |
+| `parity-runner --stage sort-atomic-style-sheet ...`                 | 12/12 byte-clean |
+| `bun run packages/css/scripts/verify-napi-sort.mjs`                 | 12/12 (JS sort.ts vs Rust NAPI direct) |
+| `bun run packages/css/scripts/verify-engine-flag.mjs`               | 12/12 (sort.ts under both engines, subprocess-isolated) |
+
+### Lifecycle ordering — load-bearing
+
+**The plugins in `postcss([A, B, C])` do NOT run in array order.**
+Postcss's actual execution lifecycle is:
+
+1. **All `Once` hooks** fire first, in plugin array order.
+2. **Per-node visitors** (`Rule`, `AtRule`, `Decl`, `Comment`) fire
+   during a depth-first walk of root.
+3. **All `OnceExit` hooks** fire, in plugin array order.
+
+For `sort.ts`'s `[discardDuplicates, mergeDuplicateAtRules, sortAtomicStyleSheet]`:
+
+| Plugin                       | Hooks                       | Lifecycle position |
+|------------------------------|-----------------------------|--------------------|
+| postcss-discard-duplicates@6 | OnceExit only               | step 3, first      |
+| mergeDuplicateAtRules        | AtRule visitor + OnceExit   | step 2 + step 3, second |
+| sortAtomicStyleSheet         | Once only                   | step 1             |
+
+So the *actual* execution order is:
+`sortAtomicStyleSheet.Once → mergeDuplicateAtRules.AtRule visitor → postcss-discard-duplicates.OnceExit → mergeDuplicateAtRules.OnceExit`.
+
+Calling them naively in array order in Rust silently changes which
+node sits at index 0 of root when discard-duplicates runs, which
+changes which `Root.removeChild` raws-transfers fire — the bytes drift
+without any obvious signal.
+
+`crates/css/src/sort.rs:35` is the canonical example. **For Phase 8b
+(`transformCss`), every plugin in `transform.ts` will need to be
+classified the same way before composing them.** The mistake is
+trivial to make and produces silent byte drift.
+
+### Parity-contract drift — RESOLVED via root `package.json` overrides
+
+Initial audit found bun's caret ranges had silently drifted past the
+pins in `crates/PARITY_VERSIONS.md` and `REFERENCE_LOCK_FILE/yarn.lock`:
+
+| Package                      | Reference pin | Pre-fix (bun)  | Post-fix |
+|------------------------------|---------------|----------------|----------|
+| postcss                      | 8.4.31        | 8.5.13         | 8.4.31 ✅ |
+| postcss-selector-parser      | 6.0.13        | 6.1.2 (6.0.13 NOT INSTALLED) | 6.0.13 ✅ |
+| postcss-discard-duplicates   | 6.0.0         | 6.0.3          | 6.0.0 ✅ |
+| autoprefixer                 | 10.4.14       | 10.5.0         | 10.4.14 ✅ |
+| postcss-nested               | 5.0.6         | 5.0.6          | 5.0.6 ✅ |
+| postcss-normalize-whitespace | 5.1.1         | 5.1.1          | 5.1.1 ✅ |
+| postcss-values-parser        | 6.0.2         | 6.0.2          | 6.0.2 ✅ |
+| cssnano-preset-default       | 5.2.14        | 5.2.14         | 5.2.14 ✅ |
+
+Fix: an `overrides` block in root `package.json` pinning every
+byte-affecting dep to its EXACT reference version, followed by
+`bun install`. **Bun does not support nested `overrides`**, so the
+Yarn-style nested resolution for the transitive
+`cssnano-preset-default → postcss-discard-duplicates@5.1.0` is not
+expressible. The global override forces all instances to 6.0.0, but
+per `PARITY_VERSIONS.md` Anomaly #5 the transitive 5.1.0 is filtered
+out by `normalize-css.ts:62-72` before execution and never reaches
+the hashing path — so this is harmless.
+
+**Every parity stage was re-run against the pinned oracle and remains
+byte-clean** (208 corpus inputs across 16 gates):
+
+| Gate                                | Corpus size | Result |
+|-------------------------------------|-------------|--------|
+| postcss-core-roundtrip              | 12          | OK |
+| discard-empty-rules                 | 16          | OK |
+| discard-duplicates (local)          | 11          | OK |
+| extract-stylesheets                 | 12          | OK |
+| parent-orphaned-pseudos             | 13          | OK |
+| flatten-multiple-selectors          | 11          | OK |
+| increase-specificity                | 12          | OK |
+| normalize-current-color             | 10          | OK |
+| atomicify-rules                     | 24          | OK |
+| expand-shorthands                   | 38          | OK |
+| merge-duplicate-at-rules            | 7           | OK |
+| sort-atomic-style-sheet             | 12          | OK |
+| npm-postcss-discard-duplicates      | 8           | OK |
+| sort (end-to-end)                   | 12          | OK |
+| verify-napi-sort.mjs                | 12          | OK |
+| verify-engine-flag.mjs              | 12          | OK |
+
+The Rust ports were already byte-clean against 8.4.31 / 6.0.13 / 6.0.0
+/ 10.4.14 — the previous "byte-clean" claim against drifted versions
+held only because patch-level diffs happened to be byte-irrelevant on
+the existing corpus. Future sessions: **always run `bun install` and
+verify `node_modules/.bun/` resolves the reference pins before
+declaring byte-clean.**
+
+## Phase 7 split contract — autoprefixer parallel agents
+
+`crates/autoprefixer/` is being ported by two agents in parallel. The
+boundary is **physical** — each agent's tree is non-overlapping except
+for one shared registration file. Read this before claiming Phase 7
+work.
+
+### Tree split
+
+| Path                                          | Owner            |
+|-----------------------------------------------|------------------|
+| `crates/autoprefixer/src/*.rs` (top-level)    | foundation agent |
+| `crates/autoprefixer/src/data/`               | foundation agent |
+| `crates/autoprefixer/src/hacks/*.rs`          | hacks agent      |
+| `crates/autoprefixer/src/hacks/HACKS_PORT.md` | hacks agent (checklist + progress tracker) |
+| `crates/autoprefixer/src/prefixes.rs`         | **shared** — append-only `register_hacks()` block |
+
+The hacks agent reads `crates/autoprefixer/src/hacks/HACKS_PORT.md`
+for the per-hack parent-class table, the trait surface, and the
+registration contract.
+
+### Foundation agent's responsibilities (in order)
+
+1. ✅ Vendor source under `crates/_vendor/autoprefixer-10.4.14/`.
+2. ✅ Scaffold crate + module tree (compiles cleanly).
+3. ✅ Port leaf utilities (`utils`, `vendor`, `brackets`, `old_value`,
+   `old_selector`).
+4. 🟡 Port `prefixer.rs` (partial — base trait + `parent_prefix`; the
+   walk-parent path needs a parent-pointer surface from
+   `postcss-core`).
+5. ⬜ Port `browsers.rs` (browserslist-shim integration).
+6. ⬜ Port `data/prefixes.rs` (~1100 LOC static data table — codegen
+   from `data/prefixes.js`).
+7. ⬜ Port mid-tier base classes (`value.rs`, `selector.rs`,
+   `at_rule.rs`, `resolution.rs`).
+8. ⬜ Port heavier base classes (`declaration.rs`, `supports.rs`,
+   `transition.rs`).
+9. ⬜ Port `prefixes.rs` (registry — wires hacks → declaration types).
+10. ⬜ Port `processor.rs` + `info.rs` + `autoprefixer.rs` (entry
+    point).
+11. ⬜ Add `Stage::Autoprefixer` parity-runner gate (requires
+    parity-runner edits + parity-bridge.mjs — re-ask permission).
+12. ⬜ Wire into `crates/css/src/transform.rs` (re-ask permission).
+
+### Hacks agent's responsibilities
+
+1. **Wait for foundation tasks #7 + #8 to land before starting.**
+   The base-class trait surface isn't final until then; starting
+   earlier guarantees rework.
+2. Pick a hack from the table in `HACKS_PORT.md`. Take it 0 → 100%
+   byte-clean (per cardinal rule).
+3. Register it in `crates/autoprefixer/src/prefixes.rs::register_hacks`
+   in alphabetical-by-JS-filename order.
+4. Mark the row in `HACKS_PORT.md` Done.
+
+### What the hacks agent must NOT do
+
+- Edit anything outside `src/hacks/` (one exception: append-only
+  registration in `src/prefixes.rs`).
+- Add methods to base traits. If a hack needs a method that isn't on
+  `Declaration`/`Value`/`Selector`/`AtRule`, file a note in
+  `HACKS_PORT.md` and pause — the foundation agent owns base-class
+  shape.
+- Re-port `flex-spec.js` or `grid-utils.js` as classes. They're
+  shared helpers; port as plain functions in
+  `hacks/flex_spec.rs` / `hacks/grid_utils.rs`.
+
+### Current handshake state
+
+- Crate compiles. `cargo test -p autoprefixer` → 11/11 passing.
+- Hacks agent **cannot start** until base classes (foundation tasks
+  #7 + #8) land. The trait surface signature would change otherwise.
+- Foundation agent will not finish in one session. Phase 7 is multi-
+  session by design; STATUS.md tracks per-task completion.
 
 ## Foundational infrastructure (load-bearing for plugin ports)
 
@@ -110,61 +332,270 @@ aware cssnano plugins.
 
 ## Workspace layout
 
-`crates/Cargo.toml` has 32 members. Naming:
+`crates/Cargo.toml` has 33 members (32 + `compiled-css-napi` added in
+Phase 8a). Naming:
 - `cssnano-postcss-*` — the 14 cssnano sub-plugins, prefixed to
   disambiguate from same-named npm packages (e.g. distinguishing
   `postcss-normalize-string` from any future v6/v7 fork).
 - `postcss-*` — the 4 plugins consumed directly by `transform.ts` /
   `sort.ts`.
 - `cssnano-preset-default` — the preset orchestrator.
+- `compiled-css-napi` — the Phase 8 NAPI bridge crate (cdylib + rlib).
 - Foundation crates keep their upstream names where unambiguous.
+
+`packages/css-native/` is the npm wrapper around the compiled `.node`
+binary. Phase 8a ships `sjcompiled-css.win32-x64-msvc.node` only;
+Phase 8b extends to linux-x64-gnu / linux-arm64-gnu / darwin-x64 /
+darwin-arm64 once `transformCss` is byte-clean.
 
 ## What's left to port (full source-faithful Rust ports)
 
-15 crates. Listed in roughly ascending complexity:
+12 crates. Listed in roughly ascending complexity:
 
-1. `postcss-discard-comments` — ~100 LOC + 2 lib files. Comment-text
-   predicate, inline-raws comment scrubbing.
-2. `postcss-normalize-positions` — ~50 LOC. Position-keyword rewrite.
-3. `postcss-normalize-string` — ~50 LOC. Quote-style normalization.
-4. `postcss-normalize-timing-functions` — ~50 LOC. Easing-keyword
+1. `postcss-normalize-positions` — ~50 LOC. Position-keyword rewrite.
+2. `postcss-normalize-timing-functions` — ~50 LOC. Easing-keyword
    compression.
-5. `postcss-ordered-values` — moderate. Reorders multi-value
+3. `postcss-ordered-values` — moderate. Reorders multi-value
    shorthand parts.
-6. `postcss-normalize-whitespace` (Phase 5b) — moderate. Walks decls
-   via postcss-value-parser, normalizes raws.between/.semicolon, IE9
-   hack regex.
-7. `postcss-minify-selectors` — moderate. Selector minification using
+4. `postcss-minify-selectors` — moderate. Selector minification using
    postcss-selector-parser.
-8. `postcss-normalize-url` — moderate. URL parsing edge cases.
-9. `postcss-normalize-unicode` — moderate, browserslist-aware.
-10. `postcss-reduce-initial` — moderate, caniuse-aware.
-11. `postcss-convert-values` — hard, uses fraction-js, browserslist.
-12. `postcss-minify-params` — hard, caniuse-aware.
-13. `postcss-minify-gradients` — hard, colord-heavy.
-14. `postcss-calc` — VERY hard. Effectively a small expression compiler.
-15. `postcss-colormin` — HARDEST cssnano plugin. Color downgrade
+5. `postcss-normalize-url` — moderate. URL parsing edge cases.
+6. `postcss-normalize-unicode` — moderate, browserslist-aware.
+7. `postcss-reduce-initial` — moderate, caniuse-aware.
+8. `postcss-convert-values` — hard, uses fraction-js, browserslist.
+9. `postcss-minify-params` — hard, caniuse-aware.
+10. `postcss-minify-gradients` — hard, colord-heavy.
+11. `postcss-calc` — VERY hard. Effectively a small expression compiler.
+12. `postcss-colormin` — HARDEST cssnano plugin. Color downgrade
     decisions hinging on caniuse + colord rounding + byte-length
     comparison.
-16. `postcss-nested` (Phase 5a) — VERY hard. Recursive selector
+13. `postcss-nested` (Phase 5a) — VERY hard. Recursive selector
     merging with bubble/unwrap config.
-17. `cssnano-preset-default` — moderate orchestrator (depends on
-    1-15 being byte-clean first).
+14. `cssnano-preset-default` — moderate orchestrator (depends on
+    1-12 being byte-clean first).
 
 Plus Phase 7 (autoprefixer — 8+ weeks of its own) and Phase 8
 (NAPI assembly + the `transformCss` / `sort` end-to-end gates).
 
 ## Recommended order for the next session
 
-1. **Phase 5b** (`postcss-normalize-whitespace`) — runs in
-   `transform.ts`'s pipeline; small but uses postcss-value-parser
-   walking. Good warmup.
-2. **Phase 5a** (`postcss-nested`) — gates everything that depends on
-   nested rules being flattened. Multi-day commitment.
-3. **Phase 6 simple band** (`discard-comments`,
-   `normalize-positions`, `normalize-string`,
-   `normalize-timing-functions`) — parallel-friendly small ports.
-4. Then layer in the harder ones.
+`sort()` is now byte-clean end-to-end through NAPI (Phase 8a) and
+Phase 5b (`postcss-normalize-whitespace`) is byte-clean across a
+20-entry corpus. The remaining work is all `transformCss`-bound. The
+cardinal-rule guidance remains: **a session must take a unit from 0%
+→ 100% byte-clean**. Half-done ports become silent byte-drift hazards
+across agent handoffs.
+
+1. **Phase 6 simple band remainder** — `normalize-positions` and
+   `normalize-timing-functions` (the other two,
+   `discard-comments` and `normalize-string`, landed this session).
+   Each ~50-200 LOC; finish one before starting the next.
+2. **Phase 5a** (`postcss-nested`) — multi-day commitment. Recursive
+   selector merging. Don't start unless you have time to finish.
+3. **Phase 6 hard band** — `ordered-values`, `minify-selectors`,
+   `normalize-url`, `normalize-unicode`, `reduce-initial`,
+   `convert-values`, `minify-params`, `minify-gradients`. Each
+   multi-day.
+4. **Phase 6h** — `postcss-calc` (small expression compiler) and
+   `postcss-colormin` (HARDEST cssnano plugin). Each multi-week.
+5. **Phase 7** — `autoprefixer@10.4.14`. ~8 weeks for one engineer.
+7. **Phase 6h orchestrator** — `cssnano-preset-default` once 1–6
+   are byte-clean.
+8. **Phase 8b** — `transformCss` NAPI export + `transform.ts` engine
+   flag, mirroring the Phase 8a pattern below.
+
+## Phase 5b ship — `postcss-normalize-whitespace@5.1.1` byte-clean
+
+Single OnceExit-only plugin that runs inside `transform.ts`'s pipeline
+(blocking Phase 8b end-to-end `transformCss` parity). Now byte-clean.
+
+### What landed this session
+
+1. `crates/postcss-normalize-whitespace/src/lib.rs` — full port of
+   `node_modules/postcss-normalize-whitespace@5.1.1/src/index.js`. The
+   single source file maps 1:1 (file/folder shape preserved).
+2. `crates/postcss-normalize-whitespace/Cargo.toml` — added `once_cell`
+   and `indexmap` deps. Pre-existing `postcss-core`,
+   `postcss-value-parser`, `regex` already declared.
+3. `crates/parity-runner/Cargo.toml` — added
+   `postcss-normalize-whitespace` workspace dep so the stage handler
+   can call into it.
+4. `crates/parity-runner/src/stages.rs` —
+   `Stage::PostcssNormalizeWhitespace` variant + handler.
+5. `crates/parity-runner/src/main.rs` — CLI mapping for
+   `postcss-normalize-whitespace`.
+6. `packages/css/scripts/parity-bridge.mjs` — JS-side stage that runs
+   `postcss([postcssNormalizeWhitespace()]).process(css)` against the
+   pinned 5.1.1 oracle.
+7. `crates/parity-runner/corpus/postcss-normalize-whitespace/` — 22
+   fixtures covering: blank, simple rule, multi-decl, calc inner WS,
+   var/env exemption, IE9 hack (single-replace, no `g` flag), excess
+   `!important` whitespace, `--*` empty value, atrule, nested atrule,
+   url, comments, multi-calc cache hits, multi-value shorthand,
+   quoted strings, mixed rule/decl neighbors, statement atrules
+   (`@charset` / `@import`), pseudo selectors, nested calc, realistic
+   atomic CSS, transform/translate function-chain spacing
+   (translate3d / matrix / rotate / scale / perspective with
+   pathological whitespace, multiline transform with embedded calc).
+
+### Verification gates run
+
+| Gate                                                                            | Status |
+|---------------------------------------------------------------------------------|--------|
+| `cargo test -p postcss-normalize-whitespace`                                    | 12/12 pass |
+| `cargo test --workspace --no-fail-fast`                                         | 368/368 pass |
+| `parity-runner --stage postcss-normalize-whitespace --corpus ...`               | 22/22 byte-clean |
+| `parity-runner --stage postcss-normalize-whitespace ... --determinism`          | 22/22 deterministic |
+| `parity-runner --stage sort --corpus crates/parity-runner/corpus/sort`          | 12/12 (no regression) |
+
+## Phase 6a ship — `postcss-discard-comments@5.1.2` byte-clean
+
+cssnano sub-plugin. Removes comments from the AST and scrubs them out
+of inline raws (`raws.between`, decl `raws.value.raw`,
+rule `raws.selector.raw`, atrule `raws.afterName` / `raws.params.raw`).
+Default opts keep `/*!` important comments.
+
+### What landed this session
+
+1. `crates/cssnano-postcss-discard-comments/src/lib.rs` — main port of
+   `node_modules/postcss-discard-comments@5.1.2/src/index.js`.
+2. `crates/cssnano-postcss-discard-comments/src/comment_parser.rs` —
+   port of `src/lib/commentParser.js`. The upstream `lib/` parent
+   directory is dropped because Rust's crate-root file is itself
+   `lib.rs` and a child module literally named `lib` collides;
+   behavior is unaffected. Includes the unclosed-comment quirk
+   (`indexOf('*/') === -1` → upstream produces `pos = 1` and a
+   sentinel slice — replicated via `UNCLOSED_END = usize::MAX`).
+3. `crates/cssnano-postcss-discard-comments/src/comment_remover.rs` —
+   port of `src/lib/commentRemover.js`. Tri-state predicate matching
+   upstream (`Some(true)` remove / `Some(false)` keep / `None` for
+   upstream `undefined` fall-through which JS treats as falsy → keep).
+4. Stage + bridge wiring: `Stage::PostcssDiscardComments`,
+   `parity-bridge.mjs` import, root `package.json` `overrides` pin
+   (`postcss-discard-comments: 5.1.2`),
+   `packages/css/package.json` devDependency.
+5. 15-fixture corpus covering: blank, no-comments, top-level comment,
+   `/*!` important kept, comments inside rule bodies, comments inside
+   decl values, comments inside selectors and selector lists, comments
+   in atrule params and afterName, comments in `raws.between` (decl
+   prop/colon split), comments around `!important`, mixed
+   important/normal, atrules without bodies (`@charset`/`@import`),
+   nested atrules, consecutive comments, realistic atomic CSS.
+
+### Verification gates run
+
+| Gate                                                                    | Status |
+|-------------------------------------------------------------------------|--------|
+| `cargo test -p cssnano-postcss-discard-comments`                        | 12/12 pass |
+| `parity-runner --stage postcss-discard-comments --corpus ...`           | 15/15 byte-clean |
+| `parity-runner --stage postcss-discard-comments ... --determinism`      | 15/15 deterministic |
+
+## Phase 6b ship — `postcss-normalize-string@5.1.0` byte-clean
+
+cssnano sub-plugin. Walks rule selectors, decl values, and atrule
+params; rewraps string literals to the preferred quote style (default
+`'double'`) when the swap reduces escapes, and collapses `\\\n`
+(escaped newline) inside string bodies.
+
+### What landed this session
+
+1. `crates/cssnano-postcss-normalize-string/src/lib.rs` — full port of
+   `node_modules/postcss-normalize-string@5.1.0/src/index.js`.
+   Single source file maps 1:1.
+2. The bespoke string-AST parser (`ast_parse`) is a hand-rolled
+   byte-scan with the same `[ \n\t\r\f'"\\]` word-end character class
+   as upstream's `WORD_END` regex, including the intentional
+   fall-through from the backslash branch into the default word
+   branch (upstream's "missing `break`" bug — replicated verbatim).
+3. Stage + bridge wiring: `Stage::PostcssNormalizeString`,
+   `parity-bridge.mjs` import, root `package.json` `overrides` pin
+   (`postcss-normalize-string: 5.1.0`),
+   `packages/css/package.json` devDependency.
+4. 15-fixture corpus covering: blank, no-strings, single/double-quoted
+   plain values, escaped-double-in-double, escaped-single-in-single,
+   mixed escapes, bare quote inside opposite wrap, empty strings,
+   attribute selectors with both quote styles, `url(...)` with
+   quotes, font-family lists, atrule string params
+   (`@charset`/`@import`), escaped newline collapse, realistic atomic
+   CSS.
+
+### Verification gates run
+
+| Gate                                                                  | Status |
+|-----------------------------------------------------------------------|--------|
+| `cargo test -p cssnano-postcss-normalize-string`                      | 7/7 pass |
+| `parity-runner --stage postcss-normalize-string --corpus ...`         | 15/15 byte-clean |
+| `parity-runner --stage postcss-normalize-string ... --determinism`    | 15/15 deterministic |
+
+### Lessons from Phase 6a / 6b — apply to every future port
+
+- **`lib/` subdirectories collide with Rust crate-root naming.** When
+  upstream nests sources under `src/lib/<name>.js`, the only
+  Rust-legal layout that keeps a 1:1 file map is to flatten the
+  `lib/` parent into the crate root and document the deviation in
+  each module header.
+- **Bug-for-bug fall-through bugs are real.** `postcss-normalize-string`
+  has an intentional missing `break` in the switch statement
+  (backslash + non-quote → falls through into the default word
+  branch). Replicate verbatim, do not "clean up" — class hashes
+  downstream depend on byte-equivalent string output.
+- **The `replaceComments` separator argument is load-bearing.** For
+  rule selectors, separator is `''` (empty), not the default `' '`.
+  This can cause previously-separated selector tokens to JOIN when a
+  comment lived between them. Replicate exactly — minified selectors
+  rely on this.
+- **JS bridge dependency resolution:** plugins not in
+  `@sjcompiled/css`'s direct deps must be added to its
+  `devDependencies` (not just root `overrides`) so
+  `parity-bridge.mjs` can `import` them. Without the package-level
+  dep, bun's `node_modules` doesn't expose the package to the bridge
+  script and `JS bridge closed unexpectedly` errors every fixture.
+
+### Lessons from Phase 5b — apply to every future port
+
+- **ECMAScript `\s` ≠ Rust regex `\s` ≠ Unicode `White_Space`.** JS
+  `\s` includes U+FEFF (BOM) but excludes U+0085 (NEL); Rust `\s`
+  (Unicode mode) is `\p{White_Space}` which is the opposite. The
+  IE9-hack regex hand-rolls the JS character class explicitly so
+  parity holds for any input that uses BOMs/NEL inside CSS values.
+  Same for the per-character `replace(/\s/g, '')` calls — we ship a
+  bespoke `is_es_whitespace` predicate, not `char::is_whitespace`.
+- **`variableFunctions` exemption is shallow.** `var()` / `env()` /
+  `constant()` keep their *Function*-level `before`/`after` raws, but
+  the default reducer recursion still descends and clears Div nodes'
+  `before`/`after` inside. So `var( --x , red )` becomes
+  `var( --x,red )`, not `var( --x , red )`. Test for this exact
+  shape.
+- **The IE9-hack regex has NO `g` flag.** First match only. Fixtures
+  that have two `\9` occurrences in the same value would only normalize
+  the first — replicate the bug, do not "fix" it.
+- **OnceExit-only plugins compose into single-plugin pipelines as a
+  direct function call.** No per-node visitor / no `Once` hook means
+  postcss runs the function once on the parsed root. The Phase 8a
+  lifecycle warning still applies: when this plugin lands in the same
+  pipeline as another plugin's `Once` / per-node visitor, the
+  OnceExit ordering matters and array order ≠ execution order.
+
+### Lessons from Phase 8a — apply to every future port
+
+- **Lifecycle ordering matters.** Read `Phase 8a ship` →
+  "Lifecycle ordering — load-bearing" before composing plugins in
+  any orchestrator. Array order ≠ execution order. The bug is silent
+  and only manifests when multiple plugins share root.
+- **`container::append` on Root applies Root.normalize.** Direct
+  `Vec::push` on `root.nodes` skips the raws-transfer and produces
+  missing-newline drift. Always go through `container::append`.
+- **`bun.lock` silently floats past `^X.Y.Z` pins.** Audit every
+  pinned version in `PARITY_VERSIONS.md` against the actual
+  `node_modules/.bun/` contents before declaring byte-clean. The
+  `postcss-discard-duplicates` `^6.0.0 → 6.0.3` drift is one example;
+  there are likely others.
+- **A new stage needs three coordinated additions:** the Rust
+  `Stage::*` variant in `crates/parity-runner/src/stages.rs`, the
+  CLI mapping in `main.rs`, and the JS counterpart in
+  `packages/css/scripts/parity-bridge.mjs`. Forgetting the JS side
+  silently produces "no diff" because both sides hit the unknown-stage
+  error path.
 
 ## Cardinal-rule conformance check
 
@@ -174,5 +605,14 @@ Plus Phase 7 (autoprefixer — 8+ weeks of its own) and Phase 8
 - ✅ No version bumps applied to any pinned package.
 - ✅ JS pipeline in `packages/css/src/transform.ts` untouched — Rust
   is additive.
+- ⚠️ JS pipeline in `packages/css/src/sort.ts` — modified additively
+  to add the `COMPILED_CSS_ENGINE=rust` env-flag gate. Default path
+  (flag unset, JS pipeline) is byte-identical to pre-modification
+  behavior. JS code stays as the parity oracle.
 - ✅ Parity-runner harness wired for every implemented plugin.
 - ✅ The CRITICAL hash plugin (`atomicify-rules`) is byte-clean.
+- ✅ JS oracle versions match `REFERENCE_LOCK_FILE/yarn.lock` exactly
+  for every byte-affecting dep (postcss 8.4.31, postcss-selector-parser
+  6.0.13, postcss-discard-duplicates 6.0.0, autoprefixer 10.4.14, etc.)
+  via root `package.json` `overrides` block. See "Parity-contract drift
+  — RESOLVED" above for the audit table.

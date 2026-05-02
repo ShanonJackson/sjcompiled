@@ -1,0 +1,6 @@
+@supports /* outer */ (display: grid) {
+  /* inside supports */
+  @media /* inner */ (min-width: 100px) {
+    a { color: red; }
+  }
+}

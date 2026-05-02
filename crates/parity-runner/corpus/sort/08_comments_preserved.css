@@ -1,0 +1,8 @@
+/* leading comment */
+._a { color: red; }
+/* between */
+._b { color: blue; }
+@media (min-width: 100px) {
+  /* inside at-rule */
+  ._c { color: green; }
+}

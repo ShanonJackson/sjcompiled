@@ -60,10 +60,11 @@
 //! `sort-atomic-style-sheet`).
 
 use indexmap::IndexMap;
-use postcss_core::container::remove_at;
+use postcss_core::container::{append, remove_at};
 use postcss_core::{stringify_node, Node, NodeKind, PluginResult, Root};
 
-struct MergedAtRule {
+/// One entry in the at-rule merge store.
+pub struct MergedAtRule {
     /// First-encountered AtRule node; its raws (between, params, etc.) are
     /// kept verbatim. Children are replaced with the deduped set at exit.
     node: Node,
@@ -72,12 +73,27 @@ struct MergedAtRule {
     children: IndexMap<String, Node>,
 }
 
-pub fn merge_duplicate_at_rules(root: &mut Root) -> PluginResult {
-    let mut store: IndexMap<String, MergedAtRule> = IndexMap::new();
+/// State shared between the visitor pass and the OnceExit pass — mirrors
+/// the closure-captured `atRuleStore` in upstream `prepare()`.
+pub type MergeStore = IndexMap<String, MergedAtRule>;
 
-    // Walk top-level children of root. Collect at-rules into the store
-    // (removing them from root) and snapshot their direct children for
-    // the merge map. Non-at-rule nodes pass through.
+/// Visitor-phase port of upstream `AtRule(atRule)`. Walks top-level
+/// children of root, removes each at-rule (via `remove_at` so the
+/// Root.removeChild raws-transfer fires), and snapshots its direct
+/// children into the merge map.
+///
+/// Returns the populated store. The caller must run [`finalize`] later
+/// to re-append the merged at-rules.
+///
+/// Splitting visit/finalize is required to reproduce postcss's plugin
+/// lifecycle: when this plugin runs in a pipeline alongside an
+/// `OnceExit`-only plugin (e.g. `postcss-discard-duplicates`), the
+/// other plugin's OnceExit fires *between* this plugin's visitor and
+/// its OnceExit. Calling them as a single combined function silently
+/// changes the byte-equivalent tree state.
+pub fn visit(root: &mut Root) -> MergeStore {
+    let mut store: MergeStore = IndexMap::new();
+
     let mut i = 0usize;
     loop {
         let len = root.root.nodes().map(|n| n.len()).unwrap_or(0);
@@ -98,17 +114,12 @@ pub fn merge_duplicate_at_rules(root: &mut Root) -> PluginResult {
             NodeKind::AtRule(a) => format!("{}{}", a.name, a.params),
             _ => unreachable!(),
         };
-        // Snapshot the at-rule's direct children for the merge map.
-        // Cloning matches upstream "object reference" capture closely
-        // enough for the top-level merge case.
         let snapshotted_children: Vec<Node> = at_node
             .nodes()
             .map(|c| c.clone())
             .unwrap_or_default();
 
         let entry = store.entry(key).or_insert_with(|| MergedAtRule {
-            // The store's `node` clone keeps the at-rule shell (raws,
-            // name, params); body gets replaced at exit.
             node: at_node.clone(),
             children: IndexMap::new(),
         });
@@ -118,16 +129,35 @@ pub fn merge_duplicate_at_rules(root: &mut Root) -> PluginResult {
         }
     }
 
-    // OnceExit: re-append merged at-rules to root in store insertion
-    // order. Each merged at-rule's `nodes` is replaced with the deduped
-    // children-map values.
+    store
+}
+
+/// OnceExit-phase port of upstream `OnceExit(root)`. Re-appends merged
+/// at-rules to root in store insertion order, each with its deduped
+/// child set substituted in for the original body.
+///
+/// Uses `container::append` (not raw `Vec::push`) so the Root.normalize
+/// raws-transfer fires — when root already has ≥2 children at append
+/// time, the appended at-rule's `raws.before` is overwritten with the
+/// current last child's `raws.before`. Skipping this produces a stray
+/// missing-newline at the boundary between the last rule and the
+/// re-appended at-rule.
+pub fn finalize(root: &mut Root, store: MergeStore) {
     for (_k, mut merged) in store {
         if let Some(body) = merged.node.nodes_mut() {
             *body = merged.children.into_values().collect();
         }
-        root.root.nodes_mut().unwrap().push(merged.node);
+        append(&mut root.root, vec![merged.node]);
     }
+}
 
+/// Combined visit + finalize. Used by callers that don't need to
+/// interleave another plugin's OnceExit between the two phases (e.g.
+/// the `Stage::MergeDuplicateAtRules` parity stage that runs this
+/// plugin in isolation).
+pub fn merge_duplicate_at_rules(root: &mut Root) -> PluginResult {
+    let store = visit(root);
+    finalize(root, store);
     Ok(())
 }
 

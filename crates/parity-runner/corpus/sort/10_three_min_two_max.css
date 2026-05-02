@@ -1,0 +1,5 @@
+@media (max-width: 100px) { ._x { color: red; } }
+@media (min-width: 200px) { ._y { color: blue; } }
+@media (min-width: 100px) { ._z { color: green; } }
+@media (max-width: 50px) { ._w { color: black; } }
+@media (min-width: 300px) { ._v { color: yellow; } }

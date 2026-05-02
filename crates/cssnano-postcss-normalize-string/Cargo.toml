@@ -9,3 +9,4 @@ description = "Byte-for-byte Rust port of postcss-normalize-string@5.1.0."
 [dependencies]
 postcss-core = { workspace = true }
 postcss-value-parser = { workspace = true }
+indexmap = { workspace = true }

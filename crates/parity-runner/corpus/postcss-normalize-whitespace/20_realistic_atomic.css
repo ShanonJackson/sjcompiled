@@ -1,0 +1,8 @@
+._a1b2c3 { color: red; }
+._d4e5f6 { font-size: 12px; }
+@media (max-width: 100px) {
+  ._g7h8i9 { color: blue; }
+}
+:root {
+  --token-color: #ff0000;
+}

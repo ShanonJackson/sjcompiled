@@ -60,6 +60,25 @@ pub enum Stage {
     /// `parse → postcss-discard-duplicates@6 → stringify`. Phase 5c.
     /// Distinct from `Stage::DiscardDuplicates` (the LOCAL plugin).
     NpmPostcssDiscardDuplicates,
+
+    /// `parse → postcss-normalize-whitespace@5.1.1 → stringify`. Phase 5b.
+    /// Single OnceExit hook — runs once on the parsed root.
+    PostcssNormalizeWhitespace,
+
+    /// `parse → postcss-discard-comments@5.1.2 (default opts) → stringify`.
+    /// Phase 6a. Default keeps `/*!` important comments, drops the rest.
+    PostcssDiscardComments,
+
+    /// `parse → postcss-normalize-string@5.1.0 (default opts) → stringify`.
+    /// Phase 6b. Default `preferredQuote: 'double'`.
+    PostcssNormalizeString,
+
+    /// The full `sort()` entry point — `packages/css/src/sort.ts`. Runs
+    /// `postcss-discard-duplicates@6 → mergeDuplicateAtRules → sortAtomicStyleSheet`
+    /// with default opts (both `Option<bool>` flags `None`, mirroring the
+    /// `undefined` defaults in the JS signature). This is the byte-parity
+    /// gate for the smaller of the two hashing entry points.
+    Sort,
 }
 
 impl Stage {
@@ -78,6 +97,10 @@ impl Stage {
             Stage::AtomicifyRules => "atomicify-rules",
             Stage::ExpandShorthands => "expand-shorthands",
             Stage::NpmPostcssDiscardDuplicates => "npm-postcss-discard-duplicates",
+            Stage::PostcssNormalizeWhitespace => "postcss-normalize-whitespace",
+            Stage::PostcssDiscardComments => "postcss-discard-comments",
+            Stage::PostcssNormalizeString => "postcss-normalize-string",
+            Stage::Sort => "sort",
         }
     }
 }
@@ -168,6 +191,32 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             postcss_discard_duplicates::postcss_discard_duplicates(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
+        }
+        Stage::PostcssNormalizeWhitespace => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            postcss_normalize_whitespace::postcss_normalize_whitespace(&mut root)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssDiscardComments => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            let opts = cssnano_postcss_discard_comments::DiscardCommentsOpts::default();
+            cssnano_postcss_discard_comments::postcss_discard_comments(&mut root, &opts)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssNormalizeString => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            let opts = cssnano_postcss_normalize_string::NormalizeStringOpts::default();
+            cssnano_postcss_normalize_string::postcss_normalize_string(&mut root, &opts)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::Sort => {
+            // Default opts: both flags `None`, matching the `undefined`
+            // defaults in `sort.ts:18-26`. The plugin defaults (true/true)
+            // take effect inside sort_atomic_style_sheet.
+            css::sort::sort(css, &css::sort::SortOpts::default())
         }
     }
 }

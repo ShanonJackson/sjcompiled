@@ -1,0 +1,26 @@
+[package]
+name = "compiled-css-napi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "NAPI bridge — exposes the Rust `sort()` (Phase 8) and eventually `transformCss` to Node/Bun consumers."
+
+[lib]
+# `cdylib`: produces a `.dll` on Windows that Node's NAPI loader can load.
+# `rlib`:   so the Rust unit tests inside this crate can compile.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+css = { workspace = true }
+napi = { workspace = true }
+napi-derive = { workspace = true }
+serde_json = { workspace = true }
+
+[build-dependencies]
+napi-build = { workspace = true }
+
+[profile.release]
+# Inherits workspace defaults — keep simple. The user-level RUSTFLAGS
+# (znver3 / lto=thin) handle optimization. Ship-time release builds set
+# `RUSTFLAGS=""` to avoid breaking proc-macro dylib LTO requirements.

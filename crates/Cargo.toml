@@ -37,6 +37,23 @@ members = [
     "cssnano-postcss-colormin",
     "postcss-calc",
     "cssnano-preset-default",
+
+    # Phase 7 — autoprefixer@10.4.14. Largest single port (~50 files).
+    "autoprefixer",
+
+    # Phase 8 — NAPI bridge. Exposes `sort()` (and eventually `transformCss`)
+    # to Node/Bun so `packages/css/src/sort.ts` can delegate to the Rust
+    # implementation behind a `COMPILED_CSS_ENGINE=rust` feature flag.
+    "compiled-css-napi",
+
+    # SWC plugins (plugins/PLAN.md). Compiled to wasm32-wasip1, ABI-compatible
+    # with @swc/core@1.15.8 -> swc_core@54.0.0 (see PARITY_VERSIONS.md).
+    "babel-plugin",
+    "babel-plugin-strip-runtime",
+
+    # Phase 0 sandbox / WASI / postcard / cache probes (PLAN.md §3.9.14).
+    # Single probe plugin with dispatch on `mode` config. Not shipped.
+    "babel-plugin-phase0-probes",
 ]
 
 [workspace.package]
@@ -86,3 +103,17 @@ cssnano-postcss-convert-values = { path = "cssnano-postcss-convert-values" }
 cssnano-postcss-colormin = { path = "cssnano-postcss-colormin" }
 postcss-calc = { path = "postcss-calc" }
 cssnano-preset-default = { path = "cssnano-preset-default" }
+autoprefixer = { path = "autoprefixer" }
+
+# Phase 8 NAPI bindings. Pinned napi-rs major. The `napi6` feature gates
+# Node 10+ ABI — required for current Node LTS / Bun.
+napi = { version = "2", default-features = false, features = ["napi6"] }
+napi-derive = "2"
+napi-build = "2"
+
+# SWC plugin runtime. PIN — see crates/PARITY_VERSIONS.md.
+# Bumping requires a coordinated @swc/core bump and full corpus re-run.
+swc_core = { version = "=54.0.0", features = ["ecma_plugin_transform", "ecma_ast", "ecma_visit", "common"] }
+babel-plugin = { path = "babel-plugin" }
+babel-plugin-strip-runtime = { path = "babel-plugin-strip-runtime" }
+postcard = { version = "1", features = ["alloc"] }

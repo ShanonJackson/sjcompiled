@@ -51,6 +51,32 @@ These are the versions reachable from `packages/css/package.json` after yarn
 resolution. The Rust crates listed in the right-most column port these specific
 versions and no others.
 
+### SWC plugin runtime (used by `crates/babel-plugin/`, `crates/babel-plugin-strip-runtime/`)
+
+The Rust SWC plugins compile against a specific `swc_core` crate version
+that is ABI-compatible with a specific `@swc/core` runtime release.
+Mismatch = plugin rejected at load time.
+
+| npm package | Pinned version | Rust crate | Notes |
+|---|---|---|---|
+| `@swc/core` | **1.15.8** | n/a (npm package, used at runtime by Parcel transformer wrapper) | Plugin loader. ABI surface frozen here. |
+| `swc_core` | **54.0.0** | crate dep in `crates/babel-plugin/Cargo.toml` and `crates/babel-plugin-strip-runtime/Cargo.toml` | Verified via `https://github.com/swc-project/swc/blob/v1.15.8/crates/swc_core/Cargo.toml`. |
+
+**Cardinal rule for SWC pins:** bumping `@swc/core` requires a coordinated
+`swc_core` bump and a full corpus re-run. The plan §1 constraint 7 is
+load-bearing: the wasm32-wasip1 ABI between plugin and runtime is what
+makes "drop-in replacement" feasible at all.
+
+### Prettier (used by the parity oracle)
+
+The verification oracle (`plugins/PLAN.md` §2) is post-prettier byte
+equality: `prettier(babelOutput) === prettier(swcOutput)`. Both calls
+must run on the same prettier version, otherwise the oracle drifts.
+
+| npm package | Pinned version | Notes |
+|---|---|---|
+| `prettier` | **2.8.8** | Resolved from `REFERENCE_LOCK_FILE/yarn.lock`. Parser: `babel-ts`. Pinned in root `package.json` `overrides` so bun's caret resolution cannot drift past it. |
+
 ### Direct dependencies of `@sjcompiled/css`
 
 | npm package | Range in `packages/css/package.json` | Resolved version | Rust crate | Used in |

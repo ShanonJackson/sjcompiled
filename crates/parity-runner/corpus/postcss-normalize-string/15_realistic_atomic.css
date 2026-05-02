@@ -1,0 +1,6 @@
+[data-tone='primary'] { color: red; }
+._a1b2c3 { font-family: 'Inter', sans-serif; }
+._d4e5f6::before { content: 'beta'; }
+@media (min-width: 100px) {
+  ._g7h8i9 { content: "release"; }
+}

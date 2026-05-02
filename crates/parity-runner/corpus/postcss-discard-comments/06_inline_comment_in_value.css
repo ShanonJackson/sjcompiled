@@ -1,0 +1,4 @@
+a {
+  color: red /* hi */ blue;
+  background: /* lead */ url(foo.png) /* trail */;
+}

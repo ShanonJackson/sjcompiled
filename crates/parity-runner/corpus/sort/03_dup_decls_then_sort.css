@@ -1,0 +1,7 @@
+._a1:hover { color: red; }
+._a1:link { color: blue; }
+._a1:visited { color: green; }
+._a1:active { color: black; }
+._a1:focus { color: yellow; }
+._dup { color: red; }
+._dup { color: red; }

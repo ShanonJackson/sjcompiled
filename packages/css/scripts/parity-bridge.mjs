@@ -27,6 +27,12 @@ import { atomicifyRules } from '../src/plugins/atomicify-rules.ts';
 import { expandShorthands } from '../src/plugins/expand-shorthands/index.ts';
 // npm `postcss-discard-duplicates` — the v6 used by sort.ts.
 import postcssDiscardDuplicates from 'postcss-discard-duplicates';
+// npm `postcss-normalize-whitespace@5.1.1` — used by transform.ts.
+import postcssNormalizeWhitespace from 'postcss-normalize-whitespace';
+// npm `postcss-discard-comments@5.1.2` — cssnano sub-plugin (Phase 6a).
+import postcssDiscardComments from 'postcss-discard-comments';
+// npm `postcss-normalize-string@5.1.0` — cssnano sub-plugin (Phase 6b).
+import postcssNormalizeString from 'postcss-normalize-string';
 
 // Sheets returned by extract-stylesheets are joined with U+001E (record
 // separator) so they ride the single-string bridge protocol unambiguously.
@@ -127,6 +133,46 @@ const STAGES = {
   // `discard-duplicates` stage above.)
   'npm-postcss-discard-duplicates': (css) => {
     const result = postcss([postcssDiscardDuplicates()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-normalize-whitespace@5.1.1 → stringify.
+  // OnceExit-only plugin: collapses internal value whitespace via
+  // postcss-value-parser, strips raws.before whitespace, normalizes
+  // raws.between/.semicolon, IE9 hack regex.
+  'postcss-normalize-whitespace': (css) => {
+    const result = postcss([postcssNormalizeWhitespace()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-discard-comments@5.1.2 (default opts) → stringify.
+  // Drops non-important comments (anything not starting with `!`) from
+  // both the AST and inline raws (between, value.raw, selector.raw,
+  // afterName, params.raw). Default keeps `/*!` important comments.
+  'postcss-discard-comments': (css) => {
+    const result = postcss([postcssDiscardComments()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-normalize-string@5.1.0 (default opts) → stringify.
+  // Default `preferredQuote: 'double'`. Walks rule selectors, decl values,
+  // and atrule params; flips wrapping quotes on string literals when the
+  // change reduces escapes, and collapses `\\\n` (escaped newline).
+  'postcss-normalize-string': (css) => {
+    const result = postcss([postcssNormalizeString()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // The full `sort()` entry point. Mirrors `packages/css/src/sort.ts`
+  // verbatim — same three plugins, same default opts (both `undefined`,
+  // which propagates the plugin defaults in sort-atomic-style-sheet.ts).
+  // This is the byte-parity gate for the smaller hashing entry point.
+  sort: (css) => {
+    const result = postcss([
+      postcssDiscardDuplicates(),
+      mergeDuplicateAtRules(),
+      sortAtomicStyleSheet({ sortAtRulesEnabled: undefined, sortShorthandEnabled: undefined }),
+    ]).process(css, { from: undefined });
     return result.css;
   },
 };

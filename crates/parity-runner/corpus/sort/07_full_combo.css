@@ -1,0 +1,10 @@
+._a:hover { color: red; }
+._a:active { color: black; }
+@media (min-width: 200px) { ._b:hover { color: red; } }
+@media (min-width: 100px) { ._c { padding: 8px; } }
+@media (min-width: 100px) { ._c { padding-top: 2px; } }
+._a:link { color: blue; }
+._a:visited { color: green; }
+._a:focus { color: yellow; }
+._dup { color: red; }
+._dup { color: red; }

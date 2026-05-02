@@ -1,0 +1,16 @@
+{
+  "name": "@sjcompiled/css-native",
+  "version": "0.0.1",
+  "description": "Native (Rust/NAPI) backend for @sjcompiled/css. Loaded behind the COMPILED_CSS_ENGINE=rust flag.",
+  "license": "Apache-2.0",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "sjcompiled-css.*.node"
+  ],
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

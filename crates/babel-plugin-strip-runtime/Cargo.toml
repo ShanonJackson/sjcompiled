@@ -1,0 +1,23 @@
+[package]
+name = "babel-plugin-strip-runtime"
+description = "Byte-for-byte port of @sjcompiled/babel-plugin-strip-runtime → SWC plugin (wasm32-wasip1). See plugins/PLAN.md."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+swc_core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+
+[package.metadata.swc]
+swc_core = "=54.0.0"
+swc_core_bytes_compatible = "@swc/core@1.15.8"
+
+# Build: RUSTFLAGS="" cargo build -p babel-plugin-strip-runtime --target wasm32-wasip1 --release
+# See crates/babel-plugin/Cargo.toml for the RUSTFLAGS="" rationale.

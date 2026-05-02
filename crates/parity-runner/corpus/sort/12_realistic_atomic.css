@@ -1,0 +1,16 @@
+._aaaabbbb { display: block; }
+._ccccdddd { color: red; }
+._eeeeffff:hover { color: blue; }
+._gggghhhh:focus { color: green; }
+._iiiijjjj:active { color: black; }
+._kkkkllll { padding: 8px; }
+._mmmmnnnn { padding-top: 2px; }
+@media (min-width: 768px) {
+  ._oooopppp { display: flex; }
+}
+@media (min-width: 480px) {
+  ._qqqqrrrr { font-size: 14px; }
+}
+@media (min-width: 768px) {
+  ._oooopppp { display: flex; }
+}

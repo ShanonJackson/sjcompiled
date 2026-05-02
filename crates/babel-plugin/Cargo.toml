@@ -1,0 +1,29 @@
+[package]
+name = "babel-plugin"
+description = "Byte-for-byte port of @sjcompiled/babel-plugin → SWC plugin (wasm32-wasip1). See plugins/PLAN.md."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+# `cdylib`: produces a `.wasm` for SWC plugin loading.
+# `rlib`:   so workspace integration tests compile against the visitor.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+swc_core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+
+[package.metadata.swc]
+# When bumped, update PARITY_VERSIONS.md AND re-run the corpus.
+swc_core = "=54.0.0"
+swc_core_bytes_compatible = "@swc/core@1.15.8"
+
+# Build:    RUSTFLAGS="" cargo build -p babel-plugin --target wasm32-wasip1 --release
+# Output:   crates/target/wasm32-wasip1/release/babel_plugin.wasm
+# RUSTFLAGS="" is required: user-level RUSTFLAGS may include `-C lto=thin`
+# which breaks proc-macro deps (swc_core pulls in many). Same pattern is
+# used by crates/compiled-css-napi/.

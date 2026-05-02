@@ -1,0 +1,5 @@
+@supports (display: grid) { ._s { display: grid; } }
+@media (max-width: 200px) { ._m2 { color: red; } }
+@layer base { ._l { color: black; } }
+@media (min-width: 100px) { ._m1 { color: blue; } }
+@media (min-width: 200px) { ._m3 { color: green; } }

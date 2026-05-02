@@ -1,0 +1,21 @@
+[package]
+name = "autoprefixer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Byte-for-byte Rust port of autoprefixer@10.4.14. See crates/PARITY_VERSIONS.md."
+
+[dependencies]
+postcss-core.workspace = true
+postcss-value-parser.workspace = true
+browserslist-shim.workspace = true
+caniuse-db.workspace = true
+caniuse-api.workspace = true
+fraction-js.workspace = true
+sjcompiled-utils.workspace = true
+indexmap.workspace = true
+once_cell.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true

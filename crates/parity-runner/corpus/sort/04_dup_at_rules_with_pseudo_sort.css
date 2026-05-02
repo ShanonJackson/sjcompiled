@@ -1,0 +1,7 @@
+@media (min-width: 100px) { ._x:hover { color: red; } }
+@media (min-width: 100px) { ._x:link { color: blue; } }
+._y:active { color: black; }
+._y:focus { color: yellow; }
+._y:hover { color: red; }
+._y:link { color: blue; }
+._y:visited { color: green; }

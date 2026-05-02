@@ -1,0 +1,2 @@
+.foo /* x */ .bar { color: red; }
+.alpha /* y */ , /* z */ .beta { color: blue; }

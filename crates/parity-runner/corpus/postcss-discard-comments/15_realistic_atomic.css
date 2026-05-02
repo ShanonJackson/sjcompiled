@@ -1,0 +1,8 @@
+/*! Copyright 2026 Acme Inc. */
+._a1b2c3 { color: red; }
+/* helper */
+._d4e5f6 { font-size: 12px; }
+@media (max-width: 100px) {
+  /* mobile */
+  ._g7h8i9 { color: blue; }
+}

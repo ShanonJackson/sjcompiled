@@ -1,0 +1,2 @@
+a:hover { color: red; }
+.foo:nth-child(2n+1) { color: blue; }

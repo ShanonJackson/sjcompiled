@@ -49,6 +49,10 @@ fn main() -> ExitCode {
         "atomicify-rules" => Stage::AtomicifyRules,
         "expand-shorthands" => Stage::ExpandShorthands,
         "npm-postcss-discard-duplicates" => Stage::NpmPostcssDiscardDuplicates,
+        "postcss-normalize-whitespace" => Stage::PostcssNormalizeWhitespace,
+        "postcss-discard-comments" => Stage::PostcssDiscardComments,
+        "postcss-normalize-string" => Stage::PostcssNormalizeString,
+        "sort" => Stage::Sort,
         s => {
             eprintln!("unknown stage: {s}");
             return ExitCode::from(2);
