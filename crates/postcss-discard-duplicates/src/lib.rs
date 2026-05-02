@@ -105,6 +105,29 @@ fn kind_tag(n: &Node) -> KindTag {
     }
 }
 
+/// Walks `n` and every descendant; returns `true` only if `attrs` is
+/// empty everywhere in the subtree. Powers the deep `debug_assert!` in
+/// [`nodes_equal`] — see that function's doc-comment for the
+/// load-bearing invariant.
+///
+/// Not `#[cfg(debug_assertions)]`-gated because `debug_assert!` expands
+/// to `if cfg!(debug_assertions) { … }` which still type-checks the
+/// argument expression in release mode. Optimizer dead-strips the call.
+#[allow(dead_code)]
+fn subtree_attrs_empty(n: &Node) -> bool {
+    if !n.attrs.is_empty() {
+        return false;
+    }
+    if let Some(children) = n.nodes() {
+        for child in children {
+            if !subtree_attrs_empty(child) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 /// `dedupeRule(last, nodes)` upstream.
 fn dedupe_rule(parent: &mut Node, last_idx: usize) {
     // Snapshot last's selector + decl children for the comparison loop.
@@ -275,11 +298,15 @@ fn nodes_equal(a: &Node, b: &Node) -> bool {
     // becomes unsound. Guard fires only when `attrs` is non-empty AND
     // the rest of equality would otherwise return `true`.
     debug_assert!(
-        a.attrs.is_empty() && b.attrs.is_empty(),
+        subtree_attrs_empty(a) && subtree_attrs_empty(b),
         "postcss-discard-duplicates::nodes_equal — `attrs` must not \
-         participate in equality. dedupe_rule / dedupe_node clone operands \
-         and compare against live siblings; if `attrs` ever becomes \
-         load-bearing here, those snapshots will diverge from live state."
+         participate in equality, anywhere in the subtree. dedupe_rule / \
+         dedupe_node clone operands (and `#[derive(Clone)]` deep-clones \
+         `attrs` for every descendant); the snapshot's descendant-attrs \
+         would freeze relative to potentially-mutated live attrs in the \
+         earlier sibling. If `attrs` ever needs to participate here, the \
+         snapshot pattern in `dedupe_rule` / `dedupe_node` must be \
+         redesigned, not the assert relaxed."
     );
     if kind_tag(a) != kind_tag(b) {
         return false;

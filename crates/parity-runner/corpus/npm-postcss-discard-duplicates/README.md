@@ -53,3 +53,10 @@ this is the npm package version pinned at 6.0.0 used by `sort.ts`.
   byte-preserving `raws.value.raw`, so the two decls are equal and
   the EARLIER one is removed. The LATER node's bytes survive —
   locks in the order-sensitivity of dedupe on raws-preserving inputs.
+- `20` — same `prop` + `value` but different `raws.between` (one
+  has `color : red`, the other has `color: red`). JS `equals` for
+  decls (`src/index.js:60-68`) compares only `prop`, `value`, and
+  `trim(raws.before)` — it does NOT compare `raws.between`. So the
+  two decls are equal and the earlier one is removed; the LATER
+  node's `raws.between` survives. Companion to `19`: `19` covers
+  raws.value.raw drift, this covers raws.between drift.

@@ -17,6 +17,20 @@
 #[derive(Debug, Clone, Default)]
 pub struct Spaces { pub before: String, pub after: String }
 
+/// Mirrors upstream `Attribute.spaces` / `raws.spaces` named-sub-space
+/// shape (`attribute.js::_spacesFor`, lines 213-220 in 6.1.2). Each
+/// sub-field is the per-name `{ before, after }` pair — `cssnano-postcss-
+/// minify-selectors@5.2.1` writes all four to clear whitespace around
+/// `[name op "value" i]` parts. Carried as `Option` on `Node` so
+/// non-Attribute kinds pay zero memory cost.
+#[derive(Debug, Clone, Default)]
+pub struct AttributeSpaces {
+    pub attribute: Spaces,
+    pub operator: Spaces,
+    pub value: Spaces,
+    pub insensitive: Spaces,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Node {
     pub kind: NodeKind,
@@ -34,6 +48,12 @@ pub struct Node {
     pub raw_value: Option<String>,
     /// Attribute payload (operator, value, quote, etc.) when [`kind`] is Attribute.
     pub attribute: Option<AttributePayload>,
+    /// Per-name sub-space pairs for Attribute nodes (mirrors upstream
+    /// `Attribute.spaces`). `None` on every other kind. Plugins that
+    /// mutate any sub-space MUST also set
+    /// `attribute.as_mut().unwrap().dirty = true` and clear
+    /// `raw_value` so the payload-aware stringifier branch fires.
+    pub attribute_spaces: Option<AttributeSpaces>,
     /// 6.1.0: zero-based byte offset into the original source where this
     /// Selector node begins. Mirrors upstream `Selector.sourceIndex`
     /// (parser.js lines 120, 582, 653 in 6.1.2). Currently only set on
@@ -51,6 +71,13 @@ pub struct AttributePayload {
     pub quote_mark: Option<char>,
     pub case_insensitive: bool,
     pub raws_unquoted: Option<String>,
+    /// When `true`, the stringifier rebuilds the `[ns|name op "value" i]`
+    /// form from this payload + `node.attribute_spaces` instead of
+    /// emitting the raw bracket text on `node.value`. Default `false`
+    /// preserves byte-perfect round-trip for un-mutated Attribute nodes.
+    /// Set this whenever you mutate `quote_mark`, `operator`,
+    /// `attribute`, `value`, or `attribute_spaces`.
+    pub dirty: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

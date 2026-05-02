@@ -1,5 +1,5 @@
 //! crates/postcss-selector-parser
-//! Byte-for-byte Rust port of `postcss-selector-parser@6.0.13`.
+//! Byte-for-byte Rust port of `postcss-selector-parser@6.1.2`.
 //! See `crates/PARITY_VERSIONS.md`.
 //!
 //! Folder/file mapping (1:1 with `dist/`):

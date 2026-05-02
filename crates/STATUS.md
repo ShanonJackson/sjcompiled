@@ -488,6 +488,70 @@ diverge.
   byte-clean + 18/18 deterministic; sort 12/12; both NAPI verifiers
   12/12.
 
+**postcss-discard-duplicates 6.0.0 fourth-pass tail-input hardening (2026-05-02):**
+Five further latent divergences scanned for AFM 90GB scale; four
+fixed (one re-classified as out-of-scope after closer inspection
+of `remove_at` semantics).
+- `dedupe_rule` empty-detection: `.unwrap_or(false)` on
+  `n.nodes()` for an earlier sibling already gated as Rule by
+  `same_selector` was silently treating malformed Rules as
+  non-empty. Replaced with `.expect(...)` documenting the structural
+  invariant that Rule always has `nodes()`. Mirrors JS's `TypeError`
+  on `node.nodes.filter(...)` if the invariant ever breaks.
+- `nodes_equal` clone-vs-live `attrs` invariant: `dedupe_rule` and
+  `dedupe_node` snapshot operands by `.clone()` and compare against
+  live siblings. Today sound because `nodes_equal` ignores
+  `node.attrs`; if a future change ever lets `attrs` participate in
+  equality, the clone+compare pattern silently breaks. Added
+  `debug_assert!(a.attrs.is_empty() && b.attrs.is_empty(), ...)` at
+  the head of `nodes_equal` and a load-bearing doc-comment.
+- `dedupe_rule` mid-iteration mutation guard: my snapshot iterates
+  a frozen clone of `last.nodes`; JS `last.each` iterates LIVE.
+  Today equivalent because the inner `dedupeNode` mutates only
+  the EARLIER rule's body. Added `#[cfg(debug_assertions)]` length
+  snapshot + `debug_assert_eq!` straddling the inner loop to trip
+  loudly if a future call-graph change ever mutates `last.nodes`.
+- `nodes_equal` order-sensitivity on raws-preserving inputs:
+  upstream `equals` only compares `value`, NOT `raws.value.raw`,
+  so `color: /*c*/red` and `color: red` are equal and the LATER
+  node's bytes survive. JS does the same — no fix, but locked in
+  by new corpus entry `19_dedupe_keeps_later_node_raws.css`.
+- Re-classified out of scope: `remove_at(parent, i)` for nested
+  (non-Root) earlier rules. `remove_at` only fires the Root
+  raws-transfer when parent IS Root, matching JS Container.removeChild
+  for non-Root parents. End state identical. No fix.
+- All gates re-run green: workspace `cargo test` 735/0; parity 19/19
+  byte-clean + 19/19 deterministic; sort 12/12; both NAPI verifiers
+  12/12.
+
+**postcss-discard-duplicates 6.0.0 fifth-pass deepening (2026-05-02):**
+Re-scan after fourth-pass; 10 candidates, 8 verified clean, 2 acted
+on.
+- Deepened the `attrs` invariant assertion in `nodes_equal`: the
+  prior `debug_assert!(a.attrs.is_empty() && b.attrs.is_empty(), …)`
+  was shallow, but `Node::clone()` deep-clones `attrs` for every
+  descendant — so if `attrs` ever participates in equality, the
+  drift would surface in DESCENDANT-attrs first. New helper
+  `subtree_attrs_empty(n)` walks the whole subtree; both operands
+  now checked at every depth in dev/CI.
+- New corpus entry `20_decl_raws_between_order_sensitive.css`
+  locking JS+Rust both stripping the earlier decl when only
+  `raws.between` differs (`color : red` vs `color: red`). JS
+  `equals` for decls compares `prop`+`value`+`trim(raws.before)`
+  ONLY — `raws.between` is invisible to dedupe, the LATER node's
+  `raws.between` survives. Companion to entry `19` (raws.value.raw).
+- Eight other suspect paths verified clean against JS (no fix):
+  Comment dispatch in outer-loop match; `same_selector` ignores
+  `Rule.raws`; `Raws.value` not consulted by `nodes_equal`;
+  `dedupe_node.last` deep-clone covered by deepened assertion;
+  `same_selector` `==` on String matches JS `===`; outer `_ => {}`
+  covers `Root | Comment`; `dedupe_rule` inner-`j` pre-loop bound
+  matches JS post-decrement; `is_ecma_whitespace` BMP-only matches
+  V8.
+- All gates re-run green: workspace `cargo test` 735/0; per-crate
+  17/17; parity 20/20 byte-clean + 20/20 deterministic; sort 12/12;
+  both NAPI verifiers 12/12.
+
 **postcss-values-parser 6.0.2 re-audit landed (2026-05-02):**
 - Version is **not** drifted between REFERENCE_LOCK_FILE and AFM (both
   pin `6.0.2`). Audit ran to close pre-existing transcription gaps in
