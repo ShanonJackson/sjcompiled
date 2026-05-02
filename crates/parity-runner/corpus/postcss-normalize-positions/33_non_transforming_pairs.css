@@ -1,0 +1,18 @@
+/* Pairs that the algorithm classifies as "two position keywords" but
+   that fall through the rewrite branches because neither slot maps in
+   horizontal_lookup × vertical_lookup nor vice-versa:
+   - `top top` / `bottom bottom`: both vertical, neither in horizontal
+     lookup → both branches false.
+   - `left left` / `right right`: both horizontal, neither in vertical
+     lookup → both branches false.
+   - `50% top` / `top 50%`: dimension × keyword where the dimension
+     never maps to either axis lookup → both branches false.
+   Locks that no spurious rewrite happens; the parser's bug-for-bug
+   contract requires identical untouched output. */
+a { background-position: top top; }
+b { background-position: left left; }
+c { background-position: bottom bottom; }
+d { background-position: right right; }
+e { background-position: 50% top; }
+f { background-position: top 50%; }
+g { background-position: 25% bottom; }

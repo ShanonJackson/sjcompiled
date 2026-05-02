@@ -1,0 +1,10 @@
+/* `linear-gradient(...)`, `url(...)`, `rgb(...)` etc. are Function nodes
+   but NOT in the math-functions set (`calc | min | max | clamp`), so
+   `isMathFunctionNode` returns false and they are NOT classified as
+   position keywords. The range-walk skips past them; the subsequent
+   keyword pair is rewritten in place. Locks the math-function set
+   membership: a regression that broadened `isMathFunctionNode` would
+   surface here as the linear-gradient slot getting a spurious `100%`. */
+a { background: linear-gradient(red, blue) left top; }
+b { background: url(foo.png) right bottom; }
+c { background: rgb(0, 0, 0) top right; }

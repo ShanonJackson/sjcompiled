@@ -9,9 +9,10 @@ actually run before claiming a piece is byte-clean.
 
 ## 1. Where you actually are
 
-`cargo test -p autoprefixer` → **57 passing** (53 unit + 4 parity).
-That number is the floor; your work must keep it there or grow it.
-Run it before EVERY commit.
+`cargo test -p autoprefixer` → **58 passing, 1 ignored** (53 unit + 4 data
+parity + 1 browserslist FF ESR parity active; 1 browserslist omnibus
+parity gate ignored — see §6 for status). That number is the floor; your
+work must keep it there or grow it. Run it before EVERY commit.
 
 What's real (full bodies, real tests):
 - `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`,
@@ -173,23 +174,59 @@ that's a regression — file it to the caniuse-db agent.
 
 ---
 
-## 6. `browserslist-shim` defaults are a known weak spot
+## 6. `browserslist-shim` defaults — gate landed, OPEN
 
-`browserslist-shim::index::resolve_with` wraps `oxc_browserslist`. The
-default query is locked to browserslist@4.24.4's
-`["> 0.5%", "last 2 versions", "Firefox ESR", "not dead"]` — but the
-*evaluation* of that query depends on the underlying `oxc_browserslist`
-crate's behavior, which may have its own drift.
+**Status:** parity gate test landed at
+`crates/autoprefixer/tests/browserslist_parity.rs`. One slice
+(`Firefox ESR`) is byte-clean and pinned by an active test. The omnibus
+across all canonical queries is `#[ignore]`'d — running it surfaces
+real divergence:
 
-**Verification gate before claiming `Browsers::new(...)` works
-correctly:** run a JS oracle that does `browserslist(...)` for a few
-canonical queries (`"defaults"`, `"> 1%"`, `"chrome >= 50"`) and assert
-the Rust output matches the JS array element-by-element. The
-cssnano agents have a similar gate; copy their pattern from
-`crates/parity-runner/src/stages.rs`.
+- `defaults` / `> 1%` / `last 2 versions` / `last 2 versions, not dead`
+  / `chrome >= 50`: RUST returns chrome 145–146 (and matching shapes on
+  android/edge/firefox) where JS returns chrome 143–144. The
+  `oxc_browserslist` Rust crate ships its own bundled caniuse-lite
+  snapshot that's ~2 chrome releases newer than the workspace pin
+  (1.0.30001766).
 
-If JS and Rust diverge on the default query, that's a `browserslist-shim`
-bug. Don't paper over it inside `Browsers`.
+Run on demand:
+
+```bash
+cargo test -p autoprefixer --test browserslist_parity -- --ignored
+```
+
+**Implication for `Prefixes::new`.** `Browsers::new(query, ignore_unknown)`
+calls `browserslist_shim::resolve` to get the `selected` list. With the
+gate open, that list silently drifts from JS for any "current versions"
+query — which is most real-world queries. `Prefixes::new` consumes
+`selected` to build the `add_table` / `remove_table` maps. Drift in
+`selected` → drift in those maps → drift in every prefix decision
+downstream. **Closing this gate is a hard pre-condition for byte-testing
+`Prefixes::new` against a JS oracle.**
+
+**Closure options** (tracked as a TaskList unit; multi-day each, do NOT
+half-land):
+- (a) Inject the workspace `caniuse-db` snapshot into oxc_browserslist
+  (probably needs an upstream PR or fork).
+- (b) Re-port `browserslist@4.24.2`'s `index.js::resolve` line-by-line
+  against `caniuse-db` directly inside `browserslist-shim`, dropping the
+  `oxc_browserslist` dependency for query resolution. Matches what JS
+  does anyway.
+- (c) Downgrade the `oxc_browserslist` Cargo dep to a version whose
+  bundled snapshot matches 1.0.30001766. Cleanest if such a version
+  exists; risk: oxc may have made API-shape changes.
+
+Until one of those lands, `Prefixes::new` work has two paths:
+1. **Skip the JS-oracle gate** — port the constructor by reading
+   `prefixes.js` line-by-line and unit-test the data-shape transforms
+   only. Risk: silent byte-drift surfaces only at full-pipeline gate.
+2. **Mock-test against fixed `selected` lists** — bypass `Browsers::new`
+   in the test fixture and feed `Prefixes::new` a hand-curated `selected`
+   that matches the JS oracle's output for a known query. Pins the
+   constructor's logic without needing the gate closed.
+
+Path 2 is the recommended interim. Don't claim the unit byte-clean — it
+isn't, but it's logic-clean.
 
 ---
 
@@ -314,6 +351,19 @@ growing as you find more:
   does not. The JS pipeline always passes `decl.value` (no trailing
   `;`), so this doesn't matter in production — but it WILL trip up
   unit tests that pass full decl strings to `Value::replace`.
+- **Workspace `browserslist` direct devDep is load-bearing.** Root
+  `package.json` lists `browserslist: "4.24.2"` in BOTH `overrides`
+  AND `devDependencies` — both required. Bun's overrides only apply to
+  **transitives**; without a direct dep, there's no top-level
+  `node_modules/browserslist/` symlink, and `require('browserslist')`
+  from the workspace root resolves to **4.28.2** (a transitive of
+  `update-browserslist-db`). Pinned independently by
+  `workspace_browserslist_pin_is_424_2` test in
+  `crates/autoprefixer/tests/browserslist_parity.rs` — that test asserts
+  `require('browserslist/package.json').version === '4.24.2'`. If the
+  test fails, re-add the devDep entry and `bun install`. Mirrors the
+  caniuse-lite pattern in §2 above (which had the identical drift mode
+  earlier in Phase 7).
 
 ---
 

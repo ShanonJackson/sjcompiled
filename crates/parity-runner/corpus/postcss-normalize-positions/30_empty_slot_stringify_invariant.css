@@ -1,0 +1,20 @@
+/* When the apply pass clears a slot via `nodes[i].value = ''`, the
+   surrounding spaces must NOT collapse and adjacent tokens must NOT
+   join. JS `valueParser.stringify` emits the empty-value Word as zero
+   bytes but preserves the surrounding Space nodes verbatim. The
+   `secondNode === 'center'` branch (clears slots [1] and [2]) and
+   the `firstNode === 'center'` branch (clears slots [0] and [1]) both
+   exercise this — the cleared Word is sandwiched between Space nodes,
+   and any whitespace-collapsing in the Rust value-parser stringifier
+   would surface here as a one-byte difference (e.g. extra/missing
+   space before/after the surviving keyword). Locks the value-parser
+   `stringify` invariant for empty-value Word nodes that are NOT at
+   the edges of the value. */
+a { background-position: right center; }
+b { background-position: left center; }
+c { background-position: center top; }
+d { background-position: center bottom; }
+e { background-position: center left; }
+f { background-position: center right; }
+g { background-position:    right    center   ; }
+h { background-position: center  top  ; }

@@ -88,17 +88,12 @@ pub fn parse_at_rule(params: &str) -> Vec<ParsedAtRule> {
 
 fn capture_groups_from<'a>(caps: &regex::Captures<'a>, src: &'a str) -> CaptureGroups<'a> {
     let m = caps.get(0).expect("regex captures have a full match");
-    // Upstream's `match.index` is the start position. JS regexes return
-    // `index === 0` as falsy in `if (!match.index)`, which means
-    // matches at index 0 are silently rejected by `getBasicMatchInfo`.
-    // We replicate that quirk: a match at byte 0 is dropped.
-    let index = m.start();
-    let matched = &src[m.start()..m.end()];
+    // The parsers' `basic_match_ok` gate replicates JS
+    // `getBasicMatchInfo`'s `if (!match.index)` falsy-drop, so position-0
+    // matches are surfaced here unchanged and rejected downstream.
     CaptureGroups {
-        // Map JS's "index 0 is falsy" to None so the parsers see
-        // missing-info and reject the match.
-        index: if index == 0 { 0 } else { index },
-        matched,
+        index: m.start(),
+        matched: &src[m.start()..m.end()],
         property: caps.name("property").map(|m| m.as_str()),
         operator: caps.name("operator").map(|m| m.as_str()),
         length: caps.name("length").map(|m| m.as_str()),

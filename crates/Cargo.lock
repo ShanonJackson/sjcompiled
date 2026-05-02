@@ -535,8 +535,10 @@ dependencies = [
 name = "cssnano-postcss-minify-selectors"
 version = "0.0.1"
 dependencies = [
+ "indexmap",
  "postcss-core",
  "postcss-selector-parser",
+ "regex",
 ]
 
 [[package]]

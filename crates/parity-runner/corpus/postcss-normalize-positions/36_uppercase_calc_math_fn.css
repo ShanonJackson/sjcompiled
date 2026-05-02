@@ -1,0 +1,8 @@
+/* `isMathFunctionNode` also lowercases. Uppercase `CALC(...)`,
+   `MIN(...)`, `MAX(...)`, `CLAMP(...)` must be classified as position
+   keywords identically. Pair with `BOTTOM` (uppercase keyword) to
+   exercise both case-folds on the same line. */
+a { background-position: CALC(50%) BOTTOM; }
+b { background-position: Min(10%, 20%) Top; }
+c { background-position: MAX(5%, 30%) center; }
+d { background-position: Clamp(0%, 50%, 100%) RIGHT; }

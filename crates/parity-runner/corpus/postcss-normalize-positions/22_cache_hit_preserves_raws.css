@@ -1,0 +1,9 @@
+/* Two decls with the same value in the same Root. The first populates
+   the per-call `cache`; the second hits the cached result. Both decls
+   capture different inline comments into `raws.value.raw`. Since the
+   transform is a no-op (`50% 50%`), both raw forms must survive. The
+   prior port cleared `node.raws.value = None` on the cache-hit path
+   too, dropping the second comment. */
+a { background-position: 50% 50% /* layer-A */; }
+b { background-position: 50% 50% /* layer-B */; }
+c { background-position: 50% 50% /* layer-C */; }

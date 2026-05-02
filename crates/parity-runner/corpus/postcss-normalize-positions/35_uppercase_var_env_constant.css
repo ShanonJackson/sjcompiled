@@ -1,0 +1,8 @@
+/* `isVariableFunctionNode` lowercases the function name before checking
+   set membership. Uppercase `VAR(...)`, `ENV(...)`, `CONSTANT(...)`
+   must short-circuit identically to lowercase. Locks `.toLowerCase()`
+   on the function-name dispatch (a regression that compared raw-case
+   would let `VAR(...)` slip through and try to position-rewrite). */
+a { background-position: VAR(--p); }
+b { background-position: Env(--p); }
+c { background-position: Constant(--safe); }

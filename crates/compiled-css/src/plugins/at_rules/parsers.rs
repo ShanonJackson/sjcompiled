@@ -3,7 +3,7 @@
 //! Each `parse*` function takes a regex-capture map (named groups) and
 //! produces a [`ParsedAtRule`] (or `None` when fields are missing).
 //! Three parsers correspond to the three regex situations in
-//! `parse-media-query.ts`:
+//! `parse-at-rule.ts`:
 //!
 //! 1. `parseMinMaxSyntax` — `(min|max)-(width|height): <length><unit>`.
 //! 2. `parseReversedRangeSyntax` — `<length><unit> <op> <prop>`.
@@ -72,11 +72,25 @@ pub fn convert_min_max(g: &CaptureGroups) -> Option<(Property, ComparisonOperato
     }
 }
 
+/// `getBasicMatchInfo` upstream — returns `undefined` when
+/// `!match.index` (i.e. the match starts at byte 0). JS treats `0` as
+/// falsy in the truthiness check, which silently drops position-0
+/// matches from `parsedMatches`. We mirror that quirk: callers gate on
+/// this returning `Some` before constructing a `ParsedAtRule`.
+fn basic_match_ok(g: &CaptureGroups) -> Option<()> {
+    if g.index == 0 {
+        None
+    } else {
+        Some(())
+    }
+}
+
 /// `parseMinMaxSyntax(match)`. Note that the regex only matches against
 /// the `colon` group, so the `colon` field must be `Some` for this path
 /// to fire (the `parse-media-query` regex pre-filters via the `colon`
 /// alternation).
 pub fn parse_min_max(g: &CaptureGroups) -> Option<ParsedAtRule> {
+    basic_match_ok(g)?;
     let (property, comparison_operator) = convert_min_max(g)?;
     let length = get_length_info(g)?;
     Some(ParsedAtRule {
@@ -91,6 +105,7 @@ pub fn parse_min_max(g: &CaptureGroups) -> Option<ParsedAtRule> {
 /// `parseReversedRangeSyntax(match)` — `<length> <op> <property>`. The
 /// operator is reversed so the resulting `ParsedAtRule` is canonical.
 pub fn parse_reversed_range(g: &CaptureGroups) -> Option<ParsedAtRule> {
+    basic_match_ok(g)?;
     let property = Property::parse(g.property?)?;
     let raw_op = ComparisonOperator::parse(g.operator?)?;
     let comparison_operator = raw_op.reverse();
@@ -106,6 +121,7 @@ pub fn parse_reversed_range(g: &CaptureGroups) -> Option<ParsedAtRule> {
 
 /// `parseRangeSyntax(match)` — `<property> <op> <length>`.
 pub fn parse_range(g: &CaptureGroups) -> Option<ParsedAtRule> {
+    basic_match_ok(g)?;
     let property = Property::parse(g.property?)?;
     let comparison_operator = ComparisonOperator::parse(g.operator?)?;
     let length = get_length_info(g)?;
@@ -128,8 +144,10 @@ mod tests {
         length: Option<&'a str>,
         unit: Option<&'a str>,
     ) -> CaptureGroups<'a> {
+        // index = 1 so we skip the `getBasicMatchInfo` falsy-drop;
+        // tests want to exercise the property/operator/length paths.
         CaptureGroups {
-            index: 0,
+            index: 1,
             matched: "",
             property,
             operator,
@@ -181,5 +199,24 @@ mod tests {
     #[test]
     fn unknown_operator_returns_none() {
         assert!(parse_range(&cap(Some("width"), Some("!="), Some("1"), Some("px"))).is_none());
+    }
+
+    #[test]
+    fn index_zero_is_dropped() {
+        // Mirrors JS `getBasicMatchInfo`: `if (!match.index) return undefined`
+        // — a position-0 match is silently rejected even when all other
+        // fields are valid. All three parsers must replicate this.
+        let g = CaptureGroups {
+            index: 0,
+            matched: "",
+            property: Some("min-width"),
+            operator: Some(">="),
+            length: Some("200"),
+            length_unit: Some("px"),
+            colon: None,
+        };
+        assert!(parse_min_max(&g).is_none());
+        assert!(parse_range(&g).is_none());
+        assert!(parse_reversed_range(&g).is_none());
     }
 }

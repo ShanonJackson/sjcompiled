@@ -1,0 +1,16 @@
+/* JS `parseFloat("Infinity")` returns `Infinity` (non-NaN), so
+   `isNumberNode` is TRUE and `Infinity` participates in range tracking
+   as a "position keyword". `parseFloat("infinity")` (lowercase) returns
+   NaN. `parseFloat("+Infinity")` / `parseFloat("-Infinity")` return
+   ±Infinity (non-NaN). The Rust `js_parse_float_is_number` mirrors this
+   case-sensitive `Infinity` literal recognition. Critical because
+   getting this wrong shifts the range and changes the output of the
+   subsequent keyword (e.g. lowercase `infinity right` -> first slot
+   skipped, then `right` is alone => `100%`; uppercase `Infinity right`
+   -> both slots tracked, no rewrite because `Infinity` isn't in the
+   horizontal/vertical lookup tables). */
+a { background-position: Infinity right; }
+b { background-position: +Infinity left; }
+c { background-position: -Infinity bottom; }
+d { background-position: infinity right; }
+e { background-position: Infinity center; }

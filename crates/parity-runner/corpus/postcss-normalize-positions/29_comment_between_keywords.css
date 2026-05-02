@@ -1,0 +1,12 @@
+/* Inline comment BETWEEN two position keywords — value-parser tokenizes
+   the comment as a Comment node (not Space), so the range-walk's
+   `if type === 'space' continue; else if isPositionKeyword end=index`
+   branch is exercised with a non-Space, non-keyword middle node. The
+   else-fall-through (`return;` in JS, `continue;` in Rust) leaves `end`
+   unchanged from the first keyword; then the second keyword updates
+   `end`. count = 3, with the comment surviving as nodes[1] verbatim
+   through stringify. Locks that comment-between-keywords still produces
+   a normalized pair (e.g. `left/*c*/top` → `0/*c*/0`). */
+a { background-position: left/*c*/top; }
+b { background-position: top/*c*/right; }
+c { background-position: right/*before*/center; }

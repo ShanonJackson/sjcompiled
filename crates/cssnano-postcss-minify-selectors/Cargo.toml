@@ -9,3 +9,5 @@ description = "Byte-for-byte Rust port of postcss-minify-selectors@5.2.1."
 [dependencies]
 postcss-core = { workspace = true }
 postcss-selector-parser = { workspace = true }
+indexmap = { workspace = true }
+regex = { workspace = true }

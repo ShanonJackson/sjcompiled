@@ -964,6 +964,133 @@ on.
 - Full audit document at
   `crates/_vendor/POSTCSS_NORMALIZE_TIMING_FUNCTIONS_5.1.0_REAUDIT.md`.
 
+**postcss-normalize-positions 5.1.1 re-audit landed (2026-05-03):**
+- Pin is `5.1.1` in BOTH `REFERENCE_LOCK_FILE/yarn.lock` and AFM
+  resolution — no version drift. Re-audit was for **port-quality**
+  drift in the existing `crates/cssnano-postcss-normalize-positions/`
+  port (single source file: `index.js`).
+- Walked the 248-line upstream `index.js` line-by-line against the
+  Rust port. **Three non-cosmetic divergences fixed:** (1) Plugin entry
+  unconditionally cleared `node.raws.value = None` after both the
+  cache-hit and fresh-transform writes — but postcss's stringifier
+  already does the `raws.value.value === decl.value ? raws.value.raw
+  : decl.value` comparison, so the prior code lost source bytes (e.g.
+  trailing `/* comment */` after a no-op decl value). Same shape as
+  the bug previously fixed in `cssnano-postcss-normalize-string` and
+  `cssnano-postcss-normalize-timing-functions`.
+  (2) Property regex `/^(background(-position)?|(-\w+-)?perspective-origin)$/i`
+  used Rust's default Unicode-aware `\w`, but JS without the `u`
+  flag treats `\w` as ASCII-only. `-übér-perspective-origin` matched
+  in Rust but not JS. Fixed by switching to `(?-u:\w)` to scope ASCII
+  semantics to the prefix.
+  (3) `is_number_node` delegated to `parse_unit(...).is_some()` which
+  uses CSS-syntax `like_number` — that rejects the literal token
+  `Infinity` because it doesn't begin with a digit / sign+digit /
+  `.digit`. JS `parseFloat("Infinity")` returns `Infinity` (non-NaN),
+  so JS treats `Infinity` (case-sensitive, optional sign) as a
+  position keyword for range tracking. Surfaced by
+  `background-position: Infinity right;`: JS marks both nodes
+  (count=3, no horizontal/vertical match → no rewrite, output
+  `Infinity right`); buggy Rust skipped `Infinity`, anchored on
+  `right` alone (count=1 → single-keyword branch fires, output
+  `Infinity 100%`). Fixed via new `js_parse_float_is_number` helper
+  that mirrors `parseFloat` (delegates to `parse_unit` for normal
+  numerics + explicit `Infinity`/`+Infinity`/`-Infinity` acceptance).
+  Refines (does not duplicate) the
+  `cssnano-postcss-normalize-timing-functions` `js_parse_float`
+  trade-off — there the divergence is unobservable inside
+  `cubic-bezier`/`steps()` arg lists; here it's observable through
+  range-tracking.
+- Eight regression tests added inside
+  `crates/cssnano-postcss-normalize-positions/src/lib.rs`:
+  `preserves_raws_value_on_noop`,
+  `preserves_raws_value_on_cache_hit_noop`,
+  `unicode_prefix_property_does_not_match`,
+  `ascii_prefix_with_underscore_matches`,
+  `infinity_first_with_keyword_does_not_substitute`,
+  `negative_infinity_second_does_not_substitute`,
+  `infinity_alone_left_alone`,
+  `js_parse_float_is_number_handles_infinity`. Crate now 20 tests,
+  all green.
+- Adversarial corpus entries added to
+  `crates/parity-runner/corpus/postcss-normalize-positions/`. First pass
+  (`21..29`, 9 entries) covered the three landed fixes: trailing-comment
+  raws preservation on no-op transform, cache-hit raws preservation,
+  Unicode-prefixed property no-match, ASCII-underscore prefix match,
+  raws invalidation on real transform, `calc()`/`min()`/`clamp()`-as-
+  first-slot non-rewrite, `var()` layer-isolation across commas,
+  `env()`/`constant()` set-membership short-circuit, and `Infinity`-as-
+  number range tracking. Second pass (`30..37`, 8 entries) drilled
+  into AFM-integration risk where the existing 20-stage smoke corpus
+  was thin: comment-between-keywords (Comment node mid-range), JS
+  `Infinity` slot-shift comparison vs lowercase, leading/trailing/empty-
+  middle comma layers, non-math-function (`linear-gradient` / `url` /
+  `rgb`)-as-first-slot, non-transforming same-axis pairs (`top top`,
+  `50% top`), CSS-3 four-value position skip, uppercase variable/math
+  function dispatch case-fold, and per-Root cache dedup across rules
+  + at-rules + vendor `-perspective-origin`. All 8 passed JS-vs-Rust
+  on the first run — invariant locks, not drift fixes — but each pins
+  a code path the original corpus didn't independently cover. Total
+  38 entries.
+- Verification gates rerun: `cargo test --workspace --no-fail-fast`
+  all green; `parity-runner postcss-normalize-positions` 38/38
+  byte-clean (JS vs Rust); determinism 38/38; both NAPI verifiers
+  12/12; `parity-runner postcss-core-roundtrip` 41/41 (no regression
+  in the AST-shape contract).
+- Full audit document at
+  `crates/_vendor/POSTCSS_NORMALIZE_POSITIONS_5.1.1_REAUDIT.md`.
+
+**Re-audit findings (`compiled-css` local plugins, AFM @0.19.0 / commit 40a4548) (2026-05-03):**
+- JS oracle (`packages/css/src/plugins/`) verified file-by-file against the AFM
+  commit's plugins/ tree. Only three files differ from upstream — all cosmetic
+  (`@compiled/utils` → `@sjcompiled/utils` import-path rebrand): `atomicify-rules.ts`,
+  `increase-specificity.ts`, `sort-shorthand-declarations.ts`. JS oracle is
+  not drifted.
+- Walked every Rust port under `crates/compiled-css/src/plugins/` (29 files
+  including `at_rules/` and `expand_shorthands/` subtrees) line-by-line against
+  the JS oracle. **One non-cosmetic drift found and fixed:**
+  - `at_rules/parsers.rs`: JS `getBasicMatchInfo` (parsers.ts:162-168) returns
+    `undefined` when `!match.index` (i.e. position 0 is falsy), causing
+    `parseMinMaxSyntax`/`parseRangeSyntax`/`parseReversedRangeSyntax` to drop
+    position-0 matches via the `basicMatchInfo && …` gate. The Rust port's
+    `capture_groups_from()` carried a comment claiming to map index 0 to None
+    but the conditional was a tautology (`if index == 0 { 0 } else { index }`)
+    — downstream parsers used `g.index` unconditionally and **kept** position-0
+    matches that JS drops. Fixed by adding `basic_match_ok(g)?` gate at the top
+    of all three parser entry points; comment cleaned up. Practical impact in
+    valid CSS is nil (PostCSS-surfaced `params` always has a leading `(`), but
+    the AFM 60–90 GB monorepo is the kind of input set where any position-0
+    edge eventually appears, so byte-equality is now restored.
+- Two **false positives** filed by the per-group audit agents and dismissed:
+  - `increase_specificity.rs` per-call `Processor::new()` vs JS module-level
+    closure — functionally identical (`astSync` is stateless across calls).
+  - `expand_shorthands/*.rs` empty-nodes early-return — defensive Rust, JS
+    would crash on the same input. Not byte-affecting.
+- One **pre-existing deferred item** flagged for visibility, not in remit:
+  `normalize_css.rs` is `unimplemented!()` (Phase 6 — cssnano-preset-default
+  integration). Not wired into any Rust caller; doesn't affect parity gates.
+- Rust files modified:
+  - `crates/compiled-css/src/plugins/at_rules/parsers.rs` — added
+    `basic_match_ok()` helper + `?`-gates in all three parsers; fixed test
+    helper `cap()` to seed non-zero index; added `index_zero_is_dropped` test
+    pinning the JS-oracle behaviour at the function boundary; corrected stale
+    `parse-media-query.ts` reference in module doc.
+  - `crates/compiled-css/src/plugins/at_rules/parse_at_rule.rs` — removed
+    misleading no-op index-0 setter and stale comment.
+- No new corpus entries: the fixed code path is unreachable from valid CSS via
+  PostCSS-surfaced `params`. The new unit test in `parsers.rs` is the correct
+  gate for this drift.
+- Verification gates rerun: `RUSTFLAGS="" cargo test --workspace --no-fail-fast`
+  all green; 11 parity stages byte-clean (`discard-empty-rules` 16/16,
+  `discard-duplicates` 11/11, `extract-stylesheets` 12/12,
+  `parent-orphaned-pseudos` 13/13, `increase-specificity` 12/12,
+  `merge-duplicate-at-rules` 7/7, `normalize-current-color` 10/10,
+  `sort-atomic-style-sheet` 17/17, `atomicify-rules` 24/24,
+  `expand-shorthands` 45/45, `sort` 12/12); `verify-napi-sort` 12/12;
+  `verify-engine-flag` 12/12; determinism on `discard-empty-rules` 16/16.
+- Full audit document at
+  `crates/_vendor/COMPILED_CSS_LOCAL_PLUGINS_AFM_REAUDIT.md`.
+
 ## postcss version pin: `8.4.31` → `8.5.6` (no code changes)
 
 The consuming monorepo's actual postcss version is `8.5.6`, not `8.4.31`
@@ -1014,7 +1141,7 @@ header. **No code changes required** — all 489 tests still green.
 | 6g | postcss-minify-gradients@5.1.1 | **SCAFFOLDED** — uses colord. |
 | 6g | postcss-colormin@5.3.1 | **SCAFFOLDED** — highest-risk cssnano plugin. |
 | 6h | cssnano-preset-default@5.2.14 (orchestrator) | **SCAFFOLDED** |
-| 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **All base classes fully ported:** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs`, `browsers.rs`, `at_rule.rs`, `value.rs`, `selector.rs`, `declaration.rs`, `resolution.rs`, plus `prefixes.rs` registry skeleton with `register_hacks(reg)` append-only block. **`data/prefixes.rs` byte-clean** — 183 entries, codegen via `build.rs` from vendored JS through `bun`, 4 parity gates (canonical-JSON byte-equal, entry count, key order, caniuse-lite version pin). **57 tests passing (53 unit + 4 parity).** (Latest: `+1` regression test in `resolution.rs::prefix_query_o_dpcm_uses_simplify` pinning the JS `value.simplify()` call after dpcm/dpi unit conversion — was a latent byte-divergence in the `-o-` resolution branch; fixed via `f.simplify(None)` after fraction-js audit surfaced the missing call.) Hacks agent **unblocked**. Still stubbed: `supports.rs`, `transition.rs` (heavy, hacks rarely subclass), `processor.rs`, `info.rs`, `autoprefixer.rs`, all 58 hacks, `Prefixes::new` orchestrator body. Split contract: see "Phase 7 split contract" section below. See also "Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix". |
+| 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **All base classes fully ported:** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs`, `browsers.rs`, `at_rule.rs`, `value.rs`, `selector.rs`, `declaration.rs`, `resolution.rs`, plus `prefixes.rs` registry skeleton with `register_hacks(reg)` append-only block. **`data/prefixes.rs` byte-clean** — 183 entries, codegen via `build.rs` from vendored JS through `bun`, 4 parity gates (canonical-JSON byte-equal, entry count, key order, caniuse-lite version pin). **59 tests passing (53 unit + 4 data parity + 2 browserslist parity active; 1 browserslist parity gate ignored, see "Phase 7 ship — browserslist-shim parity gate" below).** (Latest: `+1` active test `browserslist_shim_firefox_esr_matches_js_oracle` pinning the `rewrite_firefox_esr` shim path against `browserslist@4.24.2` JS oracle; `+1` active test `workspace_browserslist_pin_is_424_2` pinning `require('browserslist').version === '4.24.2'` after fixing the missing devDependency entry that was floating workspace resolution to 4.28.2 (root `package.json` now lists browserslist in BOTH `overrides` AND `devDependencies`); `+1 ignored` omnibus gate test `browserslist_shim_matches_js_oracle_for_canonical_queries` documenting the open caniuse-lite snapshot drift between `oxc_browserslist`'s bundled snapshot and the workspace pin 1.0.30001766. Prior: regression test in `resolution.rs::prefix_query_o_dpcm_uses_simplify` pinning the JS `value.simplify()` call after dpcm/dpi unit conversion — was a latent byte-divergence in the `-o-` resolution branch; fixed via `f.simplify(None)` after fraction-js audit surfaced the missing call.) Hacks agent **unblocked**. Still stubbed: `supports.rs`, `transition.rs` (heavy, hacks rarely subclass), `processor.rs`, `info.rs`, `autoprefixer.rs`, all 58 hacks, `Prefixes::new` orchestrator body. Split contract: see "Phase 7 split contract" section below. See also "Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix". |
 | 8a | `sort()` NAPI bridge + sort.ts engine flag | **DONE** — 12/12 corpus byte-clean end-to-end on win32-x64-msvc. See "Phase 8a ship" section below. |
 | 8b | `transformCss` NAPI bridge + transform.ts engine flag | **NOT STARTED** — blocks on Phase 5/6/7 plugin ports. |
 
@@ -1279,6 +1406,96 @@ orchestrator. Now byte-clean against the JS oracle, codegen'd via
 - **`bun.cmd` shim resolution on Windows.** `Command::new("bun")`
   doesn't walk PATHEXT. Always try the bare name then fall back to
   `bun.cmd` / `bun.exe` candidates.
+
+## Phase 7 ship — browserslist-shim parity gate (OPEN)
+
+Pre-condition for `Prefixes::new`. The new test
+`crates/autoprefixer/tests/browserslist_parity.rs` compares
+`browserslist_shim::resolve(query, true)` element-by-element against the
+pinned `browserslist@4.24.2` JS oracle for canonical queries
+(`defaults`, `> 1%`, `chrome >= 50`, `last 2 versions`, `Firefox ESR`,
+`last 2 versions, not dead`).
+
+### What landed this session
+
+1. **`crates/autoprefixer/tests/browserslist_parity.rs`** — two tests:
+   - `browserslist_shim_firefox_esr_matches_js_oracle` — **PASSES**.
+     Pins the `rewrite_firefox_esr` shim path against the JS oracle's
+     `["firefox 128","firefox 115"]` output. Both sides bypass the
+     bundled caniuse-lite snapshot (FF ESR returns a fixed pair via
+     4.24.2's hardcoded `select()`), so this slice is byte-clean.
+   - `browserslist_shim_matches_js_oracle_for_canonical_queries` —
+     **`#[ignore]`'d (gate OPEN)**. Run on demand:
+     ```bash
+     cargo test -p autoprefixer --test browserslist_parity -- --ignored
+     ```
+
+### Findings (last-observed, this session)
+
+| Query                          | Status | Drift                                                                 |
+|--------------------------------|--------|-----------------------------------------------------------------------|
+| `Firefox ESR`                  | ✅ pass | byte-equal (shim rewrite forces 115/128, bypasses caniuse-lite)       |
+| `defaults`                     | ❌ fail | RUST has chrome 145/146 + matching android/edge/firefox/etc; JS has chrome 143/144 |
+| `> 1%`                         | ❌ fail | same shape — RUST shows 2 chrome versions newer than JS               |
+| `chrome >= 50`                 | ❌ fail | RUST extra: `chrome 145, chrome 146`. Otherwise byte-equal.           |
+| `last 2 versions`              | ❌ fail | RUST: `and_chr 146, chrome 145, …`. JS: `and_chr 144, chrome 143, …`. |
+| `last 2 versions, not dead`    | ❌ fail | same shape as above                                                   |
+
+**Root cause:** `oxc_browserslist`'s bundled caniuse-lite snapshot is
+~2 chrome releases newer than the workspace pin (1.0.30001766). The
+Rust shim delegates query resolution to oxc, which uses its own
+snapshot — there's no current path for the shim to override that
+snapshot with `caniuse-db`'s pinned data.
+
+**Closure options** (all multi-day, do NOT half-land):
+- (a) Inject the workspace `caniuse-db` snapshot into oxc_browserslist
+  (probably requires upstream PR or a fork).
+- (b) Replace oxc_browserslist with a direct caniuse-db query resolver
+  in `browserslist-shim` (matches what JS does anyway — re-port
+  `browserslist@4.24.2`'s `index.js::resolve` line-by-line against
+  `caniuse-db`).
+- (c) Downgrade the `oxc_browserslist` Cargo dep to a version whose
+  bundled snapshot matches 1.0.30001766. Cleanest if such a version
+  exists; risk: oxc may have made API-shape changes that need backports.
+
+### DRIFT FIXED in-session — workspace browserslist resolution
+
+While building the gate, surfaced an independent drift: workspace
+`package.json` listed `browserslist: "4.24.2"` in `overrides` but NOT in
+`devDependencies`. As a result, `require('browserslist')` from the
+workspace root resolved to **4.28.2** (a transitive of
+`update-browserslist-db`) instead of the pinned 4.24.2.
+
+This was the exact shape of the caniuse-lite drift fixed in the
+"Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix"
+section above.
+
+**Fix landed this session:**
+- Added `"browserslist": "4.24.2"` to root `package.json`
+  `devDependencies` (alongside the existing `overrides` entry).
+- `bun install` re-resolved. `node_modules/browserslist` now symlinks to
+  the pinned 4.24.2 install.
+- `bun -e "process.stdout.write(require('browserslist/package.json').version)"`
+  → `4.24.2`.
+- New active test `workspace_browserslist_pin_is_424_2` asserts this
+  invariant via the same probe pattern as
+  `caniuse_lite_pin_matches_parity_versions`. Catches future bun.lock
+  drift even if the browserslist parity gate is closed independently.
+- The browserslist parity test was simplified — it now uses plain
+  `require('browserslist')` instead of the `node_modules/.bun/...` glob
+  workaround that was needed before the devDep landed.
+
+### Why ignored, not failing
+
+Per the cardinal rule (a session takes a unit 0 → 100% byte-clean), I
+did not in-session attempt option (a/b/c) above — each is a multi-day
+unit and the time-box for this session was the gate itself, per
+MORNING.md Option D. Marking the omnibus `#[ignore]` keeps the floor
+intact (53 unit + 4 data parity + 1 active browserslist FF ESR = 58
+passing, 0 failing). The next agent who picks up `Prefixes::new` MUST
+either close this gate first or accept that downstream prefix bytes
+will drift and `Prefixes::new`'s output cannot be byte-tested against
+the JS oracle until the gate closes.
 
 ## Phase 7 split contract — autoprefixer parallel agents
 

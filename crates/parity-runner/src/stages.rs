@@ -98,6 +98,14 @@ pub enum Stage {
     /// `stripHash`/`stripWWW`/`stripTextFragment` all `false`).
     PostcssNormalizeUrl,
 
+    /// `parse → postcss-minify-selectors@5.2.1 (no opts) → stringify`. Phase 6c.
+    /// `OnceExit` walks every Rule, runs each selector through a
+    /// postcss-selector-parser pipeline that clears spaces, dispatches
+    /// per-kind reducers (attribute / combinator / pseudo / tag / universal),
+    /// dedupes top-level Selector arms (when their stringified forms match
+    /// post-clear), and lex-sorts the surviving Selectors.
+    PostcssMinifySelectors,
+
     /// The full `sort()` entry point — `packages/css/src/sort.ts`. Runs
     /// `postcss-discard-duplicates@6 → mergeDuplicateAtRules → sortAtomicStyleSheet`
     /// with default opts (both `Option<bool>` flags `None`, mirroring the

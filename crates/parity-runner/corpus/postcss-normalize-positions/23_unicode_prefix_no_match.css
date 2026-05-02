@@ -1,0 +1,7 @@
+/* JS regex `/^(background(-position)?|(-\w+-)?perspective-origin)$/i`
+   uses `\w` without the `u` flag, so `\w` is ASCII `[A-Za-z0-9_]`.
+   Property `-übér-perspective-origin` does NOT match upstream. Rust's
+   default Unicode-aware `\w` would spuriously match — fixed by scoping
+   to `(?-u:\w)`. This corpus locks the prop-name regex's ASCII semantics. */
+a { -übér-perspective-origin: left top; }
+b { -ωmega-perspective-origin: right bottom; }

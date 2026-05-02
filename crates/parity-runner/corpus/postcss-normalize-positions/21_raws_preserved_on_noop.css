@@ -1,0 +1,11 @@
+/* Trailing inline comment in a no-op decl value.
+   The parser captures the comment into `raws.value.raw`; the stringifier
+   emits `raws.value.raw` iff `raws.value.value === decl.value`.
+   `50% 50%` is a no-op for normalize-positions (both dimensions, neither
+   in horizontal/vertical lookup tables), so decl.value stays equal to the
+   parsed value and the trailing comment must survive byte-clean.
+   Surfaces the `node.raws.value = None` drift that previously cleared
+   the raw cache unconditionally. */
+a { background-position: 50% 50% /* trailing */; }
+b { background-position: 10px 20px /* keep-me */; }
+c { background-position: 0 0 /*c*/; }

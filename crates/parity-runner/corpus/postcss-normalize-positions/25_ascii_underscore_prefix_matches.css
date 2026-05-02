@@ -1,0 +1,5 @@
+/* Inverse of 23: `_x_` is in ASCII `\w+`, so `(-_x_-)?perspective-origin`
+   IS matched by the upstream regex. Lock that the ASCII-scoping fix
+   `(?-u:\w)` doesn't accidentally over-restrict. */
+a { -_x_-perspective-origin: left top; }
+b { -A1-perspective-origin: right bottom; }

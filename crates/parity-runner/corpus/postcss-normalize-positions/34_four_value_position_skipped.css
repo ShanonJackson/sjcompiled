@@ -1,0 +1,8 @@
+/* CSS-3 four-value `background-position` (`left 10px top 20px`) is
+   tracked as a single range with count=5; the apply pass's `count > 3`
+   gate skips it without rewrite. Same for any 4-keyword string. Locks
+   the count > 3 gate so a regression that "fixes" the upstream bug
+   would surface here. */
+a { background-position: left 10px top 20px; }
+b { background-position: bottom 5% right 10%; }
+c { background-position: top right bottom left; }

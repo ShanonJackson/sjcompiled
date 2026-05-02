@@ -1,0 +1,2 @@
+@media (min-width: 100px) { .a { color: red } }
+@media (min-width: 100px) { /* leading */ .a { color: red } }

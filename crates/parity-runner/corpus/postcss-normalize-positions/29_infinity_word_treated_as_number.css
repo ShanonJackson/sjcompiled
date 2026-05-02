@@ -1,0 +1,31 @@
+/* JS `isNumberNode` uses `parseFloat(node.value); !isNaN(value)`.
+   `parseFloat("Infinity")` returns `Infinity` (NOT NaN), so the literal
+   token `Infinity` (case sensitive) is a "position keyword" for range
+   tracking — it anchors and extends ranges. The CSS-syntax `like_number`
+   helper used by `parse_unit` rejects `Infinity` because it doesn't
+   begin with a digit / sign+digit / `.digit`, so a Rust port that delegates
+   `is_number_node` to `parse_unit().is_some()` silently diverges:
+
+     - `Infinity right`: JS marks both as keywords → count=3, neither
+       "infinity" nor "right" combines via the horizontal/vertical
+       lookups, so NO rewrite. Buggy Rust skips "Infinity", anchors on
+       "right" alone (count=1), rewrites to `Infinity 100%`.
+     - `left -Infinity`: JS marks both → count=3, no horizontal/vertical
+       match → no rewrite. Buggy Rust anchors on `left` alone (count=1),
+       rewrites to `0` (single-keyword branch).
+     - `Infinity`, `+Infinity`, `-Infinity` alone: JS marks (count=1),
+       firstNode "infinity" not in horizontal/center map → no rewrite.
+       Buggy Rust doesn't even mark — also no rewrite, so single-token
+       form is parity-clean by accident. Included as a lock.
+     - Lowercase `infinity` is NOT a number per JS (parseFloat is case
+       sensitive on these literals). Both JS and the fixed Rust treat it
+       as a non-number (and a non-direction-keyword), so no rewrite.
+
+   Locks the `js_parse_float_is_number` helper that mirrors `parseFloat`
+   for `Infinity`/`+Infinity`/`-Infinity` literals. */
+a { background-position: Infinity right; }
+b { background-position: left -Infinity; }
+c { background-position: top +Infinity; }
+d { background-position: Infinity; }
+e { background-position: -Infinity; }
+f { background-position: infinity right; }

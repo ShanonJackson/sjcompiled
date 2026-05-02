@@ -1,0 +1,6 @@
+/* `env()` and `constant()` are in the variable-functions set alongside
+   `var()`. Each must short-circuit the current layer identically. Locks
+   set membership of the variableFunctions set: `var | env | constant`. */
+a { background-position: env(--p); }
+b { background-position: constant(--p); }
+c { background-position: env(safe-area-inset-top, 0) center; }

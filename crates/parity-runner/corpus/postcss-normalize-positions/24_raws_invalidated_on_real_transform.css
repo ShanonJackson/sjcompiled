@@ -1,0 +1,9 @@
+/* Mirror image of the no-op preservation test: when transform DOES
+   change the value, the parsed-vs-decl mismatch in the stringifier
+   invalidates `raws.value.raw` and emits `decl.value` directly — so
+   the trailing comment is dropped. JS does the same. Locks the
+   "raws.value is invalidated automatically by stringifier comparison"
+   contract so a future incorrect "preserve always" change would
+   surface here. */
+a { background-position: left top /* drop-me */; }
+b { background-position: right bottom /* drop-me-too */; }

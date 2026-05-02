@@ -1,0 +1,7 @@
+/* `var()` short-circuits the CURRENT comma-separated layer (sets
+   shouldContinue=false and nulls the current range). After a comma,
+   shouldContinue is reset and the next layer is processed normally.
+   Lock that var() in layer 1 doesn't poison layer 2's rewrite. */
+a { background-position: var(--p), left top; }
+b { background-position: left top, var(--p), right bottom; }
+c { background-position: var(--p) center, top right; }

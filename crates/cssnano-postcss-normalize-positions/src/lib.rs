@@ -85,13 +85,29 @@ fn is_math_function_node(node: &VNode) -> bool {
 }
 
 /// Upstream: `parseFloat(node.value); !isNaN(value)`. The JS `parseFloat`
-/// returns non-NaN exactly when the string starts with a valid numeric
-/// prefix — which is exactly what `parse_unit` checks via `like_number`.
+/// returns non-NaN whenever the string has a valid numeric prefix — which
+/// includes the literal tokens `Infinity`, `+Infinity`, `-Infinity` (case
+/// sensitive). The CSS-syntax `like_number` check used by `parse_unit`
+/// rejects all three because they don't begin with a digit, sign+digit,
+/// or `.digit`. Mirror JS verbatim so that e.g. `Infinity right` doesn't
+/// get its trailing `right` rewritten to `100%` (Rust used to skip the
+/// `Infinity` slot for range tracking and then map a single `right` keyword;
+/// JS marked the whole range and dropped it because `Infinity`/`right`
+/// aren't both in the horizontal/vertical lookup tables).
+fn js_parse_float_is_number(s: &str) -> bool {
+    if parse_unit(s).is_some() {
+        return true;
+    }
+    let bytes = s.as_bytes();
+    let start = if !bytes.is_empty() && (bytes[0] == b'+' || bytes[0] == b'-') { 1 } else { 0 };
+    s.get(start..).map(|rest| rest.starts_with("Infinity")).unwrap_or(false)
+}
+
 fn is_number_node(node: &VNode) -> bool {
     if node.kind != VKind::Word {
         return false;
     }
-    parse_unit(&node.value).is_some()
+    js_parse_float_is_number(&node.value)
 }
 
 fn is_dimension_node(node: &VNode) -> bool {
@@ -261,8 +277,12 @@ fn transform(value: &str) -> String {
 // Plugin entry — 1:1 with upstream `pluginCreator().OnceExit(css)`.
 // ---------------------------------------------------------------------------
 
+// Upstream regex: `/^(background(-position)?|(-\w+-)?perspective-origin)$/i`.
+// JS `\w` (no `u` flag) is ASCII `[A-Za-z0-9_]`; Rust's default Unicode-aware
+// `\w` would spuriously match e.g. `-übér-perspective-origin`. Scope the
+// word class to ASCII via `(?-u:\w)` to mirror JS exactly.
 static POSITION_PROP: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)^(background(-position)?|(-\w+-)?perspective-origin)$").unwrap()
+    Regex::new(r"(?i)^(background(-position)?|(-(?-u:\w)+-)?perspective-origin)$").unwrap()
 });
 
 pub fn postcss_normalize_positions(root: &mut Root) -> PluginResult {
@@ -283,15 +303,20 @@ pub fn postcss_normalize_positions(root: &mut Root) -> PluginResult {
             return Mutation::Keep;
         }
 
+        // The postcss-core stringifier (`raw_value_str`) already mirrors
+        // JS `lib/stringifier.js#rawValue`'s `raws.value.value === node.value
+        // ? raws.value.raw : node.value` comparison, so the raws cache is
+        // invalidated automatically when transform actually changes the
+        // value, and preserved (correctly) when transform is a no-op.
+        // Clearing raws here would lose source bytes (e.g. trailing
+        // comments captured into `raws.value.raw`) on no-op transforms.
         if let Some(cached) = cache.get(&value).cloned() {
             decl.value = cached;
-            node.raws.value = None;
             return Mutation::Keep;
         }
 
         let result = transform(&value);
         decl.value = result.clone();
-        node.raws.value = None;
         cache.insert(value, result);
         Mutation::Keep
     });
@@ -388,5 +413,115 @@ mod tests {
         // count > 3 — upstream returns without transforming.
         let css = "a { background-position: left top right; }";
         assert_eq!(run(css), css);
+    }
+
+    #[test]
+    fn preserves_raws_value_on_noop() {
+        // Regression for the raws-clearing drift. The decl value has a
+        // trailing comment captured into `raws.value.raw`; transform is a
+        // no-op (`50% 50%` lookups all return None). Stringifier should
+        // emit `raws.value.raw` (with the comment). Prior code cleared
+        // `raws.value` → comment was lost. Same shape as the bug fixed
+        // in `cssnano-postcss-normalize-timing-functions` /
+        // `cssnano-postcss-normalize-string`.
+        let css = "a { background-position: 50% 50% /* trailing */; }";
+        let out = run(css);
+        assert!(
+            out.contains("/* trailing */"),
+            "trailing comment must survive no-op normalization; got: {out:?}"
+        );
+    }
+
+    #[test]
+    fn preserves_raws_value_on_cache_hit_noop() {
+        // Same as above but exercises the cache-hit path: two decls with
+        // the same value in the same Root. The first populates the cache;
+        // the second hits the cache. Both must preserve `raws.value.raw`.
+        let css = "a { background-position: 50% 50% /* keep-1 */; }\n\
+                   b { background-position: 50% 50% /* keep-2 */; }";
+        let out = run(css);
+        assert!(out.contains("/* keep-1 */"), "first decl comment lost; got: {out:?}");
+        assert!(out.contains("/* keep-2 */"), "second decl comment lost; got: {out:?}");
+    }
+
+    #[test]
+    fn unicode_prefix_property_does_not_match() {
+        // JS regex `\w` (no `u` flag) is ASCII-only — `-übér-perspective-origin`
+        // does NOT match upstream. With Rust's default Unicode-aware `\w`,
+        // it WOULD match. We scope `\w` to ASCII via `(?-u:\w)` — verify
+        // the property is left untouched.
+        let css = "a { -übér-perspective-origin: left top; }";
+        assert_eq!(run(css), css, "unicode-prefixed property must not match");
+    }
+
+    #[test]
+    fn ascii_prefix_with_underscore_matches() {
+        // Lock the inverse of the Unicode-prefix test: `_x_` is ASCII `\w+`,
+        // so the regex must still match. (Underscore is in `[A-Za-z0-9_]`.)
+        let out = run("a { -_x_-perspective-origin: left top; }");
+        assert!(out.contains("0 0"), "ascii-underscore prefix should match; got: {out:?}");
+    }
+
+    #[test]
+    fn infinity_first_with_keyword_does_not_substitute() {
+        // Regression for the `is_number_node` Infinity drift.
+        // JS `parseFloat("Infinity")` returns Infinity (NOT NaN), so
+        // `isNumberNode` returns true → "Infinity" anchors the range and
+        // "right" extends it (count=3). Apply step finds neither
+        // `horizontal.has("infinity")` nor `verticalValue.has("infinity")`
+        // so the range is left untouched. The prior Rust port treated
+        // "Infinity" as a non-keyword (parse_unit's `like_number` rejects
+        // it), so the range was anchored on `right` alone (count=1) and
+        // the single-keyword branch rewrote `right` to `100%` — producing
+        // `Infinity 100%` where JS produces `Infinity right`.
+        let css = "a { background-position: Infinity right; }";
+        let out = run(css);
+        assert_eq!(out, css, "Infinity first must inhibit single-keyword rewrite");
+    }
+
+    #[test]
+    fn negative_infinity_second_does_not_substitute() {
+        // Mirror image: `-Infinity` second slot. JS treats it as a number
+        // → end is extended to it. With the buggy Rust, end stays at the
+        // first position keyword and the single-keyword rewrite fires.
+        let css = "a { background-position: left -Infinity; }";
+        let out = run(css);
+        assert_eq!(out, css, "-Infinity second must inhibit single-keyword rewrite");
+    }
+
+    #[test]
+    fn infinity_alone_left_alone() {
+        // Single-token "Infinity" — JS parses it as a number, anchors a
+        // range of count=1 with `firstNode = "infinity"` (lowercased).
+        // The map only has horizontal/`center` keys, so "infinity" doesn't
+        // match — no rewrite. Locks the no-match path on the lowercase
+        // mapping; surfaces if a regression made the lookup case-sensitive
+        // or accidentally added `infinity` as a key.
+        let css = "a { background-position: Infinity; }";
+        assert_eq!(run(css), css);
+    }
+
+    #[test]
+    fn js_parse_float_is_number_handles_infinity() {
+        // Direct unit test for the helper, since the integration cases
+        // above only fire if the helper is correct AND the rest of the
+        // range/apply logic is correct.
+        assert!(super::js_parse_float_is_number("Infinity"));
+        assert!(super::js_parse_float_is_number("+Infinity"));
+        assert!(super::js_parse_float_is_number("-Infinity"));
+        // Lowercase is NOT a number per JS parseFloat (case sensitive).
+        assert!(!super::js_parse_float_is_number("infinity"));
+        // NaN is NOT a number per parseFloat (parseFloat("NaN") === NaN).
+        assert!(!super::js_parse_float_is_number("NaN"));
+        // Sanity: ordinary numerics still work.
+        assert!(super::js_parse_float_is_number("0"));
+        assert!(super::js_parse_float_is_number("-0.5"));
+        assert!(super::js_parse_float_is_number("1e10"));
+        assert!(super::js_parse_float_is_number(".5"));
+        // Non-numeric still rejected.
+        assert!(!super::js_parse_float_is_number("abc"));
+        assert!(!super::js_parse_float_is_number(""));
+        assert!(!super::js_parse_float_is_number("+"));
+        assert!(!super::js_parse_float_is_number("."));
     }
 }

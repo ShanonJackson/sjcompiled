@@ -1,0 +1,12 @@
+/* `calc(...)` is a math function — `is_math_function_node` returns true
+   so it's a position keyword for range-tracking. But the lookup tables
+   (`horizontal`, `verticalValue`) only key on direction-keyword strings,
+   so when nodes[0] is a calc function with `value === "calc"`, no rewrite
+   happens for the first slot. The second-slot `center` triggers the
+   `secondNode === 'center'` branch which empties slots 1+2 but leaves
+   the calc untouched (because `map.has("calc")` is false). Locks that
+   exact behavior — a regression that "improved" math-fn handling here
+   would surface as a drift. */
+a { background-position: calc(50% + 10px) center; }
+b { background-position: min(10%, 20%) center; }
+c { background-position: clamp(0%, 50%, 100%) center; }

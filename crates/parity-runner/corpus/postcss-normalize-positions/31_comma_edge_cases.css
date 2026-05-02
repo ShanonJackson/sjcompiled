@@ -1,0 +1,13 @@
+/* Comma layer-separator edge cases:
+   - leading comma: range_index advances before any layer is built, so
+     ranges[0] stays `None`/empty and the first real layer is at index 1.
+   - trailing comma: range_index advances past the last layer, leaving
+     a trailing empty layer that's a hole in JS / `None` in Rust.
+   - empty middle layer (`a, , b`): JS sparse-array forEach skips the
+     hole; Rust `for range_opt in &snapshot { match { _ => continue }}`
+     skips `None` identically.
+   All three should produce identical bytes vs JS. */
+a { background-position: , left top; }
+b { background-position: left top,; }
+c { background-position: left top, , right bottom; }
+d { background-position: ,; }

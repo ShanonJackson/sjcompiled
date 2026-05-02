@@ -1,0 +1,13 @@
+/* Cross-rule cache dedup: same input value appears in multiple decls
+   spanning different rules in the same Root. The plugin's `cache`
+   is per-Root (not per-rule), so the second+ occurrences must hit
+   the cached transform result. Verify that the per-Root cache scope
+   matches JS — and that the cache key uses the ORIGINAL value, not
+   the post-transform result. */
+a { background-position: left top; }
+.b { background-position: left top; }
+#c { background-position: left top; }
+@media (min-width: 100px) {
+  d { background-position: left top; }
+}
+e { -webkit-perspective-origin: left top; }
