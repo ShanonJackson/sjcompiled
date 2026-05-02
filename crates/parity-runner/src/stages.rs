@@ -84,6 +84,15 @@ pub enum Stage {
     /// strips the redundant trailing `, end` from `steps(N, end)`. No options.
     PostcssNormalizeTimingFunctions,
 
+    /// `parse → postcss-normalize-url@5.1.0 (default opts) → stringify`. Phase 6b.
+    /// Walks every Decl value and `@namespace` AtRule params; rewrites the
+    /// inner of `url(...)` calls. Absolute/protocol-relative URLs pass through
+    /// `normalize-url@6.1.0`. Relative paths pass through `path.posix.normalize`.
+    /// `data:`/`*-extension:/` short-circuit the conversion. The 5
+    /// postcss-side overrides hold (`normalizeProtocol`/`sortQueryParameters`/
+    /// `stripHash`/`stripWWW`/`stripTextFragment` all `false`).
+    PostcssNormalizeUrl,
+
     /// The full `sort()` entry point — `packages/css/src/sort.ts`. Runs
     /// `postcss-discard-duplicates@6 → mergeDuplicateAtRules → sortAtomicStyleSheet`
     /// with default opts (both `Option<bool>` flags `None`, mirroring the
@@ -113,6 +122,7 @@ impl Stage {
             Stage::PostcssNormalizeString => "postcss-normalize-string",
             Stage::PostcssNormalizePositions => "postcss-normalize-positions",
             Stage::PostcssNormalizeTimingFunctions => "postcss-normalize-timing-functions",
+            Stage::PostcssNormalizeUrl => "postcss-normalize-url",
             Stage::Sort => "sort",
         }
     }
@@ -234,6 +244,13 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
         Stage::PostcssNormalizeTimingFunctions => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             cssnano_postcss_normalize_timing_functions::postcss_normalize_timing_functions(&mut root)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssNormalizeUrl => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            let opts = cssnano_postcss_normalize_url::NormalizeUrlOpts::default();
+            cssnano_postcss_normalize_url::postcss_normalize_url(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }

@@ -19,6 +19,7 @@ cssnano-postcss-discard-comments = { workspace = true }
 cssnano-postcss-normalize-string = { workspace = true }
 cssnano-postcss-normalize-positions = { workspace = true }
 cssnano-postcss-normalize-timing-functions = { workspace = true }
+cssnano-postcss-normalize-url = { workspace = true }
 css = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

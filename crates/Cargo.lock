@@ -584,8 +584,13 @@ dependencies = [
 name = "cssnano-postcss-normalize-url"
 version = "0.0.1"
 dependencies = [
+ "indexmap",
+ "once_cell",
+ "percent-encoding",
  "postcss-core",
  "postcss-value-parser",
+ "regex",
+ "url",
 ]
 
 [[package]]
@@ -1446,6 +1451,7 @@ dependencies = [
  "cssnano-postcss-normalize-positions",
  "cssnano-postcss-normalize-string",
  "cssnano-postcss-normalize-timing-functions",
+ "cssnano-postcss-normalize-url",
  "postcss-core",
  "postcss-discard-duplicates",
  "postcss-normalize-whitespace",

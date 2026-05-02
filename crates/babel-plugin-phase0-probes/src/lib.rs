@@ -83,23 +83,56 @@ fn write_result(call_scratch: &str, result: &ProbeResult) {
 
 fn run_wasi_io(call_scratch: &str) {
     let cwd = std::env::current_dir();
-    eprintln!("[probe wasi-io] env::current_dir() => {:?}", cwd);
-    eprintln!("[probe wasi-io] callScratch (host)  => {:?}", call_scratch);
+    eprintln!("[probe wasi-io] cwd={:?}", cwd);
 
-    // Bisect:
-    //   write attempts
+    let mut attempts = Vec::new();
+
+    // READ FIRST — output capacity is limited; we want reads in the window.
+    let read_candidates: Vec<(&str, PathBuf)> = vec![
+        ("read-rel-pkg",         PathBuf::from("package.json")),
+        ("read-abs-pkg",         PathBuf::from("/package.json")),
+        ("read-rel-pv",          PathBuf::from("crates/PARITY_VERSIONS.md")),
+        ("read-abs-pv",          PathBuf::from("/crates/PARITY_VERSIONS.md")),
+    ];
+    for (label, path) in &read_candidates {
+        let res = fs::read(path);
+        let len = res.as_ref().ok().map(|b| b.len());
+        let err = res.as_ref().err().map(|e| e.to_string());
+        let ok = res.is_ok();
+        eprintln!("[probe wasi-io] {} {:?} ok={} len={:?} err={:?}",
+                  label, path, ok, len, err);
+        attempts.push(serde_json::json!({
+            "label": label, "kind": "read",
+            "path":  path.display().to_string(), "ok": ok, "err": err, "len": len,
+        }));
+    }
+
+    // List cwd to see what the sandbox exposes
+    match fs::read_dir(".") {
+        Ok(rd) => {
+            let names: Vec<String> = rd.take(20).filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().to_string()).collect();
+            eprintln!("[probe wasi-io] read_dir(.) => {} entries: {:?}", names.len(), names);
+            attempts.push(serde_json::json!({ "label": "read-dir-dot", "kind": "list", "ok": true, "names": names }));
+        }
+        Err(e) => {
+            eprintln!("[probe wasi-io] read_dir(.) ERR {}", e);
+            attempts.push(serde_json::json!({ "label": "read-dir-dot", "kind": "list", "ok": false, "err": e.to_string() }));
+        }
+    }
+
+    // WRITE second.
     let write_candidates: Vec<(&str, PathBuf)> = vec![
         ("write-rel-cwd",        PathBuf::from("probe-cwd.bin")),
         ("write-rel-dot",        PathBuf::from("./probe-dot.bin")),
         ("write-abs-root",       PathBuf::from("/probe-root.bin")),
         ("write-abs-callscr",    PathBuf::from(call_scratch).join("probe.bin")),
     ];
-    let mut attempts = Vec::new();
     for (label, path) in &write_candidates {
         let res = fs::write(path, b"x");
         eprintln!("[probe wasi-io] {} {:?} => {:?}", label, path, res);
         attempts.push(serde_json::json!({
-            "label": label,
+            "label": label, "kind": "write",
             "path": path.display().to_string(),
             "ok":   res.is_ok(),
             "err":  res.err().map(|e| e.to_string()),

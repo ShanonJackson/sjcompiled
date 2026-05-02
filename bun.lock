@@ -81,6 +81,7 @@
         "postcss-normalize-positions": "5.1.1",
         "postcss-normalize-string": "5.1.0",
         "postcss-normalize-timing-functions": "5.1.0",
+        "postcss-normalize-url": "5.1.0",
       },
     },
     "packages/css-native": {
@@ -111,6 +112,7 @@
     "postcss-normalize-positions": "5.1.1",
     "postcss-normalize-string": "5.1.0",
     "postcss-normalize-timing-functions": "5.1.0",
+    "postcss-normalize-url": "5.1.0",
     "postcss-normalize-whitespace": "5.1.1",
     "postcss-selector-parser": "6.0.13",
     "postcss-values-parser": "6.0.2",

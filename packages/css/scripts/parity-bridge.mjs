@@ -37,6 +37,8 @@ import postcssNormalizeString from 'postcss-normalize-string';
 import postcssNormalizePositions from 'postcss-normalize-positions';
 // npm `postcss-normalize-timing-functions@5.1.0` — cssnano sub-plugin (Phase 6b).
 import postcssNormalizeTimingFunctions from 'postcss-normalize-timing-functions';
+// npm `postcss-normalize-url@5.1.0` — cssnano sub-plugin (Phase 6b).
+import postcssNormalizeUrl from 'postcss-normalize-url';
 
 // Sheets returned by extract-stylesheets are joined with U+001E (record
 // separator) so they ride the single-string bridge protocol unambiguously.
@@ -184,6 +186,17 @@ const STAGES = {
   // the redundant `, end | jump-end` argument from `steps(N, end)`.
   'postcss-normalize-timing-functions': (css) => {
     const result = postcss([postcssNormalizeTimingFunctions()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-normalize-url@5.1.0 (default opts) → stringify.
+  // Walks every Decl value and `@namespace` AtRule params; rewrites `url(...)`
+  // calls. Absolute URLs go through normalize-url@6.1.0; relative paths go
+  // through path.normalize. The 5 postcss-side overrides on top of normalize-
+  // url's defaults: normalizeProtocol/sortQueryParameters/stripHash/stripWWW/
+  // stripTextFragment all `false`.
+  'postcss-normalize-url': (css) => {
+    const result = postcss([postcssNormalizeUrl()]).process(css, { from: undefined });
     return result.css;
   },
 
