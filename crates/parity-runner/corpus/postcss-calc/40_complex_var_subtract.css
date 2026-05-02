@@ -1,0 +1,1 @@
+.foo { a: calc(0px - (24px - (var(--a) - var(--b)) / 2 + var(--c))); b: calc(0px - (var(--foo, 4px) / 2)); c: calc(-100% - var(--tooltip-calculated-offset)); }

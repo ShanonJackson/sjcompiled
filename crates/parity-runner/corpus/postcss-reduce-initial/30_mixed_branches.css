@@ -1,0 +1,12 @@
+a {
+  /* fromInitial branch */
+  min-width: initial;
+  /* toInitial branch */
+  border-collapse: separate;
+  /* ignored prop */
+  writing-mode: horizontal-tb;
+  /* unknown prop */
+  custom-prop: initial;
+  /* no-op decl */
+  color: red;
+}

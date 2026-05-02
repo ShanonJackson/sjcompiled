@@ -1,0 +1,5 @@
+.a { grid-column: 1 / span 3; }
+.b { grid-row: span 2 / 4; }
+.c { grid-column-start: span 3; }
+.d { grid-row-end: 5; }
+.e { grid-column: span 2 / span 4; }

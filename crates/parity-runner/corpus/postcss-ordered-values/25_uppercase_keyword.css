@@ -1,0 +1,3 @@
+.a { border: SOLID 1px Red; }
+.b { animation: 1s LINEAR myAnim; }
+.c { flex-flow: ROW NOWRAP; }

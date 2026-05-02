@@ -1,0 +1,2 @@
+.a { animation: 1s 2s 3s myAnim; }
+.b { animation: myName 100ms 200ms ease 300ms; }

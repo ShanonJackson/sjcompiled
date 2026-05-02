@@ -1,0 +1,2 @@
+.a { box-shadow: 1px 1px calc(2px + 1px) red; }
+.b { box-shadow: -webkit-calc(1px + 2px) 0 0 red; }

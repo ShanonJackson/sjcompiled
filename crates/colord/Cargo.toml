@@ -15,3 +15,7 @@ random = []
 once_cell = { workspace = true }
 regex = { workspace = true }
 indexmap = { workspace = true }
+postcss-core = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

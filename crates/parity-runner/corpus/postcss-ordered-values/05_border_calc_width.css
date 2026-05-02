@@ -1,0 +1,2 @@
+.a { border: solid red calc(1px + 2px); }
+.b { border: clamp(1px, 5%, 10px) solid currentColor; }

@@ -1,0 +1,8 @@
+a {
+  border-block-color: currentcolor;
+  border-block-end-color: currentcolor;
+  border-inline-start-color: currentcolor;
+  mask-clip: border-box;
+  mask-mode: match-source;
+  mask-origin: border-box;
+}

@@ -1,0 +1,1 @@
+.foo { a: calc(calc(var(--foo) + var(--bar)) + var(--baz)); b: calc(var(--foo) - calc(var(--bar) - var(--baz))); c: calc(calc(var(--foo) + var(--bar)) * var(--baz)); d: calc(var(--foo) / calc(var(--bar) + var(--baz))); }

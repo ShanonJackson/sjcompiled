@@ -1,0 +1,9 @@
+a {
+  border-bottom-color: currentcolor;
+  border-left-color: currentcolor;
+  border-right-color: currentcolor;
+  border-top-color: currentcolor;
+  text-decoration-color: currentcolor;
+  text-emphasis-color: currentcolor;
+  column-rule-color: currentcolor;
+}

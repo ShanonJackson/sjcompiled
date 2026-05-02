@@ -9,3 +9,5 @@ description = "Byte-for-byte Rust port of postcss-calc@8.2.4 — calc() expressi
 [dependencies]
 postcss-core = { workspace = true }
 postcss-value-parser = { workspace = true }
+postcss-selector-parser = { workspace = true }
+indexmap = { workspace = true }

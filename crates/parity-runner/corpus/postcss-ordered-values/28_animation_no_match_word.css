@@ -1,0 +1,2 @@
+.a { animation: 1s ease 0.5s myCustomName; }
+.b { animation: 2s linear name1 name2; }

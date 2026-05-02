@@ -1,0 +1,1 @@
+.foo { width: calc(constant(safe-area-inset-left)); padding: calc(env(safe-area-inset-left, 50px 20px)); margin: calc(unknown(#fff) - other-unknown(200px)); }

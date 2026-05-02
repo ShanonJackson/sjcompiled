@@ -1,0 +1,1 @@
+.foo { width: calc(100%/(var(--aspect-ratio))); height: calc(1/(10/var(--dot-size))); aspect: calc(1/((var(--a) - var(--b))/16)); }

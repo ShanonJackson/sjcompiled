@@ -1,0 +1,2 @@
+.a { list-style: url('bullet.svg') outside square; }
+.b { list-style: square url('bullet.svg'); }

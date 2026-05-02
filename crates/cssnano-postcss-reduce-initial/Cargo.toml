@@ -8,5 +8,7 @@ description = "Byte-for-byte Rust port of postcss-reduce-initial@5.1.2."
 
 [dependencies]
 postcss-core = { workspace = true }
-browserslist-shim = { workspace = true }
 caniuse-api = { workspace = true }
+indexmap = { workspace = true }
+once_cell = { workspace = true }
+serde_json = { workspace = true }

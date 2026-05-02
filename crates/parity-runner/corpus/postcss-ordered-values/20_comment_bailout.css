@@ -1,0 +1,2 @@
+.a { border: /* comment */ 1px solid red; }
+.b { box-shadow: 1px 1px 2px /* important */ red; }

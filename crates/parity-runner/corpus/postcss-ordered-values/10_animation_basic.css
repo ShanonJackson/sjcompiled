@@ -1,0 +1,4 @@
+.a { animation: 1s ease-in-out 0.5s infinite alternate forwards running myAnim; }
+.b { animation: linear 200ms slidein; }
+.c { animation: myAnim 2s; }
+.d { animation: 1s ease, 2s linear another; }

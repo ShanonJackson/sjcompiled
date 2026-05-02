@@ -62,3 +62,7 @@ Other audit notes (no drift, no fix needed):
 - A parallel agent independently added their own 30_..37_ corpus entries covering: comment-between-keywords (29), JS Infinity literal (30 — duplicates my 29), comma-leading/trailing/empty-middle (31), non-math function as     
   first slot (32), non-transforming pairs (33), 4-value form (34), uppercase var/env/constant (35), uppercase calc/min/max/clamp (36), per-Root cache scope across rules (37). Their coverage is complementary; nothing to remove.  
 
+
+### THIS DRIFT SHANON
+Drift flagged but not mine to fix: parallel ordered-values agent's untracked crates/postcss-calc/src/lib/transform.rs references attribute_payload which doesn't exist on postcss-selector-parser::Node. They'll need to address  
+it.

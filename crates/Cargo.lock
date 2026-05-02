@@ -382,7 +382,9 @@ version = "0.0.1"
 dependencies = [
  "indexmap",
  "once_cell",
+ "postcss-core",
  "regex",
+ "serde_json",
 ]
 
 [[package]]
@@ -488,8 +490,10 @@ dependencies = [
  "browserslist-shim",
  "caniuse-api",
  "colord",
+ "once_cell",
  "postcss-core",
  "postcss-value-parser",
+ "regex",
 ]
 
 [[package]]
@@ -600,6 +604,7 @@ name = "cssnano-postcss-ordered-values"
 version = "0.0.1"
 dependencies = [
  "cssnano-utils",
+ "indexmap",
  "postcss-core",
  "postcss-value-parser",
 ]
@@ -608,9 +613,11 @@ dependencies = [
 name = "cssnano-postcss-reduce-initial"
 version = "0.0.1"
 dependencies = [
- "browserslist-shim",
  "caniuse-api",
+ "indexmap",
+ "once_cell",
  "postcss-core",
+ "serde_json",
 ]
 
 [[package]]
@@ -1465,6 +1472,9 @@ dependencies = [
  "cssnano-postcss-normalize-string",
  "cssnano-postcss-normalize-timing-functions",
  "cssnano-postcss-normalize-url",
+ "cssnano-postcss-ordered-values",
+ "cssnano-postcss-reduce-initial",
+ "postcss-calc",
  "postcss-core",
  "postcss-discard-duplicates",
  "postcss-nested",
@@ -1567,7 +1577,9 @@ dependencies = [
 name = "postcss-calc"
 version = "0.0.1"
 dependencies = [
+ "indexmap",
  "postcss-core",
+ "postcss-selector-parser",
  "postcss-value-parser",
 ]
 

@@ -1,0 +1,3 @@
+.a { animation: myAnim 1s cubic-bezier(0, 0, 1, 1); }
+.b { animation: 2s steps(4, end) myAnim; }
+.c { animation: 0.5s frames(5) myAnim; }

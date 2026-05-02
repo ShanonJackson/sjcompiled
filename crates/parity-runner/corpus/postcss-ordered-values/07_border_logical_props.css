@@ -1,0 +1,5 @@
+.a { border-top: red solid 2px; }
+.b { border-block: solid 1px blue; }
+.c { border-inline-end: 1px dotted green; }
+.d { column-rule: solid 1px black; }
+.e { outline: 2px solid red; }

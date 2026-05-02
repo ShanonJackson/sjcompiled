@@ -1,0 +1,3 @@
+.a { columns: 2 200px; }
+.b { columns: 200px 2; }
+.c { columns: auto auto; }

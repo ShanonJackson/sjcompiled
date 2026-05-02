@@ -1,0 +1,1 @@
+.foo { a: calc(+100px + +100px); b: calc(-100px + -100px); c: calc(200px * +1); d: calc(200px / -1); e: calc(-100px - -100px); }

@@ -22,6 +22,9 @@ cssnano-postcss-normalize-positions = { workspace = true }
 cssnano-postcss-normalize-timing-functions = { workspace = true }
 cssnano-postcss-normalize-url = { workspace = true }
 cssnano-postcss-minify-selectors = { workspace = true }
+cssnano-postcss-ordered-values = { workspace = true }
+cssnano-postcss-reduce-initial = { workspace = true }
+postcss-calc = { workspace = true }
 css = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -106,6 +106,37 @@ pub enum Stage {
     /// post-clear), and lex-sorts the surviving Selectors.
     PostcssMinifySelectors,
 
+    /// `parse → postcss-ordered-values@5.1.3 (no opts) → stringify`. Phase 6d.
+    /// OnceExit walker. Reorders multi-value parts of `border` /
+    /// `box-shadow` / `animation` / `transition` / `flex-flow` / `outline`
+    /// / `column-rule` / `columns` / `list-style` / `grid-auto-flow` /
+    /// `grid-{column,row,column-start,row-start,column-end,row-end,column-gap,row-gap}`
+    /// for shorthand-deduplication consistency. Variable functions
+    /// (`var`/`env`/`constant`), comments, and `___CSS_LOADER_IMPORT___`
+    /// markers short-circuit the transformation.
+    PostcssOrderedValues,
+
+    /// `parse → postcss-reduce-initial@5.1.2 (default opts) → stringify`.
+    /// Phase 6e. Browserslist+caniuse-aware: `prepare(result)` resolves
+    /// `isSupported('css-initial-value', browsers)` once at instantiation,
+    /// then `OnceExit` walks every Decl. `toInitial[prop] === value` →
+    /// `value = "initial"` (gated on caniuse). `value === "initial"` AND
+    /// `fromInitial[prop]` exists → `value = fromInitial[prop]`.
+    /// `defaultIgnoreProps = ['writing-mode', 'transform-box']` are
+    /// always skipped (cssnano#905). `opts.ignore` extends that set.
+    PostcssReduceInitial,
+
+    /// `parse → postcss-calc@8.2.4 (default opts) → stringify`. Phase 6d.
+    /// OnceExit walks every Decl, transforms `value` through value-parser
+    /// looking for `(-vendor-)?calc(...)` function nodes, parses the inner
+    /// expression with the jison-grammar parser, reduces it (constant
+    /// folding, unit conversion, distributed mul/div), and re-stringifies.
+    /// CSS variables (`var(...)`, `env(...)`, etc. — anything tokenized
+    /// as a Function) are preserved opaquely. Default opts:
+    /// `precision: 5`, `preserve: false`, `warnWhenCannotResolve: false`,
+    /// `mediaQueries: false`, `selectors: false`.
+    PostcssCalc,
+
     /// The full `sort()` entry point — `packages/css/src/sort.ts`. Runs
     /// `postcss-discard-duplicates@6 → mergeDuplicateAtRules → sortAtomicStyleSheet`
     /// with default opts (both `Option<bool>` flags `None`, mirroring the
@@ -137,6 +168,9 @@ impl Stage {
             Stage::PostcssNormalizeTimingFunctions => "postcss-normalize-timing-functions",
             Stage::PostcssNormalizeUrl => "postcss-normalize-url",
             Stage::PostcssMinifySelectors => "postcss-minify-selectors",
+            Stage::PostcssOrderedValues => "postcss-ordered-values",
+            Stage::PostcssReduceInitial => "postcss-reduce-initial",
+            Stage::PostcssCalc => "postcss-calc",
             Stage::Sort => "sort",
         }
     }
@@ -290,6 +324,26 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
         Stage::PostcssMinifySelectors => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             cssnano_postcss_minify_selectors::postcss_minify_selectors(&mut root)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssOrderedValues => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            cssnano_postcss_ordered_values::postcss_ordered_values(&mut root)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssReduceInitial => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            let opts = cssnano_postcss_reduce_initial::PostcssReduceInitialOpts::default();
+            cssnano_postcss_reduce_initial::postcss_reduce_initial(&mut root, &opts)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssCalc => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            let opts = postcss_calc::Options::default();
+            postcss_calc::postcss_calc(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }

@@ -1,0 +1,1 @@
+.foo { width: CALC(1PX + 1PX); height: CALC( (1EM - CALC( 10PX + 1EM)) / 2); }

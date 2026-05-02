@@ -1,0 +1,4 @@
+.a { grid-auto-flow: dense row; }
+.b { grid-auto-flow: column dense; }
+.c { grid-auto-flow: row; }
+.d { grid-auto-flow: dense; }

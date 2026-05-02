@@ -1,0 +1,2 @@
+.a { transition: opacity 0.3s ease 0s, transform 1s linear 100ms, color 200ms; }
+.b { transition: all 0.5s, none 1s; }

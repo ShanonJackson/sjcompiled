@@ -28,6 +28,14 @@ Performance is a side-goal that should NEVER come at the cost of correctness but
 
 # Never
 - Never edit packages/babel-plugin, packages/babel-plugin-strip-runtime, packages/css and packages/utils consider them 100% IMMUTABLE as their EXACT source was copied from a monorepo.
+The reason these are immutable is that EACH package was taken from the EXACT commit/version that AFM uses (the monorepo)
+@compiled/babel-plugin 0.36.1 16a62b8 (solo patch release)
+@compiled/babel-plugin-strip-runtime 0.36.0 40a4548 (Jan 28 batch)
+@compiled/css 0.19.0 40a4548 (used by BOTH above, nested)
+@compiled/utils 0.13.2 130ed3b (hoisted, shared)
+
+Unfortuantely this work started INITIALLY by porting the wrong version/commits of these, so if you see "artifacts" remaining that are "oprhaned" (dont' have a lineage to these commits/versions) please raise it.
+
 
 # WASI/WASM Compilation
 - Please don't add like 10MB Rust library or anything like that. We will eventually 'build' the whole thing to WASM/WASI and we don't want a like 50MB binary.

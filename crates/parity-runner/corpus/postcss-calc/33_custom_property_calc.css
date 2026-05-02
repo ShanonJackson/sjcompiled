@@ -1,0 +1,1 @@
+:root { --foo: calc(var(--bar) / 8); --baz: calc(100% - 50px); }

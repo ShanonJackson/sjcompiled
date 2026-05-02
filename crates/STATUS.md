@@ -3,6 +3,689 @@
 End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 `PARITY_VERSIONS.md`.
 
+## Phase 6d ship — `postcss-calc@8.2.4` byte-clean (2026-05-03)
+
+`calc()` expression evaluator — the high-risk float-math plugin from
+EXECUTION_PLAN.md §6d. Now byte-clean end-to-end against the AFM-pinned
+oracle on a 40-input corpus.
+
+### What landed this session
+
+1. `crates/_vendor/POSTCSS_CALC_8.2.4_REAUDIT.md` — full audit of the
+   vendored upstream source: every public function, every numeric
+   operation, every error/warning string, every default option. The
+   contract-with-myself for the port.
+2. `crates/postcss-calc/src/lib/convert_unit.rs` (~330 LOC, port of
+   `lib/convertUnit.js`) — full unit-conversion table (length / angle /
+   time / frequency / resolution), `convert_unit()` with `Precision`
+   enum mirroring `number | false`, `js_math_round()` helper that
+   implements JS `Math.round` (half-toward-+∞) since Rust's `f64::round()`
+   is half-away-from-zero — divergence verified on `-0.5/-1.5/-2.5`.
+3. `crates/postcss-calc/src/lib/stringifier.rs` (~210 LOC, port of
+   `lib/stringifier.js`) — internal `stringify()` (precedence-aware paren
+   insertion, `+/-` get spaces around the operator, `*` and `/` don't),
+   `round()` (no `Math.ceil` / `|| 5` fallback — `prec` used directly),
+   `stringify_calc()` (re-wraps as `calc(...)` when reduction landed on
+   a MathExpression / Function).
+4. `crates/postcss-calc/src/lib/reducer.rs` (~470 LOC, port of
+   `lib/reducer.js`) — full `reduce()` with `collectAddSubItems`,
+   `reduceAddSubExpression` (zero-drop, `-Function` first-position
+   fix-up, sign normalization), `reduceMultiplicationExpression`,
+   `reduceDivisionExpression`, `applyNumberDivision` /
+   `applyNumberMultiplication` (distributing across +/- to enable
+   further reduction), `convertNodesUnits` (only kicks in for length /
+   angle / time / freq / res), `includesNoCssProperties` (CSS-variable
+   bailout — preserves parens around any expression containing a
+   Function token).
+5. `crates/postcss-calc/src/parser.rs` (~840 LOC, port of `parser.js`
+   3808 LOC + `parser.jison` 112 LOC). Hand-rolled to match the jison
+   grammar verbatim — porting the LALR(1) state tables literally would
+   buy nothing because the grammar is small and fully decidable. The
+   parser produces:
+   - The same AST shape (`MathExpression` / `ParenthesizedExpression` /
+     `Function` / `Dimension { kind, value, unit }` / `Number`).
+   - The same lexer regex order (rules 0-38) so any input the upstream
+     tokenizer accepts produces identical tokens.
+   - The same case-insensitive matching, including for unit suffixes
+     (`Hz` matches `hz`/`HZ`/`Hz`).
+   - The same `parseFloat` semantics (extract leading numeric prefix).
+   - Byte-identical error messages for both error classes the upstream
+     parser actually emits in practice:
+     - **Lexical error** (rule 35 fails to match a leading non-letter):
+       `Lexical error on line N: Unrecognized text.\n\n  Erroneous area:\n<lineno>: <line>\n^<dots>^` — locked
+       in by a unit test against the canonical input `10pc + unknown`.
+     - **Parse error** (token didn't fit grammar): `Parse error on line N: \n<showPosition>\nExpecting <token-list>, got unexpected <token>` — uses `pastInput(69)` + `upcomingInput(10)` with
+       all whitespace replaced by ASCII space, then a row of `-` of the
+       same width as the past-prefix and a single `^`.
+6. `crates/postcss-calc/src/lib/transform.rs` (~250 LOC, port of
+   `lib/transform.js`) — `transform_value()` walks the value-parser AST
+   (`postcss_value_parser::walk`) looking for `(-vendor-)?calc(...)`
+   Function nodes, parses + reduces + re-stringifies; `transform_selector()`
+   for `selectors: true` (parity-completeness — our integration never
+   enables this option since `cssnano-preset-default` invokes
+   `postcssCalc()` with default options); `transform_node_property()`
+   wraps both with the `try/catch → result.warn(error.message)` flow
+   from upstream `transform.js:84-96`.
+7. `crates/postcss-calc/src/lib.rs` (~165 LOC, port of `index.js`) —
+   `postcss_calc(root, opts)` plugin entry. Walks every Decl
+   (transform `value`), every AtRule when `mediaQueries: true` (transform
+   `params`), every Rule when `selectors: true` (transform `selector`).
+   Implements `preserve: true` correctly: clones the original node,
+   writes the new value onto the clone, inserts the clone BEFORE the
+   original (so the simplified form precedes the unsimplified one in
+   declaration order — verified against upstream test
+   `'should preserve the original declaration when preserve option is
+   set to true'`).
+8. `crates/postcss-calc/Cargo.toml` updated with `postcss-selector-parser`
+   and `indexmap` dependencies (already had `postcss-core` and
+   `postcss-value-parser`).
+9. `Stage::PostcssCalc` wired through `parity-runner`'s three coordinated
+   additions (`stages.rs` variant + handler, `main.rs` CLI mapping,
+   `parity-bridge.mjs` JS counterpart). New dep `postcss-calc@8.2.4`
+   added to `packages/css/package.json` devDependencies.
+10. New corpus `crates/parity-runner/corpus/postcss-calc/` — 40 fixtures
+    covering: blank, no-calc passthrough, simple +/-/×/÷, nested parens,
+    compatible mixed units (cm↔px), incompatible units (`100% + 1px`),
+    var() bailout (simple + nested), nested calc inside calc, vendor
+    prefixes (-webkit/-moz), uppercase CALC, precision boundaries
+    (`1/100`, `5/1000000`), leading-dot fractions (`.14285em`), exponent
+    notation (small + large `1.1e+10px`), negative-zero subtract
+    (`0 - 10px`), divide-by-zero / divide-by-unit error paths, lex
+    errors (`10pc + unknown`), unknown dimensions (`1unknown`),
+    unitless-with-unit pass-through, zero-drop, complex arithmetic
+    (`reduce-css-calc#45`), Q-unit conversion grid (q↔px/pt/pc/in),
+    time units (s/ms), var-division-precedence, unknown-function
+    pass-through (`constant()`, `env()`, `unknown()`), calc inside
+    shorthand decls, calc inside @media param (default mediaQueries=false
+    → unchanged), calc inside custom property (`--foo: calc(...)`),
+    whitespace variants (spaces, tabs, newlines), nested var-in-var,
+    nested calc-var combos (× / ÷ branches), unary +/- signs, consecutive
+    subtractions, distributed division across parens (cssnano#211),
+    complex var subtraction.
+
+### Verification gates run
+
+| Gate                                                                | Result |
+|---------------------------------------------------------------------|--------|
+| `cargo test --workspace --no-fail-fast`                             | **914 pass / 0 fail** |
+| `cargo test -p postcss-calc`                                        | 53/53 |
+| `parity-runner postcss-calc`                                        | 40/40 byte-clean |
+| `parity-runner postcss-calc --determinism` (twice)                  | 40/40 deterministic, both runs |
+| `parity-runner postcss-core-roundtrip`                              | 41/41 (no regression) |
+| `parity-runner discard-empty-rules`                                 | 16/16 (no regression) |
+| `parity-runner discard-duplicates`                                  | 11/11 (no regression) |
+| `parity-runner extract-stylesheets`                                 | 12/12 (no regression) |
+| `parity-runner parent-orphaned-pseudos`                             | 13/13 (no regression) |
+| `parity-runner increase-specificity`                                | 12/12 (no regression) |
+| `parity-runner merge-duplicate-at-rules`                            | 8/8 (no regression) |
+| `parity-runner normalize-current-color`                             | 10/10 (no regression) |
+| `parity-runner sort-atomic-style-sheet`                             | 17/17 (no regression) |
+| `parity-runner atomicify-rules`                                     | 24/24 (no regression) |
+| `parity-runner expand-shorthands`                                   | 45/45 (no regression) |
+| `parity-runner postcss-nested`                                      | 41/41 (no regression) |
+| `parity-runner postcss-normalize-whitespace`                        | 32/32 (no regression) |
+| `parity-runner postcss-discard-comments`                            | 27/27 (no regression) |
+| `parity-runner postcss-normalize-string`                            | 39/39 (no regression) |
+| `parity-runner postcss-normalize-positions`                         | 41/41 (no regression) |
+| `parity-runner postcss-normalize-timing-functions`                  | 28/28 (no regression) |
+| `parity-runner postcss-normalize-url`                               | 60/60 (no regression) |
+| `parity-runner postcss-minify-selectors`                            | 30/30 (no regression) |
+| `parity-runner npm-postcss-discard-duplicates`                      | 20/20 (no regression) |
+| `parity-runner sort` (end-to-end)                                   | 12/12 (no regression) |
+| `bun run packages/css/scripts/verify-napi-sort.mjs`                 | 12/12 OK |
+| `bun run packages/css/scripts/verify-engine-flag.mjs`               | 12/12 OK |
+
+### Bug-for-bug parity preserved
+
+The vendored upstream test suite at `crates/_vendor/postcss-calc-8.2.4/src/__tests__/index.js`
+contains three tests under `'comments'`, `'comments (#1)'`, `'comments nested'`
+that assert `calc(/*comment*/100px/*comment*/ + ...)` reduces to `200px` /
+`300px`. **These tests fail against the actual upstream postcss-calc@8.2.4**
+(empirically verified by running the npm copy against the test fixtures).
+The lexer has no comment rule — `/*` lexes as `DIV MUL`, lexical error.
+Upstream behavior: emit a Parse error warning, leave the calc value
+unchanged. Our port matches that behavior; the broken upstream tests are
+not exercised in the corpus.
+
+### Drift detected — `postcss-core::js_number_to_string` boundary cases
+
+**Where:** `crates/postcss-core/src/js_number.rs` — the `js_number_to_string(n)`
+helper that PARITY_VERSIONS.md §4 mandates for every plugin emitting f64
+to a CSS string.
+
+**What:** ECMA-262 §6.1.6.1.13 (Number.prototype.toString) switches to
+scientific notation when the exponent is `≥ 21` OR `≤ -7`. Specifically
+`String(1e21)` → `"1e+21"`, `String(1e-7)` → `"1e-7"`. Rust's
+`format!("{}", f64)` (Ryu) keeps decimal notation everywhere V8 uses
+scientific:
+
+| Input     | JS `String(n)`   | Rust `format!("{}", n)`                        |
+|-----------|------------------|------------------------------------------------|
+| `1e-7`    | `"1e-7"`         | `"0.0000001"`                                  |
+| `1e21`    | `"1e+21"`        | `"1000000000000000000000"`                    |
+
+The current `js_number_to_string()` falls through to `format!("{}", n)`
+for non-integer finite numbers and does NOT add the scientific-notation
+branches.
+
+**Why we don't fix it here (per CLAUDE.md "DON'T work around drift"):**
+fixing `js_number_to_string` is a postcss-core change, not a
+postcss-calc change. Every other plugin that emits numbers depends on
+the same helper. The fix needs to land once, in the helper, with its
+own drift-evidence parity test in postcss-core's vector suite — not
+patched into one consumer at a time. **Reporting it here per the
+drift-detection mandate.**
+
+**Why postcss-calc didn't trip it on the 40-input corpus:** with default
+`precision: 5`, every result is `Math.round(value * 10^5) / 10^5`, so
+the smallest non-zero output magnitude is `1e-5` (well above the `1e-6`
+boundary where scientific notation kicks in). The largest values seen
+in the corpus are `2.2e10` (from `1.1e+10px + 1.1e+10px = 22000000000px`),
+also well below `1e21`. A future corpus input that lands a calc result
+in `(0, 1e-6)` or `[1e21, ∞)` will diverge — the JS oracle will emit
+`1e-7` style and the Rust port will emit `0.0000001`. **Inputs to watch:**
+`calc(1px / 1e21)` (Number division yielding `1e-21px`) or
+`calc(1e10 * 1e11px)` (yields `1e21px`). Neither shows up in the
+upstream test inventory but both are valid CSS that real users have
+been observed writing.
+
+**Concrete failing inputs the corpus does not currently exercise (to
+add when the helper is fixed):**
+
+```css
+.foo { width: calc(1e-2px / 1e5); }     /* result: 1e-7px → JS "1e-7px", Rust "0.0000001px" */
+.foo { width: calc(1e+10px * 1e+11); }  /* result: 1e21px → JS "1e+21px", Rust "1000000000000000000000px" */
+```
+
+Adding these to the corpus today would fail the gate. Hold off on adding
+them until the helper is fixed; otherwise this port appears red for a
+problem it isn't responsible for.
+
+## Phase 6g foundation — `colord` minify drift fix + `cssnano-postcss-colormin@5.3.1` PARTIAL port (2026-05-03)
+
+**Multi-session port** of the highest-risk cssnano plugin (Phase 6g).
+This session lands the load-bearing `colord` drift fix and the
+`minifyColor.js` helper. The plugin entry (`transform()` + `OnceExit`
+walkDecls + browserslist resolve) remains for the next session.
+
+### Drift fix — `crates/colord/src/plugins/minify.rs`
+
+**Drift root cause:** the original `colord/plugins/minify.rs` was a
+~36-LOC placeholder that bore no resemblance to upstream
+`colord@2.9.3 plugins/minify.js`. Specifically:
+
+| Upstream behavior | Old port |
+|---|---|
+| Default opts `{hex:true, rgb:true, hsl:true}` (others falsy) | No defaulting — `MinifyOpts::all()` was the only provider |
+| Hex shortener: collapses `#aabbcc`→`#abc`, `#aabbccdd`→`#abcd` when pairs match; returns `null` if 2dp alpha round-trip fails | Just emitted `to_hex()` (full 7/9-char form) |
+| Numeric formatter `n(t)`: strips leading zero on `0<t<1` → `.5` not `0.5` | None — relied on `to_rgb_string()` / `to_hsl_string()` which emit `rgb(255, 0, 0)` with spaces |
+| RGB form: `rgb(r,g,b)` with **no spaces**; `rgba(...)` with leading-zero-trimmed alpha | Spaces present (wrong) |
+| HSL form: `hsl(h,s%,l%)` no spaces | Spaces present (wrong) |
+| `transparent` only when `r=g=b=0 && alpha=0` | Triggered on alpha=0 regardless of RGB |
+| `name` only when `alpha === 1` | Added unconditionally |
+| First-shortest tie-break (`<`, not `<=`) | `min_by_key` (close but coincidental) |
+
+**Why this blocked colormin:** `postcss-colormin@5.3.1/src/minifyColor.js`
+is essentially `colord(input).minify(opts)` plus a length-fallback. Every
+consumer call routes through `minify()`. Porting colormin on top of the
+broken implementation would have guaranteed byte-divergence on every
+non-trivial color input.
+
+**Fix scope** (`crates/colord/src/plugins/minify.rs`, full rewrite):
+
+1. `MinifyOpts::default()` now mirrors `Object.assign({hex:!0, rgb:!0,
+   hsl:!0}, undefined)` — `hex/rgb/hsl: true`,
+   `name/transparent/alpha_hex: false`. `MinifyOpts::all()` retained as
+   a test-only convenience.
+2. `n_format(t)` helper: `String(t).replace("0.", ".")` for `0 < t < 1`,
+   `js_number_to_string(t)` otherwise. Routes through
+   `postcss_core::js_number_to_string` for V8-equivalent f64 formatting.
+3. `hex_short(c)` helper: ports upstream `r(t)` line-for-line — 2dp
+   round-trip check on fractional alpha (returns None when the alpha
+   pair won't round-trip through `Math.round(100*pair/255)/100`),
+   3-pair RGB collapse, 4-pair full collapse with alpha.
+4. `minify(c, opts)` rewritten: 7 candidates total (hex, rgb, hsl,
+   transparent, name) with mutually-exclusive `else if` between
+   `transparent`/`name`. First-shortest tie-break preserves
+   hex,rgb,hsl,name priority order.
+5. `crates/colord/Cargo.toml` gains `postcss-core` workspace dep
+   (needed for `js_number_to_string`) and `serde_json` dev-dep (for
+   the parity vector test).
+6. **JS-parity vector test** at `crates/colord/tests/minify_parity.rs`
+   — consumes `crates/colord/tests/minify_vectors.json` (392 vectors:
+   49 colors × 8 opt presets) generated by
+   `packages/css/scripts/colord-minify-vectors.mjs` against the
+   pinned `colord@2.9.3` source. **All 392 vectors byte-clean.**
+7. `packages/css/package.json` devDependencies gain `colord@2.9.3` +
+   `postcss-colormin@5.3.1` so the parity script's resolver finds them
+   (mirrors Phase 6c's pattern with postcss-minify-selectors).
+
+**Drift evidence:** before-fix invocation
+`minify(colord("#aabbcc"), &MinifyOpts::default())` returned
+`"#aabbcc"` (7 chars); upstream JS returns `"#abc"` (4 chars). After
+fix: byte-equal. Locked in via the 392-vector parity gate.
+
+### Partial port — `crates/cssnano-postcss-colormin/`
+
+**Done:**
+
+1. `crates/_vendor/postcss-colormin-5.3.1/` — vendored upstream source
+   (159 LOC `index.js` + 29 LOC `minifyColor.js` + LICENSE/README/
+   package.json/types).
+2. `crates/cssnano-postcss-colormin/src/minify_color.rs` — full port
+   of `src/minifyColor.js`: wraps `colord(input).minify(opts)` with
+   the `< input.length` strict-shorter check, falling back to
+   `input.to_lowercase()` (CSS color values are ASCII so byte-vs-UTF16
+   length divergence is non-existent in practice).
+3. `crates/cssnano-postcss-colormin/src/lib.rs` — `index.js` helper
+   constants and pure functions ported:
+   - `BROWSERS_WITH_TRANSPARENT_BUG` (`{"ie 8", "ie 9"}`).
+   - `MATH_FUNCTIONS` (`{"calc","min","max","clamp"}`) + the
+     `is_math_function_name(value)` predicate (case-insensitive lookup).
+   - `SKIP_PROP_RE` lazy-compiled regex
+     `(?i)^(composes|font|src$|filter|-webkit-tap-highlight-color)`.
+   - `add_plugin_defaults(user, resolved_browsers, query)` — mirrors
+     upstream's `Object.assign({...defaults}, user)` merge with
+     transparent/alphaHex/name defaults computed from caniuse-api +
+     IE 8/9 detection.
+4. `Cargo.toml` deps: gained `once_cell`, `regex` workspace deps for
+   the constants. Existing `colord`, `caniuse-api`, `browserslist-shim`,
+   `postcss-value-parser`, `postcss-core` already present.
+
+**Verification gates run:**
+
+| Gate | Result |
+|---|---|
+| `cargo test -p colord` | 55/55 (lib) + 1/1 (minify_parity integration) |
+| `cargo test -p cssnano-postcss-colormin` | 11/11 |
+| `cargo test -p cssnano-postcss-minify-gradients` | passes (no regression — uses `colord` minify too) |
+| `cargo test --workspace --exclude parity-runner --exclude compiled-css-napi` | OK on every crate I touched |
+
+`postcss-calc` fails to build with `no field 'attribute_payload' on
+&mut postcss_selector_parser::Node` — that's the parallel ordered-
+values agent's untracked in-flight work
+(`crates/postcss-calc/src/lib/transform.rs`), not from this session.
+Surface area I touched (`colord`, `cssnano-postcss-colormin`,
+`packages/css/package.json`) is fully green.
+
+### What remains for next session
+
+The plugin entry body. Concretely:
+
+1. **`walk(parent, callback)`** helper in `lib.rs` —
+   `parent.nodes.forEach((node, idx) => { const bubble =
+   callback(node, idx, parent); if (node.type === 'function' &&
+   bubble !== false) walk(node, callback); })`. Backs the postcss-
+   value-parser walk in `transform()`.
+2. **`transform(value, options)`** in `lib.rs`:
+   - Parse `value` via `postcss_value_parser::parse`.
+   - Walk; for each `Function` node whose `value` matches
+     `^(rgb|hsl)a?$/i`, replace with `minify_color_value(stringify(node), options)`,
+     change kind to `Word`, then if the next sibling is a Word/Function,
+     splice a `Space{value:" "}` token at index+1 (parity-critical —
+     prevents `rgb(...)blue` from concatenating to `redblue`).
+   - For `Word` nodes, replace value with `minify_color_value(value, options)`.
+   - For math functions (`isMathFunctionNode`), return false from the
+     walk callback to skip recursion.
+   - Stringify and return.
+3. **`postcss_colormin()` plugin entry** — postcss `prepare(result)`/
+   `OnceExit` hook:
+   - Resolve browsers via `browserslist_shim::resolve(query, true)`.
+   - Build options via `add_plugin_defaults(user, resolved, query)`.
+   - Build cache: `IndexMap<String, String>` keyed by upstream
+     `JSON.stringify({value, options, browsers})` — must mirror that
+     exact key shape since cache hits short-circuit `transform`.
+   - `walkDecls`: skip via `SKIP_PROP_RE`, no-op on empty value, hit
+     cache, otherwise `transform(value, options)` and store back.
+4. Wire `Stage::PostcssColormin` into parity-runner
+   (`crates/parity-runner/src/stages.rs` + `main.rs`) and add the JS
+   stage to `packages/css/scripts/parity-bridge.mjs`.
+5. Build a corpus at `crates/parity-runner/corpus/postcss-colormin/`
+   covering: rgb/rgba/hsl/hsla rewrites, hex collapse, name lookup,
+   transparent shortcut, math-function bailout, `composes`/`font`/
+   `src`/`filter`/`-webkit-tap-highlight-color` skip-prop, cache hits,
+   browserslist-driven `transparent`/`alphaHex` toggles (modern vs
+   IE 8/9 targets), and the rgb→word splice-space case.
+6. Run the parity gate. Cardinal rule: zero bytes diff before
+   shipping; if anything reds, treat as drift and stop.
+
+**Critical follow-up:** before next session declares Phase 6g done,
+verify `cssnano-postcss-minify-gradients` (Phase 6g sibling) doesn't
+regress — it also calls `colord(...).minify(opts)`. The drift fix
+should help it (gradients was likely also producing wrong bytes), so
+add a parity-gate replay against its corpus once that crate's gate
+exists.
+
+## Phase 6e ship — `cssnano-postcss-reduce-initial@5.1.2` byte-clean (2026-05-03)
+
+Browserslist+caniuse-gated rewrite of declaration values to/from the
+`initial` keyword. `prepare(result)` resolves
+`isSupported('css-initial-value', browsers)` once at instantiation,
+then `OnceExit` walks every `Declaration`. Now byte-clean end-to-end
+against the AFM-pinned oracle.
+
+### What landed this session
+
+1. `crates/_vendor/postcss-reduce-initial-5.1.2/` — vendored upstream
+   source (~70 LOC `index.js` + `data/{fromInitial,toInitial}.json`).
+2. `crates/cssnano-postcss-reduce-initial/src/data/{fromInitial,toInitial}.json`
+   — byte-identical copies of the upstream JSON tables (315 +
+   33 entries), embedded via `include_str!` and parsed once into
+   `IndexMap` at first use (`once_cell::Lazy`). Folder layout mirrors
+   upstream `package/src/data/` 1:1.
+3. `crates/cssnano-postcss-reduce-initial/src/lib.rs` — full port of
+   `index.js`. `PostcssReduceInitialOpts { ignore, env }` mirrors the
+   shape of `result.opts` upstream consumes. Browserslist resolution
+   delegated to `caniuse_api::is_supported("css-initial-value", "")`,
+   which itself flows through `browserslist_shim::resolve("")` →
+   default query → matches the JS path byte-for-byte (AFM never sets
+   `stats`/`env`/`path`). `Cargo.toml` pulls in `indexmap` /
+   `once_cell` / `serde_json` workspace deps.
+4. **Bug-for-bug preserved.** `defaultIgnoreProps = ['writing-mode',
+   'transform-box']` (cssnano#905). `opts.ignore` is unioned WITHOUT
+   lowercasing the user-supplied entries — a `'MIN-WIDTH'` entry does
+   NOT suppress the rewrite of `min-width`. `fromInitial` lookup uses
+   the JS truthiness check (`!fromInitial[k]`) which collapses to
+   presence on this data because every value is a non-empty string
+   (incl. `"0"`, which is JS-truthy).
+5. `Stage::PostcssReduceInitial` wired through `parity-runner` —
+   variant + dispatch handler in `stages.rs`, CLI mapping in
+   `main.rs`, JS counterpart in `parity-bridge.mjs`. New
+   devDependency `postcss-reduce-initial@5.1.2` added to
+   `packages/css/package.json`.
+6. New corpus `crates/parity-runner/corpus/postcss-reduce-initial/`
+   — 30 fixtures covering: blank, no-op decls, fromInitial branch
+   (uppercase value/prop, vendor prefix, unknown prop short-circuit,
+   white-space/min-width/max-width), toInitial branch (border-collapse,
+   color, background-color, box-sizing, currentcolor compounds, multi-
+   word value, uppercase value), default-ignore guards (writing-mode
+   in both directions including uppercase, transform-box), `!important`
+   preservation, value with extra whitespace, value with trailing
+   comment, decls inside `@media`/`@supports`, root-level decls,
+   no-decl rule, nested-prop rewrites, mixed-branches sweep,
+   realistic atomic.
+
+### Verification gates run
+
+| Gate                                                                | Result |
+|---------------------------------------------------------------------|--------|
+| `cargo test --workspace --no-fail-fast`                             | **850 pass / 0 fail / 3 ignored** |
+| `cargo test -p cssnano-postcss-reduce-initial`                      | 12/12 |
+| `parity-runner postcss-reduce-initial`                              | 30/30 byte-clean |
+| `parity-runner postcss-reduce-initial --determinism`                | 30/30 deterministic |
+| `parity-runner postcss-core-roundtrip`                              | 41/41 (no regression) |
+| `parity-runner postcss-minify-selectors`                            | 30/30 (no regression) |
+| `parity-runner postcss-normalize-url`                               | 60/60 (no regression) |
+| `parity-runner postcss-nested`                                      | 41/41 (no regression) |
+| `parity-runner npm-postcss-discard-duplicates`                      | 20/20 (no regression) |
+| `parity-runner sort` (end-to-end)                                   | 12/12 (no regression) |
+| `parity-runner sort-atomic-style-sheet`                             | 17/17 (no regression) |
+| `bun run packages/css/scripts/verify-napi-sort.mjs`                 | 12/12 OK |
+| `bun run packages/css/scripts/verify-engine-flag.mjs`               | 12/12 OK |
+
+### Notes for future readers
+
+- The plugin signature accepts `PostcssReduceInitialOpts { ignore,
+  env }`. `env` is currently dormant — upstream forwards it to
+  `browserslist(null, { stats, path, env })`, but AFM's `normalize-
+  css.ts` invokes the plugin with no opts. When a future consumer
+  needs env-aware browserslist resolution, that's the appropriate
+  time to extend `browserslist_shim::resolve` with a stats/env/path
+  surface; until then the empty-query default-fallback path matches
+  the JS oracle byte-for-byte.
+- The pre-existing `oxc_browserslist` snapshot drift documented in
+  `crates/POSSIBLE_DRIFT_CAUSES.md` is the only realistic vector by
+  which this plugin could diverge from the JS oracle (caniuse target
+  resolution feeds `initialSupport`). The 30-entry corpus does not
+  surface it; flag loudly if a future AFM input does, and DO NOT
+  patch around the divergence in this plugin.
+
+## Phase 6d ship — `cssnano-postcss-ordered-values@5.1.3` byte-clean (2026-05-03)
+
+Multi-value reordering for `border` / `box-shadow` / `animation` /
+`transition` / `flex-flow` / `outline` / `column-rule` / `columns` /
+`list-style` / `grid-auto-flow` / `grid-{column,row,…}` /
+`grid-{column,row}-gap`. Now byte-clean end-to-end against the AFM-pinned
+JS oracle.
+
+### What landed this session
+
+1. `crates/_vendor/postcss-ordered-values-5.1.3/` — vendored upstream
+   source (`src/index.js`, `src/lib/*.js`, `src/rules/*.js`,
+   `src/rules/listStyleTypes.json`).
+2. `crates/_vendor/POSTCSS_ORDERED_VALUES_5.1.3_REAUDIT.md` — file map +
+   10 behavioural anomalies that must be preserved (last-match-wins for
+   flex-flow, last-token-decided `shouldNormalize` in grid-auto-flow,
+   asymmetric `dense` vs `row`/`column` matching, vendor-prefixed math
+   functions in box-shadow, etc.).
+3. `crates/cssnano-postcss-ordered-values/src/helpers/*.rs` — full port
+   of `src/lib/`: `add_space`, `get_value`, `join_grid_value`,
+   `math_functions`, `vendor_unprefixed` (ASCII-only `\w` per JS
+   no-`u`-flag regex semantics).
+4. `crates/cssnano-postcss-ordered-values/src/rules/*.rs` — full port of
+   `src/rules/`: `animation`, `border`, `box_shadow`, `columns`,
+   `flex_flow`, `grid` (3 exports), `list_style` (with 98-entry
+   `list_style_types.rs`), `transition`.
+5. `crates/cssnano-postcss-ordered-values/src/lib.rs` — `OnceExit`
+   walker with vendor-prefix-aware property dispatch, `IndexMap` cache
+   (insertion-ordered), `getValue` raws.value.raw fallback, and the
+   `shouldAbort` short-circuit (var/env/constant function calls,
+   comments, `___CSS_LOADER_IMPORT___` markers). Bail path matches JS
+   verbatim — `decl.value` is NOT touched on first-visit bail, only on
+   cache hit.
+6. `crates/parity-runner/src/stages.rs::Stage::PostcssOrderedValues` +
+   `crates/parity-runner/Cargo.toml` dep wiring + `parity-bridge.mjs`
+   import + `tests/postcss_ordered_values.rs` integration test.
+7. `crates/parity-runner/corpus/postcss-ordered-values/{01..36}*.css`
+   — 36-entry corpus covering every rule + bailout path + cache
+   collision + vendor-prefixed properties + uppercase keyword handling
+   + each documented anomaly.
+8. `packages/css/package.json` devDependency added: `postcss-ordered-values: 5.1.3`.
+   Following the precedent set by Phase 6a-c (`postcss-discard-comments`,
+   `postcss-minify-selectors`, etc.) — devDependencies for parity-test
+   infrastructure live alongside the source they diff against.
+
+### Verification gates run
+
+| Gate | Result |
+|---|---|
+| `cargo build -p cssnano-postcss-ordered-values`                         | clean |
+| `cargo test -p cssnano-postcss-ordered-values`                          | 19/19 unit + 5/5 helpers (vendor_unprefixed) |
+| `cargo test -p parity-runner --test postcss_ordered_values`             | 36/36 byte-clean against JS oracle |
+| `cargo test --workspace --no-fail-fast`                                 | 807 passed / 0 failed / 3 ignored |
+
+### Drift surface examined — no drift introduced
+
+The 10 anomalies in the audit are preserved verbatim:
+1. `flex-flow` last-match-wins (covered by `32_flex_flow_last_wins.css` +
+   unit test `flex_flow_last_match_wins_anomaly`).
+2. `grid-auto-flow` `shouldNormalize` flag is **last-token-decided**
+   (covered by `33_grid_with_invalid_token.css`).
+3. `grid-auto-flow` first-branch uses `===` (no toLowerCase) while
+   second-branch uses `.trim().toLowerCase()` (asymmetric — port
+   verbatim).
+4. `box-shadow` math-fn detection runs `vendorUnprefixed(value.toLowerCase())`
+   so `-webkit-calc(…)` aborts (covered by `09_box_shadow_with_calc.css`).
+5. `border` walk returns `false` from cb on every branch — never recurses
+   into Function children. Math functions get full `valueParser.stringify`
+   as their width.
+6. `animation` first-match-wins per bucket; subsequent matches fall
+   through to `name`. Multiple times: first → duration, second → delay,
+   third → name (covered by `31_animation_three_times.css`).
+7. `transition` second time bucket is `state.time2` (the JS variable name
+   omits the "delay" semantic). Output order is property → time1 →
+   timingFunction → time2.
+8. Cache stores **input value as output** on bail
+   (`length<2 || shouldAbort`); subsequent visits hit the cache and JS
+   unconditionally assigns `decl.value = cached`. The Rust port matches
+   — but on FIRST visit + bail, `decl.value` stays untouched (preserves
+   any `raws.value.raw` form).
+9. `shouldAbort` walks recursively (with bubble=false) and returns
+   `Some(false)` to suppress descent — abort flag stays sticky.
+10. `getValue` mutates last node of each non-final segment from
+    `space` to `div` in place — Rust port owns the Vec<Node> and
+    mutates it locally, no aliasing concern.
+
+### Lessons from Phase 6d — apply to every future port
+
+- **`RUSTFLAGS=""` is required for the workspace `cargo test`.** Ambient
+  `RUSTFLAGS="-C lto=thin"` causes `proc-macro` crate types
+  (displaydoc / serde_derive / zerovec-derive / yoke-derive /
+  zerofrom-derive) to error with `lto cannot be used for proc-macro
+  crate type without -Zdylib-lto`. Carry the empty-flags convention
+  forward in any new test invocation.
+- **Bail-path semantics in cssnano plugins are subtle:** JS callers
+  short-circuit with bare `return` (NO `decl.value` write) on the
+  first-visit bail, but `decl.value = cache.get(value)` on every cache
+  hit. The Rust port must split these two paths — clobbering
+  `decl.value = value` on the first-visit bail destroys any
+  `raws.value.raw` form. Same drift class as the `cssnano-postcss-normalize-string`
+  raws-clearing bug.
+- **`vendorUnprefixed`'s regex is ASCII-only** (no `u` flag). Either
+  hand-scan, or wrap `\w` in `(?-u:\w)` if using the `regex` crate.
+  Same drift class as the `postcss-normalize-timing-functions`
+  property-regex fix.
+
+## Phase 6c ship — `cssnano-postcss-minify-selectors@5.2.1` byte-clean (2026-05-03)
+
+Selector minification (whitespace collapse, attribute unquoting, nth-*
+rewrites, sibling dedup, pseudo-element double-colon strip, keyframe
+from↔0% / 100%↔to). Now byte-clean end-to-end against the AFM-pinned
+oracle.
+
+### What landed this session
+
+1. `crates/_vendor/postcss-minify-selectors-5.2.1/` — vendored upstream
+   source (215 LOC `index.js` + 25 LOC `lib/canUnquote.js`).
+2. `crates/cssnano-postcss-minify-selectors/src/can_unquote.rs` — full
+   port of `lib/canUnquote.js` (mothereff.in escape-handling regex,
+   disallowed-range check, leading-digit/double-minus rejection).
+3. `crates/cssnano-postcss-minify-selectors/src/lib.rs` — full port of
+   `index.js`. All five reducers (`attribute`, `combinator`, `pseudo`,
+   `tag`, `universal`), the OnceExit walk + per-rule cache, and the
+   final `nodes.sort()` lex-ordering of top-level Selectors.
+4. **`crates/postcss-selector-parser/src/parser.rs` drift fix** —
+   `flush_pending_descendant_combinator` helper emits explicit
+   `Combinator{value: " "}` nodes between content siblings separated
+   by whitespace, mirroring upstream `dist/parser.js::combinator` lines
+   481-569 (the descendant-combinator branch). Previously our parser
+   stored descendant whitespace as the next sibling's `spaces.before`,
+   which masqueraded under `raw_value` round-trip but diverged whenever
+   a plugin mutated the AST. The drift was already flagged by the Phase
+   5a notes; this lands the proper parser-side fix.
+5. **`crates/postcss-nested/src/lib.rs::replace_nesting`** — removed
+   the `new_node.spaces = nesting_spaces` workaround that compensated
+   for #4. The parser fix obviates the transfer; doc comment also
+   updated.
+6. `Stage::PostcssMinifySelectors` wired through `parity-runner`'s
+   three coordinated additions (`stages.rs` variant + handler,
+   `main.rs` CLI mapping, `parity-bridge.mjs` JS counterpart). New dep
+   `postcss-minify-selectors@5.2.1` added to `packages/css/package.json`
+   devDependencies and resolved via `bun install`.
+7. New corpus `crates/parity-runner/corpus/postcss-minify-selectors/`
+   — 30 fixtures covering: blank, simple class, descendant whitespace
+   collapse, combinator padding (>/+/~), comma list with/without
+   inter-arg space, dedupe-with-no-space (fires) vs dedupe-with-space
+   (bug-for-bug: doesn't fire), top-level sort, all four nth-* → first/
+   last/2n/odd rewrites, pseudo-element ::before/::after compression,
+   modern pseudo-element preservation, keyframe from→0% and 100%→to,
+   universal-with-descendant kept (post-parser-fix), universal compounded
+   removed, attribute unquote/keep-space/keep-digit/insensitive flag,
+   custom-mixin trailing-colon passthrough, `:is(.a,.b,.a)` dedupes vs
+   `:is(.a, .b, .a)` doesn't (mirrors upstream's "leading-space-on-second-arg"
+   bug), and selector cache idempotence.
+
+### Verification gates run
+
+| Gate                                                                | Result |
+|---------------------------------------------------------------------|--------|
+| `cargo test --workspace --no-fail-fast`                             | **801 pass / 0 fail** |
+| `cargo test -p postcss-selector-parser`                             | 31/31 (post-parser-fix) |
+| `cargo test -p postcss-nested`                                      | 6/6 (post-workaround-removal) |
+| `cargo test -p cssnano-postcss-minify-selectors`                    | 49/49 |
+| `parity-runner postcss-minify-selectors`                            | 30/30 byte-clean |
+| `parity-runner postcss-minify-selectors --determinism`              | 30/30 deterministic |
+| `parity-runner postcss-core-roundtrip`                              | 41/41 (no regression) |
+| `parity-runner parent-orphaned-pseudos`                             | 13/13 (no regression) |
+| `parity-runner increase-specificity`                                | 12/12 (no regression) |
+| `parity-runner atomicify-rules`                                     | 24/24 (no regression) |
+| `parity-runner discard-duplicates`                                  | 11/11 (no regression) |
+| `parity-runner sort-atomic-style-sheet`                             | 17/17 (no regression) |
+| `parity-runner merge-duplicate-at-rules`                            | 8/8 (no regression) |
+| `parity-runner postcss-nested`                                      | 41/41 (no regression) |
+| `parity-runner npm-postcss-discard-duplicates`                      | 20/20 (no regression) |
+| `parity-runner sort` (end-to-end)                                   | 12/12 (no regression) |
+| `bun run packages/css/scripts/verify-napi-sort.mjs`                 | 12/12 OK |
+| `bun run packages/css/scripts/verify-engine-flag.mjs`               | 12/12 OK |
+
+### Drift fix — `postcss-selector-parser` descendant Combinator emission
+
+**Drift root cause:** upstream `postcss-selector-parser@6.1.2`'s
+`combinator()` parser method (`dist/parser.js` lines 481-569) emits an
+explicit `Combinator{value: " "}` node when a run of whitespace tokens
+separates two content tokens. Our Rust port instead accumulated
+`pending_space` and attached it to the next content node's
+`spaces.before`. Round-trip via `Selector.raw_value` masked this
+divergence; any plugin that mutated the AST would expose it.
+
+**Evidence captured before fix** (`packages/css/scripts/dbg-minify.mjs`):
+
+```
+UPSTREAM AST for `.a .b`:
+  selector
+    class      value="a"  spaces={before:"", after:""}
+    combinator value=" "  spaces={before:"", after:""}      ← explicit descendant Combinator
+    class      value="b"  spaces={before:"", after:""}
+
+OLD RUST AST for `.a .b`:
+  Selector
+    ClassName  value="a"  spaces.before=""  .after=""
+    ClassName  value="b"  spaces.before=" " .after=""        ← whitespace fused on next sibling
+```
+
+**Concrete user-visible impact (before fix):** any selector minifier or
+nested-resolver that cleared spaces on every visited node produced
+`.a.b` instead of `.a .b`, dropping the descendant relationship. The
+universal reducer in `cssnano-postcss-minify-selectors` would also drop
+`*` from `* .a` (next sibling kind was ClassName instead of Combinator).
+Verified against upstream JS — both are byte-divergent.
+
+**Fix scope** (4 sites in `parser.rs::build_selector_children`): added
+`flush_pending_descendant_combinator(selector, &mut pending_space)` call
+before each content emission (word, asterisk, ampersand, colon,
+openSquare, fallback Tag). Helper checks whether the previously emitted
+sibling is a non-Combinator content node; if so, consumes the pending
+whitespace into a `Combinator{value: " "}` node, slicing per upstream
+lines 548-556 (trailing/leading SP determines `spaces.before`/`after`
+distribution). When there's no previous content sibling (Selector
+freshly opened after a comma split, pseudo-arg start), the pending
+whitespace is restored so the existing `apply_pending_space` path
+attaches it to the upcoming node's `spaces.before` — matching upstream
+line 488's `nodes.forEach(n => this.newNode(n))` no-last-sibling branch.
+
+**Round-trip preservation:** `Selector.raw_value` continues to hold the
+original input bytes; `any_subtree_mutated` already returns true for any
+fresh-parse Selector (its children's `raw_value` are None), so the
+stringifier always renders Selectors via children. The new Combinator
+node renders its `spaces.before + value(" ") + spaces.after` exactly
+matching the original whitespace bytes. Verified across all 41
+postcss-core-roundtrip corpus inputs — zero regression.
+
+**`postcss-nested` workaround dropped:** `replace_nesting` previously
+copied `nesting.spaces` onto the substituted parent node to preserve
+`.b & { ... }`-style descendant whitespace through the substitution.
+With the parser fix, the descendant whitespace lives on a separate
+`Combinator(" ")` sibling that survives the in-place node swap intact —
+the spaces transfer is no longer needed and was removed (line 134).
+postcss-nested's 6 unit tests + 41-input parity stage all green
+post-removal.
+
+**Drift evidence test locked in:**
+`crates/cssnano-postcss-minify-selectors/src/lib.rs::tests::drift_evidence_descendant_combinator`
+dumps the Rust AST for the four canonical inputs (`.a .b`, `* .a`,
+`.a > .b`, `.a+.b`); future "fixes" that re-introduce drift will surface
+as a diff.
+
 ## postcss-selector-parser API extension for cssnano-postcss-minify-selectors@5.2.1 (2026-05-02)
 
 The original `crates/postcss-selector-parser` port was scoped to the 4
@@ -1143,15 +1826,15 @@ header. **No code changes required** — all 489 tests still green.
 | 6b | postcss-normalize-positions@5.1.1 | **DONE** — byte-clean across 20-entry corpus, deterministic JS oracle |
 | 6b | postcss-normalize-timing-functions@5.1.0 | **DONE** — byte-clean across 21-entry corpus, deterministic JS oracle |
 | 6b | postcss-normalize-url@5.1.0 | **DONE** — byte-clean across 60-entry corpus, deterministic JS oracle |
-| 6c | postcss-minify-selectors@5.2.1 | **SCAFFOLDED** |
-| 6d | postcss-ordered-values@5.1.3 | **SCAFFOLDED** |
+| 6c | postcss-minify-selectors@5.2.1 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. Required `postcss-selector-parser` descendant-Combinator drift fix; `postcss-nested` workaround dropped as a follow-up. |
+| 6d | postcss-ordered-values@5.1.3 | **DONE** — byte-clean across 36-entry corpus, deterministic JS oracle. 19 unit + 5 helper tests. |
 | 6d | postcss-calc@8.2.4 | **SCAFFOLDED** — calc expression evaluator; high diff risk on float math. |
 | 6e | postcss-normalize-unicode@5.1.1 | **SCAFFOLDED** — browserslist-aware. |
-| 6e | postcss-reduce-initial@5.1.2 | **SCAFFOLDED** — caniuse-aware. |
+| 6e | postcss-reduce-initial@5.1.2 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. 12 unit tests. |
 | 6f | postcss-convert-values@5.1.3 | **SCAFFOLDED** — uses fraction-js. |
 | 6f | postcss-minify-params@5.1.4 | **SCAFFOLDED** — caniuse-aware. |
 | 6g | postcss-minify-gradients@5.1.1 | **SCAFFOLDED** — uses colord. |
-| 6g | postcss-colormin@5.3.1 | **SCAFFOLDED** — highest-risk cssnano plugin. |
+| 6g | postcss-colormin@5.3.1 | **PARTIAL** (multi-session) — `colord` minify drift FIXED with 392-vector JS-parity gate; `minifyColor.js` ported byte-for-byte; helper constants/`add_plugin_defaults`/`SKIP_PROP_RE` ported; `transform()` body + `OnceExit` walkDecls + parity-runner stage remain for next session. See "Phase 6g foundation" entry above. |
 | 6h | cssnano-preset-default@5.2.14 (orchestrator) | **SCAFFOLDED** |
 | 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **All base classes fully ported:** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs`, `browsers.rs`, `at_rule.rs`, `value.rs`, `selector.rs`, `declaration.rs`, `resolution.rs`, plus `prefixes.rs` registry skeleton with `register_hacks(reg)` append-only block. **`data/prefixes.rs` byte-clean** — 183 entries, codegen via `build.rs` from vendored JS through `bun`, 4 parity gates (canonical-JSON byte-equal, entry count, key order, caniuse-lite version pin). **59 tests passing (53 unit + 4 data parity + 2 browserslist parity active; 1 browserslist parity gate ignored, see "Phase 7 ship — browserslist-shim parity gate" below).** (Latest: `+1` active test `browserslist_shim_firefox_esr_matches_js_oracle` pinning the `rewrite_firefox_esr` shim path against `browserslist@4.24.2` JS oracle; `+1` active test `workspace_browserslist_pin_is_424_2` pinning `require('browserslist').version === '4.24.2'` after fixing the missing devDependency entry that was floating workspace resolution to 4.28.2 (root `package.json` now lists browserslist in BOTH `overrides` AND `devDependencies`); `+1 ignored` omnibus gate test `browserslist_shim_matches_js_oracle_for_canonical_queries` documenting the open caniuse-lite snapshot drift between `oxc_browserslist`'s bundled snapshot and the workspace pin 1.0.30001766. Prior: regression test in `resolution.rs::prefix_query_o_dpcm_uses_simplify` pinning the JS `value.simplify()` call after dpcm/dpi unit conversion — was a latent byte-divergence in the `-o-` resolution branch; fixed via `f.simplify(None)` after fraction-js audit surfaced the missing call.) Hacks agent **unblocked**. Still stubbed: `supports.rs`, `transition.rs` (heavy, hacks rarely subclass), `processor.rs`, `info.rs`, `autoprefixer.rs`, all 58 hacks, `Prefixes::new` orchestrator body. Split contract: see "Phase 7 split contract" section below. See also "Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix". |
 | 8a | `sort()` NAPI bridge + sort.ts engine flag | **DONE** — 12/12 corpus byte-clean end-to-end on win32-x64-msvc. See "Phase 8a ship" section below. |

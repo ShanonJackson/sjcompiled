@@ -1,0 +1,3 @@
+.a { grid-column-gap: normal; }
+.b { grid-row-gap: 10px normal; }
+.c { grid-column-gap: 1em; }

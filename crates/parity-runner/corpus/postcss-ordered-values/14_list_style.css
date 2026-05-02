@@ -1,0 +1,5 @@
+.a { list-style: square inside; }
+.b { list-style: inside disc; }
+.c { list-style: url(./bullet.png) outside circle; }
+.d { list-style: none disc; }
+.e { list-style: none none; }

@@ -1,0 +1,3 @@
+.a { animation: myAnim 2s 3; }
+.b { animation: 1s 5 ease myAnim; }
+.c { animation: infinite 1s myAnim; }

@@ -1,0 +1,1 @@
+.foo { width: calc(50px - (20px - 30px)); }

@@ -1,0 +1,1 @@
+.foo { width: calc(var(--mouseX) * 1px); }

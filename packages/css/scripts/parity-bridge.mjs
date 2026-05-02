@@ -42,6 +42,12 @@ import postcssNormalizeTimingFunctions from 'postcss-normalize-timing-functions'
 import postcssNormalizeUrl from 'postcss-normalize-url';
 // npm `postcss-minify-selectors@5.2.1` — cssnano sub-plugin (Phase 6c).
 import postcssMinifySelectors from 'postcss-minify-selectors';
+// npm `postcss-ordered-values@5.1.3` — cssnano sub-plugin (Phase 6d).
+import postcssOrderedValues from 'postcss-ordered-values';
+// npm `postcss-reduce-initial@5.1.2` — cssnano sub-plugin (Phase 6e).
+import postcssReduceInitial from 'postcss-reduce-initial';
+// npm `postcss-calc@8.2.4` — cssnano sub-plugin (Phase 6d).
+import postcssCalc from 'postcss-calc';
 
 // Sheets returned by extract-stylesheets are joined with U+001E (record
 // separator) so they ride the single-string bridge protocol unambiguously.
@@ -220,6 +226,39 @@ const STAGES = {
   // dedupe; `.a,.a` does), and lex-sorts the surviving Selectors.
   'postcss-minify-selectors': (css) => {
     const result = postcss([postcssMinifySelectors()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-ordered-values@5.1.3 (no opts) → stringify.
+  // OnceExit walker. Reorders multi-value parts of border / box-shadow /
+  // animation / transition / flex-flow / outline / column-rule / columns /
+  // list-style / grid-auto-flow / grid-{column,row,…}. Variable functions
+  // (var/env/constant), comments, and ___CSS_LOADER_IMPORT___ markers
+  // short-circuit the transformation.
+  'postcss-ordered-values': (css) => {
+    const result = postcss([postcssOrderedValues()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-reduce-initial@5.1.2 (default opts) → stringify.
+  // `prepare(result)` resolves browserslist + isSupported('css-initial-value')
+  // once. OnceExit walks every Decl. `toInitial[prop] === value.toLowerCase()`
+  // → `value = "initial"` (gated on caniuse). `value === "initial"` AND
+  // `fromInitial[prop]` exists → `value = fromInitial[prop]`.
+  // `defaultIgnoreProps = ['writing-mode', 'transform-box']` always skipped.
+  'postcss-reduce-initial': (css) => {
+    const result = postcss([postcssReduceInitial()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-calc@8.2.4 (default opts) → stringify. Phase 6d.
+  // OnceExit walks every Decl, runs each `value` through value-parser,
+  // for each `(-vendor-)?calc(...)` Function node parses and reduces the
+  // inner expression via the jison grammar. Default opts:
+  // precision=5, preserve=false, warnWhenCannotResolve=false,
+  // mediaQueries=false, selectors=false.
+  'postcss-calc': (css) => {
+    const result = postcss([postcssCalc()]).process(css, { from: undefined });
     return result.css;
   },
 

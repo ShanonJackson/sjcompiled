@@ -1,0 +1,1 @@
+.foo { transition-duration: calc(1s - 50ms); animation-duration: calc(2s + 500ms); }

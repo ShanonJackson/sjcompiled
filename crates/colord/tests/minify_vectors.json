@@ -1,0 +1,4235 @@
+[
+  {
+    "input": "#ff0000",
+    "preset": "default",
+    "opts": null,
+    "expected": "#f00"
+  },
+  {
+    "input": "#ff0000",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "#ff0000",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "#ff0000",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "#ff0000",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "#ff0000",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(255,0,0)"
+  },
+  {
+    "input": "#ff0000",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,100%,50%)"
+  },
+  {
+    "input": "#ff0000",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#f00"
+  },
+  {
+    "input": "#00ff00",
+    "preset": "default",
+    "opts": null,
+    "expected": "#0f0"
+  },
+  {
+    "input": "#00ff00",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#0f0"
+  },
+  {
+    "input": "#00ff00",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#0f0"
+  },
+  {
+    "input": "#00ff00",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#0f0"
+  },
+  {
+    "input": "#00ff00",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "lime"
+  },
+  {
+    "input": "#00ff00",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(0,255,0)"
+  },
+  {
+    "input": "#00ff00",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(120,100%,50%)"
+  },
+  {
+    "input": "#00ff00",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#0f0"
+  },
+  {
+    "input": "#0000ff",
+    "preset": "default",
+    "opts": null,
+    "expected": "#00f"
+  },
+  {
+    "input": "#0000ff",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "#0000ff",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "#0000ff",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "#0000ff",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "blue"
+  },
+  {
+    "input": "#0000ff",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(0,0,255)"
+  },
+  {
+    "input": "#0000ff",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(240,100%,50%)"
+  },
+  {
+    "input": "#0000ff",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "#ffffff",
+    "preset": "default",
+    "opts": null,
+    "expected": "#fff"
+  },
+  {
+    "input": "#ffffff",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "#ffffff",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "#ffffff",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "#ffffff",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "white"
+  },
+  {
+    "input": "#ffffff",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(255,255,255)"
+  },
+  {
+    "input": "#ffffff",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,0%,100%)"
+  },
+  {
+    "input": "#ffffff",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "#000000",
+    "preset": "default",
+    "opts": null,
+    "expected": "#000"
+  },
+  {
+    "input": "#000000",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "#000000",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "#000000",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "#000000",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "black"
+  },
+  {
+    "input": "#000000",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(0,0,0)"
+  },
+  {
+    "input": "#000000",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,0%,0%)"
+  },
+  {
+    "input": "#000000",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "#aabbcc",
+    "preset": "default",
+    "opts": null,
+    "expected": "#abc"
+  },
+  {
+    "input": "#aabbcc",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "#aabbcc",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "#aabbcc",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "#aabbcc",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgb(170,187,204)"
+  },
+  {
+    "input": "#aabbcc",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(170,187,204)"
+  },
+  {
+    "input": "#aabbcc",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(210,25%,73%)"
+  },
+  {
+    "input": "#aabbcc",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "#112233",
+    "preset": "default",
+    "opts": null,
+    "expected": "#123"
+  },
+  {
+    "input": "#112233",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#123"
+  },
+  {
+    "input": "#112233",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#123"
+  },
+  {
+    "input": "#112233",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#123"
+  },
+  {
+    "input": "#112233",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgb(17,34,51)"
+  },
+  {
+    "input": "#112233",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(17,34,51)"
+  },
+  {
+    "input": "#112233",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(210,50%,13%)"
+  },
+  {
+    "input": "#112233",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#123"
+  },
+  {
+    "input": "#abcdef",
+    "preset": "default",
+    "opts": null,
+    "expected": "#abcdef"
+  },
+  {
+    "input": "#abcdef",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#abcdef"
+  },
+  {
+    "input": "#abcdef",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#abcdef"
+  },
+  {
+    "input": "#abcdef",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#abcdef"
+  },
+  {
+    "input": "#abcdef",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgb(171,205,239)"
+  },
+  {
+    "input": "#abcdef",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(171,205,239)"
+  },
+  {
+    "input": "#abcdef",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(210,68%,80%)"
+  },
+  {
+    "input": "#abcdef",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#abcdef"
+  },
+  {
+    "input": "#ab12cc",
+    "preset": "default",
+    "opts": null,
+    "expected": "#ab12cc"
+  },
+  {
+    "input": "#ab12cc",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#ab12cc"
+  },
+  {
+    "input": "#ab12cc",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#ab12cc"
+  },
+  {
+    "input": "#ab12cc",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#ab12cc"
+  },
+  {
+    "input": "#ab12cc",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgb(171,18,204)"
+  },
+  {
+    "input": "#ab12cc",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(171,18,204)"
+  },
+  {
+    "input": "#ab12cc",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(289,84%,44%)"
+  },
+  {
+    "input": "#ab12cc",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#ab12cc"
+  },
+  {
+    "input": "#fa0010",
+    "preset": "default",
+    "opts": null,
+    "expected": "#fa0010"
+  },
+  {
+    "input": "#fa0010",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#fa0010"
+  },
+  {
+    "input": "#fa0010",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#fa0010"
+  },
+  {
+    "input": "#fa0010",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#fa0010"
+  },
+  {
+    "input": "#fa0010",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgb(250,0,16)"
+  },
+  {
+    "input": "#fa0010",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(250,0,16)"
+  },
+  {
+    "input": "#fa0010",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(356,100%,49%)"
+  },
+  {
+    "input": "#fa0010",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#fa0010"
+  },
+  {
+    "input": "#123456",
+    "preset": "default",
+    "opts": null,
+    "expected": "#123456"
+  },
+  {
+    "input": "#123456",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#123456"
+  },
+  {
+    "input": "#123456",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#123456"
+  },
+  {
+    "input": "#123456",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#123456"
+  },
+  {
+    "input": "#123456",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgb(18,52,86)"
+  },
+  {
+    "input": "#123456",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(18,52,86)"
+  },
+  {
+    "input": "#123456",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(210,65%,20%)"
+  },
+  {
+    "input": "#123456",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#123456"
+  },
+  {
+    "input": "#aabbcc99",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(170,187,204,.6)"
+  },
+  {
+    "input": "#aabbcc99",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#abc9"
+  },
+  {
+    "input": "#aabbcc99",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.6)"
+  },
+  {
+    "input": "#aabbcc99",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#abc9"
+  },
+  {
+    "input": "#aabbcc99",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.6)"
+  },
+  {
+    "input": "#aabbcc99",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(170,187,204,.6)"
+  },
+  {
+    "input": "#aabbcc99",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,25%,73%,.6)"
+  },
+  {
+    "input": "#aabbcc99",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(170,187,204,.6)"
+  },
+  {
+    "input": "#aabbcc66",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(170,187,204,.4)"
+  },
+  {
+    "input": "#aabbcc66",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#abc6"
+  },
+  {
+    "input": "#aabbcc66",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.4)"
+  },
+  {
+    "input": "#aabbcc66",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#abc6"
+  },
+  {
+    "input": "#aabbcc66",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.4)"
+  },
+  {
+    "input": "#aabbcc66",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(170,187,204,.4)"
+  },
+  {
+    "input": "#aabbcc66",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,25%,73%,.4)"
+  },
+  {
+    "input": "#aabbcc66",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(170,187,204,.4)"
+  },
+  {
+    "input": "#aabbcc33",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(170,187,204,.2)"
+  },
+  {
+    "input": "#aabbcc33",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#abc3"
+  },
+  {
+    "input": "#aabbcc33",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.2)"
+  },
+  {
+    "input": "#aabbcc33",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#abc3"
+  },
+  {
+    "input": "#aabbcc33",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.2)"
+  },
+  {
+    "input": "#aabbcc33",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(170,187,204,.2)"
+  },
+  {
+    "input": "#aabbcc33",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,25%,73%,.2)"
+  },
+  {
+    "input": "#aabbcc33",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(170,187,204,.2)"
+  },
+  {
+    "input": "#aabbcccc",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(170,187,204,.8)"
+  },
+  {
+    "input": "#aabbcccc",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#abcc"
+  },
+  {
+    "input": "#aabbcccc",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.8)"
+  },
+  {
+    "input": "#aabbcccc",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#abcc"
+  },
+  {
+    "input": "#aabbcccc",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.8)"
+  },
+  {
+    "input": "#aabbcccc",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(170,187,204,.8)"
+  },
+  {
+    "input": "#aabbcccc",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,25%,73%,.8)"
+  },
+  {
+    "input": "#aabbcccc",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(170,187,204,.8)"
+  },
+  {
+    "input": "#aabbcc88",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(170,187,204,.53)"
+  },
+  {
+    "input": "#aabbcc88",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#aabbcc87"
+  },
+  {
+    "input": "#aabbcc88",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.53)"
+  },
+  {
+    "input": "#aabbcc88",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#aabbcc87"
+  },
+  {
+    "input": "#aabbcc88",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.53)"
+  },
+  {
+    "input": "#aabbcc88",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(170,187,204,.53)"
+  },
+  {
+    "input": "#aabbcc88",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,25%,73%,.53)"
+  },
+  {
+    "input": "#aabbcc88",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(170,187,204,.53)"
+  },
+  {
+    "input": "#aabbcc11",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(170,187,204,.07)"
+  },
+  {
+    "input": "#aabbcc11",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#aabbcc12"
+  },
+  {
+    "input": "#aabbcc11",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.07)"
+  },
+  {
+    "input": "#aabbcc11",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#aabbcc12"
+  },
+  {
+    "input": "#aabbcc11",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.07)"
+  },
+  {
+    "input": "#aabbcc11",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(170,187,204,.07)"
+  },
+  {
+    "input": "#aabbcc11",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,25%,73%,.07)"
+  },
+  {
+    "input": "#aabbcc11",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(170,187,204,.07)"
+  },
+  {
+    "input": "#a0b1c299",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(160,177,194,.6)"
+  },
+  {
+    "input": "#a0b1c299",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#a0b1c299"
+  },
+  {
+    "input": "#a0b1c299",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(160,177,194,.6)"
+  },
+  {
+    "input": "#a0b1c299",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#a0b1c299"
+  },
+  {
+    "input": "#a0b1c299",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(160,177,194,.6)"
+  },
+  {
+    "input": "#a0b1c299",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(160,177,194,.6)"
+  },
+  {
+    "input": "#a0b1c299",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,22%,69%,.6)"
+  },
+  {
+    "input": "#a0b1c299",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(160,177,194,.6)"
+  },
+  {
+    "input": "#abc",
+    "preset": "default",
+    "opts": null,
+    "expected": "#abc"
+  },
+  {
+    "input": "#abc",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "#abc",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "#abc",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "#abc",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgb(170,187,204)"
+  },
+  {
+    "input": "#abc",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(170,187,204)"
+  },
+  {
+    "input": "#abc",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(210,25%,73%)"
+  },
+  {
+    "input": "#abc",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "#fff",
+    "preset": "default",
+    "opts": null,
+    "expected": "#fff"
+  },
+  {
+    "input": "#fff",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "#fff",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "#fff",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "#fff",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "white"
+  },
+  {
+    "input": "#fff",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(255,255,255)"
+  },
+  {
+    "input": "#fff",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,0%,100%)"
+  },
+  {
+    "input": "#fff",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "#000",
+    "preset": "default",
+    "opts": null,
+    "expected": "#000"
+  },
+  {
+    "input": "#000",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "#000",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "#000",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "#000",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "black"
+  },
+  {
+    "input": "#000",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(0,0,0)"
+  },
+  {
+    "input": "#000",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,0%,0%)"
+  },
+  {
+    "input": "#000",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "#abcd",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(170,187,204,.87)"
+  },
+  {
+    "input": "#abcd",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#aabbccde"
+  },
+  {
+    "input": "#abcd",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.87)"
+  },
+  {
+    "input": "#abcd",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#aabbccde"
+  },
+  {
+    "input": "#abcd",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.87)"
+  },
+  {
+    "input": "#abcd",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(170,187,204,.87)"
+  },
+  {
+    "input": "#abcd",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,25%,73%,.87)"
+  },
+  {
+    "input": "#abcd",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(170,187,204,.87)"
+  },
+  {
+    "input": "rgb(255,0,0)",
+    "preset": "default",
+    "opts": null,
+    "expected": "#f00"
+  },
+  {
+    "input": "rgb(255,0,0)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "rgb(255,0,0)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "rgb(255,0,0)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "rgb(255,0,0)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "rgb(255,0,0)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(255,0,0)"
+  },
+  {
+    "input": "rgb(255,0,0)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,100%,50%)"
+  },
+  {
+    "input": "rgb(255,0,0)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#f00"
+  },
+  {
+    "input": "rgb(170,187,204)",
+    "preset": "default",
+    "opts": null,
+    "expected": "#abc"
+  },
+  {
+    "input": "rgb(170,187,204)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "rgb(170,187,204)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "rgb(170,187,204)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "rgb(170,187,204)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgb(170,187,204)"
+  },
+  {
+    "input": "rgb(170,187,204)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(170,187,204)"
+  },
+  {
+    "input": "rgb(170,187,204)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(210,25%,73%)"
+  },
+  {
+    "input": "rgb(170,187,204)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "rgb(255, 255, 255)",
+    "preset": "default",
+    "opts": null,
+    "expected": "#fff"
+  },
+  {
+    "input": "rgb(255, 255, 255)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "rgb(255, 255, 255)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "rgb(255, 255, 255)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "rgb(255, 255, 255)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "white"
+  },
+  {
+    "input": "rgb(255, 255, 255)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(255,255,255)"
+  },
+  {
+    "input": "rgb(255, 255, 255)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,0%,100%)"
+  },
+  {
+    "input": "rgb(255, 255, 255)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "rgba(255,0,0,0.5)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(255,0,0,.5)"
+  },
+  {
+    "input": "rgba(255,0,0,0.5)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#ff000080"
+  },
+  {
+    "input": "rgba(255,0,0,0.5)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(255,0,0,.5)"
+  },
+  {
+    "input": "rgba(255,0,0,0.5)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#ff000080"
+  },
+  {
+    "input": "rgba(255,0,0,0.5)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(255,0,0,.5)"
+  },
+  {
+    "input": "rgba(255,0,0,0.5)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(255,0,0,.5)"
+  },
+  {
+    "input": "rgba(255,0,0,0.5)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(0,100%,50%,.5)"
+  },
+  {
+    "input": "rgba(255,0,0,0.5)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(255,0,0,.5)"
+  },
+  {
+    "input": "rgba(170,187,204,0.5)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(170,187,204,.5)"
+  },
+  {
+    "input": "rgba(170,187,204,0.5)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#aabbcc80"
+  },
+  {
+    "input": "rgba(170,187,204,0.5)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.5)"
+  },
+  {
+    "input": "rgba(170,187,204,0.5)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#aabbcc80"
+  },
+  {
+    "input": "rgba(170,187,204,0.5)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.5)"
+  },
+  {
+    "input": "rgba(170,187,204,0.5)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(170,187,204,.5)"
+  },
+  {
+    "input": "rgba(170,187,204,0.5)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,25%,73%,.5)"
+  },
+  {
+    "input": "rgba(170,187,204,0.5)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(170,187,204,.5)"
+  },
+  {
+    "input": "rgba(255,0,0,0.25)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(255,0,0,.25)"
+  },
+  {
+    "input": "rgba(255,0,0,0.25)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#ff000040"
+  },
+  {
+    "input": "rgba(255,0,0,0.25)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(255,0,0,.25)"
+  },
+  {
+    "input": "rgba(255,0,0,0.25)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#ff000040"
+  },
+  {
+    "input": "rgba(255,0,0,0.25)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(255,0,0,.25)"
+  },
+  {
+    "input": "rgba(255,0,0,0.25)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(255,0,0,.25)"
+  },
+  {
+    "input": "rgba(255,0,0,0.25)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(0,100%,50%,.25)"
+  },
+  {
+    "input": "rgba(255,0,0,0.25)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(255,0,0,.25)"
+  },
+  {
+    "input": "rgba(170,187,204,0.6)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(170,187,204,.6)"
+  },
+  {
+    "input": "rgba(170,187,204,0.6)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#abc9"
+  },
+  {
+    "input": "rgba(170,187,204,0.6)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.6)"
+  },
+  {
+    "input": "rgba(170,187,204,0.6)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#abc9"
+  },
+  {
+    "input": "rgba(170,187,204,0.6)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.6)"
+  },
+  {
+    "input": "rgba(170,187,204,0.6)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(170,187,204,.6)"
+  },
+  {
+    "input": "rgba(170,187,204,0.6)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,25%,73%,.6)"
+  },
+  {
+    "input": "rgba(170,187,204,0.6)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(170,187,204,.6)"
+  },
+  {
+    "input": "rgba(0,0,0,0.4)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(0,0,0,.4)"
+  },
+  {
+    "input": "rgba(0,0,0,0.4)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#0006"
+  },
+  {
+    "input": "rgba(0,0,0,0.4)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(0,0,0,.4)"
+  },
+  {
+    "input": "rgba(0,0,0,0.4)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#0006"
+  },
+  {
+    "input": "rgba(0,0,0,0.4)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(0,0,0,.4)"
+  },
+  {
+    "input": "rgba(0,0,0,0.4)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(0,0,0,.4)"
+  },
+  {
+    "input": "rgba(0,0,0,0.4)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(0,0%,0%,.4)"
+  },
+  {
+    "input": "rgba(0,0,0,0.4)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(0,0,0,.4)"
+  },
+  {
+    "input": "rgba(255,255,255,0.8)",
+    "preset": "default",
+    "opts": null,
+    "expected": "hsla(0,0%,100%,.8)"
+  },
+  {
+    "input": "rgba(255,255,255,0.8)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#fffc"
+  },
+  {
+    "input": "rgba(255,255,255,0.8)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "hsla(0,0%,100%,.8)"
+  },
+  {
+    "input": "rgba(255,255,255,0.8)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#fffc"
+  },
+  {
+    "input": "rgba(255,255,255,0.8)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "hsla(0,0%,100%,.8)"
+  },
+  {
+    "input": "rgba(255,255,255,0.8)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(255,255,255,.8)"
+  },
+  {
+    "input": "rgba(255,255,255,0.8)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(0,0%,100%,.8)"
+  },
+  {
+    "input": "rgba(255,255,255,0.8)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "hsla(0,0%,100%,.8)"
+  },
+  {
+    "input": "rgba(255,0,0,0.502)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(255,0,0,.502)"
+  },
+  {
+    "input": "rgba(255,0,0,0.502)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "rgba(255,0,0,.502)"
+  },
+  {
+    "input": "rgba(255,0,0,0.502)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(255,0,0,.502)"
+  },
+  {
+    "input": "rgba(255,0,0,0.502)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(255,0,0,.502)"
+  },
+  {
+    "input": "rgba(255,0,0,0.502)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(255,0,0,.502)"
+  },
+  {
+    "input": "rgba(255,0,0,0.502)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(255,0,0,.502)"
+  },
+  {
+    "input": "rgba(255,0,0,0.502)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(0,100%,50%,.502)"
+  },
+  {
+    "input": "rgba(255,0,0,0.502)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(255,0,0,.502)"
+  },
+  {
+    "input": "rgba(170,187,204,0.555)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(170,187,204,.555)"
+  },
+  {
+    "input": "rgba(170,187,204,0.555)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.555)"
+  },
+  {
+    "input": "rgba(170,187,204,0.555)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(170,187,204,.555)"
+  },
+  {
+    "input": "rgba(170,187,204,0.555)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.555)"
+  },
+  {
+    "input": "rgba(170,187,204,0.555)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(170,187,204,.555)"
+  },
+  {
+    "input": "rgba(170,187,204,0.555)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(170,187,204,.555)"
+  },
+  {
+    "input": "rgba(170,187,204,0.555)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(210,25%,73%,.555)"
+  },
+  {
+    "input": "rgba(170,187,204,0.555)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(170,187,204,.555)"
+  },
+  {
+    "input": "rgba(0,0,0,0.333)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(0,0,0,.333)"
+  },
+  {
+    "input": "rgba(0,0,0,0.333)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "rgba(0,0,0,.333)"
+  },
+  {
+    "input": "rgba(0,0,0,0.333)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(0,0,0,.333)"
+  },
+  {
+    "input": "rgba(0,0,0,0.333)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(0,0,0,.333)"
+  },
+  {
+    "input": "rgba(0,0,0,0.333)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(0,0,0,.333)"
+  },
+  {
+    "input": "rgba(0,0,0,0.333)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(0,0,0,.333)"
+  },
+  {
+    "input": "rgba(0,0,0,0.333)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(0,0%,0%,.333)"
+  },
+  {
+    "input": "rgba(0,0,0,0.333)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(0,0,0,.333)"
+  },
+  {
+    "input": "rgba(0,0,0,0)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(0,0,0,0)"
+  },
+  {
+    "input": "rgba(0,0,0,0)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#0000"
+  },
+  {
+    "input": "rgba(0,0,0,0)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(0,0,0,0)"
+  },
+  {
+    "input": "rgba(0,0,0,0)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#0000"
+  },
+  {
+    "input": "rgba(0,0,0,0)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "transparent"
+  },
+  {
+    "input": "rgba(0,0,0,0)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(0,0,0,0)"
+  },
+  {
+    "input": "rgba(0,0,0,0)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(0,0%,0%,0)"
+  },
+  {
+    "input": "rgba(0,0,0,0)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(0,0,0,0)"
+  },
+  {
+    "input": "rgba(255,0,0,1)",
+    "preset": "default",
+    "opts": null,
+    "expected": "#f00"
+  },
+  {
+    "input": "rgba(255,0,0,1)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "rgba(255,0,0,1)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "rgba(255,0,0,1)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "rgba(255,0,0,1)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "rgba(255,0,0,1)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(255,0,0)"
+  },
+  {
+    "input": "rgba(255,0,0,1)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,100%,50%)"
+  },
+  {
+    "input": "rgba(255,0,0,1)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#f00"
+  },
+  {
+    "input": "hsl(0,100%,50%)",
+    "preset": "default",
+    "opts": null,
+    "expected": "#f00"
+  },
+  {
+    "input": "hsl(0,100%,50%)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "hsl(0,100%,50%)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "hsl(0,100%,50%)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "hsl(0,100%,50%)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "hsl(0,100%,50%)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(255,0,0)"
+  },
+  {
+    "input": "hsl(0,100%,50%)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,100%,50%)"
+  },
+  {
+    "input": "hsl(0,100%,50%)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#f00"
+  },
+  {
+    "input": "hsl(120,100%,50%)",
+    "preset": "default",
+    "opts": null,
+    "expected": "#0f0"
+  },
+  {
+    "input": "hsl(120,100%,50%)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#0f0"
+  },
+  {
+    "input": "hsl(120,100%,50%)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#0f0"
+  },
+  {
+    "input": "hsl(120,100%,50%)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#0f0"
+  },
+  {
+    "input": "hsl(120,100%,50%)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "lime"
+  },
+  {
+    "input": "hsl(120,100%,50%)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(0,255,0)"
+  },
+  {
+    "input": "hsl(120,100%,50%)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(120,100%,50%)"
+  },
+  {
+    "input": "hsl(120,100%,50%)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#0f0"
+  },
+  {
+    "input": "hsl(240,100%,50%)",
+    "preset": "default",
+    "opts": null,
+    "expected": "#00f"
+  },
+  {
+    "input": "hsl(240,100%,50%)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "hsl(240,100%,50%)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "hsl(240,100%,50%)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "hsl(240,100%,50%)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "blue"
+  },
+  {
+    "input": "hsl(240,100%,50%)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(0,0,255)"
+  },
+  {
+    "input": "hsl(240,100%,50%)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(240,100%,50%)"
+  },
+  {
+    "input": "hsl(240,100%,50%)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "hsla(0,100%,50%,0.5)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(255,0,0,.5)"
+  },
+  {
+    "input": "hsla(0,100%,50%,0.5)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#ff000080"
+  },
+  {
+    "input": "hsla(0,100%,50%,0.5)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(255,0,0,.5)"
+  },
+  {
+    "input": "hsla(0,100%,50%,0.5)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#ff000080"
+  },
+  {
+    "input": "hsla(0,100%,50%,0.5)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(255,0,0,.5)"
+  },
+  {
+    "input": "hsla(0,100%,50%,0.5)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(255,0,0,.5)"
+  },
+  {
+    "input": "hsla(0,100%,50%,0.5)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(0,100%,50%,.5)"
+  },
+  {
+    "input": "hsla(0,100%,50%,0.5)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(255,0,0,.5)"
+  },
+  {
+    "input": "hsla(120,50%,50%,0.25)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(64,191,64,.25)"
+  },
+  {
+    "input": "hsla(120,50%,50%,0.25)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#40bf4040"
+  },
+  {
+    "input": "hsla(120,50%,50%,0.25)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(64,191,64,.25)"
+  },
+  {
+    "input": "hsla(120,50%,50%,0.25)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#40bf4040"
+  },
+  {
+    "input": "hsla(120,50%,50%,0.25)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(64,191,64,.25)"
+  },
+  {
+    "input": "hsla(120,50%,50%,0.25)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(64,191,64,.25)"
+  },
+  {
+    "input": "hsla(120,50%,50%,0.25)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(120,50%,50%,.25)"
+  },
+  {
+    "input": "hsla(120,50%,50%,0.25)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(64,191,64,.25)"
+  },
+  {
+    "input": "red",
+    "preset": "default",
+    "opts": null,
+    "expected": "#f00"
+  },
+  {
+    "input": "red",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "red",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "red",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "red",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "red"
+  },
+  {
+    "input": "red",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(255,0,0)"
+  },
+  {
+    "input": "red",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,100%,50%)"
+  },
+  {
+    "input": "red",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#f00"
+  },
+  {
+    "input": "blue",
+    "preset": "default",
+    "opts": null,
+    "expected": "#00f"
+  },
+  {
+    "input": "blue",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "blue",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "blue",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "blue",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "blue"
+  },
+  {
+    "input": "blue",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(0,0,255)"
+  },
+  {
+    "input": "blue",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(240,100%,50%)"
+  },
+  {
+    "input": "blue",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#00f"
+  },
+  {
+    "input": "aliceblue",
+    "preset": "default",
+    "opts": null,
+    "expected": "#f0f8ff"
+  },
+  {
+    "input": "aliceblue",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#f0f8ff"
+  },
+  {
+    "input": "aliceblue",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#f0f8ff"
+  },
+  {
+    "input": "aliceblue",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#f0f8ff"
+  },
+  {
+    "input": "aliceblue",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "aliceblue"
+  },
+  {
+    "input": "aliceblue",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(240,248,255)"
+  },
+  {
+    "input": "aliceblue",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(208,100%,97%)"
+  },
+  {
+    "input": "aliceblue",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#f0f8ff"
+  },
+  {
+    "input": "silver",
+    "preset": "default",
+    "opts": null,
+    "expected": "#c0c0c0"
+  },
+  {
+    "input": "silver",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "silver"
+  },
+  {
+    "input": "silver",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "silver"
+  },
+  {
+    "input": "silver",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "silver"
+  },
+  {
+    "input": "silver",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "silver"
+  },
+  {
+    "input": "silver",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(192,192,192)"
+  },
+  {
+    "input": "silver",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,0%,75%)"
+  },
+  {
+    "input": "silver",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#c0c0c0"
+  },
+  {
+    "input": "rebeccapurple",
+    "preset": "default",
+    "opts": null,
+    "expected": "#639"
+  },
+  {
+    "input": "rebeccapurple",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#639"
+  },
+  {
+    "input": "rebeccapurple",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#639"
+  },
+  {
+    "input": "rebeccapurple",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#639"
+  },
+  {
+    "input": "rebeccapurple",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rebeccapurple"
+  },
+  {
+    "input": "rebeccapurple",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(102,51,153)"
+  },
+  {
+    "input": "rebeccapurple",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(270,50%,40%)"
+  },
+  {
+    "input": "rebeccapurple",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#639"
+  },
+  {
+    "input": "rgba(170,187,204,1)",
+    "preset": "default",
+    "opts": null,
+    "expected": "#abc"
+  },
+  {
+    "input": "rgba(170,187,204,1)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "rgba(170,187,204,1)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "rgba(170,187,204,1)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "rgba(170,187,204,1)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgb(170,187,204)"
+  },
+  {
+    "input": "rgba(170,187,204,1)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(170,187,204)"
+  },
+  {
+    "input": "rgba(170,187,204,1)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(210,25%,73%)"
+  },
+  {
+    "input": "rgba(170,187,204,1)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#abc"
+  },
+  {
+    "input": "white",
+    "preset": "default",
+    "opts": null,
+    "expected": "#fff"
+  },
+  {
+    "input": "white",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "white",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "white",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "white",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "white"
+  },
+  {
+    "input": "white",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(255,255,255)"
+  },
+  {
+    "input": "white",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,0%,100%)"
+  },
+  {
+    "input": "white",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#fff"
+  },
+  {
+    "input": "black",
+    "preset": "default",
+    "opts": null,
+    "expected": "#000"
+  },
+  {
+    "input": "black",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "black",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "black",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "black",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "black"
+  },
+  {
+    "input": "black",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgb(0,0,0)"
+  },
+  {
+    "input": "black",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsl(0,0%,0%)"
+  },
+  {
+    "input": "black",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "#000"
+  },
+  {
+    "input": "rgba(255,0,0,0.6)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(255,0,0,.6)"
+  },
+  {
+    "input": "rgba(255,0,0,0.6)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#f009"
+  },
+  {
+    "input": "rgba(255,0,0,0.6)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(255,0,0,.6)"
+  },
+  {
+    "input": "rgba(255,0,0,0.6)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#f009"
+  },
+  {
+    "input": "rgba(255,0,0,0.6)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(255,0,0,.6)"
+  },
+  {
+    "input": "rgba(255,0,0,0.6)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(255,0,0,.6)"
+  },
+  {
+    "input": "rgba(255,0,0,0.6)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(0,100%,50%,.6)"
+  },
+  {
+    "input": "rgba(255,0,0,0.6)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(255,0,0,.6)"
+  },
+  {
+    "input": "rgba(0,255,0,0.6)",
+    "preset": "default",
+    "opts": null,
+    "expected": "rgba(0,255,0,.6)"
+  },
+  {
+    "input": "rgba(0,255,0,0.6)",
+    "preset": "colormin_modern",
+    "opts": {
+      "transparent": true,
+      "alphaHex": true,
+      "name": true
+    },
+    "expected": "#0f09"
+  },
+  {
+    "input": "rgba(0,255,0,0.6)",
+    "preset": "colormin_ie89",
+    "opts": {
+      "transparent": false,
+      "alphaHex": false,
+      "name": true
+    },
+    "expected": "rgba(0,255,0,.6)"
+  },
+  {
+    "input": "rgba(0,255,0,0.6)",
+    "preset": "all_true",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "#0f09"
+  },
+  {
+    "input": "rgba(0,255,0,0.6)",
+    "preset": "hex_off",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": true,
+      "name": true,
+      "transparent": true,
+      "alphaHex": true
+    },
+    "expected": "rgba(0,255,0,.6)"
+  },
+  {
+    "input": "rgba(0,255,0,0.6)",
+    "preset": "rgb_only",
+    "opts": {
+      "hex": false,
+      "rgb": true,
+      "hsl": false
+    },
+    "expected": "rgba(0,255,0,.6)"
+  },
+  {
+    "input": "rgba(0,255,0,0.6)",
+    "preset": "hsl_only",
+    "opts": {
+      "hex": false,
+      "rgb": false,
+      "hsl": true
+    },
+    "expected": "hsla(120,100%,50%,.6)"
+  },
+  {
+    "input": "rgba(0,255,0,0.6)",
+    "preset": "alphahex_off",
+    "opts": {
+      "hex": true,
+      "rgb": true,
+      "hsl": true,
+      "alphaHex": false
+    },
+    "expected": "rgba(0,255,0,.6)"
+  }
+]

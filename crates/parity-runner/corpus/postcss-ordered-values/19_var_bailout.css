@@ -1,0 +1,5 @@
+.a { border: 1px solid var(--my-color); }
+.b { box-shadow: var(--shadow); }
+.c { animation: var(--anim); }
+.d { border: env(safe-area-inset-top, 1px) solid red; }
+.e { transition: constant(--my-prop); }
