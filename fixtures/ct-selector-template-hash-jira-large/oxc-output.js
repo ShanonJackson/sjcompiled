@@ -1,0 +1,67 @@
+import React from "react";
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { forwardRef } from "react";
+const _16 = "._4bfu1r81{text-decoration-color:initial!important}";
+const _15 = "._4bfu18uv{text-decoration-color:initial}";
+const _14 = "._yv0ed9e1{grid-template-columns:var(--_15mlnlx)}";
+const _13 = "._2z051341{grid-template-rows:var(--_10z77pf)}";
+const _12 = "._2lx2vrvc{flex-direction:row}";
+const _11 = "._yyhydpws{grid-column:issue-type/end}";
+const _10 = "._u5f31y44{padding-right:4px}";
+const _9 = "._19bv1f4h{padding-left:28px}";
+const _8 = "._4bfu1snc{text-decoration-color:currentColor!important}";
+const _7 = "._4t3i1ejb{height:var(--ds-space-300,24px)}";
+const _6 = "._yv0es54b{grid-template-columns:var(--_183xcfk)}";
+const _5 = "._2z05kxnq{grid-template-rows:var(--_1d7lvij)}";
+const _4 = "._1e0c11p5{display:grid}";
+const _3 = "._yyhy4co5{grid-column:issue-key/end}";
+const _2 = "._1ii7pazf{grid-row:card-extra-fields/end}";
+const _ = "._1yt4v47k{padding:var(--ds-space-250,20px)}";
+const GridCard = forwardRef(({ as: C = "div", style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	const { dense, initialDirection, initialDecoration, importantDecoration, rowDirection, secondary, ...__cmpldp } = __cmplp;
+	return <CC>
+        <CS>{[
+		_,
+		_2,
+		_3,
+		_4,
+		_5,
+		_6,
+		_7,
+		_8,
+		_9,
+		_10,
+		_11,
+		_12,
+		_13,
+		_14,
+		_15,
+		_16
+	]}</CS>
+        <C {...__cmpldp} style={__cmpls} ref={__cmplr} className={ax([
+		"_1yt4v47k _1ii7pazf _yyhy4co5 _1e0c11p5 _2z05kxnq _yv0es54b _4t3i1ejb _4bfu1snc",
+		__cmplp.dense && "_19bv1f4h _u5f31y44",
+		__cmplp.initialDirection && "_yyhydpws _2lx2vrvc _2z051341 _yv0ed9e1",
+		__cmplp.initialDecoration && "_4bfu18uv",
+		__cmplp.importantDecoration && "_4bfu1r81",
+		__cmplp.rowDirection && "_2lx2vrvc",
+		__cmplp.secondary && "_1ii7pazf _yyhy4co5 _19bv1f4h",
+		__cmplp.className
+	])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	GridCard.displayName = "GridCard";
+}
+export const Component = () => <>
+    <GridCard />
+    <GridCard rowDirection />
+    <GridCard initialDirection />
+    <GridCard initialDecoration />
+    <GridCard importantDecoration />
+    <GridCard dense />
+    <GridCard secondary />
+  </>;

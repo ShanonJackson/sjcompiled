@@ -1,0 +1,27 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { forwardRef } from "react";
+const _6 = "._1lh4glyw:last-child{border-bottom:none}";
+const _5 = "._n7zl1dcg{border-bottom:1px solid #eee}";
+const _4 = "._19bvidpf{padding-left:0}";
+const _3 = "._n3tdftgi{padding-bottom:8px}";
+const _2 = "._u5f3idpf{padding-right:0}";
+const _ = "._ca0qftgi{padding-top:8px}";
+const ListItem = forwardRef(({ as: C = "li", style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	return <CC>
+        <CS>{[
+		_,
+		_2,
+		_3,
+		_4,
+		_5,
+		_6
+	]}</CS>
+        <C {...__cmplp} style={__cmpls} ref={__cmplr} className={ax(["_ca0qftgi _u5f3idpf _n3tdftgi _19bvidpf _n7zl1dcg _1lh4glyw", __cmplp.className])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	ListItem.displayName = "ListItem";
+}

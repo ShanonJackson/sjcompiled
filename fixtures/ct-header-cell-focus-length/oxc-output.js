@@ -1,0 +1,69 @@
+import _React, { forwardRef } from "react";
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _21 = "._7ehi1l5v:focus{box-shadow:inset 0 2px 0 0 currentColor}";
+const _20 = "._7u4sfl6s:focus{border-right:2px solid currentColor}";
+const _19 = "._eahy1n1a:focus:before{bottom:-1px}";
+const _18 = "._t0aw1n1a:focus:before{right:-1px}";
+const _17 = "._p0vi1n1a:focus:before{left:-1px}";
+const _16 = "._1cl9j39m:focus:before{top:-3px}";
+const _15 = "._18141osq:focus:before{width:100%}";
+const _14 = "._1w0p1osq:focus:before{height:100%}";
+const _13 = "._1qtkstnw:focus:before{position:absolute}";
+const _12 = "._1j5l1ule:focus:before{display:block}";
+const _11 = "._x7uvf705:focus:before{content:\" \"}";
+const _10 = "._qzh6fl6s:focus:before{border:2px solid currentColor}";
+const _9 = "._1hvw1o36:focus{outline-width:medium}";
+const _8 = "._49pcn7od:focus{outline-style:unset}";
+const _7 = "._nt751r31:focus{outline-color:currentColor}";
+const _6 = "._1qc71hup:focus._1qc71hup:before{height:calc(100% - 2px)}";
+const _5 = "._zzeu1n1a:focus._zzeu1n1a:before{bottom:-1px}";
+const _4 = "._1hw81n1a:focus._1hw81n1a:before{left:-1px}";
+const _3 = "._12s81n1a:focus._12s81n1a:before{right:-1px}";
+const _2 = "._1n9didpf:focus._1n9didpf:before{top:0}";
+const _ = "._kqswh2mm{position:relative}";
+// Minimal reproduction of the header cell focus outline rules where the additional
+// :focus::before override repeats some properties and currently produces a length
+// mismatch between Babel and SWC outputs.
+const FocusCell = forwardRef(({ as: C = "th", style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	return <CC>
+        <CS>{[
+		_,
+		_2,
+		_3,
+		_4,
+		_5,
+		_6,
+		_7,
+		_8,
+		_9,
+		_10,
+		_11,
+		_12,
+		_13,
+		_14,
+		_15,
+		_16,
+		_17,
+		_18,
+		_19,
+		_20,
+		_21
+	]}</CS>
+        <C {...__cmplp} style={__cmpls} ref={__cmplr} className={ax(["_kqswh2mm _1n9didpf _12s81n1a _1hw81n1a _zzeu1n1a _1qc71hup _nt751r31 _49pcn7od _1hvw1o36 _qzh6fl6s _x7uvf705 _1j5l1ule _1qtkstnw _1w0p1osq _18141osq _1cl9j39m _p0vi1n1a _t0aw1n1a _eahy1n1a _7u4sfl6s _7ehi1l5v", __cmplp.className])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	FocusCell.displayName = "FocusCell";
+}
+export default function Fixture() {
+	return <table>
+      <thead>
+        <tr>
+          <FocusCell>Header</FocusCell>
+        </tr>
+      </thead>
+    </table>;
+}

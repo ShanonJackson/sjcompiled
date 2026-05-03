@@ -1,0 +1,29 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { forwardRef } from "react";
+const _7 = "._tzy4txnc{opacity:.8}";
+const _6 = "._bfhk1d0o{background-color:rgba(0,0,0,.5)}";
+const _5 = "._94n5idpf{bottom:0}";
+const _4 = "._1xi2idpf{right:0}";
+const _3 = "._1ltvidpf{left:0}";
+const _2 = "._154iidpf{top:0}";
+const _ = "._kqsw1n9t{position:fixed}";
+const Overlay = forwardRef(({ as: C = "div", style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	return <CC>
+        <CS>{[
+		_,
+		_2,
+		_3,
+		_4,
+		_5,
+		_6,
+		_7
+	]}</CS>
+        <C {...__cmplp} style={__cmpls} ref={__cmplr} className={ax(["_kqsw1n9t _154iidpf _1ltvidpf _1xi2idpf _94n5idpf _bfhk1d0o _tzy4txnc", __cmplp.className])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	Overlay.displayName = "Overlay";
+}

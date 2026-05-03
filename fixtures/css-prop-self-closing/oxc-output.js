@@ -1,0 +1,27 @@
+import * as React from "react";
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _8 = "._4t3i1wug{height:auto}";
+const _7 = "._p12f1osq{max-width:100%}";
+const _6 = "._x3do14it{border-top:1px solid #ccc}";
+const _5 = "._18u0idpf{margin-left:0}";
+const _4 = "._otyrgktf{margin-bottom:20px}";
+const _3 = "._2hwxidpf{margin-right:0}";
+const _2 = "._19pkgktf{margin-top:20px}";
+const _ = "._19itglyw{border:none}";
+const MyComponent = () => <div>
+    <CC>
+  <CS>{[
+	_,
+	_2,
+	_3,
+	_4,
+	_5,
+	_6
+]}</CS>
+  {<hr className={ax(["_19itglyw _19pkgktf _2hwxidpf _otyrgktf _18u0idpf _x3do14it"])} />}
+  </CC>
+    <CC>
+  <CS>{[_7, _8]}</CS>
+  {<img src="test.png" alt="test" className={ax(["_p12f1osq _4t3i1wug"])} />}
+  </CC>
+  </div>;

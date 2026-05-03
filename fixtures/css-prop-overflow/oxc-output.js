@@ -1,0 +1,19 @@
+import * as React from "react";
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _5 = "._8am5i4x0{-webkit-overflow-scrolling:touch}";
+const _4 = "._1dm8q5uf{scroll-behavior:smooth}";
+const _3 = "._c71l1kdj{max-height:25pc}";
+const _2 = "._18m91wug{overflow-y:auto}";
+const _ = "._1reo1wug{overflow-x:auto}";
+const ScrollableDiv = () => <CC>
+  <CS>{[
+	_,
+	_2,
+	_3,
+	_4,
+	_5
+]}</CS>
+  {<div className={ax(["_1reo1wug _18m91wug _c71l1kdj _1dm8q5uf _8am5i4x0"])}>
+    Scrollable content
+  </div>}
+  </CC>;

@@ -1,0 +1,21 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _3 = "._1sb2bjq5{content:\"→\"}";
+const _2 = "._1sb21e8g{content:\"hello\"}";
+const _ = "._1sb2b3bt{content:\"\"}";
+export const blank = null;
+export const text = null;
+export const quoted = null;
+export const arrow = null;
+export const Element = <CC>
+  <CS>{[
+	_,
+	_2,
+	_3
+]}</CS>
+  {<div className={ax([
+	"_1sb2b3bt",
+	"_1sb21e8g",
+	"_1sb21e8g",
+	"_1sb2bjq5"
+])} />}
+  </CC>;

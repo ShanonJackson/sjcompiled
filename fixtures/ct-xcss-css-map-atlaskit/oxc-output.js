@@ -1,0 +1,35 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _9 = "._16jlkb7n{flex-grow:1}";
+const _8 = "._d0altlke:hover{cursor:pointer}";
+const _7 = "._irr3o84u:hover{background-color:var(--ds-background-neutral-hovered,#091e4224)}";
+const _6 = "._n3tddbr4{padding-bottom:var(--ds-space-100,8px)}";
+const _5 = "._u5f3dbr4{padding-right:var(--ds-space-100,8px)}";
+const _4 = "._ca0qdbr4{padding-top:var(--ds-space-100,8px)}";
+const _3 = "._80omtlke{cursor:pointer}";
+const _2 = "._1bsb1osq{width:100%}";
+const _ = "._1e0c1ule{display:block}";
+const styles = {
+	container: "_ca0qdbr4 _u5f3dbr4 _n3tddbr4 _irr3o84u _d0altlke",
+	fieldName: "_16jlkb7n"
+};
+const labelStyles = null;
+export const Component = () => <CC>
+  <CS>{[
+	_,
+	_2,
+	_3
+]}</CS>
+  {<label className={ax(["_1e0c1ule _1bsb1osq _80omtlke"])}>
+    <CC>
+  <CS>{[
+	_4,
+	_5,
+	_6,
+	_7,
+	_8,
+	_9
+]}</CS>
+  {<div xcss={styles.container}>content</div>}
+  </CC>
+  </label>}
+  </CC>;

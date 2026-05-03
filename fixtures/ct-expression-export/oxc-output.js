@@ -1,0 +1,33 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _8 = "._18u0dlk8{margin-left:14px}";
+const _7 = "._2rko14y2{border-radius:5px}";
+const _6 = "._1llw1f4f:hover{transform:translateX(5px)}";
+const _5 = "._syazudzx{color:var(--_155apf6)}";
+const _4 = "._19bv1f4h{padding-left:28px}";
+const _3 = "._n3td1f4h{padding-bottom:28px}";
+const _2 = "._u5f31f4h{padding-right:28px}";
+const _ = "._ca0q1f4h{padding-top:28px}";
+const base = 10;
+const offset = 4;
+const colors = [
+	"red",
+	"blue",
+	"seagreen"
+];
+export const dynamicPadding = null;
+export const expressionObject = null;
+export const ExpressionExample = () => <CC>
+  <CS>{[
+	_,
+	_2,
+	_3,
+	_4,
+	_5,
+	_6,
+	_7,
+	_8
+]}</CS>
+  {<div className={ax(["_ca0q1f4h _u5f31f4h _n3td1f4h _19bv1f4h _syazudzx _1llw1f4f", "_2rko14y2 _18u0dlk8"])}>
+    expression output
+  </div>}
+  </CC>;

@@ -1,0 +1,18 @@
+import { colors } from "./theme";
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { forwardRef } from "react";
+const _2 = "._syazalr3{color:#172b4d}";
+const _ = "._bfhku67f{background-color:#fff}";
+const Box = forwardRef(({ as: C = "div", style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	return <CC>
+        <CS>{[_, _2]}</CS>
+        <C {...__cmplp} style={__cmpls} ref={__cmplr} className={ax(["_bfhku67f _syazalr3", __cmplp.className])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	Box.displayName = "Box";
+}
+export const Component = () => <Box>Hi</Box>;

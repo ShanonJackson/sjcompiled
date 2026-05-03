@@ -1,0 +1,8 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _2 = "@media (min-width:90rem){._12iakb7n{flex-grow:1}._1fbvkb7n{flex-shrink:1}._190kf1ug{flex-basis:0%}._11sj15vq{overflow-x:hidden}._1l5315vq{overflow-y:hidden}._je3o1txw{display:flex}._1aev1h6o{justify-content:center}._vu061h6o{align-items:center}._16puh2mm{position:relative}._ytj91myn{min-width:654px}._2tde7vkz{padding-top:1pc}._uwpc7vkz{padding-bottom:1pc}}";
+const _ = "._1e0cglyw{display:none}";
+const card = null;
+export const Example = () => <CC>
+  <CS>{[_, _2]}</CS>
+  {<div className={ax(["_1e0cglyw _12iakb7n _1fbvkb7n _190kf1ug _11sj15vq _1l5315vq _je3o1txw _1aev1h6o _vu061h6o _16puh2mm _ytj91myn _2tde7vkz _uwpc7vkz"])} />}
+  </CC>;

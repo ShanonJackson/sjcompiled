@@ -1,0 +1,17 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { forwardRef } from "react";
+const _2 = "@keyframes k1qdkl96{0%{transform:scale(1)}50%{transform:scale(1.05)}to{transform:scale(1)}}";
+const _ = "._y44vvc1v{animation:k1qdkl96 2s infinite}";
+const pulse = null;
+const PulsingDiv = forwardRef(({ as: C = "div", style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	return <CC>
+        <CS>{[_, _2]}</CS>
+        <C {...__cmplp} style={__cmpls} ref={__cmplr} className={ax(["_y44vvc1v", __cmplp.className])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	PulsingDiv.displayName = "PulsingDiv";
+}

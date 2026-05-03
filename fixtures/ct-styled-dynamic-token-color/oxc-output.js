@@ -1,0 +1,27 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { forwardRef } from "react";
+const _3 = "._syaz1kw7{color:inherit}";
+const _2 = "._syazrhrk{color:var(--ds-text-danger,#ae2e24)}";
+const _ = "._299mangw:first-letter{text-transform:uppercase}";
+const ExpiryDateContainer = forwardRef(({ as: C = "div", style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	const { dueInWeek, ...__cmpldp } = __cmplp;
+	return <CC>
+        <CS>{[
+		_,
+		_2,
+		_3
+	]}</CS>
+        <C {...__cmpldp} style={__cmpls} ref={__cmplr} className={ax([
+		"_299mangw",
+		__cmplp.dueInWeek ? "_syazrhrk" : "_syaz1kw7",
+		__cmplp.className
+	])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	ExpiryDateContainer.displayName = "ExpiryDateContainer";
+}
+export const Component = ({ dueInWeek }) => <ExpiryDateContainer dueInWeek={dueInWeek}>Content</ExpiryDateContainer>;

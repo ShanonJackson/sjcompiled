@@ -1,0 +1,17 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { forwardRef } from "react";
+const _2 = "@media (min-aspect-ratio:11/6){._1tku1ssb{max-width:50%}}";
+const _ = "._1bsb12it{width:75%}";
+const Container = forwardRef(({ as: C = "span", style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	return <CC>
+        <CS>{[_, _2]}</CS>
+        <C {...__cmplp} style={__cmpls} ref={__cmplr} className={ax(["_1bsb12it _1tku1ssb", __cmplp.className])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	Container.displayName = "Container";
+}
+export const Component = () => <Container>preview</Container>;

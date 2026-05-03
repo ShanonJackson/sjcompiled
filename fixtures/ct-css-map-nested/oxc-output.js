@@ -1,0 +1,5 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+export const styles = {
+	success: "_syazjafr _1tjqkbp7 _yzbcy77s _30l3aebp _1takoyl8",
+	danger: "_syaz5scu _1tjqruxl _yzbc32ev _30l3qaj3 _1taki9ra"
+};

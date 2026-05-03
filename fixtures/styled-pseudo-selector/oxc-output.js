@@ -1,0 +1,27 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { forwardRef } from "react";
+const _6 = "._9h8hqaj3:active{color:darkred}";
+const _5 = "._30l35scu:hover{color:red}";
+const _4 = "._jf4cnqa1:hover{text-decoration-style:solid}";
+const _3 = "._1bnx8stv:hover{text-decoration-line:underline}";
+const _2 = "._9oik1r31:hover{text-decoration-color:currentColor}";
+const _ = "._syaz13q2{color:blue}";
+const HoverButton = forwardRef(({ as: C = "button", style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	return <CC>
+        <CS>{[
+		_,
+		_2,
+		_3,
+		_4,
+		_5,
+		_6
+	]}</CS>
+        <C {...__cmplp} style={__cmpls} ref={__cmplr} className={ax(["_syaz13q2 _9oik1r31 _1bnx8stv _jf4cnqa1 _30l35scu _9h8hqaj3", __cmplp.className])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	HoverButton.displayName = "HoverButton";
+}

@@ -1,0 +1,15 @@
+import * as React from "react";
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _3 = "._ouxl1ssb{background-position:50%}";
+const _2 = "._1lrw1dfr{background-size:cover}";
+const _ = "._11q71d6g{background:linear-gradient(90deg,red,blue)}";
+const MyComponent = () => <CC>
+  <CS>{[
+	_,
+	_2,
+	_3
+]}</CS>
+  {<div className={ax(["_11q71d6g _1lrw1dfr _ouxl1ssb"])}>
+    Hello
+  </div>}
+  </CC>;

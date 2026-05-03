@@ -1,0 +1,49 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { forwardRef } from "react";
+const _9 = "._bfhk1rtt{background-color:var(--ds-background-accent-red-subtler,#ffd5d2)}";
+const _8 = "._bfhk1dy8{background-color:var(--ds-background-accent-blue-subtler,#cfe1fd)}";
+const _7 = "._t9ecni0c{transform:translate(-5px,-5px)}";
+const _6 = "._4t3i19bv{height:10px}";
+const _5 = "._1bsb19bv{width:10px}";
+const _4 = "._1ltv1j37{left:var(--_172sugn)}";
+const _3 = "._154i1wux{top:var(--_bajtf7)}";
+const _2 = "._kqswstnw{position:absolute}";
+const _ = "._2rko1rr0{border-radius:var(--ds-radius-full,9999px)}";
+const DotStart = forwardRef(({ as: C = "div", style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	return <CC>
+        <CS>{[
+		_,
+		_2,
+		_3,
+		_4,
+		_5,
+		_6,
+		_7,
+		_8
+	]}</CS>
+        <C {...__cmplp} style={{
+		...__cmpls,
+		"--_bajtf7": ix(`${__cmplp.y}px`),
+		"--_172sugn": ix(`${__cmplp.x}px`)
+	}} ref={__cmplr} className={ax(["_2rko1rr0 _kqswstnw _154i1wux _1ltv1j37 _1bsb19bv _4t3i19bv _t9ecni0c _bfhk1dy8", __cmplp.className])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	DotStart.displayName = "DotStart";
+}
+const DotEnd = forwardRef(({ as: C = DotStart, style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	return <CC>
+        <CS>{[_9]}</CS>
+        <C {...__cmplp} style={__cmpls} ref={__cmplr} className={ax(["_bfhk1rtt", __cmplp.className])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	DotEnd.displayName = "DotEnd";
+}
+export const Example = () => <DotEnd x={10} y={20} />;

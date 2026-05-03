@@ -1,0 +1,17 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { forwardRef } from "react";
+const _2 = "._k48p8n31{font-weight:bold}";
+const _ = "._syaz5scu{color:red}";
+const BaseButton = (props) => <button {...props} />;
+const StyledBaseButton = forwardRef(({ as: C = BaseButton, style: __cmpls, ...__cmplp }, __cmplr) => {
+	if (__cmplp.innerRef) {
+		throw new Error("Please use 'ref' instead of 'innerRef'.");
+	}
+	return <CC>
+        <CS>{[_, _2]}</CS>
+        <C {...__cmplp} style={__cmpls} ref={__cmplr} className={ax(["_syaz5scu _k48p8n31", __cmplp.className])} />
+      </CC>;
+});
+if (process.env.NODE_ENV !== "production") {
+	StyledBaseButton.displayName = "StyledBaseButton";
+}

@@ -1,0 +1,7 @@
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _ = "._v5641czr{transition:background-color .5s cubic-bezier(.15,1,.3,1),outline-color .5s cubic-bezier(.15,1,.3,1)}";
+const styles = null;
+export const Component = () => <CC>
+  <CS>{[_]}</CS>
+  {<div className={ax(["_v5641czr"])} />}
+  </CC>;

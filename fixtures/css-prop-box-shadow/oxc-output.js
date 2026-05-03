@@ -1,0 +1,23 @@
+import * as React from "react";
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _7 = "._bfhku67f{background-color:#fff}";
+const _6 = "._16qsy6mk{box-shadow:0 2px 4px rgba(0,0,0,.1)}";
+const _5 = "._19bv7vkz{padding-left:1pc}";
+const _4 = "._n3td7vkz{padding-bottom:1pc}";
+const _3 = "._u5f37vkz{padding-right:1pc}";
+const _2 = "._ca0q7vkz{padding-top:1pc}";
+const _ = "._2rkoftgi{border-radius:8px}";
+const Card = () => <CC>
+  <CS>{[
+	_,
+	_2,
+	_3,
+	_4,
+	_5,
+	_6,
+	_7
+]}</CS>
+  {<div className={ax(["_2rkoftgi _ca0q7vkz _u5f37vkz _n3td7vkz _19bv7vkz _16qsy6mk _bfhku67f"])}>
+    Card content
+  </div>}
+  </CC>;

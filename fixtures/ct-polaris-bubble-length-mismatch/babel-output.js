@@ -1,0 +1,2 @@
+// Babel error:
+// C:\Users\shanon\Documents\projects\compiled-claude\oxc\crates\oxc_transformer\src\plugins\compiled_css\fixtures\ct-polaris-bubble-length-mismatch\input.tsx: Cannot find module '@atlassian/jira-polaris-lib-color-palette/src/ui/colors/index.tsx' from 'C:\Users\shanon\Documents\projects\compiled-claude\packages\babel-plugin\src\utils'
