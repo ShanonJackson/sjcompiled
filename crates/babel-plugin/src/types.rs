@@ -1,13 +1,26 @@
-//! 1:1 port of `packages/babel-plugin/src/types.ts`.
+//! 1:1 port of `packages/babel-plugin/src/types.ts` — config-side
+//! types only.
 //!
-//! Data-only at §2.1 — every field is mirrored, but the methods that
-//! operate on this state live in their own modules (`state.rs` /
-//! `mutation_recorder.rs`, landing in §2.4). The shapes here are
-//! consumed by:
+//! Phase 2 §2.4 split: the encapsulation-sensitive `State` (and its
+//! inner shapes — `CompiledImports`, `ImportedCompiledImports`,
+//! `PragmaState`, `CleanupAction`, `CleanupKind`, `CacheSlot`) moved
+//! to `state.rs` so PLAN.md §3.9.8's `pub(crate)` field-visibility
+//! contract holds at the module boundary. This file keeps the
+//! configuration / handler-call shapes that have no encapsulation
+//! contract:
 //!
-//! * The dispatcher visitor (`babel_plugin.rs`, §2.3).
-//! * The per-API handlers (Phase 6).
-//! * The cache schema (`cache_schema.rs`, §5.3).
+//! * `PluginOptions` + `CacheMode` — userland plugin config (wire
+//!   shape: camelCase; serde derive). Read-only by the visitor.
+//! * `Tag` / `TagKind` — `(name, type)` describing a JSX/styled host.
+//!   Built per-call from the AST; no shared state.
+//! * `Metadata` / `MetadataContext` — the per-handler call shape
+//!   carrying `&mut State` and traversal context.
+//! * `TransformResult` — the return shape for in-process integration
+//!   tests.
+//!
+//! Re-exports `State` (and its inner shapes) from `state.rs` so
+//! external consumers see the full surface here. Internal modules
+//! import directly from `crate::state`.
 //!
 //! ### What's intentionally omitted
 //!
@@ -25,13 +38,23 @@
 //!
 //! * `t.Identifier` / `NodePath` / `PluginPass` types — Babel-specific.
 //!   The Rust analogues are SWC AST node refs / `IndexMap`-keyed
-//!   indices, threaded through the visitor directly. See `state.rs`.
+//!   indices, threaded through the visitor directly.
 //!
 //! Drift policy: when upstream `types.ts` changes, this file MUST be
 //! updated in the same commit. Reviewers diff field-by-field.
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+
+// ───────── Re-exports of encapsulated state shapes ─────────
+//
+// Internal callers (babel_plugin.rs, lib.rs) prefer `crate::state::*`
+// for these. External callers see them here too, matching the
+// original types.ts surface area.
+pub use crate::state::{
+    CacheSlot, CleanupAction, CleanupKind, CompiledImports, ImportedCompiledImports, PragmaState,
+    State,
+};
 
 /// `PluginOptions` — userland-facing configuration. Field names use
 /// camelCase on the wire to match Babel's plugin-config convention;
@@ -161,136 +184,6 @@ impl Serialize for CacheMode {
         }
     }
 }
-
-/// Per-file traversal state. Mirrors `State` in upstream `types.ts`
-/// lines 117–211. The Babel `PluginPass` superclass fields (`file`,
-/// `filename`, `cwd`, `opts`) are absorbed where used; the rest of
-/// the state lives here verbatim.
-///
-/// Method-side mutation is forbidden outside `state.rs` /
-/// `mutation_recorder.rs` (§2.4 hard rule per PLAN.md §3.9.8).
-#[derive(Debug, Default)]
-pub struct State {
-    /// Set when the Compiled module import is found. Each known API
-    /// gets its imported binding name(s) — the visitor uses these to
-    /// match call sites.
-    pub compiled_imports: Option<CompiledImports>,
-
-    /// `true` if the module imports xcss from a Compiled origin.
-    pub uses_xcss: Option<bool>,
-
-    /// `importedCompiledImports.css` — set when `import { css } from
-    /// '@compiled/react'` is found AND a host-imported alias
-    /// shadows it (rare but supported upstream).
-    pub imported_compiled_imports: Option<ImportedCompiledImports>,
-
-    /// Module origins recognised as Compiled. Resolved from
-    /// `PluginOptions.import_sources` ∪ `DEFAULT_IMPORT_SOURCES`.
-    pub import_sources: Vec<String>,
-
-    /// Pragma state — JSX classic vs automatic, source override, etc.
-    pub pragma: PragmaState,
-
-    /// `pathsToCleanup` is a Babel-NodePath construct. The Rust port
-    /// records these as deferred mutations on the `MutationRecorder`
-    /// (§2.4); this field stays as a marker for parity but the
-    /// concrete representation moves to that recorder. See PLAN.md
-    /// §3.9.8 `StateDiff::CleanupPath`.
-    pub paths_to_cleanup: Vec<CleanupAction>,
-
-    /// User-supplied options. Owned here so handlers don't thread an
-    /// extra param.
-    pub opts: PluginOptions,
-
-    /// Hoisted style sheets — `name → identifier`. Order preserved
-    /// (insertion order matches Babel; the AST emit order depends on
-    /// it). Babel stores `t.Identifier`; we store the symbol name and
-    /// reconstruct the SWC `Ident` on emit (Phase 6).
-    pub sheets: IndexMap<String, String>,
-
-    /// Cache for evaluated paths. The concrete cache type lands in
-    /// §5.3 (`utils::cache::Cache`); this is a placeholder slot.
-    pub cache: CacheSlot,
-
-    /// Files included in this transformation pass. Drained at
-    /// `Program::exit` and serialised to `included-files.json`
-    /// sidecar (§5.7 / SIDECAR_SCHEMA.md §1).
-    pub included_files: Vec<String>,
-
-    /// Evaluated `cssMap()` outputs — `localName → vec of css rules`.
-    /// Order preserved (visitor walks in source order).
-    pub css_map: IndexMap<String, Vec<String>>,
-
-    /// MemberExpression names to skip — populated when a binding is
-    /// known not to be a Compiled API (avoids re-resolving across
-    /// many references). Mirrors `state.ignoreMemberExpressions`.
-    pub ignore_member_expressions: IndexMap<String, bool>,
-
-    // `resolver` is omitted: object form isn't reachable, string
-    // form is in `opts`. `transformCache` (Babel WeakMap on
-    // NodePath) is a Babel-only construct — the Rust visitor's
-    // single-pass design (PLAN.md §3.5) eliminates the re-visit
-    // problem the WeakMap was guarding against.
-}
-
-/// `state.compiledImports` — which Compiled API names are bound in
-/// this module, and under which local identifiers. Empty vec means
-/// "imported but no aliases" / "imported with default name".
-#[derive(Debug, Default)]
-pub struct CompiledImports {
-    pub class_names: Option<Vec<String>>,
-    pub css: Option<Vec<String>>,
-    pub keyframes: Option<Vec<String>>,
-    pub styled: Option<Vec<String>>,
-    pub css_map: Option<Vec<String>>,
-}
-
-/// `state.importedCompiledImports` — kept narrow because upstream
-/// only ever sets `css` here. Adding a new variant requires bumping
-/// the cache schema (§5.3 `schema_hash`).
-#[derive(Debug, Default)]
-pub struct ImportedCompiledImports {
-    pub css: Option<String>,
-}
-
-/// `state.pragma` — JSX-pragma awareness used by the css-prop and
-/// classnames handlers (Phase 6). Defaults are all `false` / `None`.
-#[derive(Debug, Default)]
-pub struct PragmaState {
-    /// `/** @jsx ... */` is set on this file.
-    pub jsx: Option<bool>,
-    /// `/** @jsxImportSource ... */` is set on this file.
-    pub jsx_import_source: Option<bool>,
-    /// Classic-pragma name resolves to a Compiled binding.
-    pub classic_jsx_pragma_is_compiled: Option<bool>,
-    /// Local name of the classic-pragma identifier (after rename).
-    pub classic_jsx_pragma_local_name: Option<String>,
-}
-
-/// One entry of `state.pathsToCleanup`. Babel's `NodePath` reference
-/// is replaced with an opaque ID the Phase 5 mutation recorder
-/// knows how to resolve to a concrete AST mutation.
-///
-/// `id` here corresponds to a `MutationRecorder`-issued handle
-/// (§2.4); the recorder owns the actual AST identity (BytePos /
-/// node-index).
-#[derive(Debug, Clone, Copy)]
-pub struct CleanupAction {
-    pub action: CleanupKind,
-    pub id: u32,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CleanupKind {
-    Replace,
-    Remove,
-}
-
-/// Placeholder for the Phase 5 `Cache`. Today this is empty so
-/// dispatcher code can hold a `&mut State.cache` without a type
-/// dependency on the unported cache module.
-#[derive(Debug, Default)]
-pub struct CacheSlot;
 
 /// `Metadata`'s `context` discriminator from upstream lines 232–246.
 /// Each handler call gets a `Metadata` struct describing the parent

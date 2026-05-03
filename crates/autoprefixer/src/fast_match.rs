@@ -205,6 +205,119 @@ impl SelectorMatcher {
     }
 }
 
+/// An INTRINSIC-shape matcher equivalent to the regex
+/// `(?i)(^|[\s,(])({NAME}($|[\s),]))` where NAME is the regex-escaped
+/// ASCII identifier.
+///
+/// Used by:
+///   - `OldValue.regexp` via `OldValueRegexp::Intrinsic` — `is_match`
+///     only (`OldValue::check`).
+///   - `Intrinsic::regexp_cache` (the hack instance) — `is_match` AND
+///     both `replace_all_with_prefix` and `replace_all_with_vendor_alias`
+///     (the latter implements the JS `'$1<alias>$3'` substitution where
+///     `$3` is the trailing boundary).
+///
+/// ## Why this isn't `WordMatcher`
+///
+/// The WORD pattern's trailing class is `[\s(,]`. Intrinsic's is
+/// `[\s),]`. The single byte that flips is `(` — WORD admits a `(` as
+/// a trailing boundary, Intrinsic does NOT. Inputs like
+/// `width: max(fit-content(...))` would silently produce drift if
+/// `fit-content` were matched by the WORD pattern: the trailing `(`
+/// would be consumed as a boundary char, the matcher would fire, and
+/// the output bytes would diverge from the JS oracle.
+///
+/// `tests/intrinsic_regexp_parity.rs::fit_content_open_paren_must_not_match`
+/// pins this single-byte asymmetry as a named test so any drift here
+/// surfaces immediately.
+#[derive(Clone)]
+pub struct IntrinsicMatcher {
+    name_lower: Vec<u8>,
+}
+
+impl std::fmt::Debug for IntrinsicMatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "IntrinsicMatcher({})",
+            std::str::from_utf8(&self.name_lower).unwrap_or("<non-utf8>")
+        )
+    }
+}
+
+impl IntrinsicMatcher {
+    pub fn new(name: &str) -> Self {
+        debug_assert!(
+            name.is_ascii(),
+            "IntrinsicMatcher requires ASCII name; got {name:?}"
+        );
+        let mut buf = name.as_bytes().to_vec();
+        buf.make_ascii_lowercase();
+        Self { name_lower: buf }
+    }
+
+    pub fn is_match(&self, haystack: &str) -> bool {
+        if self.name_lower.is_empty() {
+            return false;
+        }
+        find_intrinsic(haystack, &self.name_lower).is_some()
+    }
+
+    /// Mirrors `regex.replace_all(s, |caps| caps[1] + prefix + caps[2])`.
+    /// `caps[1]` = leading boundary char (or empty), `caps[2]` = NAME +
+    /// trailing boundary (or just NAME at end-of-string). Identical
+    /// shape to `WordMatcher::replace_all_with_prefix`, but using the
+    /// Intrinsic trailing class.
+    pub fn replace_all_with_prefix(&self, haystack: &str, prefix: &str) -> String {
+        if self.name_lower.is_empty() {
+            return haystack.to_string();
+        }
+        let mut out = String::with_capacity(haystack.len() + prefix.len() * 2);
+        let mut cursor = 0usize;
+        for m in find_intrinsic_iter(haystack, &self.name_lower) {
+            out.push_str(&haystack[cursor..m.span_start]);
+            // caps[1]
+            out.push_str(&haystack[m.span_start..m.name_start]);
+            // inserted prefix
+            out.push_str(prefix);
+            // caps[2] = NAME + trailing-or-eos
+            out.push_str(&haystack[m.name_start..m.span_end]);
+            cursor = m.span_end;
+        }
+        out.push_str(&haystack[cursor..]);
+        out
+    }
+
+    /// Mirrors `regex.replace_all(s, |caps| caps[1] + alias + caps[3])`
+    /// — the JS-side `Intrinsic::replace` stretch-family branch. `caps[1]`
+    /// = leading boundary, `caps[3]` = trailing boundary alone (NOT
+    /// including NAME). NAME is dropped, replaced by `alias`.
+    pub fn replace_all_with_vendor_alias(
+        &self,
+        haystack: &str,
+        alias: &str,
+    ) -> String {
+        if self.name_lower.is_empty() {
+            return haystack.to_string();
+        }
+        let mut out = String::with_capacity(haystack.len() + alias.len());
+        let mut cursor = 0usize;
+        for m in find_intrinsic_iter(haystack, &self.name_lower) {
+            out.push_str(&haystack[cursor..m.span_start]);
+            // caps[1]
+            out.push_str(&haystack[m.span_start..m.name_start]);
+            // alias replaces NAME
+            out.push_str(alias);
+            // caps[3] = trailing boundary char (or empty at end-of-string).
+            // span_end - name_end is 0 at EOS, 1 char otherwise.
+            out.push_str(&haystack[m.name_end..m.span_end]);
+            cursor = m.span_end;
+        }
+        out.push_str(&haystack[cursor..]);
+        out
+    }
+}
+
 // --------------------------------------------------------------------------
 // Internal scanners
 // --------------------------------------------------------------------------
@@ -221,6 +334,28 @@ fn is_word_left_boundary(c: char) -> bool {
 #[inline]
 fn is_word_right_boundary(c: char) -> bool {
     c.is_whitespace() || c == ',' || c == '('
+}
+
+/// Match leading boundary class for the INTRINSIC pattern: identical to
+/// WORD's left class (`[\s,(]`). Both patterns share `(^|[\s,(])` as
+/// their leading group — the only difference between WORD and INTRINSIC
+/// is the trailing class.
+#[inline]
+fn is_intrinsic_left_boundary(c: char) -> bool {
+    c.is_whitespace() || c == ',' || c == '('
+}
+
+/// Match trailing boundary class for the INTRINSIC pattern: end of
+/// string, OR next char in `[\s),]` (Unicode whitespace, close-paren,
+/// comma). The single byte that differs from WORD is `(` — WORD admits
+/// it as a trailing boundary, INTRINSIC does NOT. That asymmetry is
+/// the entire reason `IntrinsicMatcher` exists; without it,
+/// `width: max(fit-content(...))`-shaped values would produce drift
+/// because WORD would erroneously match `fit-content(`. See
+/// `tests/intrinsic_regexp_parity.rs::fit_content_open_paren_must_not_match`.
+#[inline]
+fn is_intrinsic_right_boundary(c: char) -> bool {
+    c.is_whitespace() || c == ')' || c == ','
 }
 
 /// Match leading boundary class for the SELECTOR pattern: position 0,
@@ -366,6 +501,117 @@ impl<'a> Iterator for WordIter<'a> {
             };
 
             let _ = leading_consumed; // documentation only
+            self.cursor = span_end;
+            return Some(Match {
+                span_start,
+                name_start,
+                name_end,
+                span_end,
+            });
+        }
+        self.cursor = total;
+        None
+    }
+}
+
+/// Find first INTRINSIC-boundary match.
+fn find_intrinsic(haystack: &str, needle_lower: &[u8]) -> Option<Match> {
+    find_intrinsic_iter(haystack, needle_lower).next()
+}
+
+/// Iterator over non-overlapping INTRINSIC-boundary matches. Mirrors
+/// `WordIter` byte-for-byte except for the right-boundary predicate
+/// — INTRINSIC uses `[\s),]` (close-paren), WORD uses `[\s(,]`
+/// (open-paren). The single-byte asymmetry on `(` is the entire reason
+/// this iterator exists separately from `WordIter`.
+fn find_intrinsic_iter<'a>(
+    haystack: &'a str,
+    needle_lower: &'a [u8],
+) -> IntrinsicIter<'a> {
+    IntrinsicIter {
+        haystack,
+        needle: needle_lower,
+        cursor: 0,
+    }
+}
+
+struct IntrinsicIter<'a> {
+    haystack: &'a str,
+    needle: &'a [u8],
+    cursor: usize,
+}
+
+impl<'a> Iterator for IntrinsicIter<'a> {
+    type Item = Match;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let bytes = self.haystack.as_bytes();
+        let n = self.needle.len();
+        let total = bytes.len();
+        if n == 0 || self.cursor + n > total {
+            return None;
+        }
+        let mut name_start = self.cursor;
+        while name_start + n <= total {
+            if !self.haystack.is_char_boundary(name_start) {
+                name_start += 1;
+                continue;
+            }
+
+            // Left-boundary detection — identical to WordIter (same class).
+            let span_start = if name_start == 0 {
+                0usize
+            } else if name_start > self.cursor {
+                let bc_end = name_start;
+                let bc_start = prev_char_start(self.haystack, bc_end);
+                if bc_start < self.cursor {
+                    name_start += 1;
+                    continue;
+                }
+                let prev = self.haystack[bc_start..bc_end]
+                    .chars()
+                    .next()
+                    .expect("non-empty char span");
+                if !is_intrinsic_left_boundary(prev) {
+                    name_start += 1;
+                    continue;
+                }
+                bc_start
+            } else {
+                name_start += 1;
+                continue;
+            };
+
+            // NAME match: ASCII case-insensitive byte compare.
+            if !ascii_eq_ignore_case(&bytes[name_start..name_start + n], self.needle)
+            {
+                name_start += 1;
+                continue;
+            }
+
+            let name_end = name_start + n;
+
+            // Trailing boundary — INTRINSIC class `[\s),]`. The single
+            // byte that flips from WORD is `(` — INTRINSIC rejects it.
+            let span_end = if name_end == total {
+                name_end
+            } else if !self.haystack.is_char_boundary(name_end) {
+                name_start += 1;
+                continue;
+            } else {
+                let next_start = name_end;
+                let next_end = next_char_end(self.haystack, next_start);
+                let next = self.haystack[next_start..next_end]
+                    .chars()
+                    .next()
+                    .expect("non-empty char span");
+                if !is_intrinsic_right_boundary(next) {
+                    name_start += 1;
+                    continue;
+                }
+                next_end
+            };
+
             self.cursor = span_end;
             return Some(Match {
                 span_start,
@@ -653,6 +899,106 @@ impl SelectorRegexp {
                         "{}{}",
                         caps.get(1).map(|m| m.as_str()).unwrap_or(""),
                         replacement,
+                    )
+                })
+                .into_owned()
+        }
+    }
+}
+
+/// Intrinsic-pattern wrapper — equivalent to `regex::Regex` compiled
+/// from `(?i)(^|[\s,(])({}($|[\s),]))` where `{}` is the regex-escaped
+/// name.
+///
+/// Hot-path used by the `OldValueRegexp::Intrinsic` variant (consumed
+/// by `OldValue::check`) and by the `Intrinsic` hack's lazy regexp
+/// cache (consumed by `ValuePrefixer::check` and the hack's `replace`
+/// implementation).
+///
+/// **Drift contract:** byte-equal to the equivalent `regex::Regex` for
+/// every input. The single-byte trailing-class asymmetry vs WORD is
+/// load-bearing — see `IntrinsicMatcher` doc + `tests/intrinsic_regexp_parity.rs`.
+#[cfg(feature = "fast-match")]
+#[derive(Debug, Clone)]
+pub struct IntrinsicRegexp {
+    inner: IntrinsicMatcher,
+}
+
+#[cfg(not(feature = "fast-match"))]
+#[derive(Debug, Clone)]
+pub struct IntrinsicRegexp {
+    inner: regex::Regex,
+    /// Original name — preserved so `replace_all_with_prefix` and
+    /// `replace_all_with_vendor_alias` can rebuild the same capture
+    /// access pattern the JS oracle uses.
+    #[allow(dead_code)]
+    name: String,
+}
+
+impl IntrinsicRegexp {
+    pub fn new(name: &str) -> Self {
+        #[cfg(feature = "fast-match")]
+        {
+            Self { inner: IntrinsicMatcher::new(name) }
+        }
+        #[cfg(not(feature = "fast-match"))]
+        {
+            let escaped = crate::utils::escape_regexp(name);
+            let pat =
+                format!(r"(?i)(^|[\s,(])({}($|[\s),]))", escaped);
+            let re = crate::profile::time_regex_compile(|| {
+                regex::Regex::new(&pat).expect("valid intrinsic regex")
+            });
+            Self { inner: re, name: name.to_string() }
+        }
+    }
+
+    pub fn is_match(&self, haystack: &str) -> bool {
+        self.inner.is_match(haystack)
+    }
+
+    /// `caps[1] + prefix + caps[2]` — JS Intrinsic.replace non-stretch.
+    pub fn replace_all_with_prefix(&self, haystack: &str, prefix: &str) -> String {
+        #[cfg(feature = "fast-match")]
+        {
+            self.inner.replace_all_with_prefix(haystack, prefix)
+        }
+        #[cfg(not(feature = "fast-match"))]
+        {
+            self.inner
+                .replace_all(haystack, |caps: &regex::Captures| {
+                    format!(
+                        "{}{}{}",
+                        caps.get(1).map(|m| m.as_str()).unwrap_or(""),
+                        prefix,
+                        caps.get(2).map(|m| m.as_str()).unwrap_or(""),
+                    )
+                })
+                .into_owned()
+        }
+    }
+
+    /// `caps[1] + alias + caps[3]` — JS Intrinsic.replace stretch-family
+    /// branch (drops NAME, inserts vendor alias between leading and
+    /// trailing boundaries).
+    pub fn replace_all_with_vendor_alias(
+        &self,
+        haystack: &str,
+        alias: &str,
+    ) -> String {
+        #[cfg(feature = "fast-match")]
+        {
+            self.inner.replace_all_with_vendor_alias(haystack, alias)
+        }
+        #[cfg(not(feature = "fast-match"))]
+        {
+            self.inner
+                .replace_all(haystack, |caps: &regex::Captures| {
+                    format!(
+                        "{}{}{}",
+                        caps.get(1).map(|m| m.as_str()).unwrap_or(""),
+                        alias,
+                        caps.get(3).map(|m| m.as_str()).unwrap_or(""),
                     )
                 })
                 .into_owned()

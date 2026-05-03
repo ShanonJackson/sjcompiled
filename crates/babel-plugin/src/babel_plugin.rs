@@ -1,26 +1,22 @@
 //! 1:1 port of `packages/babel-plugin/src/babel-plugin.ts` — DISPATCHER.
 //!
-//! Phase 2 §2.3 status:
+//! Phase 2 §2.3 / §2.4 status:
 //!   * §2.3 skeleton (prior session): Compiled-import recognition into
 //!     `state.compiled_imports`. Pass-through preserved.
-//!   * §2.3(a) (this checkpoint): JSX-pragma recognition. Walks the
-//!     classic-pragma `import { jsx }` site (recording
-//!     `pragma.classic_jsx_pragma_is_compiled` /
-//!     `classic_jsx_pragma_local_name`) and scans the canonical
-//!     module-level leading-comment position for `@jsx` /
-//!     `@jsxImportSource` pragmas (setting `pragma.jsx` /
-//!     `pragma.jsx_import_source` and bootstrapping
-//!     `state.compiled_imports = Some(default)`).
-//!   * §2.3(a) is recognition-only — it WRITES TO `state` but does NOT
-//!     mutate the AST or the comment store. The two AST mutations
-//!     upstream performs in this region (`path.remove()` of the
-//!     classic-pragma `jsx` specifier; `file.ast.comments` filter to
-//!     hide the matched JSX-pragma comment from
-//!     `@babel/plugin-transform-react-jsx`) are deferred to §2.3(b)
-//!     once §2.4 ships the `MutationRecorder`. See the inline
-//!     `// §2.3(b):` TODOs.
+//!   * §2.3(a): JSX-pragma recognition. Walks the classic-pragma
+//!     `import { jsx }` site and the canonical module-level
+//!     leading-comment position. Recognition only — two §2.3(b) AST
+//!     mutations marked with TODOs.
+//!   * §2.4 (this checkpoint): all evaluation-visible state
+//!     mutations route through `MutationRecorder::apply` per PLAN.md
+//!     §3.9.8. The visitor holds `state: State` and `recorder:
+//!     MutationRecorder` as separate fields; init-time non-captured
+//!     writes go through `State`'s `set_*` / `ensure_*` /
+//!     `set_classic_jsx_pragma` methods. The lint
+//!     `grep state\.[a-z_]+\.{push,set,add,insert,remove,extend}`
+//!     stays clean outside `state.rs` / `mutation_recorder.rs`.
 //!
-//! Stubs that NEXT-SESSION (§2.3(b) / §2.4 / Phase 6) work fills in:
+//! Stubs that NEXT-SESSION (§2.3(b) / Phase 6) work fills in:
 //!
 //!   * `pre()` analog — global cache initialisation, `pragma` reset,
 //!     `pathsToCleanup` reset. Today the visitor allocates fresh
@@ -32,9 +28,9 @@
 //!     first real handler in Phase 6.
 //!
 //!   * `ImportDeclaration` specifier removal (`specifier.remove()`,
-//!     `path.remove()` when the source is fully drained). Mutation
-//!     lands with §2.4 (state-encapsulation pre-req — the
-//!     MutationRecorder is what owns deferred specifier deletes).
+//!     `path.remove()` when the source is fully drained). The
+//!     queue lands via `state.queue_cleanup(action)` once §2.3(b)
+//!     wires the deferred AST-mutation path.
 //!
 //!   * `'TaggedTemplateExpression|CallExpression'` and `JSXElement`/
 //!     `JSXOpeningElement` handlers — stubbed as no-ops here. The
@@ -56,13 +52,9 @@ use swc_core::ecma::ast::{
 };
 use swc_core::ecma::visit::{VisitMut, VisitMutWith};
 
-use crate::types::{CompiledImports, PluginOptions, State};
-
-/// The five Compiled APIs the dispatcher recognises by import name.
-/// Mirrors upstream lines 275: `(['styled', 'ClassNames', 'css',
-/// 'keyframes', 'cssMap'] as const)`. Order matters only for
-/// readability — visitor logic iterates over each separately.
-const COMPILED_API_NAMES: &[&str] = &["styled", "ClassNames", "css", "keyframes", "cssMap"];
+use crate::mutation_recorder::{ApiKind, MutationRecorder, StateDiff};
+use crate::state::State;
+use crate::types::PluginOptions;
 
 /// Resolve the effective import-sources set: `DEFAULT_IMPORT_SOURCES`
 /// ∪ user `opts.import_sources`. Mirrors upstream `pre()`'s
@@ -113,9 +105,12 @@ fn imported_name(spec: &swc_core::ecma::ast::ImportNamedSpecifier) -> String {
 
 /// `BabelPluginVisitor` — the top-level dispatcher.
 ///
-/// Holds owned `State` (Babel's PluginPass analog). The `process(...)`
-/// entry in `lib.rs` allocates this once per transform; SWC tears the
-/// WASI instance down between transforms, so per-call state is the
+/// Holds owned `State` (Babel's PluginPass analog) and a
+/// `MutationRecorder` (PLAN.md §3.9.8) as SEPARATE fields so the
+/// borrow checker can split-borrow `&mut self.recorder` and
+/// `&mut self.state` simultaneously. The `process(...)` entry in
+/// `lib.rs` allocates this once per transform; SWC tears the WASI
+/// instance down between transforms, so per-call state is the
 /// only safe shape (PLAN.md cross-transform-caching constraint
 /// re-confirmed in `plugins/STATUS.md`).
 ///
@@ -125,6 +120,11 @@ fn imported_name(spec: &swc_core::ecma::ast::ImportNamedSpecifier) -> String {
 /// store). The generic is monomorphised, so there's no runtime cost.
 pub struct BabelPluginVisitor<C: Comments> {
     pub state: State,
+    /// Per-evaluation diff capture. `apply(diff, &mut state)` is the
+    /// SOLE channel for cache-replay-relevant state writes (PLAN.md
+    /// §3.9.8). Phase 5 §5.3 will drain `recorder.diff_log()` into
+    /// `Layer2Entry::state_diffs` at evaluation completion.
+    pub recorder: MutationRecorder,
     /// Effective import-sources set (DEFAULT ∪ opts.importSources).
     /// Held alongside `state` because upstream stores it on `this`
     /// (the plugin instance), not on `state` — see lines 96–108.
@@ -156,8 +156,11 @@ impl<C: Comments> BabelPluginVisitor<C> {
     pub fn new(opts: PluginOptions, comments: C) -> Self {
         let import_sources = resolve_import_sources(&opts);
         let mut state = State::default();
-        state.opts = opts;
-        state.import_sources = import_sources.clone();
+        // Init-time mutators — non-captured per STATE_MUTATIONS.md
+        // (these set per-file scaffolding written exactly once, not
+        // cross-file caching contract).
+        state.set_opts(opts);
+        state.set_import_sources(import_sources.clone());
         // Mirror upstream `pre()` initialisation: `sheets`, `cssMap`,
         // `ignoreMemberExpressions`, `includedFiles`, `pathsToCleanup`,
         // `pragma`, `usesXcss=false`. The Default impl of `State`
@@ -165,6 +168,7 @@ impl<C: Comments> BabelPluginVisitor<C> {
         // sees the parity intent.
         Self {
             state,
+            recorder: MutationRecorder::new(),
             import_sources,
             comments,
             #[cfg(debug_assertions)]
@@ -174,8 +178,12 @@ impl<C: Comments> BabelPluginVisitor<C> {
 
     /// Recognise an `ImportDeclaration` and update `state.compiledImports`
     /// with each Compiled API's local name(s). Does NOT remove the
-    /// specifier or the import — that's §2.4 / Phase 6 work. Output
-    /// stays pass-through.
+    /// specifier or the import — that's §2.3(b) work via
+    /// `state.queue_cleanup(...)`. Output stays pass-through.
+    ///
+    /// API-name pushes route through `MutationRecorder::apply` with
+    /// `StateDiff::CompiledImportsAppend` (STATE_MUTATIONS.md site 4 —
+    /// the FIRST evaluation-visible mutation, captured by the cache).
     fn record_compiled_import(&mut self, decl: &ImportDecl) {
         let userland_atom = decl.src.value.to_atom_lossy();
         let userland = userland_atom.as_str();
@@ -187,27 +195,29 @@ impl<C: Comments> BabelPluginVisitor<C> {
         // Empty struct means "Compiled module imported, but no API
         // names yet recorded" — used by the css-prop visitor (Phase 6
         // §6.5) as a "should we even look at css={...}" gate.
-        if self.state.compiled_imports.is_none() {
-            self.state.compiled_imports = Some(CompiledImports::default());
-        }
+        // STATE_MUTATIONS.md site 3 (init, not captured).
+        self.state.ensure_compiled_imports();
 
-        let imports = self.state.compiled_imports.as_mut().unwrap();
         for spec in &decl.specifiers {
             let ImportSpecifier::Named(named) = spec else { continue };
             // `imported` defaults to the local name when absent
             // (`import { foo }` vs `import { foo as bar }`).
             let name = imported_name(named);
-            for api in COMPILED_API_NAMES {
-                if &name == api {
-                    let local = named.local.sym.as_ref().to_string();
-                    push_api_local(imports, api, local);
-                    break;
-                }
+            if let Some(api) = ApiKind::from_imported_name(&name) {
+                let local = named.local.sym.as_ref().to_string();
+                self.recorder.apply(
+                    StateDiff::CompiledImportsAppend {
+                        api,
+                        local_name: local,
+                    },
+                    &mut self.state,
+                );
             }
-            // §2.3(b): MutationRecorder.queue_specifier_remove(specifier_id)
-            // — upstream calls `specifier.remove()` here and, when the
-            // specifier list empties, `path.remove()`. Deferred until
-            // §2.4 ships the recorder.
+            // §2.3(b): state.queue_cleanup(CleanupAction { action:
+            // Remove, id: <recorder-issued-handle> }) — upstream calls
+            // `specifier.remove()` here and, when the specifier list
+            // empties, `path.remove()`. Deferred until §2.3(b) wires
+            // the AST-handle table.
         }
     }
 
@@ -216,16 +226,14 @@ impl<C: Comments> BabelPluginVisitor<C> {
     /// and look for an `ImportSpecifier::Named` where the imported
     /// name (or local name when imported is None — the `{ jsx }`
     /// no-rename shape) is `"jsx"`. Records the local name and sets
-    /// `pragma.classic_jsx_pragma_is_compiled = Some(true)`.
+    /// `pragma.classic_jsx_pragma_is_compiled = Some(true)` via
+    /// `state.set_classic_jsx_pragma(local)`.
     ///
     /// Recognition only — does NOT call `path.remove()` on the
     /// specifier. The `// §2.3(b):` TODO inside marks where the
-    /// MutationRecorder hook lands once §2.4 is in.
+    /// queue_cleanup call lands.
     ///
-    /// Mirrors upstream `babel-plugin.ts` lines 43–66. Upstream uses
-    /// `path.traverse(visitor, this)` over `ImportSpecifier`; we walk
-    /// `module.body` directly because the dispatcher is a single-pass
-    /// VisitMut (PLAN.md §3.5).
+    /// Mirrors upstream `babel-plugin.ts` lines 43–66.
     fn scan_classic_jsx_pragma_import(&mut self, program: &Program) {
         let Program::Module(module) = program else {
             return;
@@ -244,21 +252,19 @@ impl<C: Comments> BabelPluginVisitor<C> {
                 if imported_name(named) != "jsx" {
                     continue;
                 }
-                // Upstream: state.pragma.classicJsxPragmaIsCompiled = true;
-                //           state.pragma.classicJsxPragmaLocalName = specifier.local.name;
-                self.state.pragma.classic_jsx_pragma_is_compiled = Some(true);
-                self.state.pragma.classic_jsx_pragma_local_name =
-                    Some(named.local.sym.as_ref().to_string());
-                // §2.3(b): MutationRecorder.queue_specifier_remove(specifier_id)
-                // — upstream's `path.remove()` hides the classic JSX
-                // pragma from `@babel/plugin-transform-react-jsx` so it
-                // doesn't re-emit `_jsx`-style calls. Deferred until
-                // §2.4 ships the recorder. NOT load-bearing for any
-                // §2.3 / §2.4 / §2.5 verification gate (the SWC
-                // classic-runtime pipeline doesn't read this AST shape
-                // until codegen, and no current fixture exercises that
-                // path); load-bearing for §6.5 (css-prop) where the
-                // pragma drives output divergence.
+                // STATE_MUTATIONS.md classifies `pragma.*` writes as
+                // out-of-capture (per-file scaffolding). Use the
+                // init-time mutator on `State`.
+                self.state
+                    .set_classic_jsx_pragma(named.local.sym.as_ref().to_string());
+                // §2.3(b): state.queue_cleanup(CleanupAction { action:
+                // Remove, id: <recorder-issued-handle> }) — upstream's
+                // `path.remove()` hides the classic JSX pragma from
+                // `@babel/plugin-transform-react-jsx` so it doesn't
+                // re-emit `_jsx`-style calls. NOT load-bearing for any
+                // §2.3 / §2.4 / §2.5 verification gate; load-bearing
+                // for §6.5 (css-prop) where the pragma drives output
+                // divergence.
                 return; // first match wins, matches upstream's early `return`
             }
         }
@@ -276,13 +282,14 @@ impl<C: Comments> BabelPluginVisitor<C> {
     /// matches the recorded local name: sets `pragma.jsx = Some(true)`
     /// and bootstraps `state.compiled_imports = Some(default)`.
     ///
+    /// All writes go through `state.set_*` / `state.ensure_*` methods
+    /// (§2.4 encapsulation contract).
+    ///
     /// Mirrors upstream `babel-plugin.ts` lines 122–181. The comment
     /// store mutations upstream performs (filtering `file.ast.comments`
     /// and `body[0].leadingComments` to drop the matched pragma
     /// comment so `@babel/plugin-transform-react-jsx` ignores it) are
-    /// DEFERRED to §2.3(b) — they pair naturally with the classic-
-    /// pragma `path.remove()` and depend on the §2.4
-    /// MutationRecorder's deferred-mutation discipline.
+    /// DEFERRED to §2.3(b).
     ///
     /// Drift watch point: see `comments` field doc on this struct for
     /// why we anchor on `first_body_item.span.lo` rather than walking
@@ -310,18 +317,13 @@ impl<C: Comments> BabelPluginVisitor<C> {
                         .iter()
                         .any(|src| src.as_str() == m.as_str())
                     {
-                        // Upstream: state.compiledImports = {};
-                        //           state.pragma.jsxImportSource = true;
-                        if self.state.compiled_imports.is_none() {
-                            self.state.compiled_imports = Some(CompiledImports::default());
-                        }
-                        self.state.pragma.jsx_import_source = Some(true);
-                        // §2.3(b): record `comment.span` for the
-                        // MutationRecorder so the pragma comment is
-                        // dropped from `body[0].leadingComments` (and
-                        // upstream's `file.ast.comments` analog) at
-                        // exit. SWC analog: `comments.take_leading(pos)`
-                        // → filter → `add_leading_comments(pos, kept)`.
+                        // STATE_MUTATIONS.md sites 1 + pragma write —
+                        // both classified as init / non-captured.
+                        self.state.ensure_compiled_imports();
+                        self.state.set_pragma_jsx_import_source();
+                        // §2.3(b): record `comment.span` for the AST-
+                        // mutation queue so the pragma comment is
+                        // dropped from the comment store at exit.
                     }
                 }
             }
@@ -330,39 +332,19 @@ impl<C: Comments> BabelPluginVisitor<C> {
             if let Some(cap) = jsx_annotation_regex().captures(text) {
                 let matches_classic = self
                     .state
-                    .pragma
+                    .pragma()
                     .classic_jsx_pragma_is_compiled
                     .unwrap_or(false)
                     && cap.get(1).map(|m| m.as_str())
-                        == self.state.pragma.classic_jsx_pragma_local_name.as_deref();
+                        == self.state.pragma().classic_jsx_pragma_local_name.as_deref();
                 if matches_classic {
-                    // Upstream: state.compiledImports = {};
-                    //           state.pragma.jsx = true;
-                    if self.state.compiled_imports.is_none() {
-                        self.state.compiled_imports = Some(CompiledImports::default());
-                    }
-                    self.state.pragma.jsx = Some(true);
+                    self.state.ensure_compiled_imports();
+                    self.state.set_pragma_jsx();
                     // §2.3(b): same comment-filter TODO as above.
                 }
             }
         }
     }
-}
-
-/// Tag-dispatch helper: append `local` to the right `CompiledImports`
-/// field based on `api_name`. Inlined in upstream's `forEach` over
-/// the API tuple; here we keep a single match so adding an API in
-/// future is a localised diff.
-fn push_api_local(imports: &mut CompiledImports, api_name: &str, local: String) {
-    let slot = match api_name {
-        "styled" => &mut imports.styled,
-        "ClassNames" => &mut imports.class_names,
-        "css" => &mut imports.css,
-        "keyframes" => &mut imports.keyframes,
-        "cssMap" => &mut imports.css_map,
-        _ => return,
-    };
-    slot.get_or_insert_with(Vec::new).push(local);
 }
 
 impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
@@ -374,10 +356,10 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
     ///   3. Children walk — `visit_mut_module_decl` handles
     ///      `ImportDeclaration` recognition (populates
     ///      `compiled_imports[apiName]`); other handlers stub out.
-    /// Order matters: step 2 may set `state.compiled_imports = {}`
-    /// (resetting the slot). Step 3's import recognition runs AFTER,
-    /// so the bootstrapped empty struct gets populated rather than
-    /// clobbering an existing one — exactly upstream's order.
+    /// Order matters: step 2 may bootstrap `state.compiled_imports`
+    /// (via `ensure_compiled_imports()`). Step 3's import recognition
+    /// runs AFTER, so the bootstrapped struct gets populated rather
+    /// than clobbering — exactly upstream's order.
     fn visit_mut_program(&mut self, program: &mut Program) {
         // §2.3(a) — recognition only, no AST mutations.
         self.scan_classic_jsx_pragma_import(program);
@@ -389,13 +371,14 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
 
         // Upstream `Program::exit`: appendRuntimeImports, banner
         // comment, React/forwardRef injection, `pathsToCleanup`.
-        // Deferred — needs §2.4 MutationRecorder to track what the
-        // handlers want injected.
+        // Deferred — needs §2.3(b) AST-mutation channel + first
+        // Phase 6 handler.
     }
 
     /// `ImportDeclaration` upstream visitor (lines 241–294).
     /// Recognition only — populates `state.compiled_imports[apiName]`
-    /// and recurses into children. Specifier removal is §2.4 work.
+    /// via `MutationRecorder::apply` and recurses into children.
+    /// Specifier removal is §2.3(b) work.
     fn visit_mut_module_decl(&mut self, decl: &mut ModuleDecl) {
         if let ModuleDecl::Import(import) = decl {
             self.record_compiled_import(import);
@@ -411,7 +394,7 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
     ///      branches. Stubbed.
     fn visit_mut_call_expr(&mut self, n: &mut swc_core::ecma::ast::CallExpr) {
         #[cfg(debug_assertions)]
-        if self.state.compiled_imports.is_some() {
+        if self.state.compiled_imports().is_some() {
             self.stub_log.push("call_expr_visited".to_string());
         }
         n.visit_mut_children_with(self);
@@ -419,7 +402,7 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
 
     fn visit_mut_tagged_tpl(&mut self, n: &mut swc_core::ecma::ast::TaggedTpl) {
         #[cfg(debug_assertions)]
-        if self.state.compiled_imports.is_some() {
+        if self.state.compiled_imports().is_some() {
             self.stub_log.push("tagged_tpl_visited".to_string());
         }
         n.visit_mut_children_with(self);
@@ -429,8 +412,7 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         #[cfg(debug_assertions)]
         if self
             .state
-            .compiled_imports
-            .as_ref()
+            .compiled_imports()
             .and_then(|i| i.class_names.as_ref())
             .is_some()
         {
@@ -443,9 +425,9 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         // Upstream: `processXcss = state.opts.processXcss ?? true`.
         // Stub: only log when the gate would have fired so the test
         // log isn't flooded.
-        let _process_xcss = self.state.opts.process_xcss.unwrap_or(true);
+        let _process_xcss = self.state.opts().process_xcss.unwrap_or(true);
         #[cfg(debug_assertions)]
-        if self.state.compiled_imports.is_some() {
+        if self.state.compiled_imports().is_some() {
             self.stub_log.push("jsx_opening_element_visited".to_string());
         }
         n.visit_mut_children_with(self);
@@ -551,9 +533,9 @@ mod tests {
             vec![named_specifier("styled", None)],
         );
         v.record_compiled_import(&decl);
-        let imports = v.state.compiled_imports.expect("compiled_imports populated");
-        let styled = imports.styled.expect("styled recorded");
-        assert_eq!(styled, vec!["styled".to_string()]);
+        let imports = v.state.compiled_imports().expect("compiled_imports populated");
+        let styled = imports.styled.as_deref().expect("styled recorded");
+        assert_eq!(styled, &["styled".to_string()][..]);
     }
 
     #[test]
@@ -564,8 +546,8 @@ mod tests {
             vec![named_specifier("MyCss", Some("css"))],
         );
         v.record_compiled_import(&decl);
-        let imports = v.state.compiled_imports.unwrap();
-        assert_eq!(imports.css.unwrap(), vec!["MyCss".to_string()]);
+        let imports = v.state.compiled_imports().expect("compiled");
+        assert_eq!(imports.css.as_deref(), Some(&["MyCss".to_string()][..]));
     }
 
     #[test]
@@ -580,10 +562,13 @@ mod tests {
             ],
         );
         v.record_compiled_import(&decl);
-        let imports = v.state.compiled_imports.unwrap();
-        assert_eq!(imports.styled.unwrap(), vec!["styled".to_string()]);
-        assert_eq!(imports.css.unwrap(), vec!["css".to_string()]);
-        assert_eq!(imports.keyframes.unwrap(), vec!["keyframes".to_string()]);
+        let imports = v.state.compiled_imports().expect("compiled");
+        assert_eq!(imports.styled.as_deref(), Some(&["styled".to_string()][..]));
+        assert_eq!(imports.css.as_deref(), Some(&["css".to_string()][..]));
+        assert_eq!(
+            imports.keyframes.as_deref(),
+            Some(&["keyframes".to_string()][..])
+        );
     }
 
     #[test]
@@ -596,7 +581,7 @@ mod tests {
         v.record_compiled_import(&decl);
         // `state.compiled_imports` stays None — the visitor never
         // recognised the source as Compiled.
-        assert!(v.state.compiled_imports.is_none());
+        assert!(v.state.compiled_imports().is_none());
     }
 
     #[test]
@@ -614,9 +599,12 @@ mod tests {
         let mut v = fresh();
         let mut program = Program::Module(module);
         v.visit_mut_program(&mut program);
-        let imports = v.state.compiled_imports.expect("compiled");
-        assert_eq!(imports.styled.unwrap(), vec!["styled".to_string()]);
-        assert_eq!(imports.class_names.unwrap(), vec!["ClassNames".to_string()]);
+        let imports = v.state.compiled_imports().expect("compiled");
+        assert_eq!(imports.styled.as_deref(), Some(&["styled".to_string()][..]));
+        assert_eq!(
+            imports.class_names.as_deref(),
+            Some(&["ClassNames".to_string()][..])
+        );
         // Verify NO mutation: original module body length preserved.
         if let Program::Module(m) = &program {
             assert_eq!(m.body.len(), 2);
@@ -626,6 +614,55 @@ mod tests {
                 assert_eq!(im.specifiers.len(), 2);
             }
         }
+    }
+
+    // ───────── §2.4 — recorder-routing assertions ─────────
+
+    #[test]
+    fn record_compiled_import_pushes_to_diff_log() {
+        // §2.4 contract: every captured mutation lands in
+        // recorder.diff_log() in iteration order.
+        let mut v = fresh();
+        let decl = import_decl(
+            "@compiled/react",
+            vec![
+                named_specifier("styled", None),
+                named_specifier("css", None),
+            ],
+        );
+        v.record_compiled_import(&decl);
+        let log = v.recorder.diff_log();
+        assert_eq!(log.len(), 2);
+        assert!(matches!(
+            &log[0],
+            StateDiff::CompiledImportsAppend {
+                api: ApiKind::Styled,
+                local_name,
+            } if local_name == "styled"
+        ));
+        assert!(matches!(
+            &log[1],
+            StateDiff::CompiledImportsAppend {
+                api: ApiKind::Css,
+                local_name,
+            } if local_name == "css"
+        ));
+    }
+
+    #[test]
+    fn jsx_specifier_does_not_emit_diff_for_api_pushes() {
+        // `import { jsx } from '@compiled/react'` — `jsx` is NOT one
+        // of the 5 Compiled APIs, so the recorder must not capture an
+        // append for it. The classic-pragma flags ARE set (init-time,
+        // not captured).
+        let mut v = fresh();
+        let decl = import_decl(
+            "@compiled/react",
+            vec![named_specifier("jsx", None)],
+        );
+        v.record_compiled_import(&decl);
+        // No StateDiff entries — `jsx` isn't an ApiKind.
+        assert!(v.recorder.diff_log().is_empty());
     }
 
     // ───────── §2.3(a) — classic JSX pragma recognition ─────────
@@ -640,9 +677,9 @@ mod tests {
         )]);
         let mut v = fresh();
         v.scan_classic_jsx_pragma_import(&Program::Module(module));
-        assert_eq!(v.state.pragma.classic_jsx_pragma_is_compiled, Some(true));
+        assert_eq!(v.state.pragma().classic_jsx_pragma_is_compiled, Some(true));
         assert_eq!(
-            v.state.pragma.classic_jsx_pragma_local_name.as_deref(),
+            v.state.pragma().classic_jsx_pragma_local_name.as_deref(),
             Some("jsx")
         );
     }
@@ -657,9 +694,9 @@ mod tests {
         )]);
         let mut v = fresh();
         v.scan_classic_jsx_pragma_import(&Program::Module(module));
-        assert_eq!(v.state.pragma.classic_jsx_pragma_is_compiled, Some(true));
+        assert_eq!(v.state.pragma().classic_jsx_pragma_is_compiled, Some(true));
         assert_eq!(
-            v.state.pragma.classic_jsx_pragma_local_name.as_deref(),
+            v.state.pragma().classic_jsx_pragma_local_name.as_deref(),
             Some("myJsx")
         );
     }
@@ -675,9 +712,9 @@ mod tests {
         )]);
         let mut v = fresh();
         v.scan_classic_jsx_pragma_import(&Program::Module(module));
-        assert_eq!(v.state.pragma.classic_jsx_pragma_is_compiled, Some(true));
+        assert_eq!(v.state.pragma().classic_jsx_pragma_is_compiled, Some(true));
         assert_eq!(
-            v.state.pragma.classic_jsx_pragma_local_name.as_deref(),
+            v.state.pragma().classic_jsx_pragma_local_name.as_deref(),
             Some("foo")
         );
     }
@@ -692,8 +729,8 @@ mod tests {
         )]);
         let mut v = fresh();
         v.scan_classic_jsx_pragma_import(&Program::Module(module));
-        assert!(v.state.pragma.classic_jsx_pragma_is_compiled.is_none());
-        assert!(v.state.pragma.classic_jsx_pragma_local_name.is_none());
+        assert!(v.state.pragma().classic_jsx_pragma_is_compiled.is_none());
+        assert!(v.state.pragma().classic_jsx_pragma_local_name.is_none());
     }
 
     #[test]
@@ -769,9 +806,9 @@ mod tests {
             BabelPluginVisitor::new(PluginOptions::default(), comments);
         let module = module_with_first_body_at(pos);
         v.scan_jsx_pragma_comments(&Program::Module(module));
-        assert_eq!(v.state.pragma.jsx_import_source, Some(true));
-        assert!(v.state.compiled_imports.is_some());
-        assert!(v.state.pragma.jsx.is_none());
+        assert_eq!(v.state.pragma().jsx_import_source, Some(true));
+        assert!(v.state.compiled_imports().is_some());
+        assert!(v.state.pragma().jsx.is_none());
     }
 
     #[test]
@@ -784,8 +821,8 @@ mod tests {
             BabelPluginVisitor::new(PluginOptions::default(), comments);
         let module = module_with_first_body_at(pos);
         v.scan_jsx_pragma_comments(&Program::Module(module));
-        assert!(v.state.pragma.jsx_import_source.is_none());
-        assert!(v.state.compiled_imports.is_none());
+        assert!(v.state.pragma().jsx_import_source.is_none());
+        assert!(v.state.compiled_imports().is_none());
     }
 
     #[test]
@@ -797,12 +834,11 @@ mod tests {
         comments.add_leading(pos, comment("* @jsx myJsx "));
         let mut v: BabelPluginVisitor<SingleThreadedComments> =
             BabelPluginVisitor::new(PluginOptions::default(), comments);
-        v.state.pragma.classic_jsx_pragma_is_compiled = Some(true);
-        v.state.pragma.classic_jsx_pragma_local_name = Some("myJsx".to_string());
+        v.state.set_classic_jsx_pragma("myJsx".into());
         let module = module_with_first_body_at(pos);
         v.scan_jsx_pragma_comments(&Program::Module(module));
-        assert_eq!(v.state.pragma.jsx, Some(true));
-        assert!(v.state.compiled_imports.is_some());
+        assert_eq!(v.state.pragma().jsx, Some(true));
+        assert!(v.state.compiled_imports().is_some());
     }
 
     #[test]
@@ -814,11 +850,10 @@ mod tests {
         comments.add_leading(pos, comment("* @jsx other "));
         let mut v: BabelPluginVisitor<SingleThreadedComments> =
             BabelPluginVisitor::new(PluginOptions::default(), comments);
-        v.state.pragma.classic_jsx_pragma_is_compiled = Some(true);
-        v.state.pragma.classic_jsx_pragma_local_name = Some("myJsx".to_string());
+        v.state.set_classic_jsx_pragma("myJsx".into());
         let module = module_with_first_body_at(pos);
         v.scan_jsx_pragma_comments(&Program::Module(module));
-        assert!(v.state.pragma.jsx.is_none());
+        assert!(v.state.pragma().jsx.is_none());
     }
 
     #[test]
@@ -833,8 +868,8 @@ mod tests {
             BabelPluginVisitor::new(PluginOptions::default(), comments);
         let module = module_with_first_body_at(pos);
         v.scan_jsx_pragma_comments(&Program::Module(module));
-        assert!(v.state.pragma.jsx.is_none());
-        assert!(v.state.compiled_imports.is_none());
+        assert!(v.state.pragma().jsx.is_none());
+        assert!(v.state.compiled_imports().is_none());
     }
 
     #[test]
@@ -892,16 +927,18 @@ mod tests {
         v.visit_mut_program(&mut program);
 
         // Classic pragma recognised.
-        assert_eq!(v.state.pragma.classic_jsx_pragma_is_compiled, Some(true));
+        assert_eq!(v.state.pragma().classic_jsx_pragma_is_compiled, Some(true));
         assert_eq!(
-            v.state.pragma.classic_jsx_pragma_local_name.as_deref(),
+            v.state.pragma().classic_jsx_pragma_local_name.as_deref(),
             Some("jsx")
         );
         // @jsx pragma comment matched the recorded local name.
-        assert_eq!(v.state.pragma.jsx, Some(true));
+        assert_eq!(v.state.pragma().jsx, Some(true));
         // ImportDeclaration walk populated styled (jsx is not a recognised API name).
-        let imports = v.state.compiled_imports.expect("imports");
-        assert_eq!(imports.styled.unwrap(), vec!["styled".to_string()]);
+        let imports = v.state.compiled_imports().expect("imports");
+        assert_eq!(imports.styled.as_deref(), Some(&["styled".to_string()][..]));
         assert!(imports.css.is_none());
+        // Recorder captured exactly one CompiledImportsAppend (for styled).
+        assert_eq!(v.recorder.diff_log().len(), 1);
     }
 }

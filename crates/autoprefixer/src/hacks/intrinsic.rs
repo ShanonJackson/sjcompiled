@@ -61,25 +61,20 @@
 //! Intrinsic-local form, `width: max(fit-content, 100px)` would not
 //! match the trailing `,` boundary.
 
+use crate::fast_match::IntrinsicRegexp;
 use crate::old_value::OldValue;
-use crate::utils;
 use crate::value::ValueBase;
 use once_cell::sync::OnceCell;
 use postcss_core::{Node, NodeKind};
-use regex::Regex;
-
-/// Matches `name` with the Intrinsic-local trailing boundary `[\s),]`.
-fn intrinsic_regexp(name: &str) -> Regex {
-    let escaped = utils::escape_regexp(name);
-    let src = format!("(^|[\\s,(])({}($|[\\s),]))", escaped);
-    Regex::new(&format!("(?i){}", src)).expect("valid intrinsic regexp")
-}
 
 pub struct Intrinsic {
     pub base: ValueBase,
     /// JS lazy `this.regexpCache`. Distinct from `ValueBase`'s own cache
-    /// because the regex source differs.
-    regexp_cache: OnceCell<Regex>,
+    /// because the regex source differs (`[\s),]` trailing class vs
+    /// the WORD pattern's `[\s(,]`). Routed through `IntrinsicRegexp`
+    /// — the hand-rolled fast-match wrapper — so the lazy rebuild on
+    /// first access stays cheap (no regex compile).
+    regexp_cache: OnceCell<IntrinsicRegexp>,
 }
 
 impl Intrinsic {
@@ -102,9 +97,9 @@ impl Intrinsic {
 
     /// JS `regexp()` — overrides `ValueBase::regexp` to use the local
     /// `regexp(name)` form. Lazy.
-    pub fn regexp(&self) -> &Regex {
+    pub fn regexp(&self) -> &IntrinsicRegexp {
         self.regexp_cache
-            .get_or_init(|| intrinsic_regexp(&self.base.prefixer.name))
+            .get_or_init(|| IntrinsicRegexp::new(&self.base.prefixer.name))
     }
 
     /// JS `isStretch()` — only `stretch` / `fill` / `fill-available` get
@@ -131,25 +126,15 @@ impl Intrinsic {
             } else {
                 "-webkit-fill-available"
             };
-            return self
-                .regexp()
-                .replace_all(string, |caps: &regex::Captures| {
-                    let g1 = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-                    let g3 = caps.get(3).map(|m| m.as_str()).unwrap_or("");
-                    format!("{g1}{alias}{g3}")
-                })
-                .into_owned();
+            // JS: `string.replace(this.regexp(), '$1<alias>$3')` —
+            // group 1 = leading boundary, group 3 = trailing boundary,
+            // group 2 (NAME) is dropped.
+            return self.regexp().replace_all_with_vendor_alias(string, alias);
         }
-        // Base `Value.replace` — but JS Intrinsic still uses its OWN
-        // regexp via `super.replace` (super looks up `this.regexp()`,
-        // which is the override). So we must call our own regex too.
-        self.regexp()
-            .replace_all(string, |caps: &regex::Captures| {
-                let g1 = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-                let g2 = caps.get(2).map(|m| m.as_str()).unwrap_or("");
-                format!("{g1}{prefix}{g2}")
-            })
-            .into_owned()
+        // Base `Value.replace` form via Intrinsic's own regex — JS:
+        // `string.replace(this.regexp(), '$1' + prefix + '$2')`. Group 1
+        // = leading boundary, group 2 = NAME + trailing-or-eos.
+        self.regexp().replace_all_with_prefix(string, prefix)
     }
 
     /// JS `old(prefix)` — returns an `OldValue` pre-configured with the
@@ -169,13 +154,16 @@ impl Intrinsic {
             prefixed.clone(),
             Some(prefixed.clone()),
             // Intrinsic uses its own trailing-boundary class `[\s),]`
-            // (NOT the standard `[\s(,]`), so we route through the
-            // `Custom` variant rather than `WordRegexp`. This bypasses
-            // the fast path for the 5 Intrinsic-named values
-            // (max-content, min-content, fit-content, fill,
-            // fill-available, stretch) — preserves byte-equality.
-            Some(crate::old_value::OldValueRegexp::Custom(
-                intrinsic_regexp(&prefixed),
+            // (NOT the standard `[\s(,]`). Routed through the dedicated
+            // `Intrinsic` variant — backed by `IntrinsicRegexp`'s
+            // hand-rolled fast-match — so the OldValue stays
+            // serializable AND the lazy regex compile cost is gone.
+            // The 6 Intrinsic-named values (max-content, min-content,
+            // fit-content, fill, fill-available, stretch) all flow
+            // through this path; byte-equality is pinned in
+            // `tests/intrinsic_regexp_parity.rs`.
+            Some(crate::old_value::OldValueRegexp::Intrinsic(
+                IntrinsicRegexp::new(&prefixed),
             )),
         )
     }

@@ -1,26 +1,29 @@
 //! Port of `crates/_vendor/autoprefixer-10.4.14/package/lib/old-value.js`.
 
-use crate::fast_match::WordRegexp;
-use regex::Regex;
+use crate::fast_match::{IntrinsicRegexp, WordRegexp};
 
-/// Either the standard WORD-shape matcher (`(^|[\s,(])(NAME($|[\s(,]))`)
-/// or a caller-supplied custom regex (currently used only by Intrinsic
-/// hacks, which match a different trailing-boundary class `[\s),]`).
+/// Either the standard WORD-shape matcher
+/// (`(^|[\s,(])(NAME($|[\s(,]))`) — the dominant case — or the
+/// Intrinsic-shape matcher (`(^|[\s,(])(NAME($|[\s),]))`) used by the
+/// 6 Intrinsic-hack names. Both variants are fast-match-backed and
+/// serializable; this is what makes V2 precomputed snapshots viable.
 ///
-/// Bypasses the fast path only on the explicit `Custom` variant —
-/// the default construction path uses [`WordRegexp`], so the dominant
-/// `OldValue` traffic still goes through the fast matcher.
+/// Replaced an earlier `Custom(regex::Regex)` variant — `regex::Regex`
+/// is not serde-able, which would have blocked the V2 populated-table
+/// snapshot. The Intrinsic variant is byte-equal to the prior regex
+/// for every input on the Intrinsic name corpus (see
+/// `tests/intrinsic_regexp_parity.rs`).
 #[derive(Debug, Clone)]
 pub enum OldValueRegexp {
     Word(WordRegexp),
-    Custom(Regex),
+    Intrinsic(IntrinsicRegexp),
 }
 
 impl OldValueRegexp {
     pub fn is_match(&self, haystack: &str) -> bool {
         match self {
             Self::Word(r) => r.is_match(haystack),
-            Self::Custom(r) => r.is_match(haystack),
+            Self::Intrinsic(r) => r.is_match(haystack),
         }
     }
 }

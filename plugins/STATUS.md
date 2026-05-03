@@ -25,26 +25,38 @@
 
 ## Resume here
 
-**Next checkpoint:** Phase 1 closed. Phase 2 §2.0–§2.2 ☑ + §2.3 ▶
-(skeleton + §2.3(a) landed; §2.3(b) gated on §2.4 — see below).
+**Next checkpoint:** Phase 1 ☑. Phase 2 ☑ (§2.0–§2.5 all closed).
+§2.3(b) is a dangling sub-checkpoint (the two deferred AST /
+comment-store mutations from §2.3(a)) — NOT a Phase 2 gate; it
+lands alongside the first §6.5 css-prop handler that needs the
+classic-pragma divergence. **Next active phase: Phase 3** (hash
+parity test corpus → reuse `crates/compiled-utils::hash`).
+Phase 4 is gated on the parallel CSS-port agent shipping
+`transform_css` as a callable `pub fn` (per `plugins/PLAN.md`);
+that's not yet ready, so Phase 3 is what's startable now.
 
-§2.0: 477 fixtures extracted from the babel-plugin test files;
-full-corpus Babel determinism baseline green.
+### Phase 2 closure summary (multi-session)
 
-§2.1: data-only `constants.rs`, `utils/constants.rs`, `types.rs`
-ported.
+§2.0 (prior): 477 fixtures extracted from the babel-plugin test
+files; full-corpus Babel determinism baseline green.
 
-§2.2: parity harness skeleton with `babelEngine` + `swcEngine`
-(pass-through `babel_plugin.wasm`); 152 sampled tests green.
+§2.1 (prior): data-only `constants.rs`, `utils/constants.rs`,
+`types.rs` ported.
 
-§2.3 (in progress): dispatcher SKELETON + §2.3(a) JSX-pragma
-recognition landed. `BabelPluginVisitor` is now generic over
-`C: Comments` (plugin entry uses `PluginCommentsProxy`; tests use
-`SingleThreadedComments::default()`). Recognition does:
+§2.2 (prior): parity harness skeleton with `babelEngine` +
+`swcEngine` (pass-through `babel_plugin.wasm`); 152 sampled tests
+green.
+
+§2.3 (this session): dispatcher SKELETON (prior) + §2.3(a)
+JSX-pragma recognition (this session) landed. `BabelPluginVisitor`
+is generic over `C: Comments` (plugin entry uses
+`PluginCommentsProxy`; tests use `SingleThreadedComments::default()`).
+Recognition covers:
   (a) Compiled-import recognition → `state.compiled_imports[apiName]`
       (moved from `visit_mut_program` pre-walk into
       `visit_mut_module_decl` so upstream's order — pragma scan
-      first, then import-decl visitor — is preserved).
+      first, then import-decl visitor — is preserved). Now routed
+      through `MutationRecorder::apply` (§2.4).
   (b) `findClassicJsxPragmaImport` analog →
       `state.pragma.classic_jsx_pragma_is_compiled` +
       `classic_jsx_pragma_local_name` (handles bare, renamed, and
@@ -53,11 +65,14 @@ recognition landed. `BabelPluginVisitor` is now generic over
       → `state.pragma.jsx` / `jsx_import_source` and bootstraps
       `state.compiled_imports = Some(default)`.
 
-Pass-through preserved (both harnesses still 1284/1284). 25
-unit tests (13 prior + 12 new: 5 classic-pragma + 6 comment-scan
-+ 1 end-to-end visitor walk). Stub handlers for
-`call_expr`/`tagged_tpl`/`jsx_element`/`jsx_opening_element`
-unchanged.
+§2.3(a) is recognition-ONLY. Two AST/comment-store mutations
+(`path.remove()` of classic-pragma `jsx` specifier; comment-store
+filter dropping the matched pragma comment) are tagged
+`// §2.3(b):` in `babel_plugin.rs` and deferred — see "§2.3(b)
+follow-up" below.
+
+Stub handlers for `call_expr`/`tagged_tpl`/`jsx_element`/
+`jsx_opening_element` unchanged from prior session.
 
 Two pieces of drift fixed while consuming `compiled-utils` (prior
 session): (a) `COMPILED_IMPORT` was `@compiled/react`, JS source is
@@ -74,28 +89,85 @@ pattern `babel-plugin-strip-runtime` already uses for banner
 comments. Documented inline in `babel_plugin.rs` (`comments` field
 doc + `scan_jsx_pragma_comments` doc).
 
-**Remaining for §2.3 (gated on §2.4):**
-- §2.3(b) — the two deferred AST/comment-store mutations paired
-  with `MutationRecorder`:
-    1. `path.remove()` of the classic-pragma `jsx` specifier
-       (upstream's `findClassicJsxPragmaImport.path.remove()`).
-       Hides the classic pragma from the SWC analog of
-       `@babel/plugin-transform-react-jsx`. NOT load-bearing for
-       any §2.3 / §2.4 / §2.5 verification gate; load-bearing for
-       §6.5 (css-prop) where the pragma drives output divergence.
-    2. Filter the matched JSX-pragma comment out of
-       `comments.get_leading(first_body_item.span.lo)` — SWC
-       analog of upstream's `file.ast.comments` /
-       `body[0].leadingComments` filter. Same gating as (1).
-  Both have `// §2.3(b):` TODOs in `babel_plugin.rs` marking the
-  call sites the §2.4 work flips into one-line recorder calls.
-- `Program::exit` `appendRuntimeImports` + banner + `pathsToCleanup`.
-  Mutating exit lands alongside the first real Phase 6 handler.
-- `ImportDeclaration` specifier removal (`specifier.remove()` /
-  `path.remove()` when source is fully drained) — also §2.4 work.
-- `is_compiled.rs`/`is_jsx_function.rs`/`normalize_props_usage.rs`
-  predicate ports — gated until the first handler that consumes
-  them.
+**§2.4 closed (this session):**
+- `state.rs` holds `State` + inner shapes (`CompiledImports`,
+  `ImportedCompiledImports`, `PragmaState`, `CleanupAction`,
+  `CleanupKind`, `CacheSlot`) with `pub(crate)` fields and
+  read-only `pub fn` getters. Init-time mutators (`set_opts`,
+  `set_import_sources`, `ensure_compiled_imports`,
+  `set_classic_jsx_pragma`, `set_pragma_jsx`,
+  `set_pragma_jsx_import_source`, `queue_cleanup`) cover the
+  non-cache-captured fields. The `MutationRecorder::apply` impl
+  block lives in `state.rs` (per PLAN.md §3.9.8 "same module as
+  State") so it has same-module write access without exposing
+  fields broader than `pub(crate)`.
+- `mutation_recorder.rs` holds 5-variant `StateDiff`
+  (IncludedFilesPush, CompiledImportsAppend, SheetsInsert,
+  CssMapInsert, IgnoreMemberExprMark — reconciled per
+  STATE_MUTATIONS.md), 5-variant `ApiKind` (ClassNames, Css,
+  Keyframes, Styled, CssMap with `from_imported_name` resolver),
+  and `MutationRecorder` (Vec<StateDiff> diff log with `new`,
+  `diff_log`, `drain_diff_log`, and a `pub(crate)` `push_diff`
+  hook the apply impl uses). Both enums derive serde for the
+  Phase 5 §5.3 `cache.bin` lock; a JSON round-trip test stands in
+  for the postcard test until that dep lands.
+- `babel_plugin.rs` `BabelPluginVisitor` adds `recorder` field.
+  `record_compiled_import` routes per-API pushes through
+  `MutationRecorder::apply(StateDiff::CompiledImportsAppend, &mut state)`.
+  Pragma writes use `state.set_*` mutators. The encapsulation lint
+  `grep -rEn 'state\.[a-z_]+\.{push,set,add,insert,remove,extend}'`
+  outside `state.rs`/`mutation_recorder.rs` returns zero matches.
+- Final test state: `cargo test -p babel-plugin --lib` → 43/43
+  pass (5 types + 4 mutation_recorder + 11 state + 23 babel_plugin).
+  Both parity harnesses still 1284/1284.
+
+§2.5 (this session): Phase 2 exit gate met.
+`BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1
+bun test parity-harness/babel-plugin/harness.test.ts` →
+**954/954 pass** (477 full-corpus parity + 477 full-corpus
+determinism). Strip-runtime corpus untouched (1132/1132).
+Dispatcher is recognition-only, so SWC output is byte-identical
+to Babel for every fixture where Babel pass-through-round-trips
+through prettier; fixtures where Babel transforms and SWC stays
+pass-through assert NOT-equal under `expectedToFail` and
+correctly fail-as-expected.
+
+### §2.3(b) follow-up — dangling sub-checkpoint, NOT a Phase 2 gate
+
+Two AST/comment-store mutations marked `// §2.3(b):` in
+`crates/babel-plugin/src/babel_plugin.rs`. Both are deferred per
+the §2.3(a) hand-off contract:
+
+1. `path.remove()` of the classic-pragma `jsx` specifier
+   (upstream's `findClassicJsxPragmaImport.path.remove()`).
+   Hides the classic pragma from the SWC analog of
+   `@babel/plugin-transform-react-jsx`. NOT load-bearing for
+   any §2.3 / §2.4 / §2.5 verification gate; load-bearing for
+   §6.5 (css-prop) where the pragma drives output divergence.
+2. Filter the matched JSX-pragma comment out of
+   `comments.get_leading(first_body_item.span.lo)` — SWC
+   analog of upstream's `file.ast.comments` /
+   `body[0].leadingComments` filter. Same gating as (1).
+
+Concrete shape decision pending the first §2.3(b) commit:
+these are NOT `StateDiff` variants (AST/comment-store, not
+cache-replay-relevant). Likely shape: extend `state.queue_cleanup`
+to accept richer `CleanupAction` variants (specifier-remove with
+node identity, comment-filter at BytePos), drained in
+`Program::exit`. Bundle this work with the first Phase 6 handler
+that consumes pragma divergence (§6.5 css-prop) so the pair lands
+together end-to-end-testable.
+
+Other §2.3-region work that's gated (NOT urgent):
+- `Program::exit` `appendRuntimeImports` + banner +
+  `pathsToCleanup` loop — lands alongside the first real Phase 6
+  handler (no point shipping runtime imports without anything that
+  needs them).
+- `ImportDeclaration` specifier removal — same AST-mutation
+  channel as §2.3(b).
+- `is_compiled.rs` / `is_jsx_function.rs` /
+  `normalize_props_usage.rs` predicate ports — gated until the
+  first handler that consumes them.
 
 **Important constraint (re-confirmed by user this session):** SWC
 tears down the WASI instance between `transformSync` calls. The
@@ -115,17 +187,66 @@ cross-transform caching anywhere in the Rust port.
 **Prerequisites met:** all of Phase 0 except probes 9 and audit
 (both Phase 5 gates, not Phase 1).
 
-**Last completed:** §1.9 (Phase 1 exit gate). Final state on
-sign-off: `RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib`
-→ 56/56 pass (55 prior + 1 §1.8 shared-binding scope test);
-`bun test parity-harness/strip-runtime/harness.test.ts` → 1132/1132
-pass (91 determinism — 41 hand-curated + 50 sampled synth — and 1041
+**Last completed:** §2.5 (Phase 2 exit gate). Final state on
+sign-off (this session):
+- `RUSTFLAGS="" cargo test -p babel-plugin --lib` → 43/43
+  (5 types + 4 mutation_recorder + 11 state + 23 babel_plugin).
+- `RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib`
+  → 56/56 (unchanged from §1.9).
+- `RUSTFLAGS="" cargo test -p compiled-utils --lib` → 31/31
+  (unchanged).
+- `bun test parity-harness/strip-runtime/harness.test.ts` →
+  1132/1132 (unchanged from §1.9).
+- `BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1
+  bun test parity-harness/babel-plugin/harness.test.ts` → 954/954
+  (full-corpus pass-through parity + full-corpus determinism).
+- Encapsulation lint
+  `grep -rEn 'state\.[a-z_]+\.(push|set|add|insert|remove|extend)'
+  crates/babel-plugin/src --include '*.rs' | grep -vE
+  'state\.rs|mutation_recorder\.rs' | wc -l` → 0.
+- `RUSTFLAGS="" cargo build -p babel-plugin
+  -p babel-plugin-strip-runtime --target wasm32-wasip1 --release`
+  clean (modulo a documented `#[allow(dead_code)]` on
+  `state::CacheSlot` — Phase 5 §5.3 placeholder).
+
+### Hand-off — what the next session should do
+
+**Active checkpoint:** Phase 3 (hash compatibility). All
+Phase 0/1/2 gates met. Phase 3 is the smallest remaining piece
+that's startable without the parallel CSS-port agent's
+`transform_css` callable shipping (Phase 4 prerequisite).
+
+Phase 3 plan (per the table below):
+- §3.1 confirm `crates/compiled-utils::hash` exists (per
+  `crates/STATUS.md` line 243).
+- §3.2 build `crates/babel-plugin/tests/hash_corpus.json` with
+  ≥30 entries: ASCII, UTF-8 multibyte, empty, embedded NUL, >4 KB,
+  leading/trailing whitespace, real keyframe-expression inputs.
+- §3.3 diff Rust `hash` vs JS `hash` over the corpus + 10K random
+  inputs — `crates/babel-plugin/tests/hash_parity.rs` (or a bun
+  test).
+- §3.4 sign-off when zero divergence holds.
+
+If the parallel CSS-port agent ships `transform_css` as a callable
+during this session, Phase 4 unblocks and §4.1 (integration parity
+test) is the natural next checkpoint — but Phase 3 is independent
+and can land in parallel.
+
+§2.3(b) (dangling sub-checkpoint) is NOT urgent — it lands with
+the first §6.5 css-prop handler.
+
+### Phase 1 closure (prior session, kept for context)
+
+§1.9 exit-gate state: `cargo test -p babel-plugin-strip-runtime
+--lib` → 56/56 pass; `bun test
+parity-harness/strip-runtime/harness.test.ts` → 1132/1132 pass
+(91 determinism — 41 hand-curated + 50 sampled synth — and 1041
 parity — 41 hand-curated + 1000 synth, with 9 hand-curated fixtures
 still gated `expectedToFail`: 3 on Phase 2 compiledBabelPlugin/bake
 parity, 6 on Phase 7 directive-prologue blank-line). Synthesised
 fixtures are deterministic — re-running
-`bun parity-harness/strip-runtime/synthesize-fixtures.mjs --count 1000`
-produces a byte-identical corpus.
+`bun parity-harness/strip-runtime/synthesize-fixtures.mjs --count
+1000` produces a byte-identical corpus.
 
 **§1.8 surfaced one real port defect.** Multi-component fixtures
 sharing an atomic-CSS declarator (e.g. two `<div css={{display:'inline-block'}}>`
@@ -343,8 +464,8 @@ done before declaring Phase 0 fully signed off across the platform set.
 | §2.1 | ☑ | Port `types.rs`, `constants.rs` (data only, no logic) | claude-2026-05-04 | `crates/babel-plugin/src/constants.rs` (1:1 port of `packages/babel-plugin/src/constants.ts`), `crates/babel-plugin/src/utils/constants.rs` (1:1 port of `packages/babel-plugin/src/utils/constants.ts`), `crates/babel-plugin/src/types.rs` (port of `types.ts` — `PluginOptions`, `State`, `Tag`, `Metadata`, `TransformResult`, with `CacheMode` custom (de)serializer for the `bool \| "file-pass"` wire shape and `IndexMap` everywhere ordering matters). Babel-only types (`NodePath`, `PluginPass`, the JS-callback `Resolver`) deliberately omitted — see module docs in `types.rs` for the resolution table. | `RUSTFLAGS="" cargo test -p babel-plugin --lib` → 5/5 pass (CacheMode bool/string round-trip, PluginOptions camelCase wire shape, default-is-all-None, full round-trip). `RUSTFLAGS="" cargo build -p babel-plugin --target wasm32-wasip1 --release` clean. |
 | §2.2 | ☑ | Build `parity-harness/babel-plugin/{engines.ts,harness.test.ts}` mirroring strip-runtime's shape | claude-2026-05-04 | `parity-harness/babel-plugin/engines.ts` (`babelEngine` + `swcEngine` + `diffSummary` — `swcEngine` runs `babel_plugin.wasm` in pass-through mode through SWC parser/codegen + prettier round-trip), `parity-harness/babel-plugin/harness.test.ts` (Babel ↔ SWC parity describe block + Babel determinism baseline; `expectedToFail` semantics mirror strip-runtime — fixtures where Babel transforms the input assert NOT-equal vs the pass-through SWC, fixtures where prettier round-trips identically through both assert byte-equal). Stride samples by default (30 parity / 100 determinism); `BABEL_PLUGIN_FULL_PARITY=1` and `BABEL_PLUGIN_FULL_DETERMINISM=1` flip to full corpus. | `bun test parity-harness/babel-plugin/harness.test.ts` → 152/152 pass (32 parity sample + 120 determinism sample); `BABEL_PLUGIN_FULL_DETERMINISM=1` → 477/477 determinism. Full parity gate (§2.5) lights up after §2.3+ ports land. |
 | §2.3 | ▶ | Port `lib.rs` entry + dispatcher visitor with stubbed handlers (no-ops that record "would have visited" in a debug log) | claude-2026-05-04 (skeleton + §2.3(a)); `—` for §2.3(b) | `crates/babel-plugin/src/lib.rs` (rewritten — `process(...)` instantiates `BabelPluginVisitor` with `PluginCommentsProxy`, threads `PluginOptions`; `run_dispatcher` is now generic `<C: Comments>` so tests can pass `SingleThreadedComments::default()`), `crates/babel-plugin/src/babel_plugin.rs` (dispatcher: `BabelPluginVisitor<C: Comments>` holds owned `State` + computed `import_sources` + comment proxy. **§2.3(a) added:** `scan_classic_jsx_pragma_import` records `pragma.classic_jsx_pragma_*` for `import { jsx }` from Compiled origins (handles bare / renamed / StringLiteral-imported shapes); `scan_jsx_pragma_comments` reads `comments.get_leading(first_body_item.span.lo)` and applies the `@jsx` / `@jsxImportSource` regexes from `compiled_utils::jsx`, setting `pragma.jsx` / `jsx_import_source` and bootstrapping `state.compiled_imports = Some(default)`. Recognition only — two AST/comment-store mutations marked with `// §2.3(b):` TODOs at the call sites the MutationRecorder will flip on. Compiled-import recognition moved from `visit_mut_program` pre-walk into `visit_mut_module_decl` to preserve upstream's `Program::enter` (pragma scan) → children walk (import-decl visitor) order. Stub `visit_mut_call_expr`/`tagged_tpl`/`jsx_element`/`jsx_opening_element` unchanged.). Drift fixed earlier in `crates/compiled-utils/src/constants.rs` (`COMPILED_IMPORT`) and `crates/compiled-utils/src/jsx.rs` ported (was missing). Remaining for §2.3(b) (gated on §2.4): (i) `MutationRecorder.queue_specifier_remove(...)` for the classic-pragma `jsx` specifier; (ii) comment-store filter dropping the matched JSX-pragma comment from `body[0].leadingComments`; (iii) generic `ImportDeclaration` specifier removal + auto-`path.remove()` when drained; (iv) `Program::exit` `appendRuntimeImports` + banner + `pathsToCleanup` loop. | `RUSTFLAGS="" cargo test -p babel-plugin --lib` → 25/25 pass (5 §2.1 types + 8 prior §2.3 skeleton + 12 new §2.3(a): 5 classic-pragma recognition, 6 comment-scan, 1 end-to-end `visit_mut_program` exercising classic-pragma + comment + ImportDeclaration walk in one pass). `RUSTFLAGS="" cargo test -p compiled-utils --lib` → 31/31. `RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib` → 56/56. Pass-through preserved: `bun test parity-harness/strip-runtime/harness.test.ts parity-harness/babel-plugin/harness.test.ts` → 1284/1284 pass. |
-| §2.4 | ☐ | State struct with `IndexMap` everywhere, `pub(self)` field encapsulation, `MutationRecorder::apply` as only mutator (per `STATE_MUTATIONS.md`) | — | `crates/babel-plugin/src/state.rs`, `crates/babel-plugin/src/mutation_recorder.rs` | Pre-commit lint `grep -rEn 'state\.[a-z_]+\.(push\|set\|add\|insert\|remove\|extend)' crates/babel-plugin/src --include '*.rs' \| grep -v 'state\.rs\|mutation_recorder\.rs'` returns zero matches |
-| §2.5 | ☐ | **Phase 2 exit gate:** pass-through harness clean across all babel-plugin fixtures | — | Updated STATUS.md | `bun test parity-harness/babel-plugin/harness.test.ts` passes for every fixture |
+| §2.4 | ☑ | State struct with `IndexMap` everywhere, `pub(crate)` field encapsulation, `MutationRecorder::apply` as only mutator (per `STATE_MUTATIONS.md`) | claude-2026-05-04 | `crates/babel-plugin/src/state.rs` (State + CompiledImports + ImportedCompiledImports + PragmaState + CleanupAction + CleanupKind + CacheSlot moved here from types.rs; fields are `pub(crate)` with read-only public getters; init-time mutators `set_opts` / `set_import_sources` / `ensure_compiled_imports` / `set_classic_jsx_pragma` / `set_pragma_jsx` / `set_pragma_jsx_import_source` / `queue_cleanup`; `MutationRecorder::apply` impl block lives here per PLAN.md §3.9.8 "lives in the same module as State" — same-module access to private fields without exposing them broadly), `crates/babel-plugin/src/mutation_recorder.rs` (5-variant `StateDiff` enum with serde-derive for the §5.3 cache.bin lock, 5-variant `ApiKind` enum with `from_imported_name` resolver, `MutationRecorder` struct owning a `Vec<StateDiff>` diff log + `new` / `diff_log` / `drain_diff_log` / `pub(crate) push_diff`), `crates/babel-plugin/src/types.rs` (slimmed to config-only types: `PluginOptions`, `CacheMode`, `Tag`/`TagKind`, `Metadata`/`MetadataContext`, `TransformResult`; re-exports State + inner shapes for the original surface area), `crates/babel-plugin/src/babel_plugin.rs` (`BabelPluginVisitor` adds `recorder: MutationRecorder` field; `record_compiled_import` routes per-API pushes through `MutationRecorder::apply` with `StateDiff::CompiledImportsAppend`; pragma writes and bootstrap `ensure_compiled_imports` go through `State`'s init-time mutators). | `RUSTFLAGS="" cargo test -p babel-plugin --lib` → 43/43 pass (5 types + 4 mutation_recorder + 11 state + 23 babel_plugin: prior 25 §2.3(a) tests + 2 new §2.4 recorder-routing assertions). Encapsulation lint `grep -rEn 'state\.[a-z_]+\.(push\|set\|add\|insert\|remove\|extend)' crates/babel-plugin/src --include '*.rs' \| grep -vE 'state\.rs\|mutation_recorder\.rs' \| wc -l` → 0. Pass-through preserved: `bun test parity-harness/strip-runtime/harness.test.ts parity-harness/babel-plugin/harness.test.ts` → 1284/1284. |
+| §2.5 | ☑ | **Phase 2 exit gate:** pass-through harness clean across all babel-plugin fixtures | claude-2026-05-04 | This STATUS.md row + the Resume block updated with the closure summary (no separate phase2-signoff.md — same convention as §1.9). | `BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1 bun test parity-harness/babel-plugin/harness.test.ts` → 954/954 pass (477 full-corpus parity + 477 full-corpus determinism). Strip-runtime corpus untouched: `bun test parity-harness/strip-runtime/harness.test.ts` → 1132/1132. Encapsulation lint clean (zero matches outside `state.rs` / `mutation_recorder.rs`). |
 
 ---
 
