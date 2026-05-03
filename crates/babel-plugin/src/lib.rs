@@ -10,7 +10,7 @@
 //!
 //! What's still to land:
 //! - JSX-pragma scan in `Program::enter` (regexes already in
-//!   `sjcompiled_utils::jsx`; classic-pragma `path.remove()` gated
+//!   `compiled_utils::jsx`; classic-pragma `path.remove()` gated
 //!   until §6.5 css-prop).
 //! - `Program::exit` `appendRuntimeImports` + banner + cleanup loop
 //!   (Phase 6, alongside the first real handler).

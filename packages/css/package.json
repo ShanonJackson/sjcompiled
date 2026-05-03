@@ -1,7 +1,7 @@
 {
-  "name": "@sjcompiled/css",
+  "name": "@compiled/css",
   "version": "0.0.1",
-  "description": "Atomic CSS transform layer for the sjcompiled toolchain.",
+  "description": "Atomic CSS transform layer for the compiled toolchain.",
   "license": "Apache-2.0",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
@@ -14,8 +14,8 @@
     "build": "tsc --build tsconfig.json"
   },
   "dependencies": {
-    "@sjcompiled/css-native": "workspace:*",
-    "@sjcompiled/utils": "workspace:*",
+    "@compiled/css-native": "workspace:*",
+    "@compiled/utils": "workspace:*",
     "autoprefixer": "^10.4.14",
     "cssnano-preset-default": "^5.2.14",
     "postcss": "^8.4.31",

@@ -61,7 +61,7 @@ export interface PluginPass extends OriginalPluginPass {
 
   /**
    * Whether the name of the jsx function (given in the jsxPragmaName
-   * property) is the `jsx` function and namespace from `@sjcompiled/react`.
+   * property) is the `jsx` function and namespace from `@compiled/react`.
    */
   jsxPragmaIsCompiled?: boolean;
 }

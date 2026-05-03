@@ -60,7 +60,7 @@ pub struct PluginOptions {
     pub nonce: Option<String>,
 
     /// Extra module origins to treat as Compiled (defaults to
-    /// `DEFAULT_IMPORT_SOURCES` from `@sjcompiled/utils`).
+    /// `DEFAULT_IMPORT_SOURCES` from `@compiled/utils`).
     #[serde(default)]
     pub import_sources: Option<Vec<String>>,
 
@@ -180,7 +180,7 @@ pub struct State {
     pub uses_xcss: Option<bool>,
 
     /// `importedCompiledImports.css` — set when `import { css } from
-    /// '@sjcompiled/react'` is found AND a host-imported alias
+    /// '@compiled/react'` is found AND a host-imported alias
     /// shadows it (rare but supported upstream).
     pub imported_compiled_imports: Option<ImportedCompiledImports>,
 

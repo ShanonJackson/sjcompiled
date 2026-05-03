@@ -1,7 +1,7 @@
 import generate from '@babel/generator';
 import template from '@babel/template';
 import * as t from '@babel/types';
-import { unique } from '@sjcompiled/utils';
+import { unique } from '@compiled/utils';
 
 import type { Metadata } from '../types';
 

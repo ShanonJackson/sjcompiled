@@ -19,7 +19,7 @@ wrapper plumbing. Best use of calendar time while waiting.
 
 Phase 2 — fully startable after Phase 1. Crate scaffold + dispatcher + pass-through visitor for babel-plugin. Validates that pass-through is byte-equal before any handler logic exists.
 
-Phase 3 (hash parity test corpus) — partially startable now. We can build the corpus of (input, expected_hash) test vectors against the JS hash today; consuming the Rust hash from crates/sjcompiled-utils waits on the CSS-port
+Phase 3 (hash parity test corpus) — partially startable now. We can build the corpus of (input, expected_hash) test vectors against the JS hash today; consuming the Rust hash from crates/compiled-utils waits on the CSS-port
 agent shipping that crate. The corpus build is mechanical and frozen forever once captured.
 
 compat/generator.rs coverage manifest (Phase 4 entry gate) — startable now. Pure grep over the consuming monorepo for every keyframes(...) call site, classify the AST shape inside each. This is the single biggest unknown in   

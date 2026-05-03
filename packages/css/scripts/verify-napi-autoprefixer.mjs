@@ -2,7 +2,7 @@
 // One-shot verification: every fixture in
 // `crates/parity-runner/corpus/autoprefixer/` is fed through both the JS
 // `autoprefixer@10.4.14` (the oracle) and the Rust NAPI `autoprefixer()`
-// (via `@sjcompiled/css-native`). Asserts byte equality.
+// (via `@compiled/css-native`). Asserts byte equality.
 //
 // Sibling of `verify-napi-sort.mjs`. The parity-runner Rust harness
 // proves Rust-`crates/autoprefixer` matches JS-`autoprefixer@10.4.14`;

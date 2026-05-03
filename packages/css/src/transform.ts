@@ -1,4 +1,4 @@
-import { createError, unique } from '@sjcompiled/utils';
+import { createError, unique } from '@compiled/utils';
 import autoprefixer from 'autoprefixer';
 import postcss from 'postcss';
 import nested from 'postcss-nested';
@@ -33,7 +33,7 @@ export const transformCss = (
   css: string,
   opts: TransformOpts
 ): { sheets: string[]; classNames: string[] } => {
-  if (process.env.COMPILED_CSS_ENGINE === 'rust') return require('@sjcompiled/css-native').transformCss(css, opts);
+  if (process.env.COMPILED_CSS_ENGINE === 'rust') return require('@compiled/css-native').transformCss(css, opts);
 
   const sheets: string[] = [];
   const classNames: string[] = [];

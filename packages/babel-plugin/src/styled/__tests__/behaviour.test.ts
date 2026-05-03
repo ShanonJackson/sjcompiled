@@ -15,7 +15,7 @@ describe('styled component behaviour', () => {
 
   it('should generate styled object call expression component code', () => {
     const code = `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         fontSize: '20px',
@@ -27,7 +27,7 @@ describe('styled component behaviour', () => {
     expect(actual).toMatchInlineSnapshot(`
       "import { forwardRef } from "react";
       import * as React from "react";
-      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
+      import { ax, ix, CC, CS } from "@compiled/react/runtime";
       const _ = "._1wybgktf{font-size:20px}";
       const ListItem = forwardRef(
         ({ as: C = "div", style: __cmpls, ...__cmplp }, __cmplr) => {
@@ -56,7 +56,7 @@ describe('styled component behaviour', () => {
 
   it('should generate styled tagged template expression component code', () => {
     const code = `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         font-size: 20px;
@@ -68,7 +68,7 @@ describe('styled component behaviour', () => {
     expect(actual).toMatchInlineSnapshot(`
       "import { forwardRef } from "react";
       import * as React from "react";
-      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
+      import { ax, ix, CC, CS } from "@compiled/react/runtime";
       const _ = "._1wybgktf{font-size:20px}";
       const ListItem = forwardRef(
         ({ as: C = "div", style: __cmpls, ...__cmplp }, __cmplr) => {
@@ -97,7 +97,7 @@ describe('styled component behaviour', () => {
 
   it('should add an identifier nonce to the style element', () => {
     const code = `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         font-size: \${props => props.color}px;
@@ -111,7 +111,7 @@ describe('styled component behaviour', () => {
 
   it('should compose CSS from multiple sources', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const styles = { fontSize: 12 };
 
@@ -127,7 +127,7 @@ describe('styled component behaviour', () => {
 
   it('should not destructure valid html attributes from props', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.font({
         color: props => props.color,
@@ -140,7 +140,7 @@ describe('styled component behaviour', () => {
 
   it('should destructure invalid html attributes from props', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         fontSize: props => props.textSize,
@@ -157,7 +157,7 @@ describe('styled component behaviour', () => {
 
   it('should shortcircuit props with suffix to a empty string to avoid undefined in css', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         font-size: \${props => props.textSize}px;
@@ -169,7 +169,7 @@ describe('styled component behaviour', () => {
 
   it('should prefix interpolation', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         font-size: -\${props => props.textSize}px;
@@ -181,7 +181,7 @@ describe('styled component behaviour', () => {
 
   it('creates a separate var name for positive and negative values of the same interpolation', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       const random = Math.random;
 
       const LayoutRight = styled.aside\`
@@ -201,7 +201,7 @@ describe('styled component behaviour', () => {
 
   it('should compose a component using tagged template expression', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         color: red;
@@ -217,7 +217,7 @@ describe('styled component behaviour', () => {
 
   it('should compose a component using object call expression', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div({
         color: 'red',
@@ -233,7 +233,7 @@ describe('styled component behaviour', () => {
 
   it('should inline constant identifier string literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const fontSize = '20px';
 
@@ -247,7 +247,7 @@ describe('styled component behaviour', () => {
 
   it('should transform an arrow function with a body into an IIFE', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         color: props => { return props.color; },
@@ -262,7 +262,7 @@ describe('styled component behaviour', () => {
 
   it('should transform an arrow function with a body into an IIFE by preventing passing down invalid html attributes to the node', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         fontSize: props => { return props.textSize; },
@@ -278,7 +278,7 @@ describe('styled component behaviour', () => {
 
   it('should move suffix and prefix of a dynamic arrow function with a body into an IIFE', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         content: \`"$\{props => { return props.color; }}"\`
@@ -293,7 +293,7 @@ describe('styled component behaviour', () => {
 
   it('should collect args as styles', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div(
         { color: 'darkorchid' },
@@ -311,7 +311,7 @@ describe('styled component behaviour', () => {
   it('should not throw when template literal CSS has no terminating semicolon', () => {
     expect(() => {
       transform(`
-        import { styled } from '@sjcompiled/react';
+        import { styled } from '@compiled/react';
 
         const ListItem = styled.div(
           \`color: red\`,
@@ -323,7 +323,7 @@ describe('styled component behaviour', () => {
 
   it('should handle destructuring in interpolation functions', () => {
     const code = `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       import colors from 'colors';
 
       export const BadgeSkeleton = styled.span\`
@@ -340,7 +340,7 @@ describe('styled component behaviour', () => {
     expect(actual).toMatchInlineSnapshot(`
       "import { forwardRef } from "react";
       import * as React from "react";
-      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
+      import { ax, ix, CC, CS } from "@compiled/react/runtime";
       import colors from "colors";
       const _10 = "._tzy4kb7n{opacity:1}";
       const _9 = "._tzy4idpf{opacity:0}";
@@ -396,7 +396,7 @@ describe('styled component behaviour', () => {
 
   it('should handle an animation that references an inline @keyframes', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         @keyframes fadeOut {
@@ -426,7 +426,7 @@ describe('styled component behaviour', () => {
   it('should not blow up with an expanding property', () => {
     expect(() =>
       transform(`
-        import { styled } from '@sjcompiled/react';
+        import { styled } from '@compiled/react';
 
         export const BoardContent = styled.span\`
           flex: 1;
@@ -437,7 +437,7 @@ describe('styled component behaviour', () => {
 
   it('should omit classes on rules with no value in string literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         color: ;
@@ -458,7 +458,7 @@ describe('styled component behaviour', () => {
 
   it('should omit classes on rules with no value in object', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div({
         color: '',
@@ -478,7 +478,7 @@ describe('styled component behaviour', () => {
 
   it('should apply no classes when styles have no value inside selector', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div({
         ':hover': {
@@ -492,7 +492,7 @@ describe('styled component behaviour', () => {
 
   it('should omit styles with no value inside selector', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div({
         ':hover': {
@@ -510,7 +510,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with ternary operator', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.button\`
         color: \${(props) => (props.isPrimary ? 'blue' : 'red')};
@@ -541,7 +541,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with ternary operators and suffix', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         border-radius: \${(props) => props.isRounded ? 10 : 1}px !important;
@@ -557,7 +557,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with ternary operator for object styles', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.button({
         color: (props) => (props.isPrimary ? 'blue' : 'red'),
@@ -579,7 +579,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with ternary operator and tagged templates branches', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.button\`
         color: \${(props) => (props.isPrimary ? \`blue\` : \`red\`)};
@@ -595,7 +595,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with ternary operators, template literal branches containing props', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       import { CUSTOM_WIDTH } from './constants';
 
       const ListItem = styled.div\`
@@ -613,7 +613,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with multiple ternary operators', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.button\`
         color: \${(props) => (props.isPrimary ? 'blue' : 'red')};
@@ -634,7 +634,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with nested ternary operators', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.button\`
         color: \${(props) => (props.isPrimary ? props.isDisabled ? 'black' : 'blue' : 'red')};
@@ -660,7 +660,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with template literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         color: red;
@@ -681,7 +681,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with template literal and nested ternary operators', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         background: white;
@@ -699,7 +699,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with template literal, nested ternary operators, and different types', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         background: white;
@@ -718,7 +718,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with template literal and multiple props lines', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         color: red;
@@ -738,7 +738,7 @@ describe('styled component behaviour', () => {
   it('should not allow a logical statement with a conditional right-hand side', () => {
     expect(() =>
       transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         \${props => props.isShown && (props.isPrimary ? { color: 'blue' } : { color: 'green' })};
@@ -751,7 +751,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS when using "key: value" in string form', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         \${props => props.isPrimary ? 'color: green' : \`color: red\`};
@@ -767,7 +767,7 @@ describe('styled component behaviour', () => {
 
   it('should apply nested conditional CSS when using "key: value" in string form', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         \${props => props.isPrimary ? 'color: blue' :  props.isGreen ? 'color: green' : 'color: red'};
@@ -784,7 +784,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS when using "key: value; key: value; ..." in string form', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         \${props => props.isPrimary ? 'color: green; font-size: 12px;' : \`color: red; font-size: 16px;\`};
@@ -802,7 +802,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS when using inline mixins', () => {
     const actual = transform(`
-      import { styled, css } from '@sjcompiled/react';
+      import { styled, css } from '@compiled/react';
 
       const Component = styled.div\`
         \${props => props.isPrimary ? css\`color: green\` : css({ color: 'red' })};
@@ -818,7 +818,7 @@ describe('styled component behaviour', () => {
 
   it('should apply unconditional before and after a conditional css rule with template literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         color: red;
@@ -839,7 +839,7 @@ describe('styled component behaviour', () => {
 
   it('should apply unconditional after a conditional css rule with template literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         \${props => props.isPrimary && ({ color: 'blue' })};
@@ -860,7 +860,7 @@ describe('styled component behaviour', () => {
 
   it('should apply unconditional CSS with props', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         props => ({ color: props.primary }),
@@ -876,7 +876,7 @@ describe('styled component behaviour', () => {
 
   it('should apply unconditional CSS with and without props', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         { background: 'red' },
@@ -894,7 +894,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with object styles', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         { color: 'red' },
@@ -911,7 +911,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with object styles and multiple props lines', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         { color: 'red' },
@@ -930,7 +930,7 @@ describe('styled component behaviour', () => {
 
   it('should apply unconditional before and after a conditional css rule with object styles', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         { color: 'red' },
@@ -949,7 +949,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with object styles regardless declaration order', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         props => props.isPrimary && ({ color: 'red' }),
@@ -967,7 +967,7 @@ describe('styled component behaviour', () => {
 
   it('should apply multi conditional logical expression', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         { color: 'red' },
@@ -984,7 +984,7 @@ describe('styled component behaviour', () => {
 
   it('should apply multi conditional logical expression with different props lines and syntax styles', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         { color: 'red' },
@@ -1004,7 +1004,7 @@ describe('styled component behaviour', () => {
 
   it('should apply the same CSS property with unconditional as default and multiple logical expressions', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         { color: 'red' },
@@ -1021,7 +1021,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS with ternary and boolean in the same line', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         { fontSize: '20px' },
@@ -1039,7 +1039,7 @@ describe('styled component behaviour', () => {
 
   it('should only evaluate the last unconditional CSS rule for each property', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         { color: 'red' },
@@ -1058,7 +1058,7 @@ describe('styled component behaviour', () => {
 
   it('should only add falsy condition when truthy condition has no value', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         props => props.isPrimary ? undefined : { color: 'green', background: 'black' },
@@ -1074,7 +1074,7 @@ describe('styled component behaviour', () => {
 
   it('should only add truthy condition when falsy condition has no value', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div(
         props => props.isPrimary ? { color: 'green', background: 'black' } : undefined,
@@ -1090,7 +1090,7 @@ describe('styled component behaviour', () => {
 
   it('should apply logical test to class when a conditional branch contains undefined value', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         color: \${props => props.isPrimary ? 'green' : undefined};
@@ -1105,7 +1105,7 @@ describe('styled component behaviour', () => {
 
   it('should apply logical test to class when a conditional branch contains null value', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div({
         color: props => props.isPrimary ? null : 'green',
@@ -1120,7 +1120,7 @@ describe('styled component behaviour', () => {
 
   it('should apply logical test to class when a conditional branch contains empty string value', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div({
         color: props => props.isPrimary ? '' : 'green',
@@ -1135,7 +1135,7 @@ describe('styled component behaviour', () => {
 
   it('should apply logical test to class when a conditional branch contains empty value inside selector', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div({
         ':hover': {
@@ -1152,7 +1152,7 @@ describe('styled component behaviour', () => {
 
   it('should apply logical test to class when a conditional branch contains empty value inside selector', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div({
         ':hover': {
@@ -1169,7 +1169,7 @@ describe('styled component behaviour', () => {
 
   it('should apply no classes when both conditional branches contains empty values', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div({
         color: props => props.isPrimary ? undefined : null,
@@ -1181,7 +1181,7 @@ describe('styled component behaviour', () => {
 
   it('should conditionally apply CSS mixins', () => {
     const actual = transform(`
-      import { styled, css } from '@sjcompiled/react';
+      import { styled, css } from '@compiled/react';
 
       const dark = css\`
         background-color: black;
@@ -1211,7 +1211,7 @@ describe('styled component behaviour', () => {
 
   it('falls back to using CSS variable when conditional is not sole expression in statement', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       const gutter = 10;
 
       const Component = styled.div\`
@@ -1228,7 +1228,7 @@ describe('styled component behaviour', () => {
 
   it('falls back to using CSS variable when conditional followed by another expression in statement', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       const gutter = 10;
 
       const Component = styled.div\`
@@ -1245,7 +1245,7 @@ describe('styled component behaviour', () => {
 
   it('falls back to using CSS variable when conditional is inside quotes', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         :before {
@@ -1263,7 +1263,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS to related selector', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         background: url('data:image/svg+xml; ... ');
@@ -1287,7 +1287,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS to related selector with object styles', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div({
         color: ({ isSelected }) => isSelected ? 'blue' : 'yellow',
@@ -1308,7 +1308,7 @@ describe('styled component behaviour', () => {
 
   it('should apply conditional CSS to related nested selector', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         color: \${({ isSelected }) => isSelected ? 'blue' : 'yellow'};
@@ -1340,7 +1340,7 @@ describe('styled component behaviour', () => {
 
   it('does not conflict conditional CSS with above selectors', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         > span:first-type-of {
@@ -1368,7 +1368,7 @@ describe('styled component behaviour', () => {
 
   it('does not conflict conditional CSS with below selectors', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         :focus {
@@ -1396,7 +1396,7 @@ describe('styled component behaviour', () => {
 
   it('does not conflict conditional CSS with surrounding selectors', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const Component = styled.div\`
         > span:first-type-of {

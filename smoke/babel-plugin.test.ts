@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { transformSync } from '@babel/core';
-import compiledPlugin from '@sjcompiled/babel-plugin';
+import compiledPlugin from '@compiled/babel-plugin';
 
 const transform = (code: string, filename = 'test.tsx') =>
   transformSync(code, {
@@ -11,7 +11,7 @@ const transform = (code: string, filename = 'test.tsx') =>
     presets: [],
   })?.code ?? '';
 
-describe('@sjcompiled/babel-plugin', () => {
+describe('@compiled/babel-plugin', () => {
   test('transforms styled.h1 template literal into atomic CSS + runtime', () => {
     const out = transform(`
       import { styled } from '@compiled/react';

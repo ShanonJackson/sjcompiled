@@ -3,7 +3,7 @@ import { transform } from '../../test-utils';
 describe('Keyframes', () => {
   it('places classes in given order when static styles precede keyframes expression', () => {
     const actual = transform(`
-      import { styled, keyframes } from '@sjcompiled/react';
+      import { styled, keyframes } from '@compiled/react';
 
       const animation = keyframes\`
         from { top: 0; }
@@ -27,7 +27,7 @@ describe('Keyframes', () => {
 
   it('places classes in given order when keyframes expression precedes static styles', () => {
     const actual = transform(`
-      import { styled, keyframes } from '@sjcompiled/react';
+      import { styled, keyframes } from '@compiled/react';
 
       const animation = keyframes({
         from: { top: 0 },
@@ -51,7 +51,7 @@ describe('Keyframes', () => {
 
   it('evaluates any expressions that precede a keyframes expression', () => {
     const actual = transform(`
-      import { styled, keyframes } from '@sjcompiled/react';
+      import { styled, keyframes } from '@compiled/react';
 
       const color = 'red';
 
@@ -75,7 +75,7 @@ describe('Keyframes', () => {
 
   it('evaluates keyframes expression when it precedes another expression', () => {
     const actual = transform(`
-      import { styled, keyframes } from '@sjcompiled/react';
+      import { styled, keyframes } from '@compiled/react';
 
       const color = 'red';
 

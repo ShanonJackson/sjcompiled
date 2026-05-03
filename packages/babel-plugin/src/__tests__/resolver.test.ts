@@ -9,7 +9,7 @@ describe('resolver', () => {
     const transform = (resolver: PluginOptions['resolver']) => {
       return transformCode(
         `
-        import { css } from '@sjcompiled/react';
+        import { css } from '@compiled/react';
         import { primary } from 'test';
 
         <div css={css({ color: primary })} />

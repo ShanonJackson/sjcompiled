@@ -42,7 +42,7 @@ Expected as of Phase 8b ship: `1226/1226` cargo, `30/30` parity-runner,
 
 ---
 
-## Building the NAPI module (`@sjcompiled/css-native`)
+## Building the NAPI module (`@compiled/css-native`)
 
 The Rust pipeline ships to JS via a single `cdylib` per platform.
 
@@ -71,7 +71,7 @@ After `cargo build -p compiled-css-napi`:
 ```bash
 # Windows (current platform):
 cp target/debug/compiled_css_napi.dll \
-   packages/css-native/sjcompiled-css.win32-x64-msvc.node
+   packages/css-native/compiled-css.win32-x64-msvc.node
 ```
 
 For other platforms (future Phase 8c), the loader in
@@ -80,11 +80,11 @@ to the right filename:
 
 | Platform / arch | Expected filename |
 |---|---|
-| `win32` `x64` | `sjcompiled-css.win32-x64-msvc.node` |
-| `linux` `x64` | `sjcompiled-css.linux-x64-gnu.node` |
-| `linux` `arm64` | `sjcompiled-css.linux-arm64-gnu.node` |
-| `darwin` `x64` | `sjcompiled-css.darwin-x64.node` |
-| `darwin` `arm64` | `sjcompiled-css.darwin-arm64.node` |
+| `win32` `x64` | `compiled-css.win32-x64-msvc.node` |
+| `linux` `x64` | `compiled-css.linux-x64-gnu.node` |
+| `linux` `arm64` | `compiled-css.linux-arm64-gnu.node` |
+| `darwin` `x64` | `compiled-css.darwin-x64.node` |
+| `darwin` `arm64` | `compiled-css.darwin-arm64.node` |
 
 ### Verify the binary loads
 
@@ -282,7 +282,7 @@ a drift escalation in `crates/STATUS.md` like the existing entries
 ## End-to-end byte-equality harness (`packages/equality-harness`)
 
 Runs every fixture under `/fixtures` through Babel twice (engine off / engine
-on) with the plugin chain `[@atlaskit/tokens/babel-plugin, @sjcompiled/babel-plugin]`
+on) with the plugin chain `[@atlaskit/tokens/babel-plugin, @compiled/babel-plugin]`
 and byte-compares `result.code`. This is the integration-level proof that
 Rust `transformCss` is observationally indistinguishable from the JS oracle
 when driven through the real Babel pipeline AFM uses in production.
@@ -356,7 +356,7 @@ Both should compile clean (one cosmetic clippy warning is preexisting).
 | Symptom | Cause | Fix |
 |---|---|---|
 | `cargo build -p compiled-css-napi --release` hangs / OOMs | Dev box has < 32 GB free; LLVM release codegen of autoprefixer is the offender | Use dev mode. Bytes-out are byte-identical. |
-| `Error: no prebuilt binary for <platform>-<arch>` from `index.js` | Built but didn't copy to `packages/css-native/` with the platform-suffixed name | `cp target/debug/compiled_css_napi.<ext> packages/css-native/sjcompiled-css.<triple>.node` |
+| `Error: no prebuilt binary for <platform>-<arch>` from `index.js` | Built but didn't copy to `packages/css-native/` with the platform-suffixed name | `cp target/debug/compiled_css_napi.<ext> packages/css-native/compiled-css.<triple>.node` |
 | Parity-runner reports diff at byte 0 with `\"sheets\":[…` JSON | Likely a real divergence; do NOT special-case | Investigate root cause; flag as drift in STATUS.md |
 | Determinism gate fails (JS-vs-JS not stable) | Browserslist resolution depends on env that isn't pinned | Both bridges pin `BROWSERSLIST=chrome 100` and clear `AUTOPREFIXER`/`COMPILED_CSS_ENGINE` — verify nothing else in your shell is leaking through |
 | `cargo test` is fast but `cargo run -p parity-runner` recompiles | Different profile than `test`; first run takes a minute | Subsequent runs are incremental |

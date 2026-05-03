@@ -18,7 +18,7 @@ const importSpecifier = (name: string, localName?: string): t.ImportSpecifier =>
 // Runtime function `ac` is less performant than `ax`, so we only want to import `ac` if classNameCompressionMap is provided.
 const COMPILED_RUNTIME_IMPORTS_WITH_COMPRESSION = ['ac', 'ix', 'CC', 'CS'];
 const COMPILED_RUNTIME_IMPORTS_WITHOUT_COMPRESSION = ['ax', 'ix', 'CC', 'CS'];
-const COMPILED_RUNTIME_MODULE = '@sjcompiled/react/runtime';
+const COMPILED_RUNTIME_MODULE = '@compiled/react/runtime';
 
 /**
  * Appends runtime import to code. If it is already present, it will append import specifiers
@@ -47,7 +47,7 @@ export const appendRuntimeImports = (path: NodePath<t.Program>, state: State): v
      * Get local import name instead of imported name to handle scenario when
      * import specifier is imported as named and normal both.
      *
-     * eg. import { CC as CompiledRoot, ax, CC, CS } from '@sjcompiled/react/runtime';
+     * eg. import { CC as CompiledRoot, ax, CC, CS } from '@compiled/react/runtime';
      * In above example `CC` is used both as `CompiledRoot` and `CC`.
      */
     const localImportNames = previouslyDeclaredRuntimeDeclaration

@@ -3,7 +3,7 @@
 //
 // For every fixture in /fixtures (each has an `input.{js,jsx,tsx}`),
 // run Babel twice with the same plugin chain
-// `[@atlaskit/tokens/babel-plugin, @sjcompiled/babel-plugin]`:
+// `[@atlaskit/tokens/babel-plugin, @compiled/babel-plugin]`:
 //
 //   1. COMPILED_CSS_ENGINE unset → JS pipeline inside transformCss.
 //   2. COMPILED_CSS_ENGINE=rust → NAPI delegate to the Rust pipeline.
@@ -48,13 +48,9 @@ function babelOptionsFor(entry) {
       plugins: ['jsx', ...(isTS ? ['typescript'] : [])],
     },
     plugins: [
-      // Order matters: tokens FIRST, sjcompiled SECOND.
+      // Order matters: tokens FIRST, compiled SECOND.
       require.resolve('@atlaskit/tokens/babel-plugin'),
-      // `importSources` extends the babel-plugin's default
-      // `[@sjcompiled/react, @atlaskit/css]` so fixtures that import
-      // from `@compiled/react` (the upstream / AFM-pre-rename name) are
-      // also recognised as Compiled API call sites.
-      [require.resolve('@sjcompiled/babel-plugin'), { importSources: ['@compiled/react'] }],
+      require.resolve('@compiled/babel-plugin'),
     ],
   };
 }

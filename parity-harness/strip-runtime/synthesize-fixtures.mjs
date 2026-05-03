@@ -10,7 +10,7 @@
  *   1. Seeded mulberry32 RNG (deterministic — re-running this script
  *      reproduces the corpus byte-for-byte; a fixture diff in CI
  *      means the generator changed).
- *   2. Generate N source variations using `@sjcompiled/react`.
+ *   2. Generate N source variations using `@compiled/react`.
  *   3. For half the fixtures, emit them as run='both' (harness pipes
  *      through the bake step). For the other half, run the JS
  *      compiledBabelPlugin offline to produce CC/CS-wrapped baked code,
@@ -26,14 +26,14 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { transformSync as babelTransformSync } from '@babel/core';
-import compiledBabelPlugin from '@sjcompiled/babel-plugin';
+import compiledBabelPlugin from '@compiled/babel-plugin';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = resolve(__dirname, 'fixtures/synthesized');
 const FILENAME = '/base/src/app.tsx';
 const SOURCE_FILE_NAME = '../src/app.tsx';
 const STYLE_SHEET_PATH =
-  '@sjcompiled/webpack-loader/css-loader!@sjcompiled/webpack-loader/css-loader/compiled-css.css';
+  '@compiled/webpack-loader/css-loader!@compiled/webpack-loader/css-loader/compiled-css.css';
 
 const argv = process.argv.slice(2);
 const COUNT = (() => {
@@ -123,8 +123,8 @@ function genComponent(idx, useCssCall) {
 function genSource({ runtime, useCssCallMix }) {
   const ncomps = range(1, 3);
   const importLine = useCssCallMix
-    ? `    import { css } from '@sjcompiled/react';`
-    : `    import '@sjcompiled/react';`;
+    ? `    import { css } from '@compiled/react';`
+    : `    import '@compiled/react';`;
   const components = [];
   for (let i = 0; i < ncomps; i++) {
     // If the file imports `css`, half the components use the call form;

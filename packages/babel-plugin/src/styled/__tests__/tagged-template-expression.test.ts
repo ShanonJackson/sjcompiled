@@ -9,9 +9,9 @@ describe('styled tagged template expression', () => {
     parserBabelPlugins: ['typescript', 'jsx'],
   };
 
-  it('only transforms @sjcompiled/react usages', () => {
+  it('only transforms @compiled/react usages', () => {
     const actual = transform(`
-      import { styled as styled2 } from '@sjcompiled/react';
+      import { styled as styled2 } from '@compiled/react';
       import styled from 'styled-components';
 
       const StyledComponent = styled.div\`
@@ -50,9 +50,9 @@ describe('styled tagged template expression', () => {
     `);
   });
 
-  it('only transforms @sjcompiled/react usages when an invalid conditional expression is used elsewhere', () => {
+  it('only transforms @compiled/react usages when an invalid conditional expression is used elsewhere', () => {
     const actual = transform(`
-      import { styled as styled2 } from '@sjcompiled/react';
+      import { styled as styled2 } from '@compiled/react';
       import styled from 'styled-components';
 
       const fontSize = 16;
@@ -98,7 +98,7 @@ describe('styled tagged template expression', () => {
 
   it('should respect missing units', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         font-size: 12;
@@ -110,7 +110,7 @@ describe('styled tagged template expression', () => {
 
   it('should not pass down invalid html attributes to the node when property has a suffix', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         font-size: \${props => props.textSize}px;
@@ -126,7 +126,7 @@ describe('styled tagged template expression', () => {
 
   it('should use css mixins', () => {
     const actual = transform(`
-      import { styled, css } from '@sjcompiled/react';
+      import { styled, css } from '@compiled/react';
 
       const big = \`font-size: 60px;\`;
       const color = { color: 'red' };
@@ -148,7 +148,7 @@ describe('styled tagged template expression', () => {
 
   it('should be able to override properties in a mixin', () => {
     const actual = transform(`
-      import { styled, css } from '@sjcompiled/react';
+      import { styled, css } from '@compiled/react';
 
       const primary = css\`
         font-size: 32px;
@@ -179,7 +179,7 @@ describe('styled tagged template expression', () => {
 
   it('should inline constant numeric literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const fontSize = 20;
 
@@ -193,7 +193,7 @@ describe('styled tagged template expression', () => {
 
   it('should move suffix to inline styles when referencing a mutable numeric literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       let fontSize = 20;
       fontSize = 19;
@@ -211,7 +211,7 @@ describe('styled tagged template expression', () => {
 
   it('should move suffix to inline styles when referencing a mutable numeric literal when missing a semi colon', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       let fontSize = 20;
       fontSize = 19;
@@ -229,7 +229,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform a static template literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         font-size: 20px;
@@ -241,7 +241,7 @@ describe('styled tagged template expression', () => {
 
   it('should inline constant string literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const fontSize = '20px';
 
@@ -255,7 +255,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform template string literal with prop reference', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         color: \${props => props.color};
@@ -267,7 +267,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform an arrow function with a body into an IIFE', () => {
     const code = `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         color: \${props => { return props.color; }};
@@ -284,7 +284,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform an arrow function with a body into an IIFE by preventing passing down invalid html attributes to the node', () => {
     const code = `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         font-size: \${props => { return props.textSize; }};
@@ -302,7 +302,7 @@ describe('styled tagged template expression', () => {
 
   it('should move suffix and prefix of a dynamic arrow function with a body into an IIFE', () => {
     const code = `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         content: "$\{props => { return props.color; }}";
@@ -319,7 +319,7 @@ describe('styled tagged template expression', () => {
 
   it('should move suffix and prefix of a dynamic arrow function with a body into an IIFE by preventing passing down invalid html attributes to the node', () => {
     const code = `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         content: "$\{props => { return props.textSize; }}";
@@ -337,7 +337,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform template string literal with obj variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const h200 = { fontSize: '12px' };
 
@@ -352,7 +352,7 @@ describe('styled tagged template expression', () => {
 
   it('should resolve identifier pointing to a call expression if it returns simple value', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const em = (str) => str;
       const color = em('blue');
@@ -367,7 +367,7 @@ describe('styled tagged template expression', () => {
 
   it('should inline call if it returns simple value', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const em = (str) => str;
 
@@ -381,7 +381,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform template string with no argument arrow function variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const mixin = () => ({ color: 'red' });
 
@@ -403,7 +403,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform template string with no argument arrow function variable when not called', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const mixin = () => ({ color: 'red' });
 
@@ -423,7 +423,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform template string with no argument functions', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = () => 'blue';
       const fontStyling = {
@@ -452,7 +452,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform template string with no argument function properties belonging to a variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = () => 'blue';
       const fontSize = 12;
@@ -486,7 +486,7 @@ describe('styled tagged template expression', () => {
 
   it('should move suffix and prefix of a dynamic arrow func property into the style property', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         content: "$\{props => props.color}";
@@ -498,7 +498,7 @@ describe('styled tagged template expression', () => {
 
   it('should move any prefix of a dynamic arrow func property into the style property', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         content: "$\{props => props.color}";
@@ -510,7 +510,7 @@ describe('styled tagged template expression', () => {
 
   it('should move any suffix of a dynamic arrow func property into the style property', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         font-size: $\{props => props.color}px;
@@ -522,7 +522,7 @@ describe('styled tagged template expression', () => {
 
   it('should move suffix and prefix of a dynamic property into the style property', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       let color = 'red';
       color = 'blue';
@@ -541,7 +541,7 @@ describe('styled tagged template expression', () => {
 
   it('should do nothing with suffix/prefix when referencing constant literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const ListItem = styled.div\`
@@ -555,7 +555,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform template string with no argument function variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       function mixin() {
         return { color: 'red' };
@@ -577,7 +577,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform template string with argument arrow function variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color1 = 'black';
       const mixin = ({ color1, color2: c }, color3, radius) => ({
@@ -609,7 +609,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform template string with unresolved argument arrow function variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const radius = 10;
       const mixin = (color1, radius, size, weight) => ({
@@ -641,7 +641,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform template string with argument arrow function variable inside member expression', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const mixin = {
         value: (color1, r, color2) => ({
@@ -671,7 +671,7 @@ describe('styled tagged template expression', () => {
 
   it('should only destructure a prop if hasnt been already', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div\`
         \${(props) =>
@@ -696,7 +696,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform identifier referencing an expression with suffix', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       let br = 2 + 2;
       br += br;
@@ -715,7 +715,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform inline arrow function with suffix', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const getBr = () => 4;
       const Div = styled.div\`
@@ -729,7 +729,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform arrow function call that returns css like object', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const getBr = () => ({ fontSize: 12 });
       const Div = styled.div\`
@@ -743,7 +743,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform arrow function call that returns number', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const getBr = () => 12;
       const Div = styled.div\`
@@ -757,7 +757,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform arrow function call that has a complex body', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const getBr = () => {
         return true ? '1' : '2';
@@ -773,7 +773,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform function returning an object', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const mixin = () => ({ color });
@@ -788,7 +788,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform member expression referencing a function which returns an object', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const mixin = () => ({ color });
@@ -804,14 +804,14 @@ describe('styled tagged template expression', () => {
   });
 
   // This may seem unusual, but this occurs when @atlaskit/tokens (as of
-  // writing - v1.0.0) runs before @sjcompiled/babel-plugin. @atlaskit/tokens'
+  // writing - v1.0.0) runs before @compiled/babel-plugin. @atlaskit/tokens'
   // babel plugin will convert something like
   //     ${token('color.background.accent.gray.subtler', colors.N20A)}
   // to
   //     ${`var(--ds-background-accent-gray-subtler, ${colors.N20A})`}
   it('should transform variable within a nested template literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
 
@@ -825,7 +825,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform variable within a nested template literal in hover selector', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
 
@@ -841,7 +841,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform variables within nested template literals in two properties', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const color2 = 'blue';
@@ -865,7 +865,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform variables within nested template literals within the same property', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const color2 = 'blue';
@@ -885,7 +885,7 @@ describe('styled tagged template expression', () => {
 
   it('should transform variable within a heavily nested template literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const interpolation = \`1px solid \${\`var(--my-variable, \${color})\`}\`;
@@ -900,7 +900,7 @@ describe('styled tagged template expression', () => {
 
   it('should handle destructuring in interpolation functions', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       import colors from 'colors';
 
       export const BadgeSkeleton = styled.span\`
@@ -931,7 +931,7 @@ describe('styled tagged template expression', () => {
   it('should transform variable within a template literal within an interpolation function', () => {
     const actual = transform(
       `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const color2 = 'blue';
@@ -990,7 +990,7 @@ describe('styled tagged template expression', () => {
     // @atlaskit/tokens (as of @atlaskit/tokens v1.0.0)
     const actual = transform(
       `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const color2 = 'blue';
@@ -1046,7 +1046,7 @@ describe('styled tagged template expression', () => {
 
   it('should place classes in given order when static styles precede expression', () => {
     const actual = transform(`
-      import { styled, keyframes } from '@sjcompiled/react';
+      import { styled, keyframes } from '@compiled/react';
       import colors from 'colors';
 
       const color = { color: colors.color };
@@ -1068,7 +1068,7 @@ describe('styled tagged template expression', () => {
 
   it('should place classes in given order when expression precedes static styles', () => {
     const actual = transform(`
-      import { styled, keyframes } from '@sjcompiled/react';
+      import { styled, keyframes } from '@compiled/react';
       import colors from 'colors';
 
       const color = { color: colors.color };

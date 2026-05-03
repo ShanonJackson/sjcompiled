@@ -41,7 +41,7 @@ use postcss_core::node::{RawValue, Raws, Source};
 use postcss_core::{
     AtRule, Declaration, Node, NodeKind, PluginError, PluginResult, Root, Rule,
 };
-use sjcompiled_utils::hash;
+use compiled_utils::hash;
 
 #[derive(Debug, Clone, Default)]
 pub struct AtomicifyRulesOpts {

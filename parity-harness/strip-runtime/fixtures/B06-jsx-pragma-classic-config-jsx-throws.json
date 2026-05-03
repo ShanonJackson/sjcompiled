@@ -1,7 +1,7 @@
 {
   "name": "B06-jsx-pragma-classic-config-jsx-throws",
   "description": "No pragma comment, but babelJSXPragma=jsx via config + Compiled — throws",
-  "source": "\n        /** @jsx jsx */\n        import { css, jsx } from '@sjcompiled/react';\n\n        const Component = () => (\n          <div css={{ fontSize: 12, color: 'blue' }}>\n            hello world 2\n          </div>\n        );\n\n        const Component2 = () => (\n          <div css={css({ fontSize: 12, color: 'pink' })}>\n            hello world 2\n          </div>\n        );\n      ",
+  "source": "\n        /** @jsx jsx */\n        import { css, jsx } from '@compiled/react';\n\n        const Component = () => (\n          <div css={{ fontSize: 12, color: 'blue' }}>\n            hello world 2\n          </div>\n        );\n\n        const Component2 = () => (\n          <div css={css({ fontSize: 12, color: 'pink' })}>\n            hello world 2\n          </div>\n        );\n      ",
   "opts": {
     "run": "both",
     "runtime": "classic",

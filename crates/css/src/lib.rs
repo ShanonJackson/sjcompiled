@@ -1,5 +1,5 @@
 //! crates/css
-//! Rust port of `@sjcompiled/css`'s public surface — the orchestrators that
+//! Rust port of `@compiled/css`'s public surface — the orchestrators that
 //! compose local plugins (`crates/compiled-css`) with third-party postcss
 //! crates into a working pipeline.
 //!

@@ -1,4 +1,4 @@
-import { shorthandBuckets, type ShorthandProperties } from '@sjcompiled/utils';
+import { shorthandBuckets, type ShorthandProperties } from '@compiled/utils';
 import type { ChildNode, Declaration } from 'postcss';
 
 const nodeIsDeclaration = (node: ChildNode): node is Declaration => node.type === 'decl';

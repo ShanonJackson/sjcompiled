@@ -16,7 +16,7 @@
 //!
 //!   * `Program::enter` JSX-pragma scan (`findClassicJsxPragmaImport`,
 //!     `JSX_ANNOTATION_REGEX`, `JSX_SOURCE_ANNOTATION_REGEX`). The
-//!     regexes are ported in `sjcompiled-utils::jsx`; the
+//!     regexes are ported in `compiled-utils::jsx`; the
 //!     classic-pragma `path.remove()` mutation is gated until §6.5
 //!     (css-prop, the only consumer of `pragma.classicJsxPragmaIsCompiled`).
 //!
@@ -40,7 +40,7 @@
 //! re-audited line-for-line — the 370-LOC source is checked in at
 //! the pinned commits noted in `CLAUDE.md`.
 
-use sjcompiled_utils::DEFAULT_IMPORT_SOURCES;
+use compiled_utils::DEFAULT_IMPORT_SOURCES;
 use swc_core::ecma::ast::{
     ImportSpecifier, ModuleDecl, ModuleExportName, ModuleItem, Program,
 };
@@ -318,7 +318,7 @@ mod tests {
     fn resolve_import_sources_includes_defaults() {
         let opts = PluginOptions::default();
         let srcs = resolve_import_sources(&opts);
-        assert!(srcs.iter().any(|s| s == "@sjcompiled/react"));
+        assert!(srcs.iter().any(|s| s == "@compiled/react"));
         assert!(srcs.iter().any(|s| s == "@atlaskit/css"));
     }
 
@@ -334,8 +334,8 @@ mod tests {
 
     #[test]
     fn is_compiled_module_source_exact_match() {
-        let srcs = vec!["@sjcompiled/react".to_string(), "@atlaskit/css".to_string()];
-        assert!(is_compiled_module_source("@sjcompiled/react", &srcs));
+        let srcs = vec!["@compiled/react".to_string(), "@atlaskit/css".to_string()];
+        assert!(is_compiled_module_source("@compiled/react", &srcs));
         assert!(is_compiled_module_source("@atlaskit/css", &srcs));
         assert!(!is_compiled_module_source("react", &srcs));
         assert!(!is_compiled_module_source("@emotion/react", &srcs));
@@ -345,7 +345,7 @@ mod tests {
     fn record_styled_import_populates_state() {
         let mut v = BabelPluginVisitor::new(PluginOptions::default());
         let decl = import_decl(
-            "@sjcompiled/react",
+            "@compiled/react",
             vec![named_specifier("styled", None)],
         );
         v.record_compiled_import(&decl);
@@ -358,7 +358,7 @@ mod tests {
     fn record_renamed_import_uses_local_name() {
         let mut v = BabelPluginVisitor::new(PluginOptions::default());
         let decl = import_decl(
-            "@sjcompiled/react",
+            "@compiled/react",
             vec![named_specifier("MyCss", Some("css"))],
         );
         v.record_compiled_import(&decl);
@@ -370,7 +370,7 @@ mod tests {
     fn record_multiple_apis_in_one_import() {
         let mut v = BabelPluginVisitor::new(PluginOptions::default());
         let decl = import_decl(
-            "@sjcompiled/react",
+            "@compiled/react",
             vec![
                 named_specifier("styled", None),
                 named_specifier("css", None),
@@ -404,7 +404,7 @@ mod tests {
         // Compiled import is in state.
         let module = module_with_imports(vec![
             import_decl(
-                "@sjcompiled/react",
+                "@compiled/react",
                 vec![named_specifier("styled", None), named_specifier("ClassNames", None)],
             ),
             import_decl("react", vec![named_specifier("useState", None)]),

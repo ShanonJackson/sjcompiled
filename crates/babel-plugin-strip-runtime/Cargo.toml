@@ -1,6 +1,6 @@
 [package]
 name = "babel-plugin-strip-runtime"
-description = "Byte-for-byte port of @sjcompiled/babel-plugin-strip-runtime → SWC plugin (wasm32-wasip1). See plugins/PLAN.md."
+description = "Byte-for-byte port of @compiled/babel-plugin-strip-runtime → SWC plugin (wasm32-wasip1). See plugins/PLAN.md."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

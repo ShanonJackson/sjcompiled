@@ -1,6 +1,6 @@
 import { transformSync as babelTransformSync } from '@babel/core';
 import type { BabelFileResult } from '@babel/core';
-import compiledBabelPlugin from '@sjcompiled/babel-plugin';
+import compiledBabelPlugin from '@compiled/babel-plugin';
 import { format } from 'prettier';
 
 import stripRuntimeBabelPlugin from '../index';

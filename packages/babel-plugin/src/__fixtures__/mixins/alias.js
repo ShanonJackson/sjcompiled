@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { css as css2 } from '@sjcompiled/react';
+import { css as css2 } from '@compiled/react';
 
 export const stylesWithAlias = {
   default: css2({

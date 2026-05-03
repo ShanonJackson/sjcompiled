@@ -2,7 +2,7 @@
 // One-shot verification: every fixture in
 // `crates/parity-runner/corpus/transform-css/` is fed through both the
 // JS `transformCss()` (the oracle) and the Rust NAPI `transformCss()`
-// (via `@sjcompiled/css-native`). Asserts byte equality on the
+// (via `@compiled/css-native`). Asserts byte equality on the
 // JSON-stringified `{ sheets, classNames }` output.
 //
 // Sibling of `verify-napi-sort.mjs` and `verify-napi-autoprefixer.mjs`.

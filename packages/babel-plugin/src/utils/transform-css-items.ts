@@ -1,5 +1,5 @@
 import * as t from '@babel/types';
-import { transformCss } from '@sjcompiled/css';
+import { transformCss } from '@compiled/css';
 
 import type { Metadata } from '../types';
 

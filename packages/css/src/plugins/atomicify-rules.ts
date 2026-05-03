@@ -1,4 +1,4 @@
-import { hash } from '@sjcompiled/utils';
+import { hash } from '@compiled/utils';
 import type { Plugin, ChildNode, Declaration, Container, Rule, AtRule } from 'postcss';
 import { rule } from 'postcss';
 

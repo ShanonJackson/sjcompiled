@@ -11,7 +11,7 @@ import {
   JSX_ANNOTATION_REGEX,
   DEFAULT_IMPORT_SOURCES,
   COMPILED_IMPORT,
-} from '@sjcompiled/utils';
+} from '@compiled/utils';
 
 import { visitClassNamesPath } from './class-names';
 import { visitCssMapPath } from './css-map';
@@ -158,11 +158,11 @@ export default declare<State>((api) => {
             // Delete the JSX pragma from the file, so that JSX
             // elements don't get converted to jsx functions when using Compiled.
             // This is to avoid having an import from a library that isn't
-            // `@sjcompiled/react/runtime` in the final output:
+            // `@compiled/react/runtime` in the final output:
             //
-            //     import { jsx } from '@sjcompiled/react'
-            //     import { jsx as _jsx } from '@sjcompiled/react/jsx-runtime';
-            //     import { jsxs as _jsxs } from '@sjcompiled/react/jsx-runtime';
+            //     import { jsx } from '@compiled/react'
+            //     import { jsx as _jsx } from '@compiled/react/jsx-runtime';
+            //     import { jsxs as _jsxs } from '@compiled/react/jsx-runtime';
 
             // Hide the JSX pragma from the
             // @babel/plugin-transform-react-jsx plugin

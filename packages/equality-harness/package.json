@@ -1,8 +1,8 @@
 {
-  "name": "@sjcompiled/equality-harness",
+  "name": "@compiled/equality-harness",
   "version": "0.0.1",
   "private": true,
-  "description": "Byte-equality harness: runs every fixture in /fixtures through Babel with [@atlaskit/tokens, @sjcompiled/babel-plugin] under both COMPILED_CSS_ENGINE off and on, asserting identical bytes.",
+  "description": "Byte-equality harness: runs every fixture in /fixtures through Babel with [@atlaskit/tokens, @compiled/babel-plugin] under both COMPILED_CSS_ENGINE off and on, asserting identical bytes.",
   "license": "Apache-2.0",
   "scripts": {
     "verify": "bun run scripts/verify.mjs",
@@ -12,7 +12,7 @@
     "@atlaskit/tokens": "*",
     "@babel/core": "^7.26.10",
     "@compiled/react": "workspace:*",
-    "@sjcompiled/babel-plugin": "workspace:*",
-    "@sjcompiled/css-native": "workspace:*"
+    "@compiled/babel-plugin": "workspace:*",
+    "@compiled/css-native": "workspace:*"
   }
 }

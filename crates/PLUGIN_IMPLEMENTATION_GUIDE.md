@@ -321,12 +321,12 @@ let css = format!("{}px", js_number_to_string(0.0));   // "0px", not "-0px"
 let css = format!("{}", js_number_to_string(0.1+0.2)); // "0.30000000000000004"
 ```
 
-### Hash: `sjcompiled_utils::hash(s)`
+### Hash: `compiled_utils::hash(s)`
 
 The class-name hash. **Bit-identical to JS** — verified against 33
-test vectors at `crates/sjcompiled-utils/tests/hash_vectors.json`.
+test vectors at `crates/compiled-utils/tests/hash_vectors.json`.
 If you regenerate the vectors (don't, unless upstream changes), also
-re-run `node crates/sjcompiled-utils/scripts/hash-vectors.mjs > ...`.
+re-run `node crates/compiled-utils/scripts/hash-vectors.mjs > ...`.
 
 ### Color manipulation: `colord::colord(input)`
 
@@ -350,12 +350,12 @@ The default query is locked to `browserslist@4.24.4`'s
 Match upstream `list.space()` and `list.comma()` for splitting decl
 values that respect parens and quotes. Don't write your own splitter.
 
-### CSS-aware unique: `sjcompiled_utils::unique(arr)`
+### CSS-aware unique: `compiled_utils::unique(arr)`
 
 `atomicifyRules` calls `unique(classNames)` to dedupe before returning.
 Use this exact helper — Vec dedup behavior differs.
 
-### Kebab case: `sjcompiled_utils::kebab_case(s)`
+### Kebab case: `compiled_utils::kebab_case(s)`
 
 Same regex as upstream (`[A-Z\u00C0-\u00D6\u00D8-\u00DE]`). Don't roll
 your own.
@@ -414,7 +414,7 @@ JS exceptions and you lose the line number.
    or color strings.** Generate JS reference vectors with a small Node
    script next to your tests (`scripts/<plugin>-vectors.mjs`), check
    them in, load via `include_str!` like
-   `crates/sjcompiled-utils/tests/hash_parity.rs`.
+   `crates/compiled-utils/tests/hash_parity.rs`.
 
 8. **No "improvements" to upstream behaviour.** Period. If you spot a
    bug in upstream, file it; do not fix it.
@@ -567,7 +567,7 @@ Phases per `crates/EXECUTION_PLAN.md`:
 | 4a | `discard-empty-rules`, `discard-duplicates` (local), `extract-stylesheets` | `compiled-css` |
 | 4b | `parent-orphaned-pseudos`, `flatten-multiple-selectors`, `increase-specificity` | `compiled-css` |
 | 4c | `merge-duplicate-at-rules`, `sort-atomic-style-sheet`, `normalize-current-color`, `sort-pseudo-selectors`, `sort-shorthand-declarations` | `compiled-css` |
-| 4d | `atomicify-rules` ← **single most important plugin; uses sjcompiled_utils::hash** | `compiled-css` |
+| 4d | `atomicify-rules` ← **single most important plugin; uses compiled_utils::hash** | `compiled-css` |
 | 4e | `expand-shorthands/*` (13 files) | `compiled-css` |
 | 5a | `postcss-nested` | new crate `postcss-nested` |
 | 5b | `postcss-normalize-whitespace` | new crate |
@@ -600,11 +600,11 @@ on them:
 | `caniuse-db` | 579 features loaded from frozen 1.0.30001690 snapshot | 5 |
 | `caniuse-api` | features / find / isSupported / getSupport | 6 |
 | `browserslist-shim` | parseConfig / parsePackage / 4.24.4 defaults | 9 |
-| `sjcompiled-utils` | hash (bit-parity vs JS) / unique / flatten / kebab / shorthand tables | 25 |
+| `compiled-utils` | hash (bit-parity vs JS) / unique / flatten / kebab / shorthand tables | 25 |
 | `css` | transform_css / sort signatures locked, identity passthrough | 4 |
 
 Total: **196 tests passing, 0 failing.**
 
 If a helper you need isn't in this list, **stop and ask** before rolling
-your own. Likely it should go in `sjcompiled-utils` or `postcss-core`,
+your own. Likely it should go in `compiled-utils` or `postcss-core`,
 not in your plugin.

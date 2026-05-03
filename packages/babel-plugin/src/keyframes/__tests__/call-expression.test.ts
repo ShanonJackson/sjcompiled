@@ -23,7 +23,7 @@ describe('keyframes', () => {
 
   describe('transforms an object call expression', () => {
     const createSingleAnimationSmokeTest = (usage: string) => `
-      import { css, keyframes, styled } from '@sjcompiled/react';
+      import { css, keyframes, styled } from '@compiled/react';
 
       const fadeOut = keyframes({
         'from, 25%': {
@@ -44,7 +44,7 @@ describe('keyframes', () => {
     `;
 
     const createMultipleAnimationsSmokeTest = (buildUsage: (animations: string) => string) => `
-      import { css, keyframes, styled } from '@sjcompiled/react';
+      import { css, keyframes, styled } from '@compiled/react';
 
       const fadeOut = keyframes({
         from: {
@@ -135,7 +135,7 @@ describe('keyframes', () => {
 
       it('by inlining identifiers that reference constant literals', () => {
         const actual = transform(`
-          import { keyframes } from '@sjcompiled/react';
+          import { keyframes } from '@compiled/react';
 
           const fromColor = 'blue';
           const fromOpacity = 1;
@@ -176,7 +176,7 @@ describe('keyframes', () => {
 
       it('by inlining identifiers that reference an object expression', () => {
         const actual = transform(`
-          import { keyframes } from '@sjcompiled/react';
+          import { keyframes } from '@compiled/react';
 
           const from = { opacity: 1 };
           const to = { opacity: 0 };
@@ -206,7 +206,7 @@ describe('keyframes', () => {
 
       it('by inlining member expressions that reference identifiers with simple values', () => {
         const actual = transform(`
-          import { keyframes } from '@sjcompiled/react';
+          import { keyframes } from '@compiled/react';
 
           const from = { color: 'blue', opacity: 1 };
           const to = { color: 'indigo', opacity: 0 };
@@ -249,7 +249,7 @@ describe('keyframes', () => {
       describe('by inlining nested member expressions that reference', () => {
         it('simple values', () => {
           const actual = transform(`
-            import { css, keyframes } from '@sjcompiled/react';
+            import { css, keyframes } from '@compiled/react';
 
             const animation = {
               colors: {
@@ -305,7 +305,7 @@ describe('keyframes', () => {
 
         it('identifiers with simple values', () => {
           const actual = transform(`
-            import { keyframes } from '@sjcompiled/react';
+            import { keyframes } from '@compiled/react';
 
             const fromOpacity = 1;
             const toOpacity = 1;
@@ -372,7 +372,7 @@ describe('keyframes', () => {
 
       it('by inlining call expressions that return simple values', () => {
         const actual = transform(`
-          import { keyframes } from '@sjcompiled/react';
+          import { keyframes } from '@compiled/react';
 
           const identity = (x) => x;
 
@@ -406,7 +406,7 @@ describe('keyframes', () => {
 
       it('by inlining identifiers that reference simple call expressions', () => {
         const actual = transform(`
-          import { keyframes } from '@sjcompiled/react';
+          import { keyframes } from '@compiled/react';
 
           const identity = (x) => x;
 
@@ -450,7 +450,7 @@ describe('keyframes', () => {
 
       it('by inlining an arrow function call expression that returns an object expression', () => {
         const actual = transform(`
-          import { keyframes } from '@sjcompiled/react';
+          import { keyframes } from '@compiled/react';
 
           const from = () => ({ color: 'blue', opacity: 1 });
           const to = () => ({ color: 'indigo', opacity: 0 });
@@ -486,7 +486,7 @@ describe('keyframes', () => {
 
       it('by inlining a function declaration call expression that returns an object expression', () => {
         const actual = transform(`
-          import { keyframes } from '@sjcompiled/react';
+          import { keyframes } from '@compiled/react';
 
           function from() {
             return { color: 'blue', opacity: 1 };
@@ -532,7 +532,7 @@ describe('keyframes', () => {
       describe('by inlining member expressions that return object expressions', () => {
         it('through an arrow function call expression', () => {
           const actual = transform(`
-            import { keyframes } from '@sjcompiled/react';
+            import { keyframes } from '@compiled/react';
 
             const from = () => ({ color: 'blue', opacity: 1 });
             const to = () => ({ color: 'indigo', opacity: 0 });
@@ -574,7 +574,7 @@ describe('keyframes', () => {
 
         it('through an identifier that references an arrow function call expression', () => {
           const actual = transform(`
-            import { keyframes } from '@sjcompiled/react';
+            import { keyframes } from '@compiled/react';
 
             const getFrom = () => ({ color: 'blue', opacity: 1 });
             const getTo = () => ({ color: 'indigo', opacity: 0 });
@@ -623,7 +623,7 @@ describe('keyframes', () => {
       describe('by inlining suffixes prefixed by an', () => {
         it('identifier that references a number literal', () => {
           const actual = transform(`
-            import { keyframes } from '@sjcompiled/react';
+            import { keyframes } from '@compiled/react';
 
             const fromFontSize = 14;
             const toFontSize = 18;
@@ -656,7 +656,7 @@ describe('keyframes', () => {
 
         it('arrow function expression call that returns a number literal', () => {
           const actual = transform(`
-            import { keyframes } from '@sjcompiled/react';
+            import { keyframes } from '@compiled/react';
 
             const fromFontSize = () => 14;
             const toFontSize = () => 18;
@@ -691,7 +691,7 @@ describe('keyframes', () => {
       describe('by preserving runtime values', () => {
         it('for a static keyframe', () => {
           const actual = transform(`
-            import { keyframes } from '@sjcompiled/react';
+            import { keyframes } from '@compiled/react';
 
             const getOpacity = (x) => runtime.enabled ? x : 1;
 
@@ -735,7 +735,7 @@ describe('keyframes', () => {
 
         describe('for a dynamic keyframe with shadowed values', () => {
           const createDynamicAnimations = (length: number) => `
-            import { keyframes } from '@sjcompiled/react';
+            import { keyframes } from '@compiled/react';
 
             const generateKeyframes = (fromColor, toColor) =>
               keyframes({
@@ -1132,7 +1132,7 @@ describe('keyframes', () => {
 
   describe('transforms a template literal call expression', () => {
     const createSingleAnimationSmokeTest = (usage: string) => `
-      import { css, keyframes, styled } from '@sjcompiled/react';
+      import { css, keyframes, styled } from '@compiled/react';
 
       const fadeOut = keyframes(\`
         from, 25% {
@@ -1153,7 +1153,7 @@ describe('keyframes', () => {
     `;
 
     const createMultipleAnimationsSmokeTest = (buildUsage: (animations: string) => string) => `
-      import { css, keyframes, styled } from '@sjcompiled/react';
+      import { css, keyframes, styled } from '@compiled/react';
 
       const fadeOut = keyframes(\`
         from {

@@ -19,7 +19,7 @@ describe('css map basic functionality', () => {
 
   it('should transform css map', () => {
     const actual = transform(`
-      import { cssMap } from '@sjcompiled/react';
+      import { cssMap } from '@compiled/react';
 
       const styles = cssMap(${styles});
 
@@ -38,7 +38,7 @@ describe('css map basic functionality', () => {
 
   it('should transform css map even when the styles are defined below the component', () => {
     const actual = transform(`
-      import { cssMap } from '@sjcompiled/react';
+      import { cssMap } from '@compiled/react';
 
       const Component = () => <div>
         <span css={styles.danger} />
@@ -57,7 +57,7 @@ describe('css map basic functionality', () => {
 
   it('should transform css map even with an empty object', () => {
     const actual = transform(`
-        import { css, cssMap } from '@sjcompiled/react';
+        import { css, cssMap } from '@compiled/react';
 
         const styles = cssMap({
           danger: {},
@@ -73,7 +73,7 @@ describe('css map basic functionality', () => {
 
   it('should transform ternary-based conditional referencing cssMap declarations', () => {
     const actual = transform(`
-      import { cssMap } from '@sjcompiled/react';
+      import { cssMap } from '@compiled/react';
 
       const styles = cssMap({
         root: { display: 'block' },
@@ -110,7 +110,7 @@ describe('css map basic functionality', () => {
   it('should error out if the root cssMap object is being directly called', () => {
     expect(() => {
       transform(`
-      import { cssMap } from '@sjcompiled/react';
+      import { cssMap } from '@compiled/react';
 
       const styles = cssMap({ root: { color: 'red' } });
 
@@ -121,7 +121,7 @@ describe('css map basic functionality', () => {
 
     expect(() => {
       transform(`
-      import { cssMap } from '@sjcompiled/react';
+      import { cssMap } from '@compiled/react';
 
       // Eg. we expect 'styles.root' here instead of 'styles'
       <div css={styles} />
@@ -136,7 +136,7 @@ describe('css map basic functionality', () => {
   it('should error out if variants are not defined at the top-most scope of the module.', () => {
     expect(() => {
       transform(`
-      import { cssMap } from '@sjcompiled/react';
+      import { cssMap } from '@compiled/react';
 
       const styles = {
         map1: cssMap(${styles}),
@@ -146,7 +146,7 @@ describe('css map basic functionality', () => {
 
     expect(() => {
       transform(`
-      import { cssMap } from '@sjcompiled/react';
+      import { cssMap } from '@compiled/react';
 
       const styles = () => cssMap(${styles})
     `);
@@ -156,7 +156,7 @@ describe('css map basic functionality', () => {
   it('should error out if cssMap receives more than one argument', () => {
     expect(() => {
       transform(`
-        import { cssMap } from '@sjcompiled/react';
+        import { cssMap } from '@compiled/react';
 
         const styles = cssMap(${styles}, ${styles})
       `);
@@ -166,7 +166,7 @@ describe('css map basic functionality', () => {
   it('should error out if cssMap does not receive an object', () => {
     expect(() => {
       transform(`
-        import { cssMap } from '@sjcompiled/react';
+        import { cssMap } from '@compiled/react';
 
         const styles = cssMap('color: red')
       `);
@@ -176,7 +176,7 @@ describe('css map basic functionality', () => {
   it('should error out if spread element is used', () => {
     expect(() => {
       transform(`
-        import { css, cssMap } from '@sjcompiled/react';
+        import { css, cssMap } from '@compiled/react';
 
         const styles = cssMap({
           ...base
@@ -188,7 +188,7 @@ describe('css map basic functionality', () => {
   it('should error out if object method is used', () => {
     expect(() => {
       transform(`
-        import { css, cssMap } from '@sjcompiled/react';
+        import { css, cssMap } from '@compiled/react';
 
         const styles = cssMap({
           danger() {}
@@ -200,7 +200,7 @@ describe('css map basic functionality', () => {
   it('should error out if variant object is dynamic', () => {
     expect(() => {
       transform(`
-        import { css, cssMap } from '@sjcompiled/react';
+        import { css, cssMap } from '@compiled/react';
 
         const styles = cssMap({
           danger: otherStyles
@@ -212,7 +212,7 @@ describe('css map basic functionality', () => {
   it('should error out if styles include runtime variables', () => {
     expect(() => {
       transform(`
-        import { css, cssMap } from '@sjcompiled/react';
+        import { css, cssMap } from '@compiled/react';
 
         const styles = cssMap({
           danger: {
@@ -226,7 +226,7 @@ describe('css map basic functionality', () => {
   it('should error out if styles include conditional CSS', () => {
     expect(() => {
       transform(`
-        import { css, cssMap } from '@sjcompiled/react';
+        import { css, cssMap } from '@compiled/react';
 
         const styles = cssMap({
           danger: {

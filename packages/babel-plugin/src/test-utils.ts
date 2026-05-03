@@ -1,5 +1,5 @@
 import { transformSync } from '@babel/core';
-import { DEFAULT_PARSER_BABEL_PLUGINS } from '@sjcompiled/utils';
+import { DEFAULT_PARSER_BABEL_PLUGINS } from '@compiled/utils';
 import { format } from 'prettier';
 
 import babelPlugin from './babel-plugin';

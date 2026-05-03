@@ -34,7 +34,7 @@ napi-build = { workspace = true }
 # !!! host (full-system OOM, ~10 min in). See `AGENT_6_DONE.md`
 # !!! §"Release-mode build OOM" for the Phase 8c retry plan.
 # !!!
-# !!! The shipped `packages/css-native/sjcompiled-css.win32-x64-msvc.node`
+# !!! The shipped `packages/css-native/compiled-css.win32-x64-msvc.node`
 # !!! is built from `cargo build -p compiled-css-napi` (dev mode). NAPI
 # !!! bytes-out are byte-identical between dev and release. The
 # !!! parity-runner + verify-napi-autoprefixer gates pass 65/65 with

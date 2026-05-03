@@ -2,7 +2,7 @@
 
 > Wires the lifecycle-correct `crates/css::transform::transform_css` body
 > (composed in Phase 8b's previous step) through `napi-rs` into
-> `@sjcompiled/css-native`, splices it into `packages/css/src/transform.ts`
+> `@compiled/css-native`, splices it into `packages/css/src/transform.ts`
 > behind a `COMPILED_CSS_ENGINE=rust` flag, and lands the byte-equality
 > parity gate (`Stage::TransformCss` + corpus + verifier).
 >
@@ -59,7 +59,7 @@ verbatim. New marshalling concerns:
   by mirroring upstream's wrap-at-call-site pattern in `transform.ts`.)
 
 Build artifact: `crates/target/debug/compiled_css_napi.dll` copied into
-`packages/css-native/sjcompiled-css.win32-x64-msvc.node` (dev mode —
+`packages/css-native/compiled-css.win32-x64-msvc.node` (dev mode —
 release mode OOMs per the `Cargo.toml` warning header). Build command:
 `RUSTFLAGS="" cargo build -p compiled-css-napi`. The `RUSTFLAGS=""`
 prefix neutralises a user-level
@@ -73,7 +73,7 @@ per `crates/autoprefixer/AGENT_6_DONE.md` and the audit. The patch:
 
 - **Lines 32-71** (after the `transformCss` arrow-function opening at
   line 32): inserts a `process.env.COMPILED_CSS_ENGINE === 'rust'` gate
-  that delegates to `require('@sjcompiled/css-native').transformCss`,
+  that delegates to `require('@compiled/css-native').transformCss`,
   threading the JS opts shape through verbatim. The Rust shim returns
   `{ sheets: string[]; classNames: string[] }` directly — no
   re-shape needed.
@@ -257,7 +257,7 @@ corpus layout.
   test harness (input → both engines → assert equal) would catch
   any drift the corpus misses. Adapt the existing parity-runner
   bridge to feed fuzz-generated CSS instead of file-based fixtures.
-- **Shadow runs.** Once AFM consumes `@sjcompiled/css-native` behind
+- **Shadow runs.** Once AFM consumes `@compiled/css-native` behind
   the engine flag in production, run JS as the canonical engine and
   Rust as a shadow on every build, asserting byte equality on the
   generated `sheets` and `classNames` arrays. Any divergence emits

@@ -1,10 +1,10 @@
 [package]
-name = "sjcompiled-utils"
+name = "compiled-utils"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
-description = "Rust port of @sjcompiled/utils — packages/utils/src/*.ts"
+description = "Rust port of @compiled/utils — packages/utils/src/*.ts"
 
 [dependencies]
 indexmap = { workspace = true }

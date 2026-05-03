@@ -6,8 +6,8 @@
  */
 import { transformSync as babelTransformSync } from '@babel/core';
 import { transformSync as swcTransformSync } from '@swc/core';
-import compiledBabelPlugin from '@sjcompiled/babel-plugin';
-import stripRuntimeBabelPlugin from '@sjcompiled/babel-plugin-strip-runtime';
+import compiledBabelPlugin from '@compiled/babel-plugin';
+import stripRuntimeBabelPlugin from '@compiled/babel-plugin-strip-runtime';
 import { format } from 'prettier';
 import { resolve, join } from 'node:path';
 

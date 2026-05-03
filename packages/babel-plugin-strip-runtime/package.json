@@ -1,7 +1,7 @@
 {
-  "name": "@sjcompiled/babel-plugin-strip-runtime",
+  "name": "@compiled/babel-plugin-strip-runtime",
   "version": "0.0.1",
-  "description": "Babel plugin that strips the sjcompiled runtime and extracts CSS.",
+  "description": "Babel plugin that strips the compiled runtime and extracts CSS.",
   "license": "Apache-2.0",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
@@ -19,13 +19,13 @@
     "@babel/template": "^7.26.9",
     "@babel/traverse": "^7.26.10",
     "@babel/types": "^7.26.10",
-    "@sjcompiled/css": "workspace:*",
-    "@sjcompiled/utils": "workspace:*"
+    "@compiled/css": "workspace:*",
+    "@compiled/utils": "workspace:*"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.29.3",
     "@babel/preset-typescript": "^7.28.5",
-    "@sjcompiled/babel-plugin": "workspace:*",
+    "@compiled/babel-plugin": "workspace:*",
     "@types/babel__core": "^7.20.5"
   }
 }

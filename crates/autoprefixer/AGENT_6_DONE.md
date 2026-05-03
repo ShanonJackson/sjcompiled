@@ -65,8 +65,8 @@ The corpus seed list (HANDOVER §9) is fully covered. The `BrowsersOptions` is s
 | `crates/compiled-css-napi/src/lib.rs`               | New `AutoprefixerOpts { from?: String }` napi-derive object + new `autoprefixer(stylesheet, opts?)` napi fn. Mirrors `autoprefixer.js`'s `OnceExit(root)` hook: parse → `build_prefixes_default(opts.from)` → `Processor::remove` → `Processor::add` → stringify. Errors mapped to `napi::Error::from_reason`, matching upstream postcss's "throws on parse error". |
 | `packages/css-native/index.js`                      | Re-exports `binary.autoprefixer` alongside `binary.sort`.                                                     |
 | `packages/css-native/index.d.ts`                    | TypeScript declaration: `AutoprefixerOpts` interface + `autoprefixer(stylesheet, opts?)` function signature, with cross-reference to `transform.ts:70` and the parity contract.                                                |
-| `packages/css/scripts/verify-napi-autoprefixer.mjs` | NEW — sibling of `verify-napi-sort.mjs`. Runs all 65 corpus entries through both JS oracle (`autoprefixer@10.4.14` via postcss) and Rust NAPI (`@sjcompiled/css-native::autoprefixer`), asserts byte-equality. Browserslist pinned identically on both sides via `from:` option / `from:` opt. |
-| `packages/css-native/sjcompiled-css.win32-x64-msvc.node` | Updated platform binary (was sort-only; now includes autoprefixer). **Shipped from `target/debug/`, NOT `target/release/`** — see §"Release-mode build OOM" below. NAPI byte-output is identical between opt levels; the parity-runner + verify-napi-autoprefixer gates both pass 65/65 with this dev `.dll`. The May 2 sort-only release binary is preserved as `sjcompiled-css.win32-x64-msvc.node.may2-bak` next to it for reference. |
+| `packages/css/scripts/verify-napi-autoprefixer.mjs` | NEW — sibling of `verify-napi-sort.mjs`. Runs all 65 corpus entries through both JS oracle (`autoprefixer@10.4.14` via postcss) and Rust NAPI (`@compiled/css-native::autoprefixer`), asserts byte-equality. Browserslist pinned identically on both sides via `from:` option / `from:` opt. |
+| `packages/css-native/compiled-css.win32-x64-msvc.node` | Updated platform binary (was sort-only; now includes autoprefixer). **Shipped from `target/debug/`, NOT `target/release/`** — see §"Release-mode build OOM" below. NAPI byte-output is identical between opt levels; the parity-runner + verify-napi-autoprefixer gates both pass 65/65 with this dev `.dll`. The May 2 sort-only release binary is preserved as `compiled-css.win32-x64-msvc.node.may2-bak` next to it for reference. |
 
 The Rust call shape inside the NAPI fn mirrors AGENT_4_DONE.md TL;DR
 exactly:
@@ -192,7 +192,7 @@ intact and the gate stayed red until the territorial fixes landed.
 | `crates/compiled-css-napi/src/lib.rs` | + `AutoprefixerOpts` napi-object + `autoprefixer()` napi fn + mod docs update | shared (asked) |
 | `packages/css-native/index.js` | + `module.exports.autoprefixer = binary.autoprefixer` re-export | shared (additive) |
 | `packages/css-native/index.d.ts` | + `AutoprefixerOpts` interface + `autoprefixer()` declaration | shared (additive) |
-| `packages/css-native/sjcompiled-css.win32-x64-msvc.node` | rebuilt (now exports autoprefixer) | binary artifact |
+| `packages/css-native/compiled-css.win32-x64-msvc.node` | rebuilt (now exports autoprefixer) | binary artifact |
 | `packages/css/scripts/verify-napi-autoprefixer.mjs` | NEW — JS-vs-NAPI byte-equality verify script over the 65-entry corpus | new (no conflict) |
 | `crates/autoprefixer/AGENT_6_DONE.md` | NEW — this file | new (no conflict) |
 

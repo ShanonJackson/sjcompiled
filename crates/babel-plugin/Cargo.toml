@@ -1,6 +1,6 @@
 [package]
 name = "babel-plugin"
-description = "Byte-for-byte port of @sjcompiled/babel-plugin → SWC plugin (wasm32-wasip1). See plugins/PLAN.md."
+description = "Byte-for-byte port of @compiled/babel-plugin → SWC plugin (wasm32-wasip1). See plugins/PLAN.md."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -17,9 +17,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true }
 # §2.3 dispatcher consumes JSX pragma regexes + DEFAULT_IMPORT_SOURCES
-# from sjcompiled-utils. Path-dep (workspace) so version drift between
+# from compiled-utils. Path-dep (workspace) so version drift between
 # the babel-plugin port and the utils crate is impossible.
-sjcompiled-utils = { path = "../sjcompiled-utils" }
+compiled-utils = { path = "../compiled-utils" }
 
 [package.metadata.swc]
 # When bumped, update PARITY_VERSIONS.md AND re-run the corpus.

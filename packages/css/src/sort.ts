@@ -1,4 +1,4 @@
-import { createError } from '@sjcompiled/utils';
+import { createError } from '@compiled/utils';
 import postcss from 'postcss';
 import discardDuplicates from 'postcss-discard-duplicates';
 
@@ -28,7 +28,7 @@ export function sort(
 ): string {
   // Phase 8a NAPI engine flag (drift-fix landing — see
   // `crates/PHASE_8B_NAPI_NOTES.md` Drift §1). When
-  // `COMPILED_CSS_ENGINE === 'rust'`, delegate to `@sjcompiled/css-native`'s
+  // `COMPILED_CSS_ENGINE === 'rust'`, delegate to `@compiled/css-native`'s
   // synchronous Rust port. Mirrors the Phase 8b pattern in
   // `packages/css/src/transform.ts:32-82` verbatim — same env var, same
   // default behavior (default = JS), same `createError('css', 'Unhandled
@@ -40,7 +40,7 @@ export function sort(
   if (process.env.COMPILED_CSS_ENGINE === 'rust') {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { sort: rustSort } = require('@sjcompiled/css-native');
+      const { sort: rustSort } = require('@compiled/css-native');
       return rustSort(stylesheet, {
         sortAtRulesEnabled,
         sortShorthandEnabled,

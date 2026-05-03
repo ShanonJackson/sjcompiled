@@ -9,7 +9,7 @@ export const createError =
 ╚██████╗╚██████╔╝██║ ╚═╝ ██║██║     ██║███████╗███████╗██████╔╝
  ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝╚═════╝
 
-  @sjcompiled/${packageName} ${group ? `- ${group}` : ''}
+  @compiled/${packageName} ${group ? `- ${group}` : ''}
 
   ${message}
 `);

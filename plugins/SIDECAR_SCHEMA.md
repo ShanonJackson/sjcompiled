@@ -27,7 +27,7 @@ re-typed field is a major bump and a coordinated plugin/host release.
 Per `plugins/PLAN.md` §3.9.5:
 
 ```
-<projectRoot>/node_modules/.cache/sjcompiled-swc/
+<projectRoot>/node_modules/.cache/compiled-swc/
   worker-<pid>/                          # mkdir at worker init
     cache.bin                            # §3 below; persistent
     call-<uuid>/                         # mkdir per transform()

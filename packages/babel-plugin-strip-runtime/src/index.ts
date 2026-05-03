@@ -5,8 +5,8 @@ import { declare } from '@babel/helper-plugin-utils';
 import template from '@babel/template';
 import type { NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
-import { sort } from '@sjcompiled/css';
-import { preserveLeadingComments } from '@sjcompiled/utils';
+import { sort } from '@compiled/css';
+import { preserveLeadingComments } from '@compiled/utils';
 
 import type { PluginPass, PluginOptions, BabelFileMetadata } from './types';
 import { isAutomaticRuntime } from './utils/is-automatic-runtime';
@@ -19,7 +19,7 @@ export default declare<PluginPass>((api) => {
   api.assertVersion(7);
 
   return {
-    name: '@sjcompiled/babel-plugin-strip-runtime',
+    name: '@compiled/babel-plugin-strip-runtime',
     pre() {
       this.styleRules = [];
     },
@@ -28,7 +28,7 @@ export default declare<PluginPass>((api) => {
         exit(path, { file, filename }) {
           if (!filename) {
             throw new Error(
-              `@sjcompiled/babel-plugin-strip-runtime expected the filename not to be empty, but actually got '${filename}'.`
+              `@compiled/babel-plugin-strip-runtime expected the filename not to be empty, but actually got '${filename}'.`
             );
           }
 

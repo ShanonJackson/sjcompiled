@@ -3,7 +3,7 @@ import * as t from '@babel/types';
 import type { State } from '../types';
 
 /**
- * Returns `true` if the node is using `css` from `@sjcompiled/react` as a call expression
+ * Returns `true` if the node is using `css` from `@compiled/react` as a call expression
  *
  * @param node {t.Expression} The expression node that is being checked
  * @param state {State} Plugin state
@@ -20,7 +20,7 @@ export const isCompiledCSSCallExpression = (
   );
 
 /**
- * Returns `true` if the node is using `css` from `@sjcompiled/react` as a tagged template expression
+ * Returns `true` if the node is using `css` from `@compiled/react` as a tagged template expression
  *
  * @param node {t.Expression} The expression node that is being checked
  * @param state {State} Plugin state
@@ -35,7 +35,7 @@ export const isCompiledCSSTaggedTemplateExpression = (
   !!state.compiledImports?.css?.includes(node.tag.name);
 
 /**
- * Returns `true` if the node is using `keyframes` from `@sjcompiled/react` as a call expression
+ * Returns `true` if the node is using `keyframes` from `@compiled/react` as a call expression
  *
  * @param node {t.Node} The node that is being checked
  * @param state {State} Plugin state
@@ -50,7 +50,7 @@ export const isCompiledKeyframesCallExpression = (
   !!state.compiledImports?.keyframes?.includes(node.callee.name);
 
 /**
- * Returns `true` if the node is using `cssMap` from `@sjcompiled/react` as a call expression
+ * Returns `true` if the node is using `cssMap` from `@compiled/react` as a call expression
  *
  * @param node {t.Node} The node that is being checked
  * @param state {State} Plugin state
@@ -65,7 +65,7 @@ export const isCompiledCSSMapCallExpression = (
   !!state.compiledImports?.cssMap?.includes(node.callee.name);
 
 /**
- * Returns `true` if the node is using `keyframes` from `@sjcompiled/react` as a tagged template expression
+ * Returns `true` if the node is using `keyframes` from `@compiled/react` as a tagged template expression
  *
  * @param node {t.Node} The node that is being checked
  * @param state {State} Plugin state
@@ -80,7 +80,7 @@ export const isCompiledKeyframesTaggedTemplateExpression = (
   !!state.compiledImports?.keyframes?.includes(node.tag.name);
 
 /**
- * Returns `true` if the node is using `styled` from `@sjcompiled/react` from a styled.tag usage
+ * Returns `true` if the node is using `styled` from `@compiled/react` from a styled.tag usage
  *
  * @param node {t.Node} The node that is being checked
  * @param state {State} Plugin state
@@ -92,7 +92,7 @@ const isCompiledStyledMemberExpression = (node: t.Node, state: State): node is t
   !!state.compiledImports?.styled?.includes(node.object.name);
 
 /**
- * Returns `true` if the node is using `styled` from `@sjcompiled/react` from a styled(Component) usage
+ * Returns `true` if the node is using `styled` from `@compiled/react` from a styled(Component) usage
  *
  * @param node {t.Node} The node that is being checked
  * @param state {State} Plugin state
@@ -107,7 +107,7 @@ const isCompiledStyledCompositionCallExpression = (
   !!state.compiledImports?.styled?.includes(node.callee.name);
 
 /**
- * Returns `true` if the node is using `styled` from `@sjcompiled/react` as a call expression
+ * Returns `true` if the node is using `styled` from `@compiled/react` as a call expression
  *
  * @param node {t.Expression} The expression node that is being checked
  * @param state {State} Plugin state
@@ -122,7 +122,7 @@ export const isCompiledStyledCallExpression = (
     isCompiledStyledCompositionCallExpression(node.callee, state));
 
 /**
- * Returns `true` if the node is using `styled` from `@sjcompiled/react` as a tagged template expression
+ * Returns `true` if the node is using `styled` from `@compiled/react` as a tagged template expression
  *
  * @param node {t.Node} The node that is being checked
  * @param state {State} Plugin state

@@ -2,8 +2,8 @@ import generate from '@babel/generator';
 import template from '@babel/template';
 import type { NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
-import { transformCss } from '@sjcompiled/css';
-import { unique, toBoolean } from '@sjcompiled/utils';
+import { transformCss } from '@compiled/css';
+import { unique, toBoolean } from '@compiled/utils';
 import isPropValid from '@emotion/is-prop-valid';
 
 import {

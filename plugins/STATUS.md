@@ -45,16 +45,16 @@ Pass-through preserved (both harnesses still 1284/1284). 13 new
 unit tests covering import recognition, source matching, default
 import-sources resolution.
 
-Two pieces of drift fixed while consuming `sjcompiled-utils`:
+Two pieces of drift fixed while consuming `compiled-utils`:
 (a) `COMPILED_IMPORT` was `@compiled/react`, JS source is
-`@sjcompiled/react`; (b) `jsx.ts` was never ported — added as
+`@compiled/react`; (b) `jsx.ts` was never ported — added as
 `jsx.rs` with `JSX_ANNOTATION_REGEX` / `JSX_SOURCE_ANNOTATION_REGEX`
 both as `OnceLock<Regex>` and 6 unit tests covering the Babel
 `comment.value` shape (delimiters stripped before regex match).
 
 **Remaining for §2.3 (next session):**
 - `Program::enter` JSX-pragma comment scan (regexes ready in
-  `sjcompiled_utils::jsx`).
+  `compiled_utils::jsx`).
 - `findClassicJsxPragmaImport` traverse — would mutate
   (`specifier.remove()`); needs §2.4 `MutationRecorder` to defer
   the mutation cleanly.
@@ -120,13 +120,13 @@ locks the parity contract.
   (interfaces aren't runtime values); (b)
   `packages/babel-plugin-strip-runtime/src/__tests__/{strip-runtime-source-code,strip-runtime-transpiled-code}.test.ts`
   had a stale `regexToFindRequireStatements` literal — `@compiled\/`
-  bumped to `@sjcompiled\/` to match the renamed constants.
+  bumped to `@compiled\/` to match the renamed constants.
 - Side-effect of the rename: `DEFAULT_IMPORT_SOURCES` is
-  `['@sjcompiled/react', '@atlaskit/css']`. Fixtures driven from any
+  `['@compiled/react', '@atlaskit/css']`. Fixtures driven from any
   source string still using `@compiled/react` go untransformed (no
   CC/CS wrappers, every `expectsError` fixture's throw-path is dead).
   `generate-fixtures.mjs` was updated accordingly. **If you regenerate
-  fixtures or write new ones, use `@sjcompiled/react` as the import
+  fixtures or write new ones, use `@compiled/react` as the import
   source.**
 
 ---
@@ -178,7 +178,7 @@ done before declaring Phase 0 fully signed off across the platform set.
 
 - **§1.5 — `.compiled.css` postcss `sort()` deferred to Phase 4.**
   Babel's `extractStylesToDirectory` write path calls
-  `sort(styleRules.sort().join('\n'), sortConfig)` from `@sjcompiled/css`.
+  `sort(styleRules.sort().join('\n'), sortConfig)` from `@compiled/css`.
   The Rust port lives at `crates/css/src/sort.rs` and depends on
   `compiled-css` + the postcss-* crates (`postcss-core`,
   `postcss-discard-duplicates`, `cssnano-preset-default`, …).
@@ -309,21 +309,21 @@ done before declaring Phase 0 fully signed off across the platform set.
 | §2.0 | ☑ | Extract all babel-plugin fixtures from `packages/babel-plugin/src/**/__tests__/*.test.ts` into `parity-harness/babel-plugin/fixtures/*.json` | claude-2026-05-04 | `parity-harness/babel-plugin/extract-fixtures.mjs` (runtime extractor — Bun.plugin loader rewrites `test-utils.ts` so `transform` records `(code, opts)` per call; Jest globals stubbed so describe/it bodies execute synchronously without assertion side-effects), `parity-harness/babel-plugin/{engines.ts,harness.test.ts}` skeleton, 477 fixture JSONs (gitignored, regenerable). 6 test files skipped: 3 use `jest.mock`/`jest.fn`/`jest.spyOn` against utility internals (`cache`, `object-property-to-string`, `module-traversal`), 1 is the perf benchmark (`__perf__/module-traversal-cache`), 2 (`errors`, `resolver`) are throw-assertion-only and don't carry byte-parity signal. | `bun test parity-harness/babel-plugin/harness.test.ts` → 120/120 pass (sampled stride). `BABEL_PLUGIN_FULL_DETERMINISM=1 bun test parity-harness/babel-plugin/harness.test.ts` → 477/477 pass (full corpus). |
 | §2.1 | ☑ | Port `types.rs`, `constants.rs` (data only, no logic) | claude-2026-05-04 | `crates/babel-plugin/src/constants.rs` (1:1 port of `packages/babel-plugin/src/constants.ts`), `crates/babel-plugin/src/utils/constants.rs` (1:1 port of `packages/babel-plugin/src/utils/constants.ts`), `crates/babel-plugin/src/types.rs` (port of `types.ts` — `PluginOptions`, `State`, `Tag`, `Metadata`, `TransformResult`, with `CacheMode` custom (de)serializer for the `bool \| "file-pass"` wire shape and `IndexMap` everywhere ordering matters). Babel-only types (`NodePath`, `PluginPass`, the JS-callback `Resolver`) deliberately omitted — see module docs in `types.rs` for the resolution table. | `RUSTFLAGS="" cargo test -p babel-plugin --lib` → 5/5 pass (CacheMode bool/string round-trip, PluginOptions camelCase wire shape, default-is-all-None, full round-trip). `RUSTFLAGS="" cargo build -p babel-plugin --target wasm32-wasip1 --release` clean. |
 | §2.2 | ☑ | Build `parity-harness/babel-plugin/{engines.ts,harness.test.ts}` mirroring strip-runtime's shape | claude-2026-05-04 | `parity-harness/babel-plugin/engines.ts` (`babelEngine` + `swcEngine` + `diffSummary` — `swcEngine` runs `babel_plugin.wasm` in pass-through mode through SWC parser/codegen + prettier round-trip), `parity-harness/babel-plugin/harness.test.ts` (Babel ↔ SWC parity describe block + Babel determinism baseline; `expectedToFail` semantics mirror strip-runtime — fixtures where Babel transforms the input assert NOT-equal vs the pass-through SWC, fixtures where prettier round-trips identically through both assert byte-equal). Stride samples by default (30 parity / 100 determinism); `BABEL_PLUGIN_FULL_PARITY=1` and `BABEL_PLUGIN_FULL_DETERMINISM=1` flip to full corpus. | `bun test parity-harness/babel-plugin/harness.test.ts` → 152/152 pass (32 parity sample + 120 determinism sample); `BABEL_PLUGIN_FULL_DETERMINISM=1` → 477/477 determinism. Full parity gate (§2.5) lights up after §2.3+ ports land. |
-| §2.3 | ▶ | Port `lib.rs` entry + dispatcher visitor with stubbed handlers (no-ops that record "would have visited" in a debug log) | claude-2026-05-04 (skeleton); `—` for follow-up | `crates/babel-plugin/src/lib.rs` (rewritten — `process(...)` instantiates `BabelPluginVisitor`, threads `PluginOptions` from the SWC plugin-config channel, deserialises with the §2.1 camelCase schema, exposes `run_dispatcher` for in-process tests), `crates/babel-plugin/src/babel_plugin.rs` (skeleton dispatcher: `BabelPluginVisitor` holds owned `State` + computed `import_sources`, recognises Compiled imports via exact-source match, populates `state.compiledImports` with API → local-name vec, stub `visit_mut_call_expr`/`tagged_tpl`/`jsx_element`/`jsx_opening_element` that recurse into children + push to a debug-only `stub_log`). Drift fixed in `crates/sjcompiled-utils/src/constants.rs` (`COMPILED_IMPORT` was `@compiled/react`, JS source is `@sjcompiled/react`) and `crates/sjcompiled-utils/src/jsx.rs` ported (was missing — needed for `JSX_ANNOTATION_REGEX` / `JSX_SOURCE_ANNOTATION_REGEX`). Remaining for next session: (a) `Program::enter` JSX-pragma scan over `file.ast.comments`; (b) `Program::exit` `appendRuntimeImports` + banner comment + `pathsToCleanup` loop; (c) `ImportDeclaration` specifier removal (gated on §2.4 MutationRecorder); (d) `findClassicJsxPragmaImport` traverse + `path.remove()` of the classic-pragma `jsx` specifier. | `RUSTFLAGS="" cargo test -p babel-plugin --lib` → 13/13 pass (5 §2.1 + 8 new §2.3: import-sources defaults/extras, exact-match recogniser, styled / renamed / multi-API recording, non-compiled-source skip, end-to-end `visit_mut_program`). `RUSTFLAGS="" cargo test -p sjcompiled-utils --lib` → 31/31 (25 prior + 6 new `jsx::tests::*`). Pass-through preserved: both harnesses still green (`bun test parity-harness/strip-runtime/harness.test.ts parity-harness/babel-plugin/harness.test.ts` → 1284/1284 pass). |
+| §2.3 | ▶ | Port `lib.rs` entry + dispatcher visitor with stubbed handlers (no-ops that record "would have visited" in a debug log) | claude-2026-05-04 (skeleton); `—` for follow-up | `crates/babel-plugin/src/lib.rs` (rewritten — `process(...)` instantiates `BabelPluginVisitor`, threads `PluginOptions` from the SWC plugin-config channel, deserialises with the §2.1 camelCase schema, exposes `run_dispatcher` for in-process tests), `crates/babel-plugin/src/babel_plugin.rs` (skeleton dispatcher: `BabelPluginVisitor` holds owned `State` + computed `import_sources`, recognises Compiled imports via exact-source match, populates `state.compiledImports` with API → local-name vec, stub `visit_mut_call_expr`/`tagged_tpl`/`jsx_element`/`jsx_opening_element` that recurse into children + push to a debug-only `stub_log`). Drift fixed in `crates/compiled-utils/src/constants.rs` (`COMPILED_IMPORT` was `@compiled/react`, JS source is `@compiled/react`) and `crates/compiled-utils/src/jsx.rs` ported (was missing — needed for `JSX_ANNOTATION_REGEX` / `JSX_SOURCE_ANNOTATION_REGEX`). Remaining for next session: (a) `Program::enter` JSX-pragma scan over `file.ast.comments`; (b) `Program::exit` `appendRuntimeImports` + banner comment + `pathsToCleanup` loop; (c) `ImportDeclaration` specifier removal (gated on §2.4 MutationRecorder); (d) `findClassicJsxPragmaImport` traverse + `path.remove()` of the classic-pragma `jsx` specifier. | `RUSTFLAGS="" cargo test -p babel-plugin --lib` → 13/13 pass (5 §2.1 + 8 new §2.3: import-sources defaults/extras, exact-match recogniser, styled / renamed / multi-API recording, non-compiled-source skip, end-to-end `visit_mut_program`). `RUSTFLAGS="" cargo test -p compiled-utils --lib` → 31/31 (25 prior + 6 new `jsx::tests::*`). Pass-through preserved: both harnesses still green (`bun test parity-harness/strip-runtime/harness.test.ts parity-harness/babel-plugin/harness.test.ts` → 1284/1284 pass). |
 | §2.4 | ☐ | State struct with `IndexMap` everywhere, `pub(self)` field encapsulation, `MutationRecorder::apply` as only mutator (per `STATE_MUTATIONS.md`) | — | `crates/babel-plugin/src/state.rs`, `crates/babel-plugin/src/mutation_recorder.rs` | Pre-commit lint `grep -rEn 'state\.[a-z_]+\.(push\|set\|add\|insert\|remove\|extend)' crates/babel-plugin/src --include '*.rs' \| grep -v 'state\.rs\|mutation_recorder\.rs'` returns zero matches |
 | §2.5 | ☐ | **Phase 2 exit gate:** pass-through harness clean across all babel-plugin fixtures | — | Updated STATUS.md | `bun test parity-harness/babel-plugin/harness.test.ts` passes for every fixture |
 
 ---
 
-## Phase 3 — Hash compatibility (consume shared `crates/sjcompiled-utils`)
+## Phase 3 — Hash compatibility (consume shared `crates/compiled-utils`)
 
 > **Goal:** prove the Rust `hash` function shared with the CSS port is
-> byte-identical to JS `@sjcompiled/utils.hash` from this plugin's
+> byte-identical to JS `@compiled/utils.hash` from this plugin's
 > consuming side.
 
 | ID | Status | Checkpoint | Owner | Artefacts | Verification |
 |---|---|---|---|---|---|
-| §3.1 | ☐ | Confirm `crates/sjcompiled-utils` exposes `pub fn hash(input: &str) -> String` | — | `crates/sjcompiled-utils/src/lib.rs` already does this per `crates/STATUS.md` line 243 | `cargo doc -p sjcompiled-utils` shows the public symbol |
+| §3.1 | ☐ | Confirm `crates/compiled-utils` exposes `pub fn hash(input: &str) -> String` | — | `crates/compiled-utils/src/lib.rs` already does this per `crates/STATUS.md` line 243 | `cargo doc -p compiled-utils` shows the public symbol |
 | §3.2 | ☐ | Build hash test-vector corpus: ASCII, UTF-8 multibyte, empty, embedded NUL, >4KB, leading/trailing whitespace, real keyframe-expression inputs | — | `crates/babel-plugin/tests/hash_corpus.json` | Corpus has ≥30 entries covering every above case |
 | §3.3 | ☐ | Diff Rust `hash` vs JS `hash` over the corpus + 10K random inputs | — | `crates/babel-plugin/tests/hash_parity.rs` (or bun test) | `cargo test -p babel-plugin hash_parity` passes; 10K random inputs all match |
 | §3.4 | ☐ | **Phase 3 exit gate:** zero divergence | — | This STATUS.md updated | Parity test green |

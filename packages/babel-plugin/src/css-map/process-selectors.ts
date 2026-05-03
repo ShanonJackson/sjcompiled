@@ -115,7 +115,7 @@ export const mergeExtendedSelectorsIntoProperties = (
   const addedSelectors: Set<string> = new Set();
 
   for (const property of [...variantStyles.properties, ...extendedSelectors]) {
-    // Covered by @sjcompiled/eslint-plugin rule already,
+    // Covered by @compiled/eslint-plugin rule already,
     // this is just to make the type checker happy
     errorIfNotValidObjectProperty(property, meta);
     // Extract property.key into its own variable so we can do

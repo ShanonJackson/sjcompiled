@@ -1,4 +1,4 @@
-# Plan: `@sjcompiled/babel-plugin` + `@sjcompiled/babel-plugin-strip-runtime` → Rust SWC plugins
+# Plan: `@compiled/babel-plugin` + `@compiled/babel-plugin-strip-runtime` → Rust SWC plugins
 
 > **Audience.** An engineer or agent picking this up cold. Read this in
 > order. This file is the source of truth for hard constraints, the verification
@@ -27,7 +27,7 @@ The two plugins:
 
 | Babel | Rust target | Size | Role |
 |---|---|---|---|
-| `packages/babel-plugin/` | `crates/babel-plugin/` | ~50 source files, ~6kLOC | Transforms Compiled API call sites (`css({...})`, `styled.div\`...\``, `cssMap`, `<ClassNames>`, `xcss`) into runtime JSX + CSS strings. Statically evaluates imports across files. Calls `transformCss` from `@sjcompiled/css`. |
+| `packages/babel-plugin/` | `crates/babel-plugin/` | ~50 source files, ~6kLOC | Transforms Compiled API call sites (`css({...})`, `styled.div\`...\``, `cssMap`, `<ClassNames>`, `xcss`) into runtime JSX + CSS strings. Statically evaluates imports across files. Calls `transformCss` from `@compiled/css`. |
 | `packages/babel-plugin-strip-runtime/` | `crates/babel-plugin-strip-runtime/` | 6 source files, ~600LOC | Strips `<CC>` / `<CS>` runtime wrappers from already-baked code, extracts CSS rules into either `require()` calls, an external `.compiled.css` file, or sidecar metadata for SSR. |
 
 Both run, in series, inside Parcel's transformer (see
@@ -71,7 +71,7 @@ this document.
    gate before Phase 5 starts.
 3. **`packages/css/src/transform.ts` ships in Rust *before* this plugin
    starts Phase 4.** A parallel agent is porting `transform.ts` to Rust;
-   their crate (`crates/sjcompiled-utils` plus the CSS crates already
+   their crate (`crates/compiled-utils` plus the CSS crates already
    scaffolded under `crates/`) exposes a synchronous Rust function we link
    in directly. **No NAPI bridge. No two-pass scan/apply protocol.**
    Earlier drafts of this plan described a two-pass workaround because
@@ -195,7 +195,7 @@ empirically verified by Phase 0 probes at `@swc/core@1.15.8` /
 ```rust
 // ✅ works — uses the /cwd mount
 fs::read("/cwd/package.json")?;
-fs::write("/cwd/node_modules/.cache/sjcompiled-swc/cache.bin", bytes)?;
+fs::write("/cwd/node_modules/.cache/compiled-swc/cache.bin", bytes)?;
 
 // ❌ fails — physical absolute path is outside the preopen
 fs::write("C:/Users/.../package.json", bytes)?;
@@ -215,7 +215,7 @@ swc-project/swc#4997 documents the same pattern from a maintainer.
 **Host-side path translation contract:** the host wrapper (Parcel
 transformer in `packages/parcel-transformer/`) computes scratch paths
 in host-absolute form (e.g.
-`<projectRoot>/node_modules/.cache/sjcompiled-swc/worker-12345/`) for
+`<projectRoot>/node_modules/.cache/compiled-swc/worker-12345/`) for
 its own `mkdirSync` / `rmSync` use, then translates to
 `/cwd/<rel-from-project-root>` form before threading into plugin
 config. The plugin only ever sees `/cwd`-prefixed paths and never
@@ -290,7 +290,7 @@ Why sidecar files vs comment sentinels in the output JS:
 Per constraint 3 in §1, the Rust port of `packages/css/src/transform.ts`
 ships **before** Phase 4 starts. That eliminates the WASI host-callback
 problem entirely: the plugin links the CSS port as a normal Rust crate
-(`crates/sjcompiled-utils` plus the CSS crates already scaffolded in
+(`crates/compiled-utils` plus the CSS crates already scaffolded in
 `crates/`) and calls `transform_css(css, &opts)` synchronously inside
 the visitor. No NAPI, no two-pass scan/apply, no marker tokens, no
 `css-requests.json` sidecar, no second `transformSync` per file.
@@ -367,7 +367,7 @@ The Wasm plugin instance is torn down per `transform()` call (verified
 empirically against `swc_plugin_runner@23.0.0` — see Phase 0 ABI gate),
 so plugin-static memory cannot persist a cache across files. Instead,
 the **host (the Parcel transformer wrapper) owns a worker-scoped scratch
-directory under `<projectRoot>/node_modules/.cache/sjcompiled-swc/`**
+directory under `<projectRoot>/node_modules/.cache/compiled-swc/`**
 (reachable from inside the WASI cwd preopen — see §3.9.5), the plugin
 reads/writes a **single compact binary cache file** (postcard-encoded,
 hard-capped at 5 MB / 500 entries) inside it via WASI sync I/O, and
@@ -504,7 +504,7 @@ earlier draft of this plan put scratch at
 literally could not open any file there. The corrected location:
 
 ```
-<projectRoot>/node_modules/.cache/sjcompiled-swc/    # gitignored by convention
+<projectRoot>/node_modules/.cache/compiled-swc/    # gitignored by convention
   worker-<pid>/                                      # mkdir at worker init
     cache.bin                                        # Layer 2 only, postcard, capped 5 MB
     call-<uuid>/                                     # mkdir per transform()
@@ -515,8 +515,8 @@ literally could not open any file there. The corrected location:
 If `node_modules/.cache/` does not exist or is not writable (rare —
 some sandboxed CI configs), the host falls back in this order:
 
-1. `<projectRoot>/.sjcompiled-swc-cache/worker-<pid>/`
-2. `<projectRoot>/.cache/sjcompiled-swc/worker-<pid>/`
+1. `<projectRoot>/.compiled-swc-cache/worker-<pid>/`
+2. `<projectRoot>/.cache/compiled-swc/worker-<pid>/`
 3. Hard error: emit a clear diagnostic naming both attempted paths
    and the resolved cwd. Do **not** silently fall back to `/tmp` —
    the plugin will appear to work but every cache lookup will fail
@@ -531,7 +531,7 @@ plugin will need to read; see §3.9.13.7. The Phase 0 location probe
 
 **`workerScratchDir`:** created exactly once per worker process by the
 Parcel transformer wrapper at module load. Path is
-`<projectRoot>/node_modules/.cache/sjcompiled-swc/worker-<pid>/` (or a
+`<projectRoot>/node_modules/.cache/compiled-swc/worker-<pid>/` (or a
 fallback per above). Created via `mkdirSync(..., { recursive: true })`
 — not `mkdtempSync`, because we want a stable per-pid path so a
 crashed worker leaves a deterministically-named directory the next
@@ -1425,11 +1425,11 @@ state setup, scope traversal, comment preservation in pass-through.
 
 ---
 
-### Phase 3 — Hash compatibility (`@sjcompiled/utils.hash`)
+### Phase 3 — Hash compatibility (`@compiled/utils.hash`)
 
 **Goal.** Adopt the Rust `hash` function the parallel CSS-port agent
-ships in `crates/sjcompiled-utils`, and prove it is byte-identical to
-the JS `@sjcompiled/utils.hash` from this plugin's perspective. **This
+ships in `crates/compiled-utils`, and prove it is byte-identical to
+the JS `@compiled/utils.hash` from this plugin's perspective. **This
 gates everything downstream.**
 
 Per the user's direction, the parallel CSS port lands its `hash`
@@ -1441,11 +1441,11 @@ copy of the hash.
 
 Tasks:
 
-- Confirm `crates/sjcompiled-utils` exports `pub fn hash(input:
+- Confirm `crates/compiled-utils` exports `pub fn hash(input:
   &str) -> String` (or the matching signature) and that the
   CSS-port crate already depends on it. **Single source of truth;
   no per-plugin reimplementation.**
-- Confirm the JS `@sjcompiled/utils.hash` source has not drifted vs
+- Confirm the JS `@compiled/utils.hash` source has not drifted vs
   what the Rust port replicates; if it has, the parallel agent owns
   closing the gap before Phase 3 exits.
 - Build a corpus of `(input string, expected hash)` test vectors
@@ -1456,7 +1456,7 @@ Tasks:
   vectors come from running the JS `hash` against the inputs in
   CI; freeze the results.
 - Add the corpus as a parity test in `crates/babel-plugin/tests/`
-  (NOT in `crates/sjcompiled-utils/` — we want this plugin's own
+  (NOT in `crates/compiled-utils/` — we want this plugin's own
   consumer-side guarantee, independent of the parallel agent's
   internal tests).
 
@@ -1481,7 +1481,7 @@ visit, no scan/apply scaffolding.
 
 **Hard preconditions (do not start Phase 4 without all four):**
 
-1. Phase 3 hash parity is green and the shared `crates/sjcompiled-utils`
+1. Phase 3 hash parity is green and the shared `crates/compiled-utils`
    crate exposes the hash function as a `pub fn` consumable by this
    plugin.
 2. The parallel CSS port has shipped a `pub fn transform_css(css: &str,
@@ -1682,7 +1682,7 @@ and SWC attach them to subtly different nodes. Specific concerns:
   Insert an empty statement (`;`) and verify prettier preserves the leading
   comment on it; if prettier strips the empty statement, reattach the
   comment to the first real body statement.
-- **`preserveLeadingComments` (from `@sjcompiled/utils`).** Port exact
+- **`preserveLeadingComments` (from `@compiled/utils`).** Port exact
   semantics — it shifts leading comments off the first body statement to
   the Program node before mutations, then restores. The shift point matters.
 - **`appendRuntimeImports` order.** `unshiftContainer('body', ...)` calls
@@ -1716,7 +1716,7 @@ any consumer.
 Tasks:
 
 - Run the parity harness across the 100k+ Compiled call sites in the
-  consuming monorepo (every workspace that imports `@sjcompiled/react`).
+  consuming monorepo (every workspace that imports `@compiled/react`).
   Capture every divergence; treat each as a blocking bug.
 - Stand up `cargo-fuzz` targets that synthesize plausible Compiled inputs
   (random JSX with random `css({...})` and `styled.X` patterns) and assert
@@ -1754,7 +1754,7 @@ of continuous runtime.
 | Hazard | Why it bites | Mitigation |
 |---|---|---|
 | **swc_core ABI ↔ @swc/core@1.15.8 mismatch** | Wrong pin → plugin rejected at load time. | Cross-check the SWC compatibility matrix; pin in `PARITY_VERSIONS.md`; CI rebuilds on every `@swc/core` bump. |
-| **`@sjcompiled/utils.hash` not bit-identical** | Every class name renames; corpus diff explodes. | Phase 3 standalone gate before any css-builders work. |
+| **`@compiled/utils.hash` not bit-identical** | Every class name renames; corpus diff explodes. | Phase 3 standalone gate before any css-builders work. |
 | **Comment attachment divergence** | Prettier preserves comments verbatim including attachment node. Even matched text can differ if attached to a different child. | Phase 7 dedicated; comment-shape diff tool; reproduce with minimal fixtures before fixing. |
 | **`@babel/generator` vs SWC printer for hash inputs** | Keyframe name uses `hash(generate(expression).code)`. SWC's printer differs from Babel's for the same AST. | `compat/generator.rs` matching Babel byte-for-byte for the relevant AST subtrees. |
 | **`t.noop()` has no SWC equivalent** | Anchor for the leading version-banner comment. | Empty statement + verify under prettier; fall back to attaching the comment to the first real body statement. |
@@ -1763,7 +1763,7 @@ of continuous runtime.
 | **`opts.resolver` (JS function)** | Cannot run inside WASI; not portable. | Constraint 1 (§1) explicitly drops support; documented; user has agreed to revisit later. |
 | **`onIncludedFiles` semantics** | Production callers (Parcel) drive HMR invalidation off it. Wrong list → stale builds. | Sidecar JSON; host calls `asset.invalidateOnFileChange` with the same array shape Babel produced; canonicalize paths the same way Babel did (no realpath at this stage — it matches Babel's behavior). |
 | **`compiledRequireExclude` SSR mode → `file.metadata.styleRules`** | SWC has no `file.metadata`. Parcel transformer reads `metadata.styleRules` (see `PARCEL_USAGE_EXAMPLE.md` line 191). | Sidecar JSON; host re-exposes as `result.styleRules`; transformer assigns to `asset.meta.styleRules` identically. |
-| **`process.env.TEST_PKG_VERSION` and version banner** | Banner contains plugin name + version. SWC plugin has a different name. | Plugin emits the **same** banner string Babel does (`@sjcompiled/babel-plugin v…`), reading the version from a shared workspace constant. Bit-parity over self-identification. |
+| **`process.env.TEST_PKG_VERSION` and version banner** | Banner contains plugin name + version. SWC plugin has a different name. | Plugin emits the **same** banner string Babel does (`@compiled/babel-plugin v…`), reading the version from a shared workspace constant. Bit-parity over self-identification. |
 | **Parallel test workers and scratch dirs** | Multiple SWC compiles in flight per process. | `mkdtemp` per-compile; never share. |
 | **Cross-platform path canonicalization** | cap-std on Windows handles symlinks/junctions differently than POSIX. | All sandbox-bound logic tests run on both Linux and Windows in CI. |
 | **`opts.cache` semantics vs Wasm instance lifetime** | Babel's `globalCache` is misnamed; reassigned per-pre-hook, never read elsewhere — effectively per-file. Wasm instance is torn down per `transform()` call (verified `swc_plugin_runner@23.0.0`). Plugin-static cross-file state is impossible. | §3.9 fully specifies the resolution: per-worker scratch dir + `cache.bin` + `swc.transformSync` mandate + mtime invalidation + two-layer (AST / evaluated-value) design. Output bytes never change with cache hit/miss; cache is perf-only. |
@@ -1773,7 +1773,7 @@ of continuous runtime.
 | **mtime unreliable on some filesystems** | Docker bind mounts, networked drives, FAT32. | `opts.cacheInvalidation: 'mtime' \| 'content-hash'` (§3.9.12) — content-hash uses xxhash3 of source bytes, slower but resolution-independent. |
 | **`swc.transformSync` removed in a future SWC release** | §3.9.4 is a hard contract; if `transformSync` disappears the cache strategy breaks. | Phase 0 ABI gate (§3.9.14) imports `transformSync` and asserts it's a function — fails loudly at version-bump time. |
 | **Babel bug compatibility** | "Fixing" a bug while porting renames classes in production. | Constraint 6 (§1): **bugs are features.** Every behavioural difference under the parity harness is a port defect, not a bug fix opportunity. |
-| **Scratch dir outside WASI cwd preopen** | An earlier draft put `workerScratchDir` under `os.tmpdir()`; the WASI sandbox at `@swc/core@1.15.8` only preopens `current_dir()`, so that path is unreachable from inside the plugin. Cache + sidecar I/O would silently fail. | §3.9.5 puts scratch at `<projectRoot>/node_modules/.cache/sjcompiled-swc/worker-<pid>/`. §3.9.14 #6 is a hard Phase 0 probe. Documented fallback chain. JS host MUST NOT use `mkdtempSync(tmpdir(), ...)`. |
+| **Scratch dir outside WASI cwd preopen** | An earlier draft put `workerScratchDir` under `os.tmpdir()`; the WASI sandbox at `@swc/core@1.15.8` only preopens `current_dir()`, so that path is unreachable from inside the plugin. Cache + sidecar I/O would silently fail. | §3.9.5 puts scratch at `<projectRoot>/node_modules/.cache/compiled-swc/worker-<pid>/`. §3.9.14 #6 is a hard Phase 0 probe. Documented fallback chain. JS host MUST NOT use `mkdtempSync(tmpdir(), ...)`. |
 | **Cache file size unbounded on 60-90 GB monorepo** | An earlier draft persisted Layer 1 (full `swc_ecma_ast::Module` serde-JSON) per-file. Worker reading/writing tens of MB of JSON per `transform()` would dwarf any saved parse cost. | §3.9.0/§3.9.8/§3.9.10 redesign: Layer 2 only on disk, postcard binary format, 5 MiB hard cap, 500-entry cap, 32-tdep-per-entry cap, dirty-bit short-circuits no-op writes. Layer 1 stays in-memory per transform. |
 | **`compat/generator.rs` coverage gap** | Keyframe-name input is `hash(generate(expression).code)`. SWC's printer differs from Babel's; we port a Babel-equivalent printer. If a single AST node kind reachable via `keyframes(...)` is missing or wrong, that one keyframe renames in production — the kind of bug that's individually low-blast-radius but collectively erodes confidence. | Phase 4 entry gate produces `COMPAT_GENERATOR_COVERAGE.md` enumerating every node kind reachable from `keyframes(...)` call sites in the consuming monorepo, plus parity fixtures per kind. Any node kind reached in the corpus that is not on the list = port defect. No half-bakes (constraint 5). |
 | **State mutation site missed by `MutationRecorder`** | A single `state.compiledImports.set(...)` not routed through the recorder = silent HMR breakage; bytes match (state isn't in the AST), corpus diff is clean, production is wrong. | §3.9.8: make `State` fields `pub(self)`; only public mutator is `MutationRecorder::apply`. Phase 0 produces `STATE_MUTATIONS.md`; Phase 5 task 0 reconciles it; pre-commit grep lint catches new sites. §3.9.15 shadow-eval gates the rip-cord removal. Together: missed mutation = compile error or pre-commit reject. |
@@ -1878,9 +1878,9 @@ import { randomUUID } from 'crypto';
 // inside the WASI cwd preopen. tmpdir() is unreachable from the plugin.
 const projectRoot = process.cwd();   // §3.9.13.7 — must be monorepo root
 const cacheRoot = pickCacheRoot(projectRoot);
-  // → <projectRoot>/node_modules/.cache/sjcompiled-swc/  (preferred)
-  // fallback: <projectRoot>/.sjcompiled-swc-cache/
-  // fallback: <projectRoot>/.cache/sjcompiled-swc/
+  // → <projectRoot>/node_modules/.cache/compiled-swc/  (preferred)
+  // fallback: <projectRoot>/.compiled-swc-cache/
+  // fallback: <projectRoot>/.cache/compiled-swc/
   // hard error otherwise (do NOT silently fall back to tmpdir).
 const workerScratchDir = join(cacheRoot, `worker-${process.pid}`);
 mkdirSync(workerScratchDir, { recursive: true });
@@ -1903,13 +1903,13 @@ try {
   const result = transformSync(code, {
     filename: asset.filePath,
     jsc: { experimental: { plugins: [
-      ['@sjcompiled/swc-plugin', {
+      ['@compiled/swc-plugin', {
         ...config,
         workerScratchDir,                  // §3.9.6 — stable per worker, holds cache.bin
         callScratch,                       // §3.9.6 — fresh per call
         cacheLevel: config.cacheLevel ?? 'value',
       }],
-      extract && ['@sjcompiled/swc-plugin-strip-runtime', {
+      extract && ['@compiled/swc-plugin-strip-runtime', {
         compiledRequireExclude: true,
         extractStylesToDirectory: config.extractStylesToDirectory,
         callScratch,                       // strip-runtime only needs callScratch

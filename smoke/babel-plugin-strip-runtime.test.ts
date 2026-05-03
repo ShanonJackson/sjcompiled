@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { transformSync } from '@babel/core';
 import jsxSyntax from '@babel/plugin-syntax-jsx';
-import compiledPlugin from '@sjcompiled/babel-plugin';
-import stripRuntimePlugin from '@sjcompiled/babel-plugin-strip-runtime';
+import compiledPlugin from '@compiled/babel-plugin';
+import stripRuntimePlugin from '@compiled/babel-plugin-strip-runtime';
 
 type StyleRules = string[];
 interface Metadata { styleRules?: StyleRules }
@@ -35,7 +35,7 @@ const stripTransform = (code: string, filename = 'test.tsx') => {
   };
 };
 
-describe('@sjcompiled/babel-plugin-strip-runtime', () => {
+describe('@compiled/babel-plugin-strip-runtime', () => {
   test('extracts atomic style rules into metadata and strips CC/CS imports', () => {
     const { code, metadata } = stripTransform(`
       import { styled } from '@compiled/react';

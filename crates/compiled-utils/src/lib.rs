@@ -1,5 +1,5 @@
-//! crates/sjcompiled-utils
-//! Byte-for-byte Rust port of `@sjcompiled/utils` (`packages/utils/src/`).
+//! crates/compiled-utils
+//! Byte-for-byte Rust port of `@compiled/utils` (`packages/utils/src/`).
 //!
 //! Folder/file mapping (1:1 with `packages/utils/src/`):
 //!   - `hash.ts`                    -> `src/hash.rs`           **CRITICAL**

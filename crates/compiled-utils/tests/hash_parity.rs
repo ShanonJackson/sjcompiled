@@ -6,7 +6,7 @@
 //! JS source. **DO NOT EDIT** the JSON file by hand — regenerate it via
 //! the script so the JS-side oracle is preserved.
 
-use sjcompiled_utils::hash;
+use compiled_utils::hash;
 
 const VECTORS: &str = include_str!("hash_vectors.json");
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Emit JSON test vectors of `hash(input)` produced by the upstream JS.
 // Run from the workspace root:
-//   node crates/sjcompiled-utils/scripts/hash-vectors.mjs > crates/sjcompiled-utils/tests/hash_vectors.json
+//   node crates/compiled-utils/scripts/hash-vectors.mjs > crates/compiled-utils/tests/hash_vectors.json
 //
 // The Rust crate's integration tests at `tests/hash_parity.rs` consume this
 // file via `include_str!` to assert byte parity against the JS reference.

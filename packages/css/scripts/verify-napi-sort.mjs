@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One-shot verification: every fixture in `crates/parity-runner/corpus/sort/`
 // is fed through both the JS `sort()` (the oracle) and the Rust NAPI
-// `sort()` (via `@sjcompiled/css-native`). Asserts byte equality.
+// `sort()` (via `@compiled/css-native`). Asserts byte equality.
 //
 // This is the integration sibling of the `Stage::Sort` Rust harness —
 // the harness proves Rust-`crates/css` matches JS-`sort.ts`; this script

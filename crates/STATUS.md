@@ -118,7 +118,7 @@ it now actually exercises the Rust path.
      what the JS function destructures from its second argument.
    - JS pipeline below the gate is UNCHANGED — stays as the parity
      oracle and emergency fallback per EXECUTION_PLAN.md Phase 10d.
-2. `createError` import added from `@sjcompiled/utils` (was not
+2. `createError` import added from `@compiled/utils` (was not
    previously imported in `sort.ts` — the JS path didn't need it).
 3. No changes to NAPI shim, `css-native` package, or any other file
    under `packages/css/**`. The NAPI `sort()` export's signature was
@@ -139,7 +139,7 @@ The `verify-engine-flag.mjs` flip is the load-bearing one: prior to
 this fix, both subprocess invocations (`COMPILED_CSS_ENGINE=js` and
 `COMPILED_CSS_ENGINE=rust`) hit the JS pipeline since `sort.ts` ignored
 the flag. Now the `=rust` invocation routes through
-`@sjcompiled/css-native`, byte-equal output is asserted, and a future
+`@compiled/css-native`, byte-equal output is asserted, and a future
 refactor that drops the flag handling will fail this gate before
 consumers see it.
 
@@ -186,14 +186,14 @@ the JS oracle.
 2. `packages/css-native/index.js` + `index.d.ts` — `transformCss`
    re-export added alongside the existing `sort` and `autoprefixer`
    exports. New `TransformOpts` / `TransformResult` types declared.
-3. `packages/css-native/sjcompiled-css.win32-x64-msvc.node` —
+3. `packages/css-native/compiled-css.win32-x64-msvc.node` —
    rebuilt from `RUSTFLAGS="" cargo build -p compiled-css-napi` (dev
    mode; release mode OOMs on the dev box per `Cargo.toml` warning
    block). Bytes-out are byte-identical between dev and release per
    Phase 8a's `verify-napi-autoprefixer` precedent.
 4. `packages/css/src/transform.ts` — engine flag spliced. When
    `process.env.COMPILED_CSS_ENGINE === 'rust'`, the function
-   delegates to `@sjcompiled/css-native`'s NAPI shim via a synchronous
+   delegates to `@compiled/css-native`'s NAPI shim via a synchronous
    `require()`. Default = JS engine. The JS pipeline below the gate
    stays unchanged as the parity oracle and emergency fallback for
    the next 12+ months per EXECUTION_PLAN Phase 10d. Errors thrown
@@ -791,7 +791,7 @@ in territorial owner's file:
 - AGENT_3: `transition.rs`, `tests/transition_unit.rs`.
 - AGENT_4: `processor.rs`, `declaration.rs` (signature change for `restore_before` wiring), `prefixes.rs` (preprocess + AddBucket/RemoveBucket).
 - AGENT_5: `hacks/{cross_fade,intrinsic,text_decoration,text_decoration_skip_ink,user_select}.rs`, `hacks/HACKS_PORT.md`, `prefixes.rs::register_hacks` BEGIN/END block + `DeclPrefixer`/`ValuePrefixer` wrappers, `AFM_HACKS_INSTRUMENTATION.md`, `_phase_a_scratch/`.
-- AGENT_6: `crates/parity-runner/{Cargo.toml,src/stages.rs,src/main.rs}`, `crates/parity-runner/corpus/autoprefixer/` (NEW, 65 fixtures), `packages/css/scripts/parity-bridge.mjs`, `crates/compiled-css-napi/{Cargo.toml,src/lib.rs}`, `packages/css-native/{index.js,index.d.ts,sjcompiled-css.win32-x64-msvc.node}`, `packages/css/scripts/verify-napi-autoprefixer.mjs` (NEW).
+- AGENT_6: `crates/parity-runner/{Cargo.toml,src/stages.rs,src/main.rs}`, `crates/parity-runner/corpus/autoprefixer/` (NEW, 65 fixtures), `packages/css/scripts/parity-bridge.mjs`, `crates/compiled-css-napi/{Cargo.toml,src/lib.rs}`, `packages/css-native/{index.js,index.d.ts,compiled-css.win32-x64-msvc.node}`, `packages/css/scripts/verify-napi-autoprefixer.mjs` (NEW).
 
 The Phase 7 ship represents the largest single port in the project
 (8+ weeks for one engineer per the original `EXECUTION_PLAN.md`
@@ -2247,7 +2247,7 @@ deltas applied:
 - **Reverted** `expand-shorthands/flex.ts`: only handles `none` keyword
   in the 1-arg word case (drops `auto`/`initial`/`revert`/`revert-layer`/
   `unset`/`inherit` branches added in 0.20+).
-- All `@compiled/utils` imports translated to `@sjcompiled/utils`.
+- All `@compiled/utils` imports translated to `@compiled/utils`.
 - `sort.ts` re-wrapped with the `COMPILED_CSS_ENGINE=rust` engine flag
   (Phase 8a wiring preserved on top of the 0.19.0 source).
 
@@ -3189,7 +3189,7 @@ on.
 **Re-audit findings (`compiled-css` local plugins, AFM @0.19.0 / commit 40a4548) (2026-05-03):**
 - JS oracle (`packages/css/src/plugins/`) verified file-by-file against the AFM
   commit's plugins/ tree. Only three files differ from upstream — all cosmetic
-  (`@compiled/utils` → `@sjcompiled/utils` import-path rebrand): `atomicify-rules.ts`,
+  (`@compiled/utils` → `@compiled/utils` import-path rebrand): `atomicify-rules.ts`,
   `increase-specificity.ts`, `sort-shorthand-declarations.ts`. JS oracle is
   not drifted.
 - Walked every Rust port under `crates/compiled-css/src/plugins/` (29 files
@@ -3343,7 +3343,7 @@ the unchanged JS pipeline — no behavior change for unflagged consumers.
    exports `sort(stylesheet, opts?)`. Phase 8b will add `transformCss`.
 3. `packages/css-native/` — new npm workspace package wrapping the
    prebuilt `.node` binary. Platform-binary loader follows napi-rs
-   naming convention (`sjcompiled-css.<triple>.node`).
+   naming convention (`compiled-css.<triple>.node`).
 4. `packages/css/src/sort.ts` — env-flag gate via `createRequire` +
    lazy import. Default path unchanged; oracle JS pipeline preserved.
 5. `Stage::Sort` added to parity-runner + JS bridge counterpart in
@@ -3820,7 +3820,7 @@ re-implement helpers. Add new ones in the appropriate crate:
   values-parser node hierarchy (skips outer `raws_before`; Funcs emit
   child `raws_before` inside parens).
 
-### `sjcompiled-utils`
+### `compiled-utils`
 
 - `hash` — bit-identical to JS `murmurhash2_gc`. **Do not re-port.**
 - `unique` / `flatten` / `kebab_case` / `to_boolean`.
@@ -3851,7 +3851,7 @@ Phase 8a). Naming:
 - Foundation crates keep their upstream names where unambiguous.
 
 `packages/css-native/` is the npm wrapper around the compiled `.node`
-binary. Phase 8a ships `sjcompiled-css.win32-x64-msvc.node` only;
+binary. Phase 8a ships `compiled-css.win32-x64-msvc.node` only;
 Phase 8b extends to linux-x64-gnu / linux-arm64-gnu / darwin-x64 /
 darwin-arm64 once `transformCss` is byte-clean.
 
@@ -4445,7 +4445,7 @@ The 5 postcss-side overrides on top of normalize-url's defaults:
   comment lived between them. Replicate exactly — minified selectors
   rely on this.
 - **JS bridge dependency resolution:** plugins not in
-  `@sjcompiled/css`'s direct deps must be added to its
+  `@compiled/css`'s direct deps must be added to its
   `devDependencies` (not just root `overrides`) so
   `parity-bridge.mjs` can `import` them. Without the package-level
   dep, bun's `node_modules` doesn't expose the package to the bridge

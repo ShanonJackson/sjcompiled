@@ -1,7 +1,7 @@
 # Parity harness
 
-The verification oracle for the `@sjcompiled/babel-plugin` and
-`@sjcompiled/babel-plugin-strip-runtime` Rust SWC ports
+The verification oracle for the `@compiled/babel-plugin` and
+`@compiled/babel-plugin-strip-runtime` Rust SWC ports
 (`plugins/PLAN.md` §2). Asserts:
 
 ```

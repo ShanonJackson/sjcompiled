@@ -5,9 +5,9 @@ describe('styled object call expression', () => {
   const transform = (code: string, opts: TransformOptions = {}) =>
     transformCode(code, { snippet: true, ...opts });
 
-  it('only transforms @sjcompiled/react usages', () => {
+  it('only transforms @compiled/react usages', () => {
     const actual = transform(`
-      import { styled as styled2 } from '@sjcompiled/react';
+      import { styled as styled2 } from '@compiled/react';
       import styled from 'styled-components';
 
       const StyledComponent = styled.div({
@@ -48,7 +48,7 @@ describe('styled object call expression', () => {
 
   it('should respect the definition of pseudo element content ala emotion with double quotes', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         ':after': {
@@ -62,7 +62,7 @@ describe('styled object call expression', () => {
 
   it('should respect the definition of pseudo element content ala emotion with single quotes', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         ':after': {
@@ -76,7 +76,7 @@ describe('styled object call expression', () => {
 
   it('should respect the definition of pseudo element content ala styled components with no content', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         ':after': {
@@ -90,7 +90,7 @@ describe('styled object call expression', () => {
 
   it('should respect the definition of pseudo element content ala styled components with content', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         ':after': {
@@ -104,7 +104,7 @@ describe('styled object call expression', () => {
 
   it('should append "px" on numeric literals if missing', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         fontSize: 12,
@@ -116,7 +116,7 @@ describe('styled object call expression', () => {
 
   it('should reference property access expression', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       let color = { blue: 'red' };
       color = {};
@@ -134,7 +134,7 @@ describe('styled object call expression', () => {
 
   it('should not pass down invalid html attributes to the node when property has a suffix', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       const ListItem = styled.div({
         fontSize: props => \`\${props.textSize}px\`,
       });
@@ -149,7 +149,7 @@ describe('styled object call expression', () => {
 
   it('should not pass down invalid html attributes to the node when property has a suffix when func in template literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       const ListItem = styled.div({
         fontSize: \`\${props => props.textSize}px\`,
       });
@@ -164,7 +164,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with simple values', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         color: 'blue',
@@ -177,7 +177,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with nested object into a selector', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         ':hover': {
@@ -192,7 +192,7 @@ describe('styled object call expression', () => {
 
   it('should resolve identifier pointing to a call expression if it returns simple value', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const em = (str) => str;
       const color = em('blue');
@@ -207,7 +207,7 @@ describe('styled object call expression', () => {
 
   it('should inline call if it returns simple value', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const em = (str) => str;
 
@@ -221,7 +221,7 @@ describe('styled object call expression', () => {
 
   it('should inline constant string literal', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'blue';
 
@@ -235,7 +235,7 @@ describe('styled object call expression', () => {
 
   it('should transform template object with prop reference', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const ListItem = styled.div({
         color: props => props.color,
@@ -247,7 +247,7 @@ describe('styled object call expression', () => {
 
   it('should transform object spread from variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const h100 = { fontSize: '12px' };
 
@@ -262,7 +262,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with mutable identifier', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       let color = 'blue';
       color = 'red';
@@ -277,7 +277,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with obj variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const hover = { color: 'red' };
 
@@ -292,7 +292,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with no argument arrow function variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const mixin = () => ({ color: 'red' });
 
@@ -306,7 +306,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with no argument function variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       function mixin() {
         return { color: 'red' };
@@ -322,7 +322,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with no argument functions', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const bgColor = 'blue';
       const fontStyling = {
@@ -353,7 +353,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with no argument function properties belonging to a variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const bgColor = 'blue';
       const fontSize = 12;
@@ -385,7 +385,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with argument arrow function variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color1 = 'black';
       const mixin = ({ color1, color2: c }, color3, radius) => ({
@@ -413,7 +413,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with unresolved argument arrow function variable', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const radius = 10;
       const mixin = (color1, radius, size, weight) => ({
@@ -441,7 +441,7 @@ describe('styled object call expression', () => {
 
   it('should transform object with argument arrow function variable inside member expression', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const mixin = {
         value: (color1, r, color2) => ({
@@ -467,7 +467,7 @@ describe('styled object call expression', () => {
 
   it('should transform function returning an object', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const mixin = () => ({ color });
@@ -482,7 +482,7 @@ describe('styled object call expression', () => {
 
   it('should transform member expression referencing a function which returns an object', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const mixin = () => ({ color });
@@ -499,7 +499,7 @@ describe('styled object call expression', () => {
 
   it('should handle destructuring in interpolation functions', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       import colors from 'colors';
 
       export const BadgeSkeleton = styled.span({
@@ -515,7 +515,7 @@ describe('styled object call expression', () => {
 
   it('should handle member expression pointing to a CSS call expression', () => {
     const actual = transform(`
-      import { styled, css } from '@sjcompiled/react';
+      import { styled, css } from '@compiled/react';
 
       const styles = {
         default: css({
@@ -552,7 +552,7 @@ describe('styled object call expression', () => {
     //     })
 
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
 
@@ -571,7 +571,7 @@ describe('styled object call expression', () => {
     //     })
 
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
 
@@ -598,7 +598,7 @@ describe('styled object call expression', () => {
 
     const actual = transform(
       `
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       const color = 'red';
       const color2 = 'blue';
@@ -650,7 +650,7 @@ describe('styled object call expression', () => {
 
   it('should refuse to expand shorthand property when value is unknown at build time (arrow function)', () => {
     const actual = transform(`
-    import { styled } from '@sjcompiled/react';
+    import { styled } from '@compiled/react';
 
     const Container = styled.div({
       padding: ({ customPadding }) => customPadding,
@@ -687,7 +687,7 @@ describe('styled object call expression', () => {
 
   it('should refuse to expand shorthand property when value is unknown at build time (ternary expression)', () => {
     const actual = transform(`
-    import { styled } from '@sjcompiled/react';
+    import { styled } from '@compiled/react';
 
     const Container = styled.div({
       padding: ({ morePadding }) => morePadding ? morePadding : '4px 8px',

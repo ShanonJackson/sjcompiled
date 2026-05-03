@@ -102,7 +102,7 @@ must run on the same prettier version, otherwise the oracle drifts.
 |---|---|---|
 | `prettier` | **2.8.8** | Resolved from `REFERENCE_LOCK_FILE/yarn.lock`. Parser: `babel-ts`. Pinned in root `package.json` `overrides` so bun's caret resolution cannot drift past it. |
 
-### Direct dependencies of `@sjcompiled/css`
+### Direct dependencies of `@compiled/css`
 
 | npm package | Range in `packages/css/package.json` | Resolved version | Rust crate | Used in |
 |---|---|---|---|---|

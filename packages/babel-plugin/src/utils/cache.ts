@@ -1,4 +1,4 @@
-import { hash } from '@sjcompiled/utils';
+import { hash } from '@compiled/utils';
 
 import type { PluginOptions } from '../types';
 

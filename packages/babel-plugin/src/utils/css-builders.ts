@@ -1,8 +1,8 @@
 import generate from '@babel/generator';
 import type { NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
-import { addUnitIfNeeded, cssAffixInterpolation } from '@sjcompiled/css';
-import { hash, kebabCase } from '@sjcompiled/utils';
+import { addUnitIfNeeded, cssAffixInterpolation } from '@compiled/css';
+import { hash, kebabCase } from '@compiled/utils';
 
 import { visitCssMapPath } from '../css-map';
 import type { Metadata } from '../types';
@@ -448,7 +448,7 @@ const extractLogicalExpression = (node: t.ArrowFunctionExpression, meta: Metadat
 };
 
 /*
- * Extracts the keyframes CSS from the `@sjcompiled/react` keyframes usage.
+ * Extracts the keyframes CSS from the `@compiled/react` keyframes usage.
  *
  * @param expression {t.CallExpression | t.TaggedTemplateExpression} The keyframes declaration
  * @param meta {Metadata} Useful metadata that can be used during the transformation

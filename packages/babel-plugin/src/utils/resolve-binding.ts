@@ -5,7 +5,7 @@ import { parse } from '@babel/parser';
 import type { NodePath, Binding } from '@babel/traverse';
 import traverse from '@babel/traverse';
 import * as t from '@babel/types';
-import { DEFAULT_PARSER_BABEL_PLUGINS } from '@sjcompiled/utils';
+import { DEFAULT_PARSER_BABEL_PLUGINS } from '@compiled/utils';
 import resolve from 'resolve';
 
 import { DEFAULT_CODE_EXTENSIONS } from '../constants';
@@ -291,7 +291,7 @@ export const resolveBinding = (
     // It will therefore try to parse and resolve both.
     // This workaround short circuits when we call `resolveBinding` on a Compiled module.
     // Documented in Issue ##1010: https://github.com/atlassian-labs/compiled/issues/1010
-    if (moduleImportSource.startsWith('@sjcompiled/')) {
+    if (moduleImportSource.startsWith('@compiled/')) {
       // Ignore @compiled modules.
       return;
     }

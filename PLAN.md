@@ -163,7 +163,7 @@ pub fn transform_css(css: String, opts: TransformOpts) -> TransformResult { ... 
 
 Update packages/css/src/transform.ts:
 
-import { transformCss as transformCssRust } from '@sjcompiled/css-native';
+import { transformCss as transformCssRust } from '@compiled/css-native';
 
 export const transformCss = (css, opts) => {
 if (process.env.COMPILED_CSS_ENGINE === 'rust') {
@@ -213,7 +213,7 @@ Risk register
 ├────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ postcss raws drift                                 │ Round-trip identity test on full corpus before any plugin work.                                          │
 ├────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ Hash function in atomicify-rules not bit-identical │ Read @sjcompiled/utils hash impl, port with byte-level test vectors.                                     │
+│ Hash function in atomicify-rules not bit-identical │ Read @compiled/utils hash impl, port with byte-level test vectors.                                     │
 ├────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ Stable-sort tie-breaks                             │ Audit each sort call; explicit tie-break comparators.                                                    │
 ├────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────┤

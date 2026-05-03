@@ -91,7 +91,7 @@
 use std::cmp::Ordering;
 
 use postcss_core::{Node, NodeKind};
-use sjcompiled_utils::shorthand_buckets;
+use compiled_utils::shorthand_buckets;
 
 /// Find the "first declaration" used as the sort key for `node`.
 fn find_decl(node: &Node) -> Option<&postcss_core::Declaration> {

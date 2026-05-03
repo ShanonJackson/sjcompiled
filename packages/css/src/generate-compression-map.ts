@@ -6,7 +6,7 @@ import { ClassNameGenerator } from './utils/class-name-generator';
 const UNDERSCORE_UNICODE = 95;
 
 /**
- * Generate a compression map, which is used by @sjcompiled/babel-plugin to compress class names.
+ * Generate a compression map, which is used by @compiled/babel-plugin to compress class names.
  * The compression map looks like { 'aaaabbbb': 'a', 'bbbbcccc': 'b' }
  *
  * @param stylesheet css content i.e. `.aaaabbbb{font-size: 10px}`

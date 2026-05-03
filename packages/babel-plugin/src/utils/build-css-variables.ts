@@ -1,5 +1,5 @@
 import * as t from '@babel/types';
-import { unique } from '@sjcompiled/utils';
+import { unique } from '@compiled/utils';
 
 import type { Variable } from './types';
 

@@ -8,8 +8,8 @@
  */
 import { transformSync as babelTransformSync } from '@babel/core';
 import { transformSync as swcTransformSync } from '@swc/core';
-import { DEFAULT_PARSER_BABEL_PLUGINS } from '@sjcompiled/utils';
-import compiledBabelPlugin from '@sjcompiled/babel-plugin';
+import { DEFAULT_PARSER_BABEL_PLUGINS } from '@compiled/utils';
+import compiledBabelPlugin from '@compiled/babel-plugin';
 import { format } from 'prettier';
 import { resolve } from 'node:path';
 

@@ -13,7 +13,7 @@ members = [
     "browserslist-shim",
     "compiled-css",
     "css",
-    "sjcompiled-utils",
+    "compiled-utils",
     "parity-runner",
 
     # Phase 5 — direct pipeline plugins (transformCss + sort entry points).
@@ -88,7 +88,7 @@ caniuse-api = { path = "caniuse-api" }
 browserslist-shim = { path = "browserslist-shim" }
 compiled-css = { path = "compiled-css" }
 css = { path = "css" }
-sjcompiled-utils = { path = "sjcompiled-utils" }
+compiled-utils = { path = "compiled-utils" }
 parity-runner = { path = "parity-runner" }
 
 postcss-nested = { path = "postcss-nested" }

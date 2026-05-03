@@ -29,6 +29,8 @@ The reason these are immutable is that EACH package was taken from the EXACT com
 @compiled/css 0.19.0 40a4548 (used by BOTH above, nested)
 @compiled/utils 0.13.2 130ed3b (hoisted, shared)
 
+One-time exception (2026-05-04): a historic fork-prefix rename was reverted to `@compiled/` across packages/* and crates/* atomically so emitted strings (runtime imports, file-header banners, error messages) match upstream. This was authorised explicitly to align with the AFM monorepo prefix. The IMMUTABLE rule still applies — no further edits to packages/* without explicit authorisation.
+
 # WASI/WASM Compilation
 - Please don't add like 10MB Rust library or anything like that. We will eventually 'build' the whole thing to WASM/WASI and we don't want a like 50MB binary.
 - PLEASE KEEP IN MIND SWC Tears down the WASI instance between CALLS. ANY Cross-transform caching will be destroyed; If you feel like you need cross-transform caching COMMUNICATE with me.

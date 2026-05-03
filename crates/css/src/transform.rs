@@ -149,7 +149,7 @@ use autoprefixer::autoprefixer::build_prefixes_default;
 use autoprefixer::precomputed::build_prefixes_from_precomputed;
 use autoprefixer::processor::Processor as AutoprefixerProcessor;
 
-use sjcompiled_utils::unique;
+use compiled_utils::unique;
 
 /// `BASE_PLUGINS` from `packages/css/src/plugins/normalize-css.ts:44-50`.
 /// Always run regardless of `optimizeCss`.

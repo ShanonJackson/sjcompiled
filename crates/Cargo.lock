@@ -98,6 +98,7 @@ dependencies = [
  "browserslist-shim",
  "caniuse-api",
  "caniuse-db",
+ "compiled-utils",
  "fraction-js",
  "indexmap",
  "once_cell",
@@ -107,17 +108,16 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "sjcompiled-utils",
 ]
 
 [[package]]
 name = "babel-plugin"
 version = "0.0.1"
 dependencies = [
+ "compiled-utils",
  "indexmap",
  "serde",
  "serde_json",
- "sjcompiled-utils",
  "swc_core",
 ]
 
@@ -407,6 +407,7 @@ name = "compiled-css"
 version = "0.0.1"
 dependencies = [
  "colord",
+ "compiled-utils",
  "cssnano-preset-default",
  "indexmap",
  "once_cell",
@@ -415,7 +416,6 @@ dependencies = [
  "postcss-value-parser",
  "postcss-values-parser",
  "regex",
- "sjcompiled-utils",
 ]
 
 [[package]]
@@ -430,6 +430,15 @@ dependencies = [
  "napi-derive",
  "postcss-core",
  "serde_json",
+]
+
+[[package]]
+name = "compiled-utils"
+version = "0.0.1"
+dependencies = [
+ "indexmap",
+ "once_cell",
+ "regex",
 ]
 
 [[package]]
@@ -481,6 +490,7 @@ version = "0.0.1"
 dependencies = [
  "autoprefixer",
  "compiled-css",
+ "compiled-utils",
  "cssnano-preset-default",
  "indexmap",
  "postcss-core",
@@ -491,7 +501,6 @@ dependencies = [
  "postcss-value-parser",
  "postcss-values-parser",
  "serde",
- "sjcompiled-utils",
 ]
 
 [[package]]
@@ -2026,15 +2035,6 @@ name = "siphasher"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
-
-[[package]]
-name = "sjcompiled-utils"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "once_cell",
- "regex",
-]
 
 [[package]]
 name = "slab"

@@ -4,7 +4,7 @@ describe('ClassNames used with a css call expression', () => {
   describe('transforms an object expression that contains', () => {
     it('inlined values', () => {
       const actual = transform(`
-        import { ClassNames } from '@sjcompiled/react';
+        import { ClassNames } from '@compiled/react';
 
         const ListItem = () => (
           <ClassNames>
@@ -25,7 +25,7 @@ describe('ClassNames used with a css call expression', () => {
 
     it('an inlined psuedo-class object expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@sjcompiled/react';
+        import { ClassNames } from '@compiled/react';
 
         const ListItem = () => (
           <ClassNames>
@@ -46,7 +46,7 @@ describe('ClassNames used with a css call expression', () => {
 
     it('a declared psuedo-class object expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@sjcompiled/react';
+        import { ClassNames } from '@compiled/react';
 
         const hover = { color: 'red' };
 
@@ -66,7 +66,7 @@ describe('ClassNames used with a css call expression', () => {
 
     it('a declared string literal', () => {
       const actual = transform(`
-        import { ClassNames } from '@sjcompiled/react';
+        import { ClassNames } from '@compiled/react';
 
         const color = 'red';
 
@@ -86,7 +86,7 @@ describe('ClassNames used with a css call expression', () => {
 
     it('a spread element that references an object expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@sjcompiled/react';
+        import { ClassNames } from '@compiled/react';
 
         const mixin = { color: 'red' };
 
@@ -106,7 +106,7 @@ describe('ClassNames used with a css call expression', () => {
 
     it('a dynamic property value using inline styles', () => {
       const code = `
-        import { ClassNames } from '@sjcompiled/react';
+        import { ClassNames } from '@compiled/react';
         import { useState } from 'react';
 
         const [fontSize] = useState('10px');
@@ -132,7 +132,7 @@ describe('ClassNames used with a css call expression', () => {
 
     it('a dynamic property value and suffix using inline styles', () => {
       const code = `
-        import { ClassNames } from '@sjcompiled/react';
+        import { ClassNames } from '@compiled/react';
         import { useState } from 'react';
 
         const fontSize = useState(20);
@@ -158,7 +158,7 @@ describe('ClassNames used with a css call expression', () => {
 
     it('a spread element call expression referencing an arrow function that returns an object expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@sjcompiled/react';
+        import { ClassNames } from '@compiled/react';
 
         const color1 = 'black';
         const mixin = ({ color1, color2: c }, color3, radius) => ({
@@ -194,7 +194,7 @@ describe('ClassNames used with a css call expression', () => {
 
     it('a member call expression referencing an arrow function that returns an object expression', () => {
       const actual = transform(`
-        import { ClassNames } from '@sjcompiled/react';
+        import { ClassNames } from '@compiled/react';
 
         const mixin = {
           value: (color1, r, color2) => ({
@@ -227,7 +227,7 @@ describe('ClassNames used with a css call expression', () => {
 
     it('a call expression with unresolved arguments', () => {
       const actual = transform(`
-        import { ClassNames } from '@sjcompiled/react';
+        import { ClassNames } from '@compiled/react';
 
         const radius = 10;
         const mixin = (color1, radius, size, weight) => ({

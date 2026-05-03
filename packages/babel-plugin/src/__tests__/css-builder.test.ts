@@ -3,7 +3,7 @@ import { transform } from '../test-utils';
 describe('css builder', () => {
   it('should convert css properties to kebab-case with css prop', () => {
     const actual = transform(`
-      import '@sjcompiled/react';
+      import '@compiled/react';
       <div css={{ backgroundColor: 'red' }} />
     `);
 
@@ -12,7 +12,7 @@ describe('css builder', () => {
 
   it('should convert css properties to kebab-case with styled function', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       const MyDiv = styled.div({
         backgroundColor: 'red'
       });
@@ -24,7 +24,7 @@ describe('css builder', () => {
 
   it('should convert css properties to kebab-case with css func and css map', () => {
     const actual = transform(`
-    import { css, cssMap } from '@sjcompiled/react';
+    import { css, cssMap } from '@compiled/react';
       const styles = cssMap({
         danger: {
           backgroundColor: 'red'
@@ -44,7 +44,7 @@ describe('css builder', () => {
 
   it('should preserve custom property name casing with css prop', () => {
     const actual = transform(`
-      import '@sjcompiled/react';
+      import '@compiled/react';
       <div css={{
         '--panelColor': 'red',
         '--panel-height': '600px',
@@ -61,7 +61,7 @@ describe('css builder', () => {
 
   it('should preserve custom property name casing with styled function', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
       const MyDiv = styled.div({
         '--panelColor': 'red',
         '--panel-height': '600px',
@@ -79,7 +79,7 @@ describe('css builder', () => {
 
   it('should preserve custom property name casing with css func and css map', () => {
     const actual = transform(`
-    import { css, cssMap } from '@sjcompiled/react';
+    import { css, cssMap } from '@compiled/react';
       const styles = cssMap({
         background: {
           '--panelColor': 'red',
@@ -104,7 +104,7 @@ describe('css builder', () => {
 
   it('should keep nested unconditional css together', () => {
     const actual = transform(`
-      import '@sjcompiled/react';
+      import '@compiled/react';
 
       <div css={{ '@media screen': { color: 'red', fontSize: 20 } }} />
     `);
@@ -114,7 +114,7 @@ describe('css builder', () => {
 
   it('generates the correct style prop for shadowed runtime identifiers', () => {
     const actual = transform(`
-      import '@sjcompiled/react';
+      import '@compiled/react';
 
       const getBackgroundColor = (color) => color;
       const color = baseColor;
@@ -130,7 +130,7 @@ describe('css builder', () => {
 
     expect(actual).toMatchInlineSnapshot(`
       "import * as React from "react";
-      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
+      import { ax, ix, CC, CS } from "@compiled/react/runtime";
       const _2 = "._syaz1aj3{color:var(--_1ylxx6h)}";
       const _ = "._bfhk8ruw{background-color:var(--_agotg1)}";
       const getBackgroundColor = (color) => color;

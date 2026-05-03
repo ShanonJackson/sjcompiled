@@ -248,7 +248,7 @@ All in `crates/compiled-css`. Sub-bands run parallel-friendly **within Phase 4**
 **Effort:** 2 weeks total. **Risk:** medium (sort tie-breaks are subtle).
 
 ### 4d. `atomicify-rules` — **CRITICAL** (single stream)
-- Reads the hash function from `@sjcompiled/utils` (path: `packages/utils/src/`).
+- Reads the hash function from `@compiled/utils` (path: `packages/utils/src/`).
 - Whatever hash that is — likely a small custom hash like `hash` or murmur — its Rust port must produce **bit-identical hashes** for identical byte inputs. This is the function whose output becomes class names.
 - The class-name compression map (`opts.classNameCompressionMap`) iteration order matters; preserve insertion order (`IndexMap`).
 
@@ -383,7 +383,7 @@ Solo phase. Single largest port.
 ### 8b. Wire `packages/css/src/transform.ts` and `sort.ts`
 
 - Add a feature flag `COMPILED_CSS_ENGINE` (`js` | `rust`, default `js`).
-- When `rust`, call into `@sjcompiled/css-native`. When `js`, run the existing pipeline unchanged.
+- When `rust`, call into `@compiled/css-native`. When `js`, run the existing pipeline unchanged.
 - **Do not delete the JS pipeline.** It stays as the parity oracle and emergency fallback.
 
 **Exit gate:** Phase 0 harness runs both engines under the flag and gets zero bytes diff across the **full corpus**. Both `transformCss` and `sort` are byte-clean end-to-end for the first time.

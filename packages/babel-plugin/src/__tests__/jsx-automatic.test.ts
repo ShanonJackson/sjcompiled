@@ -16,7 +16,7 @@ describe('jsx automatic', () => {
     );
 
     expect(actual).toMatchInlineSnapshot(`
-      "import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
+      "import { ax, ix, CC, CS } from "@compiled/react/runtime";
       import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
       const _ = "._syaz13q2{color:blue}";
       const styles = {
@@ -38,13 +38,13 @@ describe('jsx automatic', () => {
 
   it('should work with css prop', () => {
     const actual = transform(`
-      import '@sjcompiled/react';
+      import '@compiled/react';
 
       <div css={{ color: 'blue' }} />
     `);
 
     expect(actual).toMatchInlineSnapshot(`
-      "import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
+      "import { ax, ix, CC, CS } from "@compiled/react/runtime";
       import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
       const _ = "._syaz13q2{color:blue}";
       _jsxs(CC, {
@@ -63,7 +63,7 @@ describe('jsx automatic', () => {
 
   it('should work with class names', () => {
     const actual = transform(`
-      import { ClassNames } from '@sjcompiled/react';
+      import { ClassNames } from '@compiled/react';
 
       <ClassNames>
         {props => <div className={props.css({ color: 'blue' })} />}
@@ -71,7 +71,7 @@ describe('jsx automatic', () => {
     `);
 
     expect(actual).toMatchInlineSnapshot(`
-      "import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
+      "import { ax, ix, CC, CS } from "@compiled/react/runtime";
       import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
       const _ = "._syaz13q2{color:blue}";
       _jsxs(CC, {
@@ -90,7 +90,7 @@ describe('jsx automatic', () => {
 
   it('should work with styled', () => {
     const actual = transform(`
-      import { styled } from '@sjcompiled/react';
+      import { styled } from '@compiled/react';
 
       styled.div\`
         color: blue;
@@ -99,7 +99,7 @@ describe('jsx automatic', () => {
 
     expect(actual).toMatchInlineSnapshot(`
       "import { forwardRef } from "react";
-      import { ax, ix, CC, CS } from "@sjcompiled/react/runtime";
+      import { ax, ix, CC, CS } from "@compiled/react/runtime";
       import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
       const _ = "._syaz13q2{color:blue}";
       forwardRef(({ as: C = "div", style: __cmpls, ...__cmplp }, __cmplr) => {

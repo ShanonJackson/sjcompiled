@@ -78,8 +78,8 @@ mod tests {
     #[test]
     fn jsx_source_matches_import_source_pragma() {
         let re = jsx_source_annotation_regex();
-        let cap = re.captures("* @jsxImportSource @sjcompiled/react ").unwrap();
-        assert_eq!(&cap[1], "@sjcompiled/react");
+        let cap = re.captures("* @jsxImportSource @compiled/react ").unwrap();
+        assert_eq!(&cap[1], "@compiled/react");
     }
 
     #[test]

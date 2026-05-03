@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
-description = "Rust port of @sjcompiled/css orchestrators (transformCss + sort) — packages/css/src/{transform,sort}.ts"
+description = "Rust port of @compiled/css orchestrators (transformCss + sort) — packages/css/src/{transform,sort}.ts"
 
 [dependencies]
 postcss-core = { workspace = true }
@@ -21,7 +21,7 @@ postcss-nested = { workspace = true }
 postcss-normalize-whitespace = { workspace = true }
 autoprefixer = { workspace = true }
 cssnano-preset-default = { workspace = true }
-sjcompiled-utils = { workspace = true }
+compiled-utils = { workspace = true }
 compiled-css = { workspace = true }
 indexmap = { workspace = true }
 serde = { workspace = true }

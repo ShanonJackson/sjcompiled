@@ -227,7 +227,7 @@ Per `EXECUTION_PLAN.md` Phase 8b:
 2. In `crates/css/src/transform.rs`, find where autoprefixer is called
    in the JS pipeline. Wrap with the `COMPILED_CSS_ENGINE` flag check:
    - `js` (default) → existing JS pipeline unchanged.
-   - `rust` → call into `@sjcompiled/css-native`'s `autoprefixer`.
+   - `rust` → call into `@compiled/css-native`'s `autoprefixer`.
 3. **Do not delete the JS pipeline.** It stays as the parity oracle and
    emergency fallback per cross-cutting policy #10.
 4. Build platform binaries — workspace already does this for `sort()`,

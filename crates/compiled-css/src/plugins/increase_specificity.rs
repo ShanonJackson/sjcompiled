@@ -2,7 +2,7 @@
 //!
 //! Upstream JS:
 //! ```ts
-//! import { INCREASE_SPECIFICITY_SELECTOR } from '@sjcompiled/utils';
+//! import { INCREASE_SPECIFICITY_SELECTOR } from '@compiled/utils';
 //! import { default as selectorParser, pseudo } from 'postcss-selector-parser';
 //!
 //! const parser = selectorParser((root) => {
@@ -49,7 +49,7 @@
 use postcss_core::container::walk_rules_mut;
 use postcss_core::{Mutation, NodeKind, PluginResult, Root};
 use postcss_selector_parser as ssp;
-use sjcompiled_utils::INCREASE_SPECIFICITY_SELECTOR;
+use compiled_utils::INCREASE_SPECIFICITY_SELECTOR;
 
 pub fn increase_specificity(root: &mut Root) -> PluginResult {
     walk_rules_mut(&mut root.root, &mut |node, _ctx| {

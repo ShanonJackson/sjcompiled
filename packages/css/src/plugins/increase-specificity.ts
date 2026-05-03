@@ -1,4 +1,4 @@
-import { INCREASE_SPECIFICITY_SELECTOR } from '@sjcompiled/utils';
+import { INCREASE_SPECIFICITY_SELECTOR } from '@compiled/utils';
 import type { Plugin } from 'postcss';
 import { default as selectorParser, pseudo } from 'postcss-selector-parser';
 

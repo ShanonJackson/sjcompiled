@@ -462,7 +462,7 @@ creation time, NOT at OnceExit time — i.e. it fires before postcss
 even starts processing.
 
 **DRIFT RISK / hash entry point:** `atomicClassName` (lines 38-47)
-calls `hash()` from `@sjcompiled/utils` (see CLAUDE.md "Never" list —
+calls `hash()` from `@compiled/utils` (see CLAUDE.md "Never" list —
 that package is immutable). The Rust port must wire to a byte-identical
 hash impl for class-name byte parity. `crates/compiled-css` should
 already cover this — re-verify before Phase 8b ships.
@@ -506,7 +506,7 @@ already cover this — re-verify before Phase 8b ships.
 | Per-node visitors | none | — |
 | `OnceExit(root)` | **YES** (lines 27-38) | `root.walkRules((rule) => { rule.selectors = rule.selectors.map(selector => …) })`. For each selector: if it contains the substring `'._'` (i.e. a Compiled-generated atomic class), runs `parser.astSync(selector).toString()`. The shared `parser` (lines 5-11) walks classes and inserts a `:not(#\#)` pseudo via `parent.insertAfter(node, pseudo({ value: INCREASE_SPECIFICITY_SELECTOR }))`. |
 
-`INCREASE_SPECIFICITY_SELECTOR` lives in `@sjcompiled/utils` (immutable
+`INCREASE_SPECIFICITY_SELECTOR` lives in `@compiled/utils` (immutable
 package) — Rust must use the same constant string.
 
 ### Mutation profile
@@ -1081,7 +1081,7 @@ already — re-use that filter logic; do NOT re-derive it.
    it).
 
 9. **Hash impl.** `atomicifyRules` calls `hash()` from
-   `@sjcompiled/utils`. That package is immutable per CLAUDE.md.
+   `@compiled/utils`. That package is immutable per CLAUDE.md.
    Phase 8b assumes `crates/utils` (or wherever the hash is ported)
    already byte-matches. Re-verify.
 

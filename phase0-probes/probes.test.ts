@@ -26,7 +26,7 @@ const PROBE_WASM = join(
   REPO_ROOT,
   'crates/target/wasm32-wasip1/release/babel_plugin_phase0_probes.wasm'
 );
-const PROBE_SCRATCH_ROOT = join(REPO_ROOT, 'node_modules/.cache/sjcompiled-swc-probes');
+const PROBE_SCRATCH_ROOT = join(REPO_ROOT, 'node_modules/.cache/compiled-swc-probes');
 
 // PHASE 0 FINDING: the WASI sandbox virtualizes the host cwd to `/`.
 // Host-side absolute paths (`C:/Users/...` on Windows, `/Users/...` on macOS)
