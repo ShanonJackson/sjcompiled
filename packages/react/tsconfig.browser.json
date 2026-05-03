@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.options.json",
+  "compilerOptions": {
+    "outDir": "dist/browser",
+    "module": "es6",
+    "moduleResolution": "node",
+    "plugins": [
+      {
+        "transform": "ts-transform-define",
+        "replace": {
+          "isServerEnvironment()": "false"
+        }
+      }
+    ],
+    "tsBuildInfoFile": "tsconfig.browser.tsbuildinfo"
+  },
+  "references": [{ "path": "../benchmark" }, { "path": "../jest" }, { "path": "../utils" }]
+}

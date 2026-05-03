@@ -607,7 +607,7 @@ const DefaultBubbleContainer = styled.div<{
 	display: 'flex',
 	alignItems: 'center',
 	justifyContent: 'center',
-	font: token('font.body.UNSAFE_small'),
+	font: token('font.body.small'),
 	// eslint-disable-next-line @atlaskit/ui-styling-standard/no-dynamic-styles -- Ignored via go/DSP-18766
 	opacity: ({ isDragging }) => (isDragging ? '0' : '1'),
 	transition: '0.5s',

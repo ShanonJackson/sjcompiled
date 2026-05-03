@@ -16,6 +16,7 @@
     "@babel/core": "^7.26.10",
     "@babel/plugin-syntax-jsx": "^7.25.9",
     "@babel/preset-react": "^7.28.5",
+    "@compiled/react": "workspace:*",
     "@sjcompiled/babel-plugin": "workspace:*",
     "@sjcompiled/babel-plugin-strip-runtime": "workspace:*",
     "@sjcompiled/css": "workspace:*",
@@ -71,6 +72,8 @@
     "cssnano-preset-default": {
       ".": "5.2.14",
       "postcss-discard-duplicates": "5.1.0"
-    }
+    },
+    "@compiled/benchmark": "npm:csstype@3.1.3",
+    "@fixture/strict-api-test": "npm:csstype@3.1.3"
   }
 }

@@ -4,7 +4,7 @@ import { token } from '@atlaskit/tokens';
 const styles = css({
   backgroundColor: 'color.background.discovery',
   borderRadius: token('radius.large'),
-  font: token('font.body.UNSAFE_small'),
+  font: token('font.body.small'),
   color: token('color.text.discovery'),
 });
 
