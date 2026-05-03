@@ -148,33 +148,71 @@ export function swcEngine(source: string, opts: StripRuntimeOpts, preBaked?: str
     return format(input, { parser: 'babel', singleQuote: true });
   }
 
-  const result = swcTransformSync(input, {
-    filename: FILENAME,
-    jsc: {
-      target: 'es2022',
-      parser: { syntax: 'typescript', tsx: true },
-      // `verbatimModuleSyntax: true` makes SWC treat every import as
-      // load-bearing — without it SWC elides unused named specifiers
-      // (e.g. `ix` from `@compiled/react/runtime`), which Babel keeps,
-      // and the byte-parity oracle fails before our plugin even gets
-      // to run. Source: SWC TsConfig in @swc/types, mirroring
-      // tsconfig#verbatimModuleSyntax.
-      transform: { verbatimModuleSyntax: true },
-      preserveAllComments: true,
-      experimental: {
-        plugins: [
-          [
-            STRIP_RUNTIME_WASM,
-            {
-              styleSheetPath: opts.styleSheetPath ?? undefined,
-              compiledRequireExclude: opts.compiledRequireExclude ?? false,
-              extractStylesToDirectory: opts.extractStylesToDirectory ?? undefined,
-            },
+  // Phase 1 §1.5 — host responsibilities:
+  //   1. `extractStylesToDirectory` writes `<cwd>/<dest>/<rel>/x.compiled.css`.
+  //      The plugin's WASI preopen IS process.cwd(), so we chdir into a
+  //      scratch dir before the SWC call to scope writes there.
+  //   2. `compiledRequireExclude=true` writes `<callScratch>/style-rules.json`.
+  //      We mkdir the scratch dir under repo cwd; the plugin sees it
+  //      via the `/cwd/<rel>` mount.
+  const fs = require('node:fs') as typeof import('node:fs');
+  const path = require('node:path') as typeof import('node:path');
+
+  let callScratch: string | undefined;
+  if (opts.compiledRequireExclude) {
+    callScratch = path.join(
+      ensureScratchDir(),
+      `call-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    );
+    fs.mkdirSync(callScratch, { recursive: true });
+  }
+
+  const previousCwd = opts.extractStylesToDirectory ? process.cwd() : null;
+  if (previousCwd) {
+    process.chdir(ensureScratchDir());
+  }
+
+  let result;
+  try {
+    result = swcTransformSync(input, {
+      filename: FILENAME,
+      jsc: {
+        target: 'es2022',
+        parser: { syntax: 'typescript', tsx: true },
+        // `verbatimModuleSyntax: true` makes SWC treat every import as
+        // load-bearing — without it SWC elides unused named specifiers
+        // (e.g. `ix` from `@compiled/react/runtime`), which Babel keeps,
+        // and the byte-parity oracle fails before our plugin even gets
+        // to run. Source: SWC TsConfig in @swc/types, mirroring
+        // tsconfig#verbatimModuleSyntax.
+        transform: { verbatimModuleSyntax: true },
+        preserveAllComments: true,
+        experimental: {
+          plugins: [
+            [
+              STRIP_RUNTIME_WASM,
+              {
+                styleSheetPath: opts.styleSheetPath ?? undefined,
+                compiledRequireExclude: opts.compiledRequireExclude ?? false,
+                extractStylesToDirectory: opts.extractStylesToDirectory ?? undefined,
+                // §1.5 host-threaded options. The SWC plugin has no
+                // equivalent of Babel's `file.opts.generatorOpts.sourceFileName`,
+                // so we pass it explicitly. `callScratch` is the
+                // per-call sidecar dir from PLAN.md §3.9.6 — we
+                // translate it to /cwd/<rel> form below.
+                sourceFileName: SOURCE_FILE_NAME,
+                callScratch: callScratch ? toWasiPath(callScratch) : undefined,
+              },
+            ],
           ],
-        ],
+        },
       },
-    },
-  });
+    });
+  } finally {
+    if (previousCwd) {
+      process.chdir(previousCwd);
+    }
+  }
 
   if (!result?.code) throw new Error('swcEngine: empty result');
 

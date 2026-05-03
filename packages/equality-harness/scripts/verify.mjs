@@ -50,7 +50,11 @@ function babelOptionsFor(entry) {
     plugins: [
       // Order matters: tokens FIRST, sjcompiled SECOND.
       require.resolve('@atlaskit/tokens/babel-plugin'),
-      require.resolve('@sjcompiled/babel-plugin'),
+      // `importSources` extends the babel-plugin's default
+      // `[@sjcompiled/react, @atlaskit/css]` so fixtures that import
+      // from `@compiled/react` (the upstream / AFM-pre-rename name) are
+      // also recognised as Compiled API call sites.
+      [require.resolve('@sjcompiled/babel-plugin'), { importSources: ['@compiled/react'] }],
     ],
   };
 }

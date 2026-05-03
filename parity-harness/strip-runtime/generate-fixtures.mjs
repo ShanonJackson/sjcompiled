@@ -44,12 +44,9 @@ function _rawWriteFixture(filename, fixture) {
 // phase that fixes it. "Just expected to fail" without a reason is
 // how regressions hide.
 const EXPECTED_TO_FAIL = {
-  // §1.5 — extractStylesToDirectory writes `<dest>/<rel>.compiled.css`
-  // and prepends `import './<file>.compiled.css'` to body.
-  'A01-extract-styles-classic-no-pragma': '§1.5 extractStylesToDirectory write',
-  'A02-extract-styles-classic-source-not-found': '§1.5 extractStylesToDirectory error',
-  'A03-extract-styles-classic-with-pragma': '§1.5 extractStylesToDirectory write',
-  'A04-extract-styles-automatic-with-pragma': '§1.5 extractStylesToDirectory write',
+  // (§1.5 graduated — A01–A04 now pass with the extractStylesToDirectory
+  //  port: filename-derived `app.compiled.css` write under `/cwd/<dest>`,
+  //  source-not-found throw, AST `import './app.compiled.css'` injection.)
   // Phase 2 — compiledBabelPlugin ports to Rust. The "Found a `jsx`
   // function call" / mixed-Compiled-Emotion errors originate there,
   // not in strip-runtime.

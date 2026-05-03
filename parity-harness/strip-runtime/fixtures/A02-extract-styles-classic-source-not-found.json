@@ -12,7 +12,5 @@
   },
   "expectsError": {
     "babelMessage": "Source directory 'not-existing-src/' was not found relative to source file ('../src/app.tsx')"
-  },
-  "expectedToFail": true,
-  "failureReason": "§1.5 extractStylesToDirectory error"
+  }
 }

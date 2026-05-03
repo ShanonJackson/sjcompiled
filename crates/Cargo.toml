@@ -123,3 +123,15 @@ swc_core = { version = "=54.0.0", features = ["ecma_plugin_transform", "ecma_ast
 babel-plugin = { path = "babel-plugin" }
 babel-plugin-strip-runtime = { path = "babel-plugin-strip-runtime" }
 postcard = { version = "1", features = ["alloc"] }
+
+# Bench-friendly release profile. The user's global RUSTFLAGS sets
+# `lto=thin` + `codegen-units=1` + `opt-level=3` which OOMs on this
+# workspace (autoprefixer + cssnano-preset-default = huge LTO graph).
+# Use this profile for `cargo run --example perf` etc. to get a
+# representative-but-bounded build.
+[profile.bench-fast]
+inherits = "release"
+opt-level = 2
+lto = "off"
+codegen-units = 16
+debug = false

@@ -1,30 +1,25 @@
 ## Goal
+We've implemented packages/css IDENTICALLY in Rust exposed via packages/css-native/index.js; Performance is a lot slower, but we're investigating that in parallel.
+Output through transformCss is CONFIRMED byte-equal via fixtures/* running babel with/without Rust and confirming byte-equality (See: packages/equality-harness/scripts/verify.mjs)
+Now that we've confirmed packages/css has been rebuilt and packages/babel-plugin works IDENTICALLY using the new one. It's time to start working towards migrating
+packages/babel-plugin and packages-babel-plugin-strip-runtime to Rust following our DEEP investigations here:  plugins/* (ALL MD FILES READ THESE).
 
-What we're doing is packages/css/src/transform.ts to Rust 1:1; What this means is that following PLAN.md and crates/PARITY_VERSIONS.md (describes which versions we need co copy) we need to replicate EVERYTHING 
-1:1 in Rust (yes rebuild postcss in Rust) by 1:1 it means that all bugs, file folder structure for the original js or ts source needs to be migrated IDENTICALLY. The reason why all bugs and identically is that at the end
-of that pipeline a hash is generated; The hashes for all INPUTS needs to remain identical. For the hash to remain identical any 'white space' or parsing/string manipuation obviously needs to be identical in the new Rust copy.
-When we're finished we will call out to Rust via NAPI synchronously in that file so that from ANY consumers perspective there is NO percievable difference in OUTPUT EVER UNDER ANY CIRCUMSTANCE.
-
-This is obviously incredibly complex work, The only way the "WHOLE" is what we want is if all the "PARTS" are 1:1; Which means we'll need to rigorously test all the parts as we go
-
-In order to do this correctly, it's probably best if we replicate their folder/file structure of what we have to port from JS -> Rust identically as well. That way it's very easy to compare old/new source and spot differences in logic (which should never occur)
+The ONLY way to do this correctly is to migrate everything 1:1 same folder/file system as ORIGINAL where all the parts are 1:1 and therefore the WHOLE is 1:1. 
+Obviously we have to make some EXTREMELY minor exceptions because babel and swc are not the same. For anything that needs to match a babel-api put that in a compat/* folder with clear comment on usage.
 
 
 # DRIFT DETECTION - 
 THIS PART IS CRITICAL!
 If you think someone hasn't ported something OUTSIDE your work CORRECTLY; Immedietly I.E "Drift detected in X - <Explanation here>" this is CRITICALLY important. otherwise if many things have slight drift the "WHOLE" will have MAJOR drift. Minor drift is unnacceptable.
 DONT try and "WORK AROUND" drift; That's not your call to make. Drift is the enemy.
-
 Finally on 'DRIFT DETECTION' it's important we DONT try WORK AROUND and Patch drift in our implementation. This will cause more drift, not less drift. Because if 1 plugin has a small issue, and we fix the issue in ours now 2 plugins have drift instead of 1.
 
 
 # Quality
 Quality is more important than speed; Again if we port something even slightly incorrectly when we eventually integrate it into the 60-90GB Monorepo ANY issue that CAN happen WILL happen.
 
-
 # Performance
 Performance is a side-goal that should NEVER come at the cost of correctness but yet is important. If we ship the entire thing end-to-end and it's slower than the original we've failed.
-
 
 # Never
 - Never edit packages/babel-plugin, packages/babel-plugin-strip-runtime, packages/css and packages/utils consider them 100% IMMUTABLE as their EXACT source was copied from a monorepo.
@@ -33,9 +28,6 @@ The reason these are immutable is that EACH package was taken from the EXACT com
 @compiled/babel-plugin-strip-runtime 0.36.0 40a4548 (Jan 28 batch)
 @compiled/css 0.19.0 40a4548 (used by BOTH above, nested)
 @compiled/utils 0.13.2 130ed3b (hoisted, shared)
-
-Unfortuantely this work started INITIALLY by porting the wrong version/commits of these, so if you see "artifacts" remaining that are "oprhaned" (dont' have a lineage to these commits/versions) please raise it.
-
 
 # WASI/WASM Compilation
 - Please don't add like 10MB Rust library or anything like that. We will eventually 'build' the whole thing to WASM/WASI and we don't want a like 50MB binary.

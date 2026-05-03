@@ -16,6 +16,7 @@
     "@babel/core": "^7.26.10",
     "@babel/plugin-syntax-jsx": "^7.25.9",
     "@babel/preset-react": "^7.28.5",
+    "@atlaskit/tokens": "*",
     "@compiled/react": "workspace:*",
     "@sjcompiled/babel-plugin": "workspace:*",
     "@sjcompiled/babel-plugin-strip-runtime": "workspace:*",

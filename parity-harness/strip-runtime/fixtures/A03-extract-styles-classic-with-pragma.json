@@ -9,7 +9,5 @@
       "source": "src/",
       "dest": "dist/"
     }
-  },
-  "expectedToFail": true,
-  "failureReason": "§1.5 extractStylesToDirectory write"
+  }
 }

@@ -279,6 +279,40 @@ a drift escalation in `crates/STATUS.md` like the existing entries
 
 ---
 
+## End-to-end byte-equality harness (`packages/equality-harness`)
+
+Runs every fixture under `/fixtures` through Babel twice (engine off / engine
+on) with the plugin chain `[@atlaskit/tokens/babel-plugin, @sjcompiled/babel-plugin]`
+and byte-compares `result.code`. This is the integration-level proof that
+Rust `transformCss` is observationally indistinguishable from the JS oracle
+when driven through the real Babel pipeline AFM uses in production.
+
+```bash
+# Full sweep (336 fixtures, ~3 minutes):
+bun run --cwd packages/equality-harness verify
+
+# Stop on first divergence:
+bun run --cwd packages/equality-harness verify:bail
+
+# Run only specific fixtures by directory name:
+bun run --cwd packages/equality-harness verify -- --only ct-css-null-literal-styles ct-lozenge-mixed-cssmap-patterns
+```
+
+Expected output:
+
+```
+Total fixtures:     336
+Skipped (no input): 0
+Pass:               336
+Fail:               0
+```
+
+Any byte divergence is reported with the smallest divergent byte range and
+surrounding context. Per CLAUDE.md drift-detection: do NOT special-case
+fixtures — every divergence points at a real bug somewhere in the Rust port.
+
+---
+
 ## Engine flag — manual smoke test
 
 `packages/css/src/transform.ts` and `packages/css/src/sort.ts` both honor

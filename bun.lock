@@ -5,6 +5,7 @@
     "": {
       "name": "sjcompiled",
       "devDependencies": {
+        "@atlaskit/tokens": "*",
         "@babel/core": "^7.26.10",
         "@babel/plugin-syntax-jsx": "^7.25.9",
         "@babel/preset-react": "^7.28.5",
