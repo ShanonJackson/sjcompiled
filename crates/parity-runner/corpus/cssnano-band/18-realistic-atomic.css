@@ -1,0 +1,8 @@
+/* atomic-style sample */
+._padding-0 { padding: 0px; }
+._color-red { color: #ff0000; }
+._color-current { color: currentcolor; }
+._content { content: 'hello'; }
+@media all and (min-width: 768px) {
+  ._md-padding { padding: 8px; }
+}

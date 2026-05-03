@@ -1,0 +1,3 @@
+.x { flex-direction: row; }
+.y { flex-direction: column; }
+.z { flex-direction: row-reverse; }

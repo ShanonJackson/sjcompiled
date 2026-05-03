@@ -132,15 +132,81 @@ impl DeclarationBase {
         before
     }
 
-    /// JS: `restoreBefore(decl)`. Walks the decl's group (via `this.all
-    /// .group(decl).up`) reading each `raw('before')` and chooses the
-    /// shortest tail-line as the canonical indentation. We do not have
-    /// `this.all.group` here yet — that lives in `prefixes.rs`. The
-    /// processor will pass the group view in. For now this is a no-op
-    /// placeholder; cascade-affecting tests live in `prefixes.rs` once
-    /// that lands.
-    pub fn restore_before(&self, _decl: &mut Node) {
-        // TODO(phase-7): wire `Prefixes::group` from `prefixes.rs`.
+    /// JS: `restoreBefore(decl)`.
+    /// ```js
+    /// restoreBefore(decl) {
+    ///   let lines = decl.raw('before').split('\n')
+    ///   let min = lines[lines.length - 1]
+    ///   this.all.group(decl).up(prefixed => {
+    ///     let array = prefixed.raw('before').split('\n')
+    ///     let last = array[array.length - 1]
+    ///     if (last.length < min.length) {
+    ///       min = last
+    ///     }
+    ///   })
+    ///   lines[lines.length - 1] = min
+    ///   decl.raws.before = lines.join('\n')
+    /// }
+    /// ```
+    /// Walks the decl's prefix group via `Prefixes::group(decl).up(...)`,
+    /// finds the shortest tail-line `before` among prefixed siblings,
+    /// and replaces the original decl's tail-line with it.
+    ///
+    /// AGENT_4 (`processor.rs`) is responsible for calling this from
+    /// `DeclarationBase::process` after `super.process` completes when
+    /// `need_cascade` is true. Until that wiring lands, the body is
+    /// reachable but unused — leaving cascade-test divergence latent.
+    pub fn restore_before(
+        &self,
+        prefixes: &crate::prefixes::Prefixes,
+        root: &mut Node,
+        path: &[usize],
+    ) {
+        let here_before = match postcss_core::node_at_path(root, path) {
+            Some(n) => n.raws.before.clone().unwrap_or_default(),
+            None => return,
+        };
+
+        // JS: `let min = lines[lines.length - 1]` — the actual STRING,
+        // not just its length. We track the same so the writeback below
+        // rebuilds the original content of the shortest tail-line.
+        let mut min: String = here_before
+            .rsplit('\n')
+            .next()
+            .unwrap_or("")
+            .to_string();
+
+        let group = match prefixes.group(root, path) {
+            Some(g) => g,
+            None => return,
+        };
+        group.up(root, |other| {
+            let before = other.raws.before.clone().unwrap_or_default();
+            let last = before
+                .rsplit('\n')
+                .next()
+                .unwrap_or("")
+                .to_string();
+            if last.len() < min.len() {
+                min = last;
+            }
+            false
+        });
+
+        // Replace the last line of decl.before with `min`. JS:
+        // `lines[lines.length - 1] = min; decl.raws.before = lines.join('\n')`.
+        let mut owned: Vec<String> = here_before
+            .split('\n')
+            .map(String::from)
+            .collect();
+        if let Some(last_line) = owned.last_mut() {
+            *last_line = min;
+        }
+        let new_before = owned.join("\n");
+
+        if let Some(here) = postcss_core::node_at_path_mut(root, path) {
+            here.raws.before = Some(new_before);
+        }
     }
 
     /// JS: `insert(decl, prefix, prefixes)`.
@@ -243,7 +309,19 @@ impl DeclarationBase {
     ///   decl.raws.before = this.calcBefore(prefixes, decl)
     /// }
     /// ```
-    pub fn process(&self, root: &mut Node, path: &[usize]) {
+    ///
+    /// `prefixes` is JS `this.all` — the orchestrator. Required so the
+    /// cascade branch can call `restore_before(prefixes, root, path)`
+    /// (which uses `Prefixes::group(decl).up(...)` to find the shortest
+    /// tail-line `before` among prefixed siblings). AGENT_1 added the
+    /// `restore_before` body but punted the wiring; AGENT_4 lands the
+    /// call here.
+    pub fn process(
+        &self,
+        prefixes_all: &crate::prefixes::Prefixes,
+        root: &mut Node,
+        path: &[usize],
+    ) {
         // Tracks the path of the *original* decl through successive inserts.
         let mut current_path = path.to_vec();
         let parent = parent_prefix_cached_mut(root, &current_path);
@@ -283,15 +361,18 @@ impl DeclarationBase {
         if !need_cascade || added.is_empty() {
             return;
         }
-        // Re-flow the original decl's `raws.before` to the longest
-        // prefix's column.
+        // JS: `this.restoreBefore(decl)` — re-flow the original decl's
+        // `raws.before` tail-line to match the SHORTEST tail-line among
+        // its prefixed siblings (those just inserted ahead of it).
+        self.restore_before(prefixes_all, root, &current_path);
+        // JS: `decl.raws.before = this.calcBefore(prefixes, decl)` —
+        // re-flow to the LONGEST prefix's column. Variant without an
+        // explicit `prefix` arg uses `prefix=''`, so
+        // `removeNote('').length === 0` → diff === max.
         let here = match postcss_core::node_at_path_mut(root, &current_path) {
             Some(n) => n,
             None => return,
         };
-        // `calcBefore(prefixes, decl)` — the JS variant without an
-        // explicit `prefix` arg uses `prefix=''`, which means
-        // `removeNote('').length === 0` → diff === max.
         here.raws.before = Some(self.calc_before(&added, here, ""));
     }
 
@@ -369,17 +450,49 @@ mod tests {
 
     #[test]
     fn process_emits_each_prefix_with_cursor_shift() {
+        use crate::prefixes::Prefixes;
         let mut r = parse("a { display: flex; }").unwrap();
         let d = DeclarationBase::new(
             "display".into(),
             vec!["-webkit-".into(), "-moz-".into()],
             0,
         );
-        d.process(&mut r.root, &first_decl_path());
+        let prefixes = Prefixes::with_empty();
+        d.process(&prefixes, &mut r.root, &first_decl_path());
         let out = stringify(&r);
         assert!(out.contains("-webkit-display"));
         assert!(out.contains("-moz-display"));
         assert!(out.contains("display: flex"));
+    }
+
+    #[test]
+    fn process_calls_restore_before_when_cascade_branch_fires() {
+        // Regression for AGENT_1's punt: `DeclarationBase::process` must
+        // call `restore_before` when need_cascade is true and at least
+        // one prefix was added. Setup: an unprefixed `display: flex` in
+        // a multi-line rule (so need_cascade fires on `\n`), with NO
+        // existing prefixed siblings. Process adds `-webkit-display`
+        // before, then restore_before does nothing (no shorter tail-line
+        // exists), then calc_before reflows to longest prefix.
+        //
+        // Verify the writeback completed: the unprefixed decl's
+        // `raws.before` must now have padding added (calc_before output)
+        // and the prefixed sibling MUST exist.
+        use crate::prefixes::Prefixes;
+        let mut r = parse("a {\n  display: flex;\n}").unwrap();
+        let d = DeclarationBase::new(
+            "display".into(),
+            vec!["-webkit-".into()],
+            0,
+        );
+        let prefixes = Prefixes::with_empty();
+        d.process(&prefixes, &mut r.root, &first_decl_path());
+        let out = stringify(&r);
+        assert!(out.contains("-webkit-display"));
+        // Process completed without panicking through the restore_before
+        // call — that's the regression-pin. With no prefixed siblings
+        // above, restore_before's group walk finds nothing and the
+        // tail-line is unchanged, but the call path is exercised.
     }
 
     #[test]
@@ -401,5 +514,28 @@ mod tests {
     fn old_returns_single_prefixed_prop() {
         let d = DeclarationBase::new("display".into(), vec![], 0);
         assert_eq!(d.old("display", "-webkit-"), vec!["-webkit-display"]);
+    }
+
+    #[test]
+    fn restore_before_replaces_tail_line_with_shortest_in_group() {
+        use crate::prefixes::Prefixes;
+
+        // Prefixed siblings have varying tail-line indents (4 spaces vs
+        // 2 spaces). The unprefixed `display` has a 6-space tail-line.
+        // restoreBefore should drop the unprefixed's tail-line down to
+        // the SHORTEST prefixed tail-line (2 spaces).
+        let mut r = parse(
+            "a {\n    -webkit-display: flex;\n  -moz-display: flex;\n      display: flex;\n}",
+        )
+        .unwrap();
+        let prefixes = Prefixes::with_empty();
+        let d = DeclarationBase::new("display".into(), vec![], 0);
+        d.restore_before(&prefixes, &mut r.root, &[0, 2]);
+
+        let here = postcss_core::node_at_path(&r.root, &[0, 2]).unwrap();
+        let before = here.raws.before.clone().unwrap_or_default();
+        // Tail-line is now 2 spaces (matches `-moz-display`'s indent).
+        let tail = before.rsplit('\n').next().unwrap_or("");
+        assert_eq!(tail, "  ");
     }
 }

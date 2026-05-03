@@ -1,0 +1,6 @@
+.x {
+  color: #ffffff;
+  background: linear-gradient(to bottom, #fff, #000);
+  margin: 0px;
+  width: calc(10px + 5px);
+}

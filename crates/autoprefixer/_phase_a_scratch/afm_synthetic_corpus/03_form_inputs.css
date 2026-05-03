@@ -1,0 +1,12 @@
+/* AFM form components: inputs, selects, textareas, autocomplete. */
+.input { appearance: none; -webkit-appearance: none; background: #fff; border: 1px solid #ccc; padding: 6px 8px; }
+.select { appearance: none; background-image: url(arrow.svg); background-repeat: no-repeat; background-position: right 8px center; padding-right: 24px; }
+.input::placeholder { color: #888; opacity: 0.6; }
+.input::-webkit-input-placeholder { color: #888; }
+.input:placeholder-shown { border-color: #999; }
+.input:autofill { background-color: #fffbe6; }
+.button-reset { appearance: none; background: none; border: 0; padding: 0; cursor: pointer; }
+.input-file::file-selector-button { background: #f4f5f7; border: 0; padding: 4px 8px; cursor: pointer; }
+.checkbox { appearance: none; width: 14px; height: 14px; }
+.search { user-select: none; -webkit-user-select: none; }
+.scrollable { user-select: text; }

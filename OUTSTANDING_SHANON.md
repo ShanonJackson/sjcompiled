@@ -25,6 +25,10 @@ pass, 112/112 postcss-nested, 6/6 compiled-css) make that clear by implication.
 
 
 
+### Tracked follow-ups (not on critical path)
+
+- **`Browsers::prefix("chrome 100 2009")` 3-part-input latent bug.** AGENT_1 (autoprefixer/Prefixes::new) flagged: `crates/autoprefixer/src/browsers.rs::prefix` uses `splitn(2, ' ')`, so a 3-part input like `"chrome 100 2009"` (a "note" suffix) carries the `"100 2009"` substring into the `version` lookup against `agent.prefix_exceptions`. JS does `let [name, version] = i.split(' ')` and discards the third part, so version=`"100"`. Both currently produce the same byte output because no `prefix_exceptions` key contains a space — but a future caniuse-lite repin where a noted-version IS in `prefix_exceptions` would diverge silently. Worked around in `Prefixes::select` by explicit pre-trim. Real fix: change `Browsers::prefix` to do a full split + take-first-two. Not in scope today, but AGENT_5's hacks may call `Browsers::prefix` directly with raw 3-part strings; they should pre-trim too until this lands.
+
 ### Drifts to look into
 Two pieces of DRIFT detected (both flagged, none silently worked around)
 

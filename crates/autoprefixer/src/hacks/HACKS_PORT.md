@@ -119,7 +119,7 @@ above as a sketch.
 | border-image.js                 | Declaration  |   15 | TODO |
 | border-radius.js                | Declaration  |   40 | TODO |
 | break-props.js                  | Declaration  |   63 | TODO |
-| cross-fade.js                   | Value        |   35 | TODO |
+| cross-fade.js                   | Value        |   35 | Done (AGENT_5; 5 unit tests) |
 | display-flex.js                 | Value        |   65 | TODO |
 | display-grid.js                 | Value        |   21 | TODO |
 | file-selector-button.js         | Selector     |   26 | TODO |
@@ -148,7 +148,7 @@ above as a sketch.
 | image-rendering.js              | Declaration  |   48 | TODO |
 | image-set.js                    | Value        |   18 | TODO |
 | inline-logical.js               | Declaration  |   34 | TODO |
-| intrinsic.js                    | Value        |   61 | TODO |
+| intrinsic.js                    | Value        |   61 | Done (AGENT_5; 11 unit tests) |
 | justify-content.js              | Declaration  |   54 | TODO |
 | mask-border.js                  | Declaration  |   38 | TODO |
 | mask-composite.js               | Declaration  |   88 | TODO |
@@ -159,11 +159,11 @@ above as a sketch.
 | placeholder-shown.js            | Selector     |   17 | TODO |
 | placeholder.js                  | Selector     |   33 | TODO |
 | print-color-adjust.js           | Declaration  |   25 | TODO |
-| text-decoration-skip-ink.js     | Declaration  |   23 | TODO |
-| text-decoration.js              | Declaration  |   25 | TODO |
+| text-decoration-skip-ink.js     | Declaration  |   23 | Done (AGENT_5; 3 unit tests) |
+| text-decoration.js              | Declaration  |   25 | Done (AGENT_5; 6 unit tests) |
 | text-emphasis-position.js       | Declaration  |   14 | TODO |
 | transform-decl.js               | Declaration  |   79 | TODO |
-| user-select.js                  | Declaration  |   28 | TODO |
+| user-select.js                  | Declaration  |   28 | Done (AGENT_5; 6 unit tests) |
 | writing-mode.js                 | Declaration  |   42 | TODO |
 
 Suggested order: start with the smallest Declaration-parented hacks

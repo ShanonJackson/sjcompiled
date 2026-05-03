@@ -1,0 +1,3 @@
+@media (resolution: 2dppx) {
+  .icon { background-image: url('@2x.png'); }
+}

@@ -65,6 +65,7 @@ fn main() -> ExitCode {
         "postcss-calc" => Stage::PostcssCalc,
         "postcss-convert-values" => Stage::PostcssConvertValues,
         "sort" => Stage::Sort,
+        "cssnano-band" => Stage::CssnanoBand,
         s => {
             eprintln!("unknown stage: {s}");
             return ExitCode::from(2);

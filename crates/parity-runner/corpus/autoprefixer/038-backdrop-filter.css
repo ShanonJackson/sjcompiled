@@ -1,0 +1,2 @@
+.glass { backdrop-filter: blur(8px) saturate(150%); background: rgba(255, 255, 255, 0.65); }
+.dim { backdrop-filter: brightness(0.6); }

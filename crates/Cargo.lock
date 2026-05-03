@@ -405,6 +405,7 @@ name = "compiled-css"
 version = "0.0.1"
 dependencies = [
  "colord",
+ "cssnano-preset-default",
  "indexmap",
  "once_cell",
  "postcss-core",

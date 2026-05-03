@@ -208,6 +208,21 @@ pub enum Stage {
     /// `undefined` defaults in the JS signature). This is the byte-parity
     /// gate for the smaller of the two hashing entry points.
     Sort,
+
+    /// Phase 6 band exit gate — `packages/css/src/plugins/normalize-css.ts`
+    /// in isolation. Runs `postcss(normalizeCSS({optimizeCss: true}))
+    /// .process(css)` end-to-end: 14 cssnano sub-plugins (in preset
+    /// source order) plus `normalize-current-color`'s Declaration visitor,
+    /// composed via the postcss lifecycle (walk → OnceExit). This proves
+    /// every Phase 6 sub-plugin port composes byte-clean against the JS
+    /// pipeline as a unit, not just individually.
+    ///
+    /// Browserslist is pinned to `chrome 100` for the gate (env var
+    /// `BROWSERSLIST=chrome 100` set by both bridges). Otherwise the 5
+    /// browserslist-aware plugins (colormin, convert-values, minify-params,
+    /// normalize-unicode, reduce-initial) would resolve to the workspace
+    /// default which can drift across caniuse-lite versions.
+    CssnanoBand,
 }
 
 impl Stage {
@@ -242,6 +257,7 @@ impl Stage {
             Stage::PostcssCalc => "postcss-calc",
             Stage::PostcssConvertValues => "postcss-convert-values",
             Stage::Sort => "sort",
+            Stage::CssnanoBand => "cssnano-band",
         }
     }
 }
@@ -458,6 +474,20 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             // defaults in `sort.ts:18-26`. The plugin defaults (true/true)
             // take effect inside sort_atomic_style_sheet.
             css::sort::sort(css, &css::sort::SortOpts::default())
+        }
+        Stage::CssnanoBand => {
+            // Phase 6 band exit gate. `optimize_css = None` defaults to
+            // `true` per JS line 59 — runs all 14 cssnano sub-plugins +
+            // normalize-current-color. BROWSERSLIST env var is set by
+            // the caller (parity-runner main / test harness) to keep both
+            // engines on the same browser list.
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            let opts = compiled_css::plugins::normalize_css::NormalizeCssOpts {
+                optimize_css: None,
+            };
+            compiled_css::plugins::normalize_css::normalize_css(&mut root, &opts)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
         }
     }
 }

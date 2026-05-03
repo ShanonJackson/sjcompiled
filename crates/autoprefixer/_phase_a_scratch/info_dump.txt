@@ -1,0 +1,550 @@
+=== autoprefixer.info() for AFM browserslist ===
+Browsers:
+  Chrome for Android: 144
+  Chrome: 144, 143, 142, 141, 140
+  Edge: 144, 143
+  Firefox: 147, 146
+  iOS Safari: 26.2, 26.1
+  Safari: 26.2, 26.1
+
+These browsers account for 65.26% of all users globally
+
+Properties:
+  box-decoration-break: webkit
+  text-decoration-skip-ink: webkit
+  text-decoration-skip: webkit
+  text-decoration: webkit
+  text-size-adjust: webkit
+  user-select: webkit
+
+Values:
+  cross-fade: webkit
+  element: moz
+  fill-available: webkit
+  fill: webkit
+  fit-content: moz
+  stretch: webkit, moz
+
+
+=== prefixes.add (declaration/value bucket — keys) ===
+  @supports                            -> Supports                      prefixes=undefined
+  background                           -> Object                        prefixes=undefined
+  background-image                     -> Object                        prefixes=undefined
+  block-size                           -> Object                        prefixes=undefined
+  border-image                         -> Object                        prefixes=undefined
+  box-decoration-break                 -> Declaration                   prefixes=["-webkit-"]
+  content                              -> Object                        prefixes=undefined
+  grid                                 -> Object                        prefixes=undefined
+  grid-auto-columns                    -> Object                        prefixes=undefined
+  grid-auto-rows                       -> Object                        prefixes=undefined
+  grid-template                        -> Object                        prefixes=undefined
+  grid-template-columns                -> Object                        prefixes=undefined
+  grid-template-rows                   -> Object                        prefixes=undefined
+  height                               -> Object                        prefixes=undefined
+  inline-size                          -> Object                        prefixes=undefined
+  list-style                           -> Object                        prefixes=undefined
+  list-style-image                     -> Object                        prefixes=undefined
+  mask                                 -> Object                        prefixes=undefined
+  mask-image                           -> Object                        prefixes=undefined
+  max-block-size                       -> Object                        prefixes=undefined
+  max-height                           -> Object                        prefixes=undefined
+  max-inline-size                      -> Object                        prefixes=undefined
+  max-width                            -> Object                        prefixes=undefined
+  min-block-size                       -> Object                        prefixes=undefined
+  min-height                           -> Object                        prefixes=undefined
+  min-inline-size                      -> Object                        prefixes=undefined
+  min-width                            -> Object                        prefixes=undefined
+  text-decoration                      -> TextDecoration                prefixes=["-webkit-"]
+  text-decoration-skip                 -> TextDecorationSkipInk         prefixes=["-webkit-"]
+  text-decoration-skip-ink             -> TextDecorationSkipInk         prefixes=["-webkit-"]
+  text-size-adjust                     -> Declaration                   prefixes=["-webkit-"]
+  user-select                          -> UserSelect                    prefixes=["-webkit-"]
+  width                                -> Object                        prefixes=undefined
+
+=== prefixes.add.selectors ===
+
+=== prefixes.transition ===
+  class=Transition
+  prefixes=(none)
+
+=== prefixes.add[*].values (Value-bucket hacks) ===
+  background           value=element              -> Value                prefixes=["-moz-"]
+  background           value=cross-fade           -> CrossFade            prefixes=["-webkit-"]
+  background-image     value=element              -> Value                prefixes=["-moz-"]
+  background-image     value=cross-fade           -> CrossFade            prefixes=["-webkit-"]
+  block-size           value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  block-size           value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  block-size           value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  block-size           value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  border-image         value=element              -> Value                prefixes=["-moz-"]
+  border-image         value=cross-fade           -> CrossFade            prefixes=["-webkit-"]
+  content              value=element              -> Value                prefixes=["-moz-"]
+  content              value=cross-fade           -> CrossFade            prefixes=["-webkit-"]
+  grid                 value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  grid                 value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  grid                 value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  grid                 value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  grid-auto-columns    value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  grid-auto-columns    value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  grid-auto-columns    value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  grid-auto-columns    value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  grid-auto-rows       value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  grid-auto-rows       value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  grid-auto-rows       value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  grid-auto-rows       value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  grid-template        value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  grid-template        value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  grid-template        value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  grid-template        value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  grid-template-columns value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  grid-template-columns value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  grid-template-columns value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  grid-template-columns value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  grid-template-rows   value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  grid-template-rows   value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  grid-template-rows   value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  grid-template-rows   value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  height               value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  height               value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  height               value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  height               value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  inline-size          value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  inline-size          value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  inline-size          value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  inline-size          value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  list-style           value=element              -> Value                prefixes=["-moz-"]
+  list-style           value=cross-fade           -> CrossFade            prefixes=["-webkit-"]
+  list-style-image     value=element              -> Value                prefixes=["-moz-"]
+  list-style-image     value=cross-fade           -> CrossFade            prefixes=["-webkit-"]
+  mask                 value=element              -> Value                prefixes=["-moz-"]
+  mask                 value=cross-fade           -> CrossFade            prefixes=["-webkit-"]
+  mask-image           value=element              -> Value                prefixes=["-moz-"]
+  mask-image           value=cross-fade           -> CrossFade            prefixes=["-webkit-"]
+  max-block-size       value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  max-block-size       value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  max-block-size       value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  max-block-size       value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  max-height           value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  max-height           value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  max-height           value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  max-height           value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  max-inline-size      value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  max-inline-size      value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  max-inline-size      value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  max-inline-size      value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  max-width            value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  max-width            value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  max-width            value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  max-width            value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  min-block-size       value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  min-block-size       value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  min-block-size       value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  min-block-size       value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  min-height           value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  min-height           value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  min-height           value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  min-height           value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  min-inline-size      value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  min-inline-size      value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  min-inline-size      value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  min-inline-size      value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  min-width            value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  min-width            value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  min-width            value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  min-width            value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+  width                value=fill                 -> Intrinsic            prefixes=["-webkit-"]
+  width                value=fill-available       -> Intrinsic            prefixes=["-webkit-"]
+  width                value=fit-content          -> Intrinsic            prefixes=["-moz-"]
+  width                value=stretch              -> Intrinsic            prefixes=["-webkit-","-moz-"]
+
+=== resolved selected browsers ===
+[
+  "and_chr 144",
+  "chrome 144",
+  "chrome 143",
+  "chrome 142",
+  "chrome 141",
+  "chrome 140",
+  "edge 144",
+  "edge 143",
+  "firefox 147",
+  "firefox 146",
+  "ios_saf 26.2",
+  "ios_saf 26.1",
+  "safari 26.2",
+  "safari 26.1"
+]
+
+=== prefixes.remove (cleanup pass) ===
+  *                                    -> Object
+  -khtml-animation                     -> Object
+  -khtml-animation-delay               -> Object
+  -khtml-animation-direction           -> Object
+  -khtml-animation-duration            -> Object
+  -khtml-animation-fill-mode           -> Object
+  -khtml-animation-iteration-count     -> Object
+  -khtml-animation-name                -> Object
+  -khtml-animation-play-state          -> Object
+  -khtml-animation-timing-function     -> Object
+  -khtml-border-bottom-left-radius     -> Object
+  -khtml-border-bottom-right-radius    -> Object
+  -khtml-border-radius                 -> Object
+  -khtml-border-top-left-radius        -> Object
+  -khtml-border-top-right-radius       -> Object
+  -khtml-box-shadow                    -> Object
+  -khtml-transition                    -> Object
+  -khtml-transition-delay              -> Object
+  -khtml-transition-duration           -> Object
+  -khtml-transition-property           -> Object
+  -khtml-transition-timing-function    -> Object
+  -khtml-user-select                   -> Object
+  -moz-align-content                   -> Object
+  -moz-align-self                      -> Object
+  -moz-animation                       -> Object
+  -moz-animation-delay                 -> Object
+  -moz-animation-direction             -> Object
+  -moz-animation-duration              -> Object
+  -moz-animation-fill-mode             -> Object
+  -moz-animation-iteration-count       -> Object
+  -moz-animation-name                  -> Object
+  -moz-animation-play-state            -> Object
+  -moz-animation-timing-function       -> Object
+  -moz-appearance                      -> Object
+  -moz-backface-visibility             -> Object
+  -moz-background-origin               -> Object
+  -moz-background-size                 -> Object
+  -moz-border-end                      -> Object
+  -moz-border-image                    -> Object
+  -moz-border-radius                   -> Object
+  -moz-border-radius-bottomleft        -> Object
+  -moz-border-radius-bottomright       -> Object
+  -moz-border-radius-topleft           -> Object
+  -moz-border-radius-topright          -> Object
+  -moz-border-start                    -> Object
+  -moz-box-align                       -> Object
+  -moz-box-direction                   -> Object
+  -moz-box-flex                        -> Object
+  -moz-box-ordinal-group               -> Object
+  -moz-box-orient                      -> Object
+  -moz-box-pack                        -> Object
+  -moz-box-shadow                      -> Object
+  -moz-box-sizing                      -> Object
+  -moz-column-break-after              -> Object
+  -moz-column-break-before             -> Object
+  -moz-column-break-inside             -> Object
+  -moz-column-count                    -> Object
+  -moz-column-fill                     -> Object
+  -moz-column-gap                      -> Object
+  -moz-column-rule                     -> Object
+  -moz-column-rule-color               -> Object
+  -moz-column-rule-style               -> Object
+  -moz-column-rule-width               -> Object
+  -moz-column-span                     -> Object
+  -moz-column-width                    -> Object
+  -moz-columns                         -> Object
+  -moz-flex-basis                      -> Object
+  -moz-flex-flow                       -> Object
+  -moz-flex-shrink                     -> Object
+  -moz-flex-wrap                       -> Object
+  -moz-font-feature-settings           -> Object
+  -moz-font-language-override          -> Object
+  -moz-font-variant-ligatures          -> Object
+  -moz-hyphens                         -> Object
+  -moz-margin-end                      -> Object
+  -moz-margin-start                    -> Object
+  -moz-padding-end                     -> Object
+  -moz-padding-start                   -> Object
+  -moz-perspective                     -> Object
+  -moz-perspective-origin              -> Object
+  -moz-tab-size                        -> Object
+  -moz-text-align-last                 -> Object
+  -moz-text-decoration-color           -> Object
+  -moz-text-decoration-line            -> Object
+  -moz-text-decoration-style           -> Object
+  -moz-text-size-adjust                -> Object
+  -moz-transform                       -> Object
+  -moz-transform-origin                -> Object
+  -moz-transform-style                 -> Object
+  -moz-transition                      -> Object
+  -moz-transition-delay                -> Object
+  -moz-transition-duration             -> Object
+  -moz-transition-property             -> Object
+  -moz-transition-timing-function      -> Object
+  -moz-user-select                     -> Object
+  -ms-animation                        -> Object
+  -ms-animation-delay                  -> Object
+  -ms-animation-direction              -> Object
+  -ms-animation-duration               -> Object
+  -ms-animation-fill-mode              -> Object
+  -ms-animation-iteration-count        -> Object
+  -ms-animation-name                   -> Object
+  -ms-animation-play-state             -> Object
+  -ms-animation-timing-function        -> Object
+  -ms-appearance                       -> Object
+  -ms-backdrop-filter                  -> Object
+  -ms-backface-visibility              -> Object
+  -ms-background-clip                  -> Object
+  -ms-border-bottom-left-radius        -> Object
+  -ms-border-bottom-right-radius       -> Object
+  -ms-border-radius                    -> Object
+  -ms-border-top-left-radius           -> Object
+  -ms-border-top-right-radius          -> Object
+  -ms-flex                             -> Object
+  -ms-flex-align                       -> Object
+  -ms-flex-direction                   -> Object
+  -ms-flex-flow                        -> Object
+  -ms-flex-item-align                  -> Object
+  -ms-flex-line-pack                   -> Object
+  -ms-flex-negative                    -> Object
+  -ms-flex-order                       -> Object
+  -ms-flex-pack                        -> Object
+  -ms-flex-positive                    -> Object
+  -ms-flex-preferred-size              -> Object
+  -ms-flex-wrap                        -> Object
+  -ms-flow-from                        -> Object
+  -ms-flow-into                        -> Object
+  -ms-grid-area                        -> Object
+  -ms-grid-column                      -> Object
+  -ms-grid-column-align                -> Object
+  -ms-grid-column-end                  -> Object
+  -ms-grid-columns                     -> Object
+  -ms-grid-row                         -> Object
+  -ms-grid-row-align                   -> Object
+  -ms-grid-row-end                     -> Object
+  -ms-grid-rows                        -> Object
+  -ms-grid-template                    -> Object
+  -ms-grid-template-areas              -> Object
+  -ms-hyphens                          -> Object
+  -ms-interpolation-mode               -> Object
+  -ms-place-self                       -> Object
+  -ms-region-fragment                  -> Object
+  -ms-scroll-chaining                  -> Object
+  -ms-scroll-snap-coordinate           -> Object
+  -ms-scroll-snap-destination          -> Object
+  -ms-scroll-snap-points-x             -> Object
+  -ms-scroll-snap-points-y             -> Object
+  -ms-scroll-snap-type                 -> Object
+  -ms-text-size-adjust                 -> Object
+  -ms-text-spacing                     -> Object
+  -ms-touch-action                     -> Object
+  -ms-transform                        -> Object
+  -ms-transform-origin                 -> Object
+  -ms-transform-style                  -> Object
+  -ms-transition                       -> Object
+  -ms-transition-delay                 -> Object
+  -ms-transition-duration              -> Object
+  -ms-transition-property              -> Object
+  -ms-transition-timing-function       -> Object
+  -ms-user-select                      -> Object
+  -ms-writing-mode                     -> Object
+  -o-animation                         -> Object
+  -o-animation-delay                   -> Object
+  -o-animation-direction               -> Object
+  -o-animation-duration                -> Object
+  -o-animation-fill-mode               -> Object
+  -o-animation-iteration-count         -> Object
+  -o-animation-name                    -> Object
+  -o-animation-play-state              -> Object
+  -o-animation-timing-function         -> Object
+  -o-backface-visibility               -> Object
+  -o-background-origin                 -> Object
+  -o-background-size                   -> Object
+  -o-border-bottom-left-radius         -> Object
+  -o-border-bottom-right-radius        -> Object
+  -o-border-image                      -> Object
+  -o-border-radius                     -> Object
+  -o-border-top-left-radius            -> Object
+  -o-border-top-right-radius           -> Object
+  -o-object-fit                        -> Object
+  -o-object-position                   -> Object
+  -o-tab-size                          -> Object
+  -o-text-overflow                     -> Object
+  -o-transform                         -> Object
+  -o-transform-origin                  -> Object
+  -o-transform-style                   -> Object
+  -o-transition                        -> Object
+  -o-transition-delay                  -> Object
+  -o-transition-duration               -> Object
+  -o-transition-property               -> Object
+  -o-transition-timing-function        -> Object
+  -webkit- 2009flex-flow               -> Object
+  -webkit- 2009flex-wrap               -> Object
+  -webkit-align-content                -> Object
+  -webkit-align-items                  -> Object
+  -webkit-align-self                   -> Object
+  -webkit-animation                    -> Object
+  -webkit-animation-delay              -> Object
+  -webkit-animation-direction          -> Object
+  -webkit-animation-duration           -> Object
+  -webkit-animation-fill-mode          -> Object
+  -webkit-animation-iteration-count    -> Object
+  -webkit-animation-name               -> Object
+  -webkit-animation-play-state         -> Object
+  -webkit-animation-timing-function    -> Object
+  -webkit-appearance                   -> Object
+  -webkit-backdrop-filter              -> Object
+  -webkit-backface-visibility          -> Object
+  -webkit-background-clip              -> Object
+  -webkit-background-origin            -> Object
+  -webkit-background-size              -> Object
+  -webkit-border-after                 -> Object
+  -webkit-border-before                -> Object
+  -webkit-border-bottom-left-radius    -> Object
+  -webkit-border-bottom-right-radius   -> Object
+  -webkit-border-end                   -> Object
+  -webkit-border-image                 -> Object
+  -webkit-border-radius                -> Object
+  -webkit-border-start                 -> Object
+  -webkit-border-top-left-radius       -> Object
+  -webkit-border-top-right-radius      -> Object
+  -webkit-box-align                    -> Object
+  -webkit-box-direction                -> Object
+  -webkit-box-flex                     -> Object
+  -webkit-box-ordinal-group            -> Object
+  -webkit-box-orient                   -> Object
+  -webkit-box-pack                     -> Object
+  -webkit-box-shadow                   -> Object
+  -webkit-box-sizing                   -> Object
+  -webkit-clip-path                    -> Object
+  -webkit-column-break-after           -> Object
+  -webkit-column-break-before          -> Object
+  -webkit-column-break-inside          -> Object
+  -webkit-column-count                 -> Object
+  -webkit-column-fill                  -> Object
+  -webkit-column-gap                   -> Object
+  -webkit-column-rule                  -> Object
+  -webkit-column-rule-color            -> Object
+  -webkit-column-rule-style            -> Object
+  -webkit-column-rule-width            -> Object
+  -webkit-column-span                  -> Object
+  -webkit-column-width                 -> Object
+  -webkit-columns                      -> Object
+  -webkit-filter                       -> Object
+  -webkit-flex                         -> Object
+  -webkit-flex-basis                   -> Object
+  -webkit-flex-direction               -> Object
+  -webkit-flex-flow                    -> Object
+  -webkit-flex-grow                    -> Object
+  -webkit-flex-shrink                  -> Object
+  -webkit-flex-wrap                    -> Object
+  -webkit-flow-from                    -> Object
+  -webkit-flow-into                    -> Object
+  -webkit-font-feature-settings        -> Object
+  -webkit-font-kerning                 -> Object
+  -webkit-font-language-override       -> Object
+  -webkit-font-variant-ligatures       -> Object
+  -webkit-hyphens                      -> Object
+  -webkit-justify-content              -> Object
+  -webkit-margin-after                 -> Object
+  -webkit-margin-before                -> Object
+  -webkit-margin-end                   -> Object
+  -webkit-margin-start                 -> Object
+  -webkit-mask                         -> Object
+  -webkit-mask-box-image               -> Object
+  -webkit-mask-box-image-outset        -> Object
+  -webkit-mask-box-image-repeat        -> Object
+  -webkit-mask-box-image-slice         -> Object
+  -webkit-mask-box-image-source        -> Object
+  -webkit-mask-box-image-width         -> Object
+  -webkit-mask-clip                    -> Object
+  -webkit-mask-composite               -> Object
+  -webkit-mask-image                   -> Object
+  -webkit-mask-origin                  -> Object
+  -webkit-mask-position                -> Object
+  -webkit-mask-repeat                  -> Object
+  -webkit-mask-size                    -> Object
+  -webkit-order                        -> Object
+  -webkit-padding-after                -> Object
+  -webkit-padding-before               -> Object
+  -webkit-padding-end                  -> Object
+  -webkit-padding-start                -> Object
+  -webkit-perspective                  -> Object
+  -webkit-perspective-origin           -> Object
+  -webkit-print-color-adjust           -> Object
+  -webkit-region-fragment              -> Object
+  -webkit-scroll-snap-coordinate       -> Object
+  -webkit-scroll-snap-destination      -> Object
+  -webkit-scroll-snap-points-x         -> Object
+  -webkit-scroll-snap-points-y         -> Object
+  -webkit-scroll-snap-type             -> Object
+  -webkit-shape-image-threshold        -> Object
+  -webkit-shape-margin                 -> Object
+  -webkit-shape-outside                -> Object
+  -webkit-text-decoration-color        -> Object
+  -webkit-text-decoration-line         -> Object
+  -webkit-text-decoration-style        -> Object
+  -webkit-text-emphasis                -> Object
+  -webkit-text-emphasis-color          -> Object
+  -webkit-text-emphasis-position       -> Object
+  -webkit-text-emphasis-style          -> Object
+  -webkit-text-orientation             -> Object
+  -webkit-transform                    -> Object
+  -webkit-transform-origin             -> Object
+  -webkit-transform-style              -> Object
+  -webkit-transition                   -> Object
+  -webkit-transition-delay             -> Object
+  -webkit-transition-duration          -> Object
+  -webkit-transition-property          -> Object
+  -webkit-transition-timing-function   -> Object
+  -webkit-writing-mode                 -> Object
+  @-khtml-keyframes                    -> Object
+  @-moz-keyframes                      -> Object
+  @-ms-keyframes                       -> Object
+  @-ms-viewport                        -> Object
+  @-o-keyframes                        -> Object
+  @-o-viewport                         -> Object
+  @-webkit-keyframes                   -> Object
+  @resolution                          -> Resolution
+  background                           -> Object
+  background-image                     -> Object
+  block-size                           -> Object
+  border-image                         -> Object
+  color-adjust                         -> Object
+  content                              -> Object
+  cursor                               -> Object
+  display                              -> Object
+  grid                                 -> Object
+  grid-auto-columns                    -> Object
+  grid-auto-rows                       -> Object
+  grid-template                        -> Object
+  grid-template-columns                -> Object
+  grid-template-rows                   -> Object
+  height                               -> Object
+  image-rendering                      -> Object
+  inline-size                          -> Object
+  list-style                           -> Object
+  list-style-image                     -> Object
+  mask                                 -> Object
+  mask-image                           -> Object
+  max-block-size                       -> Object
+  max-height                           -> Object
+  max-inline-size                      -> Object
+  max-width                            -> Object
+  min-block-size                       -> Object
+  min-height                           -> Object
+  min-inline-size                      -> Object
+  min-width                            -> Object
+  position                             -> Object
+  unicode-bidi                         -> Object
+  width                                -> Object
+
+=== prefixes.remove.selectors (cleanup pass) ===
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector
+  <unknown>                            -> OldSelector

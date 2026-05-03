@@ -1,0 +1,5 @@
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  50% { opacity: 0.5; }
+  100% { background-position: 200% 0; }
+}

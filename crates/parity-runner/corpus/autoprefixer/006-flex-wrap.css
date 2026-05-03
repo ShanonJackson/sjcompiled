@@ -1,0 +1,3 @@
+.x { flex-wrap: wrap; }
+.y { flex-wrap: nowrap; }
+.z { flex-wrap: wrap-reverse; }

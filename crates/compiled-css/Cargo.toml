@@ -16,3 +16,8 @@ colord = { workspace = true }
 indexmap = { workspace = true }
 once_cell = { workspace = true }
 regex = { workspace = true }
+# Phase 6 — `normalize_css` orchestrator wraps the cssnano preset.
+# `default_preset()` returns the 29-entry tuple list; this crate filters
+# it to the 14 AFM hashing-path plugins and applies them in postcss
+# lifecycle order (Once → walk → OnceExit).
+cssnano-preset-default = { workspace = true }

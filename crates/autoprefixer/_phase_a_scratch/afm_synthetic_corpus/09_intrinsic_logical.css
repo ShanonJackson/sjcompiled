@@ -1,0 +1,11 @@
+/* Intrinsic sizing + logical properties (RTL support). */
+.fit-content { width: fit-content; }
+.fill-available { width: fill-available; }
+.stretch { width: stretch; }
+.min-content { width: min-content; }
+.max-content { width: max-content; }
+.logical-block { padding-block: 8px; padding-block-start: 4px; padding-block-end: 12px; }
+.logical-inline { padding-inline: 16px; padding-inline-start: 12px; padding-inline-end: 20px; }
+.margin-logical { margin-block-start: 4px; margin-inline-start: 8px; }
+.border-logical { border-block-start: 1px solid #ccc; border-inline-end: 1px solid #ccc; }
+.size-block { block-size: 100px; min-block-size: 80px; max-block-size: 200px; inline-size: 100%; }

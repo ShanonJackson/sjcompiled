@@ -1,0 +1,3 @@
+@supports not (display: grid) {
+  .fallback { display: flex; }
+}

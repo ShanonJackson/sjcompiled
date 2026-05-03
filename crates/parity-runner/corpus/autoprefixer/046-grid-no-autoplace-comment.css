@@ -1,0 +1,2 @@
+/* autoprefixer grid: no-autoplace */
+.board { display: grid; grid-template-columns: repeat(3, 1fr); }

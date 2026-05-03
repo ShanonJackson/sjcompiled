@@ -3,6 +3,91 @@
 End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 `PARITY_VERSIONS.md`.
 
+## Phase 6 BAND ship — `normalize-css.ts` byte-clean end-to-end
+
+The Phase 6 cssnano band exit gate landed. The 14 sub-plugin Rust ports
++ `cssnano-preset-default` orchestrator + `normalize-current-color` are
+now byte-clean composed as a unit through the postcss lifecycle, against
+the live JS `normalizeCSS({optimizeCss: true})` from
+`packages/css/src/plugins/normalize-css.ts:58`.
+
+### What landed this session
+
+1. `crates/compiled-css/src/plugins/normalize_css.rs` — the stub
+   `normalize_css(root, opts)` body filled in 1:1 with `normalize-css.ts`.
+   Builds the `BASE_PLUGINS ∪ PROD_PLUGINS` filter, runs
+   `normalize-current-color`'s Declaration visitor (walk pass), then
+   iterates `default_preset()` in source order and applies survivors
+   (OnceExit pass). 6/6 unit tests pass.
+2. `crates/compiled-css/Cargo.toml` — new `cssnano-preset-default` dep
+   so `normalize_css.rs` can call `default_preset()`.
+3. `crates/parity-runner/src/stages.rs` — `Stage::CssnanoBand` variant
+   + handler that parses, runs `normalize_css`, stringifies.
+4. `crates/parity-runner/src/main.rs` — CLI mapping for `cssnano-band`.
+5. `packages/css/scripts/parity-bridge.mjs` — JS-side `cssnano-band`
+   stage that runs `postcss(normalizeCSS({optimizeCss: true}))
+   .process(css)`. Sets `process.env.BROWSERSLIST = 'chrome 100'` for the
+   call (restored after) so the 5 browserslist-aware plugins resolve to
+   a known target on both engines — Rust side reads the same env var via
+   `browserslist_shim::resolve("", true)`.
+6. `crates/parity-runner/corpus/cssnano-band/` — 20 fixtures covering:
+   blank, non-important comment dropping, `/*!` important kept,
+   selector lex-sort, `@media all and (...)` legacy strip, `border`
+   shorthand reordering, zero-unit shortening, `#ffffff` → `#fff` /
+   `#ff0000` → `red`, single-quote → double-quote, `top left` → `0 0`,
+   `cubic-bezier(...)` → `ease`, `linear-gradient(to bottom, ...)` →
+   angle, `calc(2px + 3px)` → `5px`, `currentcolor`/`current-color` →
+   `currentColor`, relative `url(...)` normalization, `auto` →
+   `initial` (reduce-initial), `unicode-range` lowercase + collapse,
+   realistic atomic CSS combo, multi-decl combo, nested `@supports`.
+
+### Verification gates run
+
+| Gate                                                                      | Status |
+|---------------------------------------------------------------------------|--------|
+| `cargo test --workspace --no-fail-fast`                                   | 1134/1134 pass, 0 fail, 2 ignored |
+| `parity-runner --stage cssnano-band --corpus crates/parity-runner/corpus/cssnano-band` | **20/20 byte-clean (JS vs Rust)** |
+| `parity-runner --stage cssnano-band ... --determinism`                    | **20/20 deterministic (JS oracle stable)** |
+
+### Lifecycle ordering — load-bearing (recap)
+
+The same hazard from Phase 8a's `sort()` bites here. All 14 cssnano
+sub-plugins use **only `OnceExit`**; `normalize-current-color` uses a
+**`Declaration` visitor**. Postcss runs:
+
+1. Once hooks (none in this band)
+2. Per-node visitors (DFS walk) — `normalize-current-color` fires here
+3. OnceExit hooks (in plugin-array order) — 14 cssnano plugins fire here
+
+JS array order: `[…filtered preset (preset source order), normalizeCurrentColor]`.
+`Array.filter` preserves source order, so OnceExit firing order = preset
+source order. The Rust port replays both passes in that exact sequence;
+calling them naively in BASE/PROD declaration order would silently
+diverge.
+
+### Browserslist parity
+
+5 of the 14 plugins resolve browserslist (`postcss-colormin`,
+`postcss-convert-values`, `postcss-minify-params`, `postcss-normalize-
+unicode`, `postcss-reduce-initial`). All read `BROWSERSLIST` env var via
+`browserslist_shim::resolve("", true)` (Rust) or
+`browserslist(null, ...)` (JS). The bridge pins `BROWSERSLIST=chrome 100`
+per call so both engines target the same set — without this pin the
+workspace-default resolution risks drift across caniuse-lite versions
+(same risk that `Stage::PostcssColormin` mitigates with its explicit
+`postcss_colormin_with_query(..., "chrome 100")`).
+
+### What this unlocks
+
+Phase 6 is fully closed. The remaining work is `transform.ts`-bound
+(Phase 8b NAPI bridge), still blocking on Phase 7 (autoprefixer). When
+Phase 8b lands, this `normalize_css` becomes one of the spread-in pieces
+of the full transformCss pipeline; the lifecycle classification
+documented here applies to every plugin in `transform.ts` and informs
+the band → full-pipeline composition.
+
+
+
 ## Phase 6h ship — `cssnano-preset-default@5.2.14` orchestrator ported (2026-05-03)
 
 Closes the cssnano band. Convert-values landed earlier this session,
@@ -2727,6 +2812,7 @@ header. **No code changes required** — all 489 tests still green.
 | 6g | postcss-minify-gradients@5.1.1 | **DONE** — byte-clean across 39-entry corpus, deterministic JS oracle. 16 unit tests. See "Phase 6g ship — `cssnano-postcss-minify-gradients@5.1.1` byte-clean" at top of file. |
 | 6g | postcss-colormin@5.3.1 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. Required `colord` minify drift fix + 392-vector JS-parity gate (see "Phase 6g foundation" entry). The highest-risk cssnano plugin is now complete. |
 | 6h | cssnano-preset-default@5.2.14 (orchestrator) | **DONE** — tuple-list factory ported 1:1, 29-entry source order pinned against upstream, AFM hashing-path subset (14 plugins) wired with real `apply` fns, remaining 15 wired to `apply_filtered_out` for drift detection. 3/3 unit tests pass. Phase 6 *band* exit gate (full pipeline byte-clean replacing `normalize-css.ts` output) is a separate follow-up — see "Phase 6h ship — `cssnano-preset-default@5.2.14` orchestrator ported" at top of file. |
+| 6 BAND | `normalizeCSS({optimizeCss: true})` end-to-end (14 cssnano sub-plugins + `normalize-current-color`) | **DONE** — 20/20 corpus byte-clean (JS vs Rust), 20/20 deterministic (JS vs JS). Browserslist pinned to `chrome 100` via env var on both engines. Postcss lifecycle replicated: walk pass (`normalize-current-color` Declaration visitor) → OnceExit pass (14 cssnano plugins in preset source order). See "Phase 6 BAND ship — `normalize-css.ts` byte-clean" below. |
 | 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **All base classes fully ported:** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs`, `browsers.rs`, `at_rule.rs`, `value.rs`, `selector.rs`, `declaration.rs`, `resolution.rs`, plus `prefixes.rs` registry skeleton with `register_hacks(reg)` append-only block. **`data/prefixes.rs` byte-clean** — 183 entries, codegen via `build.rs` from vendored JS through `bun`, 4 parity gates (canonical-JSON byte-equal, entry count, key order, caniuse-lite version pin). **59 tests passing (53 unit + 4 data parity + 2 browserslist parity active; 1 browserslist parity gate ignored, see "Phase 7 ship — browserslist-shim parity gate" below).** (Latest: `+1` active test `browserslist_shim_firefox_esr_matches_js_oracle` pinning the `rewrite_firefox_esr` shim path against `browserslist@4.24.2` JS oracle; `+1` active test `workspace_browserslist_pin_is_424_2` pinning `require('browserslist').version === '4.24.2'` after fixing the missing devDependency entry that was floating workspace resolution to 4.28.2 (root `package.json` now lists browserslist in BOTH `overrides` AND `devDependencies`); `+1 ignored` omnibus gate test `browserslist_shim_matches_js_oracle_for_canonical_queries` documenting the open caniuse-lite snapshot drift between `oxc_browserslist`'s bundled snapshot and the workspace pin 1.0.30001766. Prior: regression test in `resolution.rs::prefix_query_o_dpcm_uses_simplify` pinning the JS `value.simplify()` call after dpcm/dpi unit conversion — was a latent byte-divergence in the `-o-` resolution branch; fixed via `f.simplify(None)` after fraction-js audit surfaced the missing call.) Hacks agent **unblocked**. Still stubbed: `supports.rs`, `transition.rs` (heavy, hacks rarely subclass), `processor.rs`, `info.rs`, `autoprefixer.rs`, all 58 hacks, `Prefixes::new` orchestrator body. Split contract: see "Phase 7 split contract" section below. See also "Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix". |
 | 8a | `sort()` NAPI bridge + sort.ts engine flag | **DONE** — 12/12 corpus byte-clean end-to-end on win32-x64-msvc. See "Phase 8a ship" section below. |
 | 8b | `transformCss` NAPI bridge + transform.ts engine flag | **NOT STARTED** — blocks on Phase 5/6/7 plugin ports. |
@@ -3290,11 +3376,10 @@ darwin-arm64 once `transformCss` is byte-clean.
 
 **Phase 6 cssnano band: COMPLETE.** All 14 sub-plugins byte-clean.
 Orchestrator (`cssnano-preset-default@5.2.14`) ported 1:1 with manifest
-drift-pinning. The Phase 6 *band* exit gate (full pipeline byte-clean
-replacing `normalize-css.ts` output) is the remaining check — feasible
-now that convert-values landed; needs a Rust wrapper that consumes
-`default_preset()` and applies the AFM filter, or direct wiring through
-Phase 8b's `transformCss` NAPI bridge.
+drift-pinning. **Phase 6 *band* exit gate landed** — `normalize_css`
+wraps the preset filter + lifecycle, 20/20 byte-clean (JS vs Rust) /
+20/20 deterministic. See "Phase 6 BAND ship — `normalize-css.ts`
+byte-clean end-to-end" at the top of this file.
 
 **Phase 7 (in progress, parallel agents):**
 

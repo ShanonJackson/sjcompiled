@@ -1,0 +1,3 @@
+.search { user-select: none; }
+.scrollable { user-select: text; }
+.copy-target { user-select: all; }

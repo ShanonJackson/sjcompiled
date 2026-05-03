@@ -59,6 +59,12 @@ import postcssCalc from 'postcss-calc';
 // npm `postcss-convert-values@5.1.3` — cssnano sub-plugin (Phase 6f).
 import postcssConvertValues from 'postcss-convert-values';
 
+// Phase 6 band exit gate — full `normalizeCSS(opts)` from the local
+// `packages/css/src/plugins/normalize-css.ts`. Spread inside `transform.ts`
+// in production; here we run it in isolation through postcss to gate the
+// 14 cssnano sub-plugins + normalize-current-color as a unit.
+import { normalizeCSS } from '../src/plugins/normalize-css.ts';
+
 // Sheets returned by extract-stylesheets are joined with U+001E (record
 // separator) so they ride the single-string bridge protocol unambiguously.
 // Real CSS never contains U+001E.
@@ -361,6 +367,29 @@ const STAGES = {
       sortAtomicStyleSheet({ sortAtRulesEnabled: undefined, sortShorthandEnabled: undefined }),
     ]).process(css, { from: undefined });
     return result.css;
+  },
+
+  // Phase 6 band exit gate — `normalizeCSS({optimizeCss: true})` in
+  // isolation. Wires the live `packages/css/src/plugins/normalize-css.ts`
+  // through postcss with the same default opts the production transform.ts
+  // uses (`optimizeCss` defaults to `true` per JS line 59). Browserslist
+  // pinned to `chrome 100` per-call so the 5 browserslist-aware plugins
+  // (colormin, convert-values, minify-params, normalize-unicode,
+  // reduce-initial) resolve to a known target on both sides — otherwise
+  // they walk up from each plugin's `__dirname` and pick up the workspace
+  // default which can drift across caniuse-lite versions.
+  'cssnano-band': (css) => {
+    const previous = process.env.BROWSERSLIST;
+    process.env.BROWSERSLIST = 'chrome 100';
+    try {
+      const result = postcss(normalizeCSS({ optimizeCss: true })).process(css, {
+        from: undefined,
+      });
+      return result.css;
+    } finally {
+      if (previous === undefined) delete process.env.BROWSERSLIST;
+      else process.env.BROWSERSLIST = previous;
+    }
   },
 };
 
