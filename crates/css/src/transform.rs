@@ -146,6 +146,7 @@ use postcss_nested::{postcss_nested, PostcssNestedOpts};
 use postcss_normalize_whitespace::postcss_normalize_whitespace;
 
 use autoprefixer::autoprefixer::build_prefixes_default;
+use autoprefixer::precomputed::build_prefixes_from_precomputed;
 use autoprefixer::processor::Processor as AutoprefixerProcessor;
 
 use sjcompiled_utils::unique;
@@ -202,6 +203,24 @@ pub struct TransformOpts {
     pub sort_shorthand: Option<bool>,
     #[serde(rename = "classHashPrefix", default)]
     pub class_hash_prefix: Option<String>,
+    /// **Optional perf knob — NOT part of the upstream `TransformOpts`
+    /// surface.** When `Some(bytes)`, the autoprefixer prefix tables
+    /// are reconstructed from a precomputed postcard snapshot
+    /// ([`autoprefixer::precomputed`]) instead of running the
+    /// filesystem walk + browserslist resolution + full PREFIXES table
+    /// iteration on every call. Byte-equal to the slow path; verified
+    /// in `autoprefixer::precomputed::tests`.
+    ///
+    /// Falls back to [`build_prefixes_default`] when `None`. Designed
+    /// for the WASI / SWC plugin call site where caching across calls
+    /// is impossible (per-call linear-memory teardown), so the cost
+    /// must be eliminated rather than cached.
+    ///
+    /// `#[serde(skip)]` because the bytes round-trip through the NAPI
+    /// `Buffer` type at the boundary, not through `serde_json`. Inside
+    /// Rust we treat them as opaque blobs handed to autoprefixer.
+    #[serde(skip)]
+    pub precomputed_prefixes: Option<Vec<u8>>,
 }
 
 /// Mirrors upstream return shape: `{ sheets: string[]; classNames: string[] }`.
@@ -354,8 +373,16 @@ pub fn transform_css(css: &str, opts: &TransformOpts) -> Result<TransformResult,
     //     Internal lifecycle: `prepare` → loadPrefixes; OnceExit calls
     //     `prefixes.processor.remove(root)` then `prefixes.processor.add(root)`.
     if autoprefixer_enabled {
-        let prefixes = build_prefixes_default(None)
-            .map_err(|e| format!("autoprefixer build error: {e}"))?;
+        // Fast path when caller supplied a precomputed postcard
+        // snapshot: skip filesystem walk + browserslist resolution +
+        // full PREFIXES iteration. Byte-equal to the slow path
+        // (`autoprefixer::precomputed::tests::snapshot_rebuild_matches_slow_path_inputs`).
+        let prefixes = match opts.precomputed_prefixes.as_deref() {
+            Some(bytes) => build_prefixes_from_precomputed(bytes)
+                .map_err(|e| format!("autoprefixer precomputed load error: {e}"))?,
+            None => build_prefixes_default(None)
+                .map_err(|e| format!("autoprefixer build error: {e}"))?,
+        };
         let proc = AutoprefixerProcessor::new(&prefixes);
         let mut warnings: Vec<String> = Vec::new();
         // Warnings are diagnostic-only (not on the hashing path); discarded.

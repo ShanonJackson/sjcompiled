@@ -1,14 +1,36 @@
 //! Port of `crates/_vendor/autoprefixer-10.4.14/package/lib/old-value.js`.
 
-use crate::utils;
+use crate::fast_match::WordRegexp;
 use regex::Regex;
+
+/// Either the standard WORD-shape matcher (`(^|[\s,(])(NAME($|[\s(,]))`)
+/// or a caller-supplied custom regex (currently used only by Intrinsic
+/// hacks, which match a different trailing-boundary class `[\s),]`).
+///
+/// Bypasses the fast path only on the explicit `Custom` variant —
+/// the default construction path uses [`WordRegexp`], so the dominant
+/// `OldValue` traffic still goes through the fast matcher.
+#[derive(Debug, Clone)]
+pub enum OldValueRegexp {
+    Word(WordRegexp),
+    Custom(Regex),
+}
+
+impl OldValueRegexp {
+    pub fn is_match(&self, haystack: &str) -> bool {
+        match self {
+            Self::Word(r) => r.is_match(haystack),
+            Self::Custom(r) => r.is_match(haystack),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct OldValue {
     pub unprefixed: String,
     pub prefixed: String,
     pub string: String,
-    pub regexp: Regex,
+    pub regexp: OldValueRegexp,
 }
 
 impl OldValue {
@@ -18,11 +40,13 @@ impl OldValue {
         unprefixed: impl Into<String>,
         prefixed: impl Into<String>,
         string: Option<String>,
-        regexp: Option<Regex>,
+        regexp: Option<OldValueRegexp>,
     ) -> Self {
         let prefixed = prefixed.into();
         let string = string.unwrap_or_else(|| prefixed.clone());
-        let regexp = regexp.unwrap_or_else(|| utils::regexp(&prefixed, true));
+        let regexp = regexp.unwrap_or_else(|| {
+            OldValueRegexp::Word(WordRegexp::new(&prefixed))
+        });
         Self {
             unprefixed: unprefixed.into(),
             prefixed,

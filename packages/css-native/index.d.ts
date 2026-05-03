@@ -59,6 +59,18 @@ export interface TransformOpts {
   sortAtRules?: boolean;
   sortShorthand?: boolean;
   classHashPrefix?: string;
+  /**
+   * Optional postcard-encoded prefix tables produced by
+   * `precomputePrefixesDefault()`. When supplied, the autoprefixer
+   * step skips its per-call filesystem walk + browserslist resolution
+   * + full PREFIXES iteration. Byte-equal to omitting it.
+   *
+   * Designed for the WASI / SWC plugin call site where caching across
+   * calls is impossible (per-call linear-memory teardown). Node
+   * consumers can also benefit — call `precomputePrefixesDefault()`
+   * once at process startup, pass the bytes on every `transformCss`.
+   */
+  precomputedPrefixes?: Buffer;
 }
 
 export interface TransformResult {
@@ -88,3 +100,13 @@ export function transformCss(
   css: string,
   opts?: TransformOpts | null,
 ): TransformResult;
+
+/**
+ * Build the postcard prefix-tables blob once. Pass the returned
+ * `Buffer` back via `transformCss(css, { precomputedPrefixes })` on
+ * every call to skip the per-call autoprefixer setup cost.
+ *
+ * `from` mirrors `result.opts.from` — anchor for the `.browserslistrc`
+ * walk. When omitted, resolution starts at `process.cwd()`.
+ */
+export function precomputePrefixesDefault(from?: string | null): Buffer;

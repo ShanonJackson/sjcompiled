@@ -1253,6 +1253,15 @@ impl Prefixes {
     /// output is byte-clean. For corpus that does, the bytes diverge.
     /// Tracked as AGENT_4 Pass 3 follow-up: wire `HackRegistry::lookup`
     /// into the load paths here.
+    ///
+    /// Crate-internal alias [`preprocess_for_precomputed`] exposes this
+    /// step to the `precomputed` module so a snapshot-loaded `Prefixes`
+    /// can run preprocess after construction without exposing internals
+    /// outside the crate.
+    pub(crate) fn preprocess_for_precomputed(&mut self) {
+        self.preprocess();
+    }
+
     fn preprocess(&mut self) {
         let mut add = AddTable::default();
         let mut remove = RemoveTable::default();

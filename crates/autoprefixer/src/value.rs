@@ -7,11 +7,10 @@
 use indexmap::IndexMap;
 use once_cell::sync::OnceCell;
 use postcss_core::{AttrValue, Node, NodeKind};
-use regex::Regex;
 
+use crate::fast_match::WordRegexp;
 use crate::old_value::OldValue;
 use crate::prefixer::PrefixerBase;
-use crate::utils;
 
 /// `decl.attrs[_autoprefixerValues]: { prefix → value-with-prefixed-tokens }`.
 pub const ATTR_VALUES: &str = "_autoprefixerValues";
@@ -19,7 +18,7 @@ pub const ATTR_VALUES: &str = "_autoprefixerValues";
 pub struct ValueBase {
     pub prefixer: PrefixerBase,
     /// `regexpCache` — JS uses a per-instance lazy field. We cache once.
-    regexp_cache: OnceCell<Regex>,
+    regexp_cache: OnceCell<WordRegexp>,
 }
 
 impl ValueBase {
@@ -44,26 +43,18 @@ impl ValueBase {
     }
 
     /// JS: `regexp()` — lazy. Built from `utils.regexp(this.name)`.
-    pub fn regexp(&self) -> &Regex {
+    pub fn regexp(&self) -> &WordRegexp {
         self.regexp_cache
-            .get_or_init(|| utils::regexp(&self.prefixer.name, true))
+            .get_or_init(|| WordRegexp::new(&self.prefixer.name))
     }
 
     /// JS: `replace(string, prefix)` — `string.replace(regexp, '$1' + prefix + '$2')`.
     pub fn replace(&self, string: &str, prefix: &str) -> String {
         // utils::regexp captures group 1 = prefix-context (`^` or `[\s,(]`),
         // group 2 = `name` followed by `$|[\s(,]`. JS `.replace()` puts
-        // the prefix between groups 1 and 2. The Rust `regex` crate's
-        // `Replacer` API needs a function for that.
-        let re = self.regexp();
-        re.replace_all(string, |caps: &regex::Captures| {
-            format!(
-                "{}{prefix}{}",
-                caps.get(1).map(|m| m.as_str()).unwrap_or(""),
-                caps.get(2).map(|m| m.as_str()).unwrap_or(""),
-            )
-        })
-        .into_owned()
+        // the prefix between groups 1 and 2. `WordRegexp::replace_all_with_prefix`
+        // implements that exact semantic, byte-equal to the regex.
+        self.regexp().replace_all_with_prefix(string, prefix)
     }
 
     /// JS: `value(decl)` — return `decl.raws.value.raw` if it represents

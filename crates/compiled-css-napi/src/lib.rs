@@ -74,7 +74,8 @@ use napi_derive::napi;
 
 use ::css::sort::{sort as rust_sort, SortOpts as RustSortOpts};
 use ::css::transform::{transform_css as rust_transform_css, TransformOpts as RustTransformOpts};
-use ::autoprefixer::autoprefixer::build_prefixes_default;
+use ::autoprefixer::autoprefixer::{build_prefixes_default, AutoprefixerOptions as RustAutoprefixerOptions};
+use ::autoprefixer::precomputed::{encode_precomputed, precompute_prefixes};
 use ::autoprefixer::processor::Processor as AutoprefixerProcessor;
 use ::postcss_core::{parse as postcss_parse, stringify as postcss_stringify};
 
@@ -149,6 +150,15 @@ pub struct TransformOpts {
     pub sort_at_rules: Option<bool>,
     pub sort_shorthand: Option<bool>,
     pub class_hash_prefix: Option<String>,
+    /// **Optional perf knob — NOT part of the upstream `TransformOpts`
+    /// surface.** Pass postcard bytes produced by
+    /// `precomputePrefixesDefault()` to skip the per-call autoprefixer
+    /// filesystem walk + browserslist resolution + full PREFIXES table
+    /// iteration. Byte-equal to omitting it.
+    ///
+    /// `Buffer` round-trips zero-copy through NAPI. The Rust side
+    /// passes the bytes opaquely to `autoprefixer::precomputed`.
+    pub precomputed_prefixes: Option<Buffer>,
 }
 
 /// JS-shaped `TransformResult`. Field naming matches the JS contract in
@@ -186,6 +196,11 @@ pub fn transform_css(css: String, opts: Option<TransformOpts>) -> Result<Transfo
             sort_at_rules: o.sort_at_rules,
             sort_shorthand: o.sort_shorthand,
             class_hash_prefix: o.class_hash_prefix,
+            // `Buffer.as_ref()` borrows; `to_vec()` copies. We copy
+            // because `RustTransformOpts` owns the bytes — keeps
+            // lifetime management trivial. The cost is one alloc +
+            // memcpy per call (the snapshot is small, kilobyte-range).
+            precomputed_prefixes: o.precomputed_prefixes.map(|b| b.as_ref().to_vec()),
         },
         None => RustTransformOpts::default(),
     };
@@ -195,6 +210,32 @@ pub fn transform_css(css: String, opts: Option<TransformOpts>) -> Result<Transfo
         sheets: result.sheets,
         class_names: result.class_names,
     })
+}
+
+/// `precomputePrefixesDefault(from?)` — produce the postcard bytes a
+/// caller can pass back to `transformCss` via `opts.precomputedPrefixes`.
+///
+/// Runs the slow construction path (`Browsers::new` + `select` +
+/// snapshot) ONCE, returns the encoded blob as a `Buffer`. Hand that
+/// `Buffer` to subsequent `transformCss` calls and they skip the
+/// per-call setup cost.
+///
+/// `from` mirrors `result.opts.from` — pass the project root or any
+/// path under it so `.browserslistrc` resolution lands in the right
+/// scope. When `None`, `current_dir()` is the resolution anchor.
+///
+/// **WASI consumers:** the host (Node) calls this once, reads the
+/// returned bytes, and passes them through `plugin_config` on every
+/// subsequent SWC plugin invocation. The plugin sees a fresh
+/// `Buffer` per call but the bytes are constant.
+#[napi]
+pub fn precompute_prefixes_default(from: Option<String>) -> Result<Buffer> {
+    let snapshot = precompute_prefixes(RustAutoprefixerOptions {
+        from,
+        ..Default::default()
+    });
+    let bytes = encode_precomputed(&snapshot);
+    Ok(Buffer::from(bytes))
 }
 
 /// Walks a JS object's own enumerable string-keyed properties in JS-spec

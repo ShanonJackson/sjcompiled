@@ -58,5 +58,23 @@ pub mod data {
 
 pub mod hacks;
 
+/// Postcard-serializable snapshot of a fully-resolved `Prefixes`
+/// post-`select()`. Lets WASI consumers skip the filesystem walk +
+/// browserslist resolution + full PREFIXES iteration on every call by
+/// supplying a precomputed bundle. See `precomputed.rs` for the
+/// byte-equality contract.
+pub mod precomputed;
+
+/// Diagnostic counters used by the perf examples to attribute
+/// `preprocess()` time. Never affects output; safe to leave compiled
+/// in (atomic-add overhead is negligible vs the work it instruments).
+pub mod profile;
+
+/// Hand-rolled byte-equal substitutes for the WORD and SELECTOR regex
+/// shapes that dominate `preprocess()` time. Behind property tests
+/// gated by `tests/fast_match_parity.rs`; integration into the live
+/// path is feature-flagged so drift detection has a clean revert path.
+pub mod fast_match;
+
 #[cfg(test)]
 pub(crate) mod test_support;

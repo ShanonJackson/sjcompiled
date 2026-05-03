@@ -101,6 +101,7 @@ dependencies = [
  "fraction-js",
  "indexmap",
  "once_cell",
+ "postcard",
  "postcss-core",
  "postcss-value-parser",
  "regex",
@@ -116,6 +117,7 @@ dependencies = [
  "indexmap",
  "serde",
  "serde_json",
+ "sjcompiled-utils",
  "swc_core",
 ]
 

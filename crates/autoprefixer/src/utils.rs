@@ -74,7 +74,9 @@ pub fn regexp_source(word: &str, escape: bool) -> String {
 /// Compile the case-insensitive (`gi`) regex from `regexp_source`.
 pub fn regexp(word: &str, escape: bool) -> Regex {
     let src = regexp_source(word, escape);
-    Regex::new(&format!("(?i){}", src)).expect("valid regexp")
+    crate::profile::time_regex_compile(|| {
+        Regex::new(&format!("(?i){}", src)).expect("valid regexp")
+    })
 }
 
 /// Change comma list. Splits via postcss `list.comma`, calls callback,

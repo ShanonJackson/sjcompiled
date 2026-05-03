@@ -16,6 +16,10 @@ swc_core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true }
+# §2.3 dispatcher consumes JSX pragma regexes + DEFAULT_IMPORT_SOURCES
+# from sjcompiled-utils. Path-dep (workspace) so version drift between
+# the babel-plugin port and the utils crate is impossible.
+sjcompiled-utils = { path = "../sjcompiled-utils" }
 
 [package.metadata.swc]
 # When bumped, update PARITY_VERSIONS.md AND re-run the corpus.

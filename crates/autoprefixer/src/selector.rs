@@ -14,9 +14,9 @@ use postcss_core::{
 use regex::Regex;
 
 use crate::browsers::Browsers;
+use crate::fast_match::SelectorRegexp;
 use crate::old_selector::{OldSelector, SelectorView};
 use crate::prefixer::{clone_node, PrefixerBase};
-use crate::utils;
 
 /// `rule.attrs[_autoprefixerPrefixeds]: { name → { prefix → selector } }`.
 pub const ATTR_PREFIXEDS: &str = "_autoprefixerPrefixeds";
@@ -25,7 +25,7 @@ pub struct SelectorBase {
     pub prefixer: PrefixerBase,
     /// `regexpCache: Map<prefix, RegExp>` — `prefix` here is the JS
     /// argument (`undefined` keyed under the empty string).
-    regexp_cache: RefCell<HashMap<String, Regex>>,
+    regexp_cache: RefCell<HashMap<String, SelectorRegexp>>,
 }
 
 impl SelectorBase {
@@ -65,7 +65,9 @@ impl SelectorBase {
 
     /// JS: `regexp(prefix)` — lazy.
     /// `new RegExp("(^|[^:\"'=])" + escape(name|prefixed), "gi")`.
-    pub fn regexp(&self, prefix: Option<&str>) -> Regex {
+    /// Returns by value (cheap clone — wrapper either holds a small
+    /// `SelectorMatcher` or a refcounted regex internal).
+    pub fn regexp(&self, prefix: Option<&str>) -> SelectorRegexp {
         let key = prefix.unwrap_or("").to_string();
         if let Some(re) = self.regexp_cache.borrow().get(&key) {
             return re.clone();
@@ -74,9 +76,7 @@ impl SelectorBase {
             Some(p) => self.prefixed(p),
             None => self.prefixer.name.clone(),
         };
-        let pattern =
-            format!(r#"(?i)(^|[^:"'=]){}"#, utils::escape_regexp(&target));
-        let re = Regex::new(&pattern).expect("valid selector regex");
+        let re = SelectorRegexp::new(&target);
         self.regexp_cache.borrow_mut().insert(key, re.clone());
         re
     }
@@ -91,14 +91,7 @@ impl SelectorBase {
     pub fn replace(&self, selector: &str, prefix: &str) -> String {
         let re = self.regexp(None);
         let prefixed = self.prefixed(prefix);
-        re.replace_all(selector, |caps: &regex::Captures| {
-            format!(
-                "{}{}",
-                caps.get(1).map(|m| m.as_str()).unwrap_or(""),
-                prefixed
-            )
-        })
-        .into_owned()
+        re.replace_all_with(selector, &prefixed)
     }
 
     /// JS: `prefixeds(rule)` — populate per-rule cache of all possible

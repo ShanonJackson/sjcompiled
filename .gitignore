@@ -5,3 +5,12 @@ dist/
 *.log
 bun.lockb
 parity-harness/strip-runtime/_scratch/
+# §1.8 synth corpus is regenerable from the deterministic seed in
+# synthesize-fixtures.mjs; checking in 1000 small fixtures bloats the
+# repo and obscures real fixture diffs. Run
+# `bun parity-harness/strip-runtime/synthesize-fixtures.mjs` to
+# rehydrate before `bun test parity-harness/strip-runtime/harness.test.ts`.
+parity-harness/strip-runtime/fixtures/synthesized/
+# §2.0 babel-plugin fixtures are regenerable from the source tests via
+# extract-fixtures.mjs. The harness self-bootstraps if absent.
+parity-harness/babel-plugin/fixtures/

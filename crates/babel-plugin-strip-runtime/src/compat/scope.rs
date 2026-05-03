@@ -91,10 +91,26 @@ impl ModuleScope {
 
     /// Mark the declarator with this name for removal in
     /// `apply_removals`. No-op if `name` was never indexed.
+    ///
+    /// Also clears the cached string value so subsequent
+    /// `get_string_binding(name)` calls return `None`. This mirrors
+    /// Babel's immediate `binding.path.remove()` semantics: in the JS
+    /// plugin, `parentPath.scope.getBinding(name)` returns `undefined`
+    /// after a remove, so a second CC site referencing the same `_n`
+    /// binding (legal — Compiled hoists shared atomic-CSS string
+    /// declarators above multiple components) finds nothing and skips.
+    /// Without this clear, the Rust port pushes the same rule string
+    /// once per CC site that references it, multiplying duplicates in
+    /// the require-injection / sidecar output. Surfaced by §1.8 synth
+    /// fixture `synth-00042-automatic-extract-adds-require` (two
+    /// components sharing one declarator). The location is kept on
+    /// `pending` so `apply_removals` can still drop the declarator
+    /// itself in `Program::exit`.
     pub fn mark_for_removal(&mut self, name: &str) {
-        if let Some((loc, _)) = self.bindings.get(name) {
+        if let Some((loc, cached)) = self.bindings.get_mut(name) {
             self.pending
                 .insert((loc.item_index, loc.declarator_index));
+            *cached = None;
         }
     }
 
@@ -306,6 +322,20 @@ mod tests {
         let scope2 = ModuleScope::from_module(&m);
         assert!(scope2.get_string_binding("_a").is_none());
         assert_eq!(scope2.get_string_binding("_b"), Some("rule_b"));
+    }
+
+    #[test]
+    fn mark_for_removal_invalidates_subsequent_lookup() {
+        // Babel parity: after `binding.path.remove()`, the scope's
+        // `getBinding(name)` returns undefined, so a second CC site
+        // referencing the same declarator pushes nothing. The Rust
+        // port mirrors this by clearing the cached string value on
+        // `mark_for_removal`.
+        let m = module(vec![const_str("_1", "._abc{color:red}")]);
+        let mut scope = ModuleScope::from_module(&m);
+        assert_eq!(scope.get_string_binding("_1"), Some("._abc{color:red}"));
+        scope.mark_for_removal("_1");
+        assert!(scope.get_string_binding("_1").is_none());
     }
 
     #[test]

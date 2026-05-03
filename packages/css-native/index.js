@@ -32,3 +32,8 @@ const binary = require(path.join(__dirname, platformBinaryName()));
 module.exports.sort = binary.sort;
 module.exports.autoprefixer = binary.autoprefixer;
 module.exports.transformCss = binary.transformCss;
+// Optional perf knob — produces a postcard `Buffer` of the autoprefixer
+// prefix tables. Pass it back via `opts.precomputedPrefixes` on every
+// `transformCss` call to skip the per-call autoprefixer setup cost.
+// Byte-equal to omitting it.
+module.exports.precomputePrefixesDefault = binary.precomputePrefixesDefault;

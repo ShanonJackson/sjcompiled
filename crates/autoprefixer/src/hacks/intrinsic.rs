@@ -168,7 +168,15 @@ impl Intrinsic {
             self.base.prefixer.name.clone(),
             prefixed.clone(),
             Some(prefixed.clone()),
-            Some(intrinsic_regexp(&prefixed)),
+            // Intrinsic uses its own trailing-boundary class `[\s),]`
+            // (NOT the standard `[\s(,]`), so we route through the
+            // `Custom` variant rather than `WordRegexp`. This bypasses
+            // the fast path for the 5 Intrinsic-named values
+            // (max-content, min-content, fit-content, fill,
+            // fill-available, stretch) — preserves byte-equality.
+            Some(crate::old_value::OldValueRegexp::Custom(
+                intrinsic_regexp(&prefixed),
+            )),
         )
     }
 

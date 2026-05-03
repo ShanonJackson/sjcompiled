@@ -6,26 +6,26 @@
 //! keeps the 1:1 file mapping while sidestepping Rust's lack of class
 //! inheritance.
 
-use regex::Regex;
+use crate::fast_match::SelectorRegexp;
 
 /// View of a `Selector` instance — only the bits OldSelector consumes.
 #[derive(Debug, Clone)]
 pub struct SelectorView {
     pub prefixed: String,
-    pub regexp: Regex,
-    pub prefixeds: Vec<(String, Regex)>,
+    pub regexp: SelectorRegexp,
+    pub prefixeds: Vec<(String, SelectorRegexp)>,
     pub unprefixed: String,
-    pub name_regexp: Regex,
+    pub name_regexp: SelectorRegexp,
 }
 
 #[derive(Debug, Clone)]
 pub struct OldSelector {
     pub prefix: String,
     pub prefixed: String,
-    pub regexp: Regex,
-    pub prefixeds: Vec<(String, Regex)>,
+    pub regexp: SelectorRegexp,
+    pub prefixeds: Vec<(String, SelectorRegexp)>,
     pub unprefixed: String,
-    pub name_regexp: Regex,
+    pub name_regexp: SelectorRegexp,
 }
 
 impl OldSelector {

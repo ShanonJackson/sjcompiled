@@ -19,6 +19,7 @@ once_cell.workspace = true
 regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+postcard.workspace = true
 
 [build-dependencies]
 # `preserve_order` is load-bearing — JS `Object.keys` iteration order
@@ -32,3 +33,13 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # canonicalizes via recursive object-key sort on both sides, but the
 # raw oracle JSON is parsed for the diff.
 serde_json = { version = "1", features = ["preserve_order"] }
+
+[features]
+# Hand-rolled byte-equal substitutes for the WORD/SELECTOR regex shapes
+# in `prefixer.rs::preprocess` (~93% of preprocess time per profile).
+# Default OFF — flip to default ON only after parity-runner 337/337
+# confirms byte-equality with the feature enabled.
+#
+# Enable from the workspace via `--features autoprefixer/fast-match` or
+# from a downstream crate via its own forwarding feature.
+fast-match = []

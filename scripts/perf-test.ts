@@ -6,6 +6,21 @@
 
 import { transformCss, type TransformOpts } from '../packages/css/src/transform';
 
+// Native-only API: pre-build the autoprefixer prefix tables once, hand
+// them to every Rust call. Byte-equal to omitting them; intended to
+// neutralize the per-call autoprefixer setup cost (filesystem walk +
+// browserslist resolution + full PREFIXES iteration). The bytes are
+// the WASI delivery shape — host produces them once, plugin receives
+// them via plugin_config on every call.
+const native = require('../packages/css-native');
+const precomputedPrefixes: Buffer | null =
+  typeof native.precomputePrefixesDefault === 'function'
+    ? native.precomputePrefixesDefault()
+    : null;
+if (!precomputedPrefixes) {
+  console.warn('[perf-test] precomputePrefixesDefault unavailable — Rust path will use slow autoprefixer setup.');
+}
+
 const SAMPLE_CSS = `
   display: flex;
   flex-direction: column;
@@ -48,14 +63,22 @@ const OPTS: TransformOpts = {
 function bench(label: string, engine: 'js' | 'rust', durationMs = 3000) {
   process.env.COMPILED_CSS_ENGINE = engine;
 
+  // Rust engine accepts a precomputed prefix-tables Buffer. JS engine
+  // ignores unknown opts. Type-cast since `TransformOpts` from the
+  // immutable JS package doesn't model the Rust-only field.
+  const opts: TransformOpts =
+    engine === 'rust' && precomputedPrefixes
+      ? ({ ...OPTS, precomputedPrefixes } as TransformOpts)
+      : OPTS;
+
   // Warmup
-  for (let i = 0; i < 50; i++) transformCss(SAMPLE_CSS, OPTS);
+  for (let i = 0; i < 50; i++) transformCss(SAMPLE_CSS, opts);
 
   let ops = 0;
   const start = performance.now();
   const deadline = start + durationMs;
   while (performance.now() < deadline) {
-    transformCss(SAMPLE_CSS, OPTS);
+    transformCss(SAMPLE_CSS, opts);
     ops++;
   }
   const elapsed = (performance.now() - start) / 1000;
