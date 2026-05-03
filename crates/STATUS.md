@@ -3,6 +3,325 @@
 End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 `PARITY_VERSIONS.md`.
 
+## Phase 6h ship — `cssnano-preset-default@5.2.14` orchestrator ported (2026-05-03)
+
+Closes the cssnano band. Convert-values landed earlier this session,
+unblocking 6h. The preset itself is a **tuple-list factory** — upstream
+`src/index.js` returns `{ plugins: [[creator, options], ...] }` in a
+fixed source order and invokes nothing. The byte-affecting layer is the
+*consumer* (`packages/css/src/plugins/normalize-css.ts`) which filters
+the list by `plugin.postcssPlugin` against `BASE_PLUGINS ∪ PROD_PLUGINS`
+and applies the survivors **in preset source order** (Anomaly #7).
+
+### What landed this session
+
+1. `crates/_vendor/cssnano-preset-default-5.2.14/` — vendored upstream
+   `src/index.js` (132 LOC) + `types/index.d.ts` + `package.json` +
+   `LICENSE-MIT` + `README.md`. md5 verified byte-equal against the
+   bun-resolved `node_modules/.bun/cssnano-preset-default@5.2.14+...`
+   tree.
+2. `crates/cssnano-preset-default/src/lib.rs` — full port of
+   `src/index.js`. Public surface: `default_preset(opts: &PresetOpts)
+   -> Preset { plugins: Vec<PluginEntry> }`. `PluginEntry { name,
+   apply, on_afm_hashing_path }`. The 29-entry list is laid out 1:1
+   with upstream `src/index.js:96-126` source order. Plugin names
+   sourced from `creator().postcssPlugin` of the bundled plugin
+   versions (extracted via `node -e require('cssnano-preset-default')...`).
+3. **Apply wiring.** Each of the 14 plugins on AFM's hashing path
+   (`BASE_PLUGINS ∪ PROD_PLUGINS` from `normalize-css.ts:13-50`) gets
+   a wrapper that calls its Rust port with `Default::default()` opts —
+   matches Anomaly #8 (`normalize-css.ts:69` calls `creator()` with
+   no args, so the second tuple slot is dropped before reaching the
+   plugin). The remaining 15 plugins (svgo, normalize-charset,
+   discard-overridden, …, css-declaration-sorter, raw-cache) get
+   `apply_filtered_out` which returns
+   `PluginError::generic("cssnano-preset-default", "plugin not on AFM
+   hashing path … drift detected if invoked")` — fails loud if a future
+   `normalize-css.ts` change ever admits one.
+4. **Drift-detection unit tests** (`tests` mod, 3/3 pass):
+   - `manifest_matches_upstream_source_order` pins the 29-entry list
+     against the upstream order extracted from JS.
+   - `afm_hashing_path_subset_matches_normalize_css` asserts exactly
+     the 14 plugins from `BASE_PLUGINS ∪ PROD_PLUGINS` have
+     `on_afm_hashing_path: true` — catches drift in the consumer
+     filter.
+   - `filtered_out_apply_returns_drift_error` pins the error wiring
+     (plugin = "cssnano-preset-default", message contains "not on AFM
+     hashing path").
+
+### Bug-for-bug parity preserved
+
+- **Source order is the EXECUTION order** (Anomaly #7). The Rust
+  manifest matches `src/index.js:96-126` exactly:
+  `discard-comments → minify-gradients → reduce-initial → svgo
+   → normalize-display-values → reduce-transforms → colormin
+   → normalize-timing-functions → calc → convert-values
+   → ordered-values → minify-selectors → minify-params
+   → normalize-charset → discard-overridden → normalize-string
+   → normalize-unicode → minify-font-values → normalize-url
+   → normalize-repeat-style → normalize-positions
+   → normalize-whitespace → merge-longhand → discard-duplicates
+   → merge-rules → discard-empty → unique-selectors
+   → css-declaration-sorter → cssnano-util-raw-cache`.
+- **Anomaly #8**: each Rust apply wrapper calls its plugin port with
+  `Default::default()` opts (matches `creator()` no-args invocation).
+  The second tuple slot's value (e.g. `options.convertValues = {
+  length: false }`) is recorded conceptually but never reaches the
+  plugin on AFM's path.
+- **Anomaly #5**: entry #24 is `postcss-discard-duplicates` v5.1.0
+  (filtered out — apply panics). The v6.0.0 used by `sort.ts` lives
+  in a different crate (`postcss-discard-duplicates`).
+- **Filtered-out apply panics loudly** rather than no-op'ing —
+  any drift in `normalize-css.ts`'s filter that admits a stub-applied
+  plugin surfaces as a hard error rather than silent byte divergence.
+
+### Verification gates run
+
+| Gate                                                          | Status |
+|---------------------------------------------------------------|--------|
+| `cargo build -p cssnano-preset-default`                       | OK |
+| `cargo test  -p cssnano-preset-default`                       | 3/3 unit tests pass |
+| `cargo test  -p cssnano-postcss-discard-comments`             | 15/15 (no regression) |
+| `cargo test  -p cssnano-postcss-minify-gradients`             | 16/16 (no regression) |
+| `cargo test  -p cssnano-postcss-colormin`                     | 30/30 (no regression) |
+
+### Out of scope (Phase 6 BAND exit gate)
+
+The **per-row** Phase 6h deliverable is the structural port + manifest
+pinning (above). Per `EXECUTION_PLAN.md:348`, the **Phase 6 band exit
+gate** is a separate concern — corpus diff with the entire cssnano
+subset spliced into the JS pipeline (Rust replaces `normalize-css.ts`'s
+output) zero-byte. That's a follow-up: it requires either porting
+`normalize-css.ts` into a Rust orchestrator wrapper that consumes
+`default_preset()`, or wiring it into the `transformCss` NAPI bridge
+when Phase 8b lands. Convert-values + autoprefixer being live makes
+the gate runnable now in principle; the orchestrator wrapper hasn't
+been written yet.
+
+## Phase 6f ship — `cssnano-postcss-convert-values@5.1.3` byte-clean (2026-05-03)
+
+The **last cssnano sub-plugin**. With this landing, every cssnano
+sub-plugin called by `cssnano-preset-default@5.2.14` (Phase 6a–6g) is
+byte-clean. Phase 6h (the orchestrator) is now unblocked.
+
+Browserslist-aware. Walks every Decl, skipping `flex*` / `--*` /
+`notALength` props; for each Word inside (excluding `url()` args),
+parses number+unit, converts to the shortest equivalent across
+length / time / angle conv tables, and clamps `opacity` /
+`shape-image-threshold` to `[0, 1]`.
+
+### What landed this session
+
+1. `crates/_vendor/postcss-convert-values-5.1.3/` — vendored upstream
+   `src/index.js` (207 LOC) + `src/lib/convert.js` (85 LOC) + `types/`
+   + `package.json` + `LICENSE-MIT` + `README.md`. Two source files
+   map 1:1 to two Rust modules.
+2. `crates/_vendor/POSTCSS_CONVERT_VALUES_5.1.3_REAUDIT.md` — full
+   audit of the upstream source: every helper, every JS quirk, every
+   bug-for-bug behavior. Notes that despite earlier scaffold claims,
+   **the plugin does NOT use `fraction.js`** — pure `Number` /
+   `Math.round` / `Math.pow` arithmetic.
+3. `crates/cssnano-postcss-convert-values/src/lib.rs` — full port of
+   `src/index.js`. Public surface: `postcss_convert_values(root, opts)`
+   + `postcss_convert_values_with_browsers(root, opts, browsers)` for
+   tests that need to pin the browserslist resolution. Module-level
+   helpers mirror upstream verbatim (`is_length_unit`,
+   `is_not_a_length`, `is_keep_when_zero`, `is_keep_zero_percent`,
+   `strip_leading_dot`, `transform_value`, `parse_word`,
+   `clamp_opacity`, `should_keep_zero_unit`, `js_math_round`).
+4. `crates/cssnano-postcss-convert-values/src/lib/convert.rs` — port
+   of `src/lib/convert.js`. Public surface: `convert(number, unit, opts)`
+   + `drop_leading_zero(number)`. Three insertion-ordered conv tables
+   (length / time / angle). Internal `transform_internal` runs the
+   filter-then-`map`-then-`reduce` pipeline; `reduce` ties favor the
+   LATER candidate per upstream's strict-`<` reduce.
+5. `crates/cssnano-postcss-convert-values/Cargo.toml` — dropped the
+   `fraction-js` workspace dep (incorrect prior scaffold claim).
+   Final deps: `postcss-core`, `postcss-value-parser`,
+   `browserslist-shim`.
+6. `crates/parity-runner/Cargo.toml` — added
+   `cssnano-postcss-convert-values` workspace dep.
+7. `crates/parity-runner/src/stages.rs` — `Stage::PostcssConvertValues`
+   variant + handler. Default opts (no opts in upstream's consumer call).
+8. `crates/parity-runner/src/main.rs` — `postcss-convert-values`
+   stage-name dispatch.
+9. `packages/css/scripts/parity-bridge.mjs` — added
+   `import postcssConvertValues from 'postcss-convert-values'` and the
+   matching STAGES entry running the plugin with default opts.
+10. Root `package.json` — added `postcss-convert-values` to
+    `devDependencies` (`5.1.3`) and `overrides` (`5.1.3`) so bun pins
+    the AFM-resolved version. `bun install` re-locked cleanly.
+11. `crates/parity-runner/corpus/postcss-convert-values/` — 40
+    fixtures: blank, no-units, ms↔s conversion, pc-keeps-shorter,
+    96px→6pc tie (later candidate wins per strict-`<` reduce),
+    in→pc, pt-passthrough, turn→deg, zero-strips-px / zero-strips-%
+    / zero-keeps-fr, keepWhenZero (line-height, stroke-width,
+    stroke-dashoffset), flex / `--` / notALength bails, calc inner,
+    min/max/clamp inner, url() skip, opacity clamp above/below/%,
+    shape-image-threshold, @keyframes stroke-dasharray (keeps unit),
+    @-webkit-keyframes (does NOT match — vendor-prefix bug),
+    leading-zero strip, `.5px` dot-only-unit path, uppercase units,
+    var() passthrough, hsl(...) inner walks, keepZeroPercent under
+    no-IE-11 default browserslist (no special handling), multi-value
+    decl, nested @media, linear-gradient passthrough (function not
+    in calc/min/max set, so descended normally), -0px / -0em,
+    `1e2px` exponent, decimal pc, multiple turns, unitless 0.
+
+### Bug-for-bug parity preserved
+
+- **`reduce` ties favor LATER candidate.** `reduce((a,b) => a.length <
+  b.length ? a : b)` is strict-`<`; on ties the predicate is false →
+  yields `b`. Replicated via `iter.fold(first, |a, b| if a.len() <
+  b.len() { a } else { b })`.
+- **`-webkit-keyframes` does NOT match `keyframes`** (lowercased
+  compare against the literal `keyframes`). Replicated — vendor-
+  prefixed at-rules fall through and the 0px stripping fires.
+- **`stripLeadingDot` only inspects byte 0.** Multi-dot units like
+  `..px` lose only one dot. Replicated.
+- **`pair.number.includes('.')` for the px-precision branch** uses
+  the ORIGINAL number string. `1e2px` (no dot) skips the rounder;
+  `1.5e2px` triggers it. The rounded result uses `parseFloat` of the
+  CONVERTED string, which is "the px-or-shorter form" — so the
+  precision rounding can pick up post-conversion bytes. Replicated.
+- **`Number(pair.number)` parsing matches Rust `f64::from_str`**
+  byte-for-byte across the ASCII numeric grammar value-parser emits.
+- **Walker callback returns `Some(false)`** for `calc/min/max/clamp/
+  hsl/hsla` AND for `url`, matching upstream's explicit `return false`.
+  For other Function names and non-Word/non-Function nodes, returns
+  `Some(true)` (descend) — matches JS `undefined`-truthy default.
+- **Per-call browserslist resolution.** Upstream resolves browsers in
+  `pluginCreator`; under our wiring `browserslist-shim::resolve("",
+  true)` returns the AFM defaults. Result is consumed only via
+  `.includes('ie 11')` — under 4.24.2 defaults this is `false`, so
+  the `keepZeroPercent` branch never fires.
+- **`Math.round` divergence.** JS `Math.round(-0.5)` → `-0`, Rust
+  `f64::round(-0.5)` → `-1`. Local `js_math_round(n)` uses
+  `(n + 0.5).floor()` — same helper postcss-calc uses (NOT shared
+  to avoid coupling).
+
+### Verification gates run
+
+| Gate                                                                                            | Status |
+|-------------------------------------------------------------------------------------------------|--------|
+| `cargo build -p cssnano-postcss-convert-values`                                                 | OK |
+| `cargo test  -p cssnano-postcss-convert-values`                                                 | 34/34 unit tests pass |
+| `parity-runner --stage postcss-convert-values --corpus crates/parity-runner/corpus/postcss-convert-values` | 40/40 byte-clean |
+| `parity-runner --stage postcss-convert-values ... --determinism`                                | 40/40 deterministic |
+| `cargo test --workspace --no-fail-fast`                                                         | **1023/1023 passed, 0 failed, 1 ignored** |
+| `parity-runner --stage postcss-calc`                                                            | 40/40 (no regression) |
+| `parity-runner --stage postcss-minify-gradients`                                                | 39/39 (no regression) |
+| `parity-runner --stage postcss-colormin`                                                        | 30/30 (no regression) |
+| `parity-runner --stage postcss-normalize-unicode`                                               | 27/27 (no regression) |
+| `parity-runner --stage postcss-reduce-initial`                                                  | 30/30 (no regression) |
+| `parity-runner --stage sort`                                                                    | 12/12 (no regression) |
+
+### Phase 6 status
+
+**Phase 6 is now COMPLETE for sub-plugins.** Every cssnano-preset-default
+sub-plugin (6a–6g) is byte-clean against the AFM-pinned JS oracle:
+
+- 6a: postcss-discard-comments ✅
+- 6b: postcss-normalize-string / -positions / -timing-functions / -url ✅
+- 6c: postcss-minify-selectors ✅
+- 6d: postcss-ordered-values / postcss-calc ✅
+- 6e: postcss-normalize-unicode / postcss-reduce-initial ✅
+- 6f: postcss-minify-params / **postcss-convert-values (this session)** ✅
+- 6g: postcss-minify-gradients / postcss-colormin ✅
+
+**Phase 6h** (cssnano-preset-default orchestrator) is now unblocked
+and is the next logical pickup.
+
+## Phase 7 ship — browserslist-shim AFM parity gate CLOSED (2026-05-03)
+
+The previously-OPEN `oxc_browserslist`-bundled-snapshot drift gate
+(documented in prior `crates/autoprefixer/HANDOVER.md` §6) is closed
+for AFM's actual surface. Pre-condition for `Prefixes::new` /
+`processor.rs` work — `Browsers::new(...)` now returns byte-correct
+`selected` lists for AFM's `.browserslistrc` against the
+`caniuse-db@1.0.30001766` pinned snapshot.
+
+### What landed this session
+
+1. **Hybrid resolver in `crates/browserslist-shim/src/index.rs`** —
+   `resolve_with` checks every atom against the AFM grammar
+   (`crates/browserslist-shim/src/parse.rs::try_parse_atom_afm`). If
+   every atom parses, resolves against `caniuse-db` directly
+   (byte-correct). Otherwise falls through to `oxc_browserslist` —
+   unchanged from pre-closure behaviour, used by Phase 6 cssnano
+   consumers whose output reduces to drift-stable booleans.
+2. **AFM grammar at `crates/browserslist-shim/src/parse.rs`** — two
+   `QueryAtom` variants: `LastNBrowserVersions { n, browser }` (the
+   single atom AFM's `.browserslistrc` contains) and `BrowserVersion
+   { browser, version }` (the literal pair the Firefox ESR rewrite
+   expands into). Browser-name aliasing per `browserslist@4.24.2` —
+   `Edge → edge`, `iOS → ios_saf`, `ChromeAndroid → and_chr`, etc.
+   `try_parse_all_afm` is unanimous-or-none — partial mixes route to
+   the fallback in entirety to avoid silent half-drift.
+3. **AFM fixture at `crates/browserslist-shim/tests/fixtures/afm/.browserslistrc`** —
+   byte-copy of AFM's `jira/.browserslistrc`, SHA256
+   `08c8e1bf56ad773621c9b264971365f66f78a808d6d369a4ea9584a02da459cb`
+   (verified by `tests/afm_parity.rs::afm_browserslistrc_fixture_sha256_matches`
+   via inline pure-Rust SHA-256 to avoid a dev-dep).
+4. **End-to-end fixture-driven parity test at
+   `crates/browserslist-shim/tests/afm_parity.rs`** — resolves the
+   fixture via `resolve_with("", { path: fixture_dir })` and asserts
+   the output matches the frozen 14-entry oracle list AFM's runtime
+   instrumentation captured. Drift here is a hash-rotation event.
+5. **Autoprefixer parity test rewritten at
+   `crates/autoprefixer/tests/browserslist_parity.rs`** — the previously
+   `#[ignore]`'d `browserslist_shim_matches_js_oracle_for_canonical_queries`
+   omnibus is replaced by `browserslist_shim_matches_js_oracle_for_afm_browserslistrc`
+   which spawns bun with `browserslist@4.24.2` against the SAME AFM
+   fixture and compares element-by-element to the Rust shim's output.
+   Active, passing.
+6. **`Browsers::new` plumbs `path`** — `crates/autoprefixer/src/browsers.rs::Browsers::parse_static`
+   forwards `BrowsersOptions::from` to `ResolveOpts::path`. When `from`
+   is unset, falls back to `std::env::current_dir()` matching
+   `browserslist@4.24.2`'s `prepareOpts` defaulting (index.js:366).
+   AFM's `browserslist(null, { path: cwd })` call thus walks up to
+   `jira/.browserslistrc` and resolves byte-correctly.
+7. **`crates/browserslist-shim/AFM_PORT_NOTES.md`** — full architecture
+   doc: hybrid rationale, AFM grammar table, resolver semantics,
+   fallback semantics, Firefox ESR override, "what NOT to remove"
+   guidance per the user's explicit request, protocol for adding new
+   atoms when AFM's `.browserslistrc` evolves.
+8. **`crates/autoprefixer/HANDOVER.md` §1 + §6 + §2 §5 updates** —
+   floor count (60 passing, 0 ignored), gate-closure description,
+   stale `caniuse-lite: 1.0.30001690` references corrected to
+   `1.0.30001766` (the actual workspace pin per `PARITY_VERSIONS.md`).
+
+### Test counts (post-closure)
+
+| Crate | Pre | Post | Notes |
+|---|---|---|---|
+| `browserslist-shim` | 15 passing, 0 ignored | **29 passing**, 0 ignored | +10 unit (parse + AFM fast-path), +4 integration (fixture + SHA self-test) |
+| `autoprefixer` | 58 passing, 1 ignored | **60 passing**, 0 ignored | +2 (omnibus replacement) — net +2, gate count 1 → 0 |
+
+Downstream consumers (`cssnano-postcss-normalize-unicode`,
+`postcss-colormin`, `postcss-minify-params`, `caniuse-api`,
+`caniuse-db`) all green via the unchanged oxc fallback.
+
+### What this DOES NOT close
+
+- `Prefixes::new` body — still `unimplemented!()`. This work was the
+  pre-condition; the constructor port is the next session's unit. See
+  `crates/autoprefixer/HANDOVER.md` §1 + §12.
+- `processor.rs` main walk — depends on `Prefixes::new`. ~720 LOC.
+- Generic `Prefixes::new` against arbitrary queries — only AFM-shaped
+  queries are byte-clean. AFM never calls `defaults` etc., but a stray
+  test that did would still drift.
+
+### Source-of-truth pointers for the next agent
+
+- `BROWSER_LIST_FROM_AFM.md` (workspace root) — AFM dependency
+  engineer's runtime-instrumentation report. Defines the AFM surface.
+- `crates/browserslist-shim/AFM_PORT_NOTES.md` — port architecture +
+  what NOT to remove + add-an-atom protocol.
+- `crates/browserslist-shim/tests/fixtures/afm/.browserslistrc` —
+  byte-frozen AFM input. SHA256 asserted by integration test.
+
+---
+
 ## Phase 6g ship — `cssnano-postcss-minify-gradients@5.1.1` byte-clean (2026-05-03)
 
 Linear / radial / `-webkit-(repeating-)?(linear|radial)-gradient` stop
@@ -2400,14 +2719,14 @@ header. **No code changes required** — all 489 tests still green.
 | 6b | postcss-normalize-url@5.1.0 | **DONE** — byte-clean across 60-entry corpus, deterministic JS oracle |
 | 6c | postcss-minify-selectors@5.2.1 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. Required `postcss-selector-parser` descendant-Combinator drift fix; `postcss-nested` workaround dropped as a follow-up. |
 | 6d | postcss-ordered-values@5.1.3 | **DONE** — byte-clean across 36-entry corpus, deterministic JS oracle. 19 unit + 5 helper tests. |
-| 6d | postcss-calc@8.2.4 | **SCAFFOLDED** — calc expression evaluator; high diff risk on float math. |
+| 6d | postcss-calc@8.2.4 | **DONE** — byte-clean across 40-entry corpus, deterministic JS oracle. See "Phase 6d ship — `postcss-calc@8.2.4` byte-clean" below. |
 | 6e | postcss-normalize-unicode@5.1.1 | **DONE** — byte-clean across 27-entry corpus, deterministic JS oracle. 7 unit tests. Browserslist-aware (`is_legacy = false` under default 4.24.2 query — no IE 10/11 / Edge ≤15). See "Phase 6e ship — postcss-normalize-unicode" above. |
 | 6e | postcss-reduce-initial@5.1.2 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. 12 unit tests. |
-| 6f | postcss-convert-values@5.1.3 | **SCAFFOLDED** — uses fraction-js. |
+| 6f | postcss-convert-values@5.1.3 | **DONE** — byte-clean across 40-entry corpus, deterministic JS oracle. 34 unit tests. Browserslist-aware (`browsers.includes('ie 11') = false` under default 4.24.2 query). NB: previous scaffold note claimed `fraction-js` usage; **incorrect** — upstream uses plain `Number`/`Math.round`, no fraction.js dep. See "Phase 6f ship — `cssnano-postcss-convert-values@5.1.3` byte-clean" at top of file. |
 | 6f | postcss-minify-params@5.1.4 | **DONE** — byte-clean across 42-entry corpus, deterministic JS oracle. 14 unit tests. Browserslist-aware (`legacy = false` under default 4.24.2 query — no IE 10/11). See "Phase 6f ship — postcss-minify-params" below. |
-| 6g | postcss-minify-gradients@5.1.1 | **SCAFFOLDED** — uses colord. |
+| 6g | postcss-minify-gradients@5.1.1 | **DONE** — byte-clean across 39-entry corpus, deterministic JS oracle. 16 unit tests. See "Phase 6g ship — `cssnano-postcss-minify-gradients@5.1.1` byte-clean" at top of file. |
 | 6g | postcss-colormin@5.3.1 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. Required `colord` minify drift fix + 392-vector JS-parity gate (see "Phase 6g foundation" entry). The highest-risk cssnano plugin is now complete. |
-| 6h | cssnano-preset-default@5.2.14 (orchestrator) | **SCAFFOLDED** |
+| 6h | cssnano-preset-default@5.2.14 (orchestrator) | **DONE** — tuple-list factory ported 1:1, 29-entry source order pinned against upstream, AFM hashing-path subset (14 plugins) wired with real `apply` fns, remaining 15 wired to `apply_filtered_out` for drift detection. 3/3 unit tests pass. Phase 6 *band* exit gate (full pipeline byte-clean replacing `normalize-css.ts` output) is a separate follow-up — see "Phase 6h ship — `cssnano-preset-default@5.2.14` orchestrator ported" at top of file. |
 | 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **All base classes fully ported:** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs`, `browsers.rs`, `at_rule.rs`, `value.rs`, `selector.rs`, `declaration.rs`, `resolution.rs`, plus `prefixes.rs` registry skeleton with `register_hacks(reg)` append-only block. **`data/prefixes.rs` byte-clean** — 183 entries, codegen via `build.rs` from vendored JS through `bun`, 4 parity gates (canonical-JSON byte-equal, entry count, key order, caniuse-lite version pin). **59 tests passing (53 unit + 4 data parity + 2 browserslist parity active; 1 browserslist parity gate ignored, see "Phase 7 ship — browserslist-shim parity gate" below).** (Latest: `+1` active test `browserslist_shim_firefox_esr_matches_js_oracle` pinning the `rewrite_firefox_esr` shim path against `browserslist@4.24.2` JS oracle; `+1` active test `workspace_browserslist_pin_is_424_2` pinning `require('browserslist').version === '4.24.2'` after fixing the missing devDependency entry that was floating workspace resolution to 4.28.2 (root `package.json` now lists browserslist in BOTH `overrides` AND `devDependencies`); `+1 ignored` omnibus gate test `browserslist_shim_matches_js_oracle_for_canonical_queries` documenting the open caniuse-lite snapshot drift between `oxc_browserslist`'s bundled snapshot and the workspace pin 1.0.30001766. Prior: regression test in `resolution.rs::prefix_query_o_dpcm_uses_simplify` pinning the JS `value.simplify()` call after dpcm/dpi unit conversion — was a latent byte-divergence in the `-o-` resolution branch; fixed via `f.simplify(None)` after fraction-js audit surfaced the missing call.) Hacks agent **unblocked**. Still stubbed: `supports.rs`, `transition.rs` (heavy, hacks rarely subclass), `processor.rs`, `info.rs`, `autoprefixer.rs`, all 58 hacks, `Prefixes::new` orchestrator body. Split contract: see "Phase 7 split contract" section below. See also "Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix". |
 | 8a | `sort()` NAPI bridge + sort.ts engine flag | **DONE** — 12/12 corpus byte-clean end-to-end on win32-x64-msvc. See "Phase 8a ship" section below. |
 | 8b | `transformCss` NAPI bridge + transform.ts engine flag | **NOT STARTED** — blocks on Phase 5/6/7 plugin ports. |
@@ -2415,7 +2734,9 @@ header. **No code changes required** — all 489 tests still green.
 ## Test totals
 
 `RUSTFLAGS="" cargo test --workspace --no-fail-fast`:
-- **502 tests pass / 0 fail / 1 ignored / 0 failed suites.**
+- **1023 tests pass / 0 fail / 1 ignored / 0 failed suites.**
+  (Phase 6f `postcss-convert-values` adds 34 unit tests; total grew
+  from 974 → 1023, ~+49 across all crates.)
   (12 from Phase 5b `postcss-normalize-whitespace`,
   12 from Phase 6a `postcss-discard-comments`,
   7 from Phase 6b `postcss-normalize-string`,
@@ -2967,16 +3288,13 @@ darwin-arm64 once `transformCss` is byte-clean.
 > The phase-progress table earlier in this file is the authoritative
 > per-row state. This section gives the same picture as a roadmap.
 
-**2 cssnano plugins still scaffolded** (Phase 6 band):
-
-1. `postcss-convert-values@5.1.3` — hard. Uses fraction-js + browserslist.
-2. `postcss-minify-gradients@5.1.1` — hard. colord-heavy.
-
-**Orchestrator (blocked on the 3 above):**
-
-4. `cssnano-preset-default@5.2.14` — moderate. Replicates the plugin
-   tuple list + source order from upstream `src/index.js` so the
-   `normalize-css.ts` filter-then-execute behavior matches.
+**Phase 6 cssnano band: COMPLETE.** All 14 sub-plugins byte-clean.
+Orchestrator (`cssnano-preset-default@5.2.14`) ported 1:1 with manifest
+drift-pinning. The Phase 6 *band* exit gate (full pipeline byte-clean
+replacing `normalize-css.ts` output) is the remaining check — feasible
+now that convert-values landed; needs a Rust wrapper that consumes
+`default_preset()` and applies the AFM filter, or direct wiring through
+Phase 8b's `transformCss` NAPI bridge.
 
 **Phase 7 (in progress, parallel agents):**
 
@@ -2999,7 +3317,8 @@ postcss-nested, postcss-normalize-whitespace, postcss-discard-duplicates,
 postcss-discard-comments, postcss-normalize-string, postcss-normalize-
 positions, postcss-normalize-timing-functions, postcss-normalize-url,
 postcss-normalize-unicode, postcss-minify-selectors, postcss-ordered-values,
-postcss-reduce-initial, postcss-calc, postcss-colormin, postcss-minify-params.
+postcss-reduce-initial, postcss-calc, postcss-colormin, postcss-minify-params,
+postcss-convert-values, postcss-minify-gradients, cssnano-preset-default.
 
 ## Recommended order for the next session
 
@@ -3008,23 +3327,21 @@ remaining work is all `transformCss`-bound. The cardinal-rule guidance
 holds: **a session must take a unit from 0% → 100% byte-clean**.
 Half-done ports become silent byte-drift hazards across agent handoffs.
 
-1. **Finish the Phase 6 cssnano band** — pick whichever fits the
-   session's time box:
-   - `postcss-convert-values@5.1.3` (fraction-js + browserslist; hard).
-   - `postcss-minify-gradients@5.1.1` (colord-heavy; hard).
-   One per session. Land byte-clean before starting the next.
-2. **Phase 6h orchestrator** — `cssnano-preset-default@5.2.14` once
-   the three above are byte-clean. Source-order replication of the
-   upstream plugin tuple list is the byte-affecting detail (Anomaly #7
-   in `PARITY_VERSIONS.md`).
-3. **Phase 7 — autoprefixer** — runs in parallel with the cssnano band
-   under the existing two-agent split. See "Phase 7 split contract".
-4. **Phase 8b — `transformCss` NAPI export** — mirrors Phase 8a's
-   `sort()` pattern. Blocks on Phase 6h + Phase 7 finishing. Every
-   plugin in `transform.ts` must be classified by its postcss
-   lifecycle hooks before composition (see Phase 8a "Lifecycle
-   ordering — load-bearing"); the mistake is trivial to make and
-   produces silent byte drift.
+1. **Phase 6 BAND exit gate** — corpus diff with the entire cssnano
+   subset spliced into the JS pipeline (Rust replaces
+   `normalize-css.ts`'s output) zero-byte. Now feasible (all sub-plugins
+   + orchestrator landed). Needs a thin Rust wrapper that consumes
+   `default_preset()`, runs the `BASE_PLUGINS ∪ PROD_PLUGINS` filter,
+   and applies the survivors in source order — OR direct wiring
+   through Phase 8b's NAPI bridge.
+2. **Phase 7 — autoprefixer** — runs in parallel under the existing
+   two-agent split. See "Phase 7 split contract".
+3. **Phase 8b — `transformCss` NAPI export** — mirrors Phase 8a's
+   `sort()` pattern. Blocks on Phase 7 finishing. Every plugin in
+   `transform.ts` must be classified by its postcss lifecycle hooks
+   before composition (see Phase 8a "Lifecycle ordering —
+   load-bearing"); the mistake is trivial to make and produces silent
+   byte drift.
 
 ## Phase 5a ship — `postcss-nested@5.0.6` byte-clean
 

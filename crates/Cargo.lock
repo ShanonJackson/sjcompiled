@@ -1469,6 +1469,7 @@ dependencies = [
  "compiled-css",
  "css",
  "cssnano-postcss-colormin",
+ "cssnano-postcss-convert-values",
  "cssnano-postcss-discard-comments",
  "cssnano-postcss-minify-gradients",
  "cssnano-postcss-minify-params",

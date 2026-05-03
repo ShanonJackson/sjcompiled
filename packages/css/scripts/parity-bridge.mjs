@@ -56,6 +56,8 @@ import postcssColormin from 'postcss-colormin';
 import postcssMinifyGradients from 'postcss-minify-gradients';
 // npm `postcss-calc@8.2.4` — cssnano sub-plugin (Phase 6d).
 import postcssCalc from 'postcss-calc';
+// npm `postcss-convert-values@5.1.3` — cssnano sub-plugin (Phase 6f).
+import postcssConvertValues from 'postcss-convert-values';
 
 // Sheets returned by extract-stylesheets are joined with U+001E (record
 // separator) so they ride the single-string bridge protocol unambiguously.
@@ -329,6 +331,22 @@ const STAGES = {
   // mediaQueries=false, selectors=false.
   'postcss-calc': (css) => {
     const result = postcss([postcssCalc()]).process(css, { from: undefined });
+    return result.css;
+  },
+
+  // parse → npm postcss-convert-values@5.1.3 (default opts) → stringify.
+  // Phase 6f. Browserslist-aware: pluginCreator resolves
+  // `browsers = browserslist(null, { path: __dirname })` once. Under the
+  // workspace's locked 4.24.2 defaults the result does NOT contain
+  // `'ie 11'`, so the keepZeroPercent IE-11 branch never fires. OnceExit
+  // walks every Decl, skipping flex / `--*` / notALength props; for each
+  // Word inside (excluding url() args), parses the number+unit, converts
+  // to the shortest equivalent across length/time/angle conv tables (ties
+  // favor the LATER candidate per upstream's strict-`<` reduce), and
+  // clamps opacity/shape-image-threshold to [0, 1]. Default opts:
+  // `precision: false` — px-precision rounding disabled.
+  'postcss-convert-values': (css) => {
+    const result = postcss([postcssConvertValues()]).process(css, { from: undefined });
     return result.css;
   },
 

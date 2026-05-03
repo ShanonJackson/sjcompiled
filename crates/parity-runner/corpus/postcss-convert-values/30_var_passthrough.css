@@ -1,0 +1,1 @@
+a { width: var(--foo); transition: var(--time, 1000ms); }

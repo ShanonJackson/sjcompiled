@@ -152,22 +152,22 @@ mod tests {
     }
 
     #[test]
-    fn transform_picks_shortest() {
-        // 96px → 1in. Both candidates: "1in" (3) wins over keeping "96px".
+    fn transform_picks_shortest_with_tie_to_later() {
+        // 96px (filter px out): in=1in(3), pt=72pt(4), pc=6pc(3).
+        // reduce: "1in" vs "72pt" → 3<4 keep "1in"; "1in" vs "6pc" →
+        // 3<3 false → take b "6pc". Tie favors LATER candidate.
         let c = transform_internal(96.0, "px", length_conv());
-        assert_eq!(c, "1in");
+        assert_eq!(c, "6pc");
     }
 
     #[test]
-    fn transform_tie_picks_later() {
-        // 1pc = 16px → "16px" (4 chars), → "12pt" wait. Compute:
-        //   in: 16/96 = 0.1666… → ".16666666666666666in" (long)
-        //   pt: 16/(4/3) = 12 → "12pt" (4)
-        //   px: 16 (filtered out, original)
-        // candidates after filter: in, px, pt → in, pt
-        // reduce: start with "0.166...in", then compare to "12pt" — 4<long, picks "12pt"
-        // Actually we filter out original "pc". So candidates are in/px/pt.
-        // reduce(("..in", "16px"))="16px"(4), reduce(("16px","12pt"))=12pt(4 tie -> b)="12pt"
+    fn transform_pc_picks_pt_after_ties() {
+        // 1pc → base=16. Filter pc out. Candidates:
+        //   in:  16/96 = 0.1666… → ".16666666666666666in" (long)
+        //   px:  16    → "16px" (4)
+        //   pt:  16/(4/3) = 12 → "12pt" (4)
+        // reduce: long vs "16px" (4 < long) → "16px"; "16px" vs "12pt"
+        // (4<4 false) → "12pt".
         let c = transform_internal(1.0, "pc", length_conv());
         assert_eq!(c, "12pt");
     }

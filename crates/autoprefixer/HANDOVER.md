@@ -9,10 +9,11 @@ actually run before claiming a piece is byte-clean.
 
 ## 1. Where you actually are
 
-`cargo test -p autoprefixer` → **58 passing, 1 ignored** (53 unit + 4 data
-parity + 1 browserslist FF ESR parity active; 1 browserslist omnibus
-parity gate ignored — see §6 for status). That number is the floor; your
-work must keep it there or grow it. Run it before EVERY commit.
+`cargo test -p autoprefixer` → **60 passing, 0 ignored** (53 unit + 4 data
+parity + 3 browserslist parity active — including the AFM-fixture
+omnibus, which CLOSED the previously-open canonical-queries gate; see
+§6 for the closure history). That number is the floor; your work must
+keep it there or grow it. Run it before EVERY commit.
 
 What's real (full bodies, real tests):
 - `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`,
@@ -68,17 +69,19 @@ closure.
 
 - `bun` on PATH.
 - `bun install` has run at workspace root with `caniuse-lite:
-  1.0.30001690` in BOTH root `package.json` `overrides` AND
+  1.0.30001766` in BOTH root `package.json` `overrides` AND
   `devDependencies` (the latter is load-bearing — without the direct
   devDep, bun's isolated install layout leaves no top-level
   `node_modules/caniuse-lite/` symlink and the vendored JS resolves a
-  parent-directory shadow).
+  parent-directory shadow). NOTE: prior versions of this doc said
+  `1.0.30001690`; the workspace pin moved to `1.0.30001766` per the
+  AFM repin captured in `crates/PARITY_VERSIONS.md` line 124.
 - `build.rs` panics with a clear message if either pre-condition fails.
 
 ### If you need to bump caniuse-lite
 
 DON'T. Anomaly #3 in `PARITY_VERSIONS.md` says it's frozen at
-1.0.30001690 forever. If a future session genuinely needs a bump,
+1.0.30001766 forever. If a future session genuinely needs a bump,
 the work order is:
 
 1. Update `caniuse-lite` version in root `package.json` `overrides`
@@ -161,7 +164,7 @@ will fail visibly if you forget.
 
 ---
 
-## 5. The `caniuse-lite` snapshot is frozen at 1.0.30001690
+## 5. The `caniuse-lite` snapshot is frozen at 1.0.30001766
 
 `crates/caniuse-db/` reads its data from a build-time JSON snapshot
 that's pinned to that version (see `PARITY_VERSIONS.md` Anomaly #3).
@@ -174,59 +177,83 @@ that's a regression — file it to the caniuse-db agent.
 
 ---
 
-## 6. `browserslist-shim` defaults — gate landed, OPEN
+## 6. `browserslist-shim` AFM gate — CLOSED
 
-**Status:** parity gate test landed at
-`crates/autoprefixer/tests/browserslist_parity.rs`. One slice
-(`Firefox ESR`) is byte-clean and pinned by an active test. The omnibus
-across all canonical queries is `#[ignore]`'d — running it surfaces
-real divergence:
+**Status:** the previously-open canonical-queries omnibus gate is
+**closed for AFM's actual surface** via a hybrid AFM-fast-path /
+oxc-fallback resolver. Three browserslist parity tests at
+`crates/autoprefixer/tests/browserslist_parity.rs` now run unconditionally:
 
-- `defaults` / `> 1%` / `last 2 versions` / `last 2 versions, not dead`
-  / `chrome >= 50`: RUST returns chrome 145–146 (and matching shapes on
-  android/edge/firefox) where JS returns chrome 143–144. The
-  `oxc_browserslist` Rust crate ships its own bundled caniuse-lite
-  snapshot that's ~2 chrome releases newer than the workspace pin
-  (1.0.30001766).
+- `workspace_browserslist_pin_is_424_2` — bun loads `browserslist@4.24.2`
+- `browserslist_shim_firefox_esr_matches_js_oracle` — Firefox ESR rewrite
+- `browserslist_shim_matches_js_oracle_for_afm_browserslistrc` — **the
+  closure**: bun reads AFM's pinned `.browserslistrc` (fixture at
+  `crates/browserslist-shim/tests/fixtures/afm/.browserslistrc`, SHA256
+  `08c8e1bf56ad773621c9b264971365f66f78a808d6d369a4ea9584a02da459cb`)
+  and resolves to the frozen 14-entry oracle list; the Rust shim does
+  the same and the lists match element-for-element.
 
-Run on demand:
+**How it works.** `crates/browserslist-shim/src/index.rs::resolve_with`
+checks every atom against the AFM grammar (`crates/browserslist-shim/src/parse.rs::try_parse_atom_afm`).
+If every atom parses (`last N <browser> version`, `<browser> <version>`
+literal), the resolver consumes `caniuse-db@1.0.30001766` directly —
+byte-correct against the AFM-pinned snapshot. Otherwise (`> X%`, `<= 15`,
+`not all`, defaults, etc.) it falls through to `oxc_browserslist` —
+unchanged from the pre-closure behaviour, used by Phase 6 cssnano
+consumers whose output is drift-stable.
 
-```bash
-cargo test -p autoprefixer --test browserslist_parity -- --ignored
+`Browsers::new(query, ignore_unknown)` now plumbs `BrowsersOptions::from`
+through to the shim as `ResolveOpts::path` — when `from` is unset, falls
+back to `std::env::current_dir()` matching `browserslist@4.24.2`'s
+`prepareOpts` defaulting (index.js:366). AFM's call site
+(`browserslist(null, { path: cwd })`) thus walks up to AFM's
+`.browserslistrc` and resolves byte-correctly through the fast path.
+
+**Implication for `Prefixes::new`.** The AFM-shaped query is now
+byte-clean end-to-end. `Prefixes::new` can be byte-tested against
+`Browsers::new(...)` for the AFM call site without mocking `selected`.
+Generic `Prefixes::new` against arbitrary queries (e.g. `defaults`)
+still drifts because those go through the oxc fallback — but AFM never
+calls them.
+
+**Test discipline — ALWAYS set `BrowsersOptions::from` explicitly.**
+The closure agent's `parse_static` change defaults `path` to
+`std::env::current_dir()` when `from` is unset. Cargo's test-binary cwd
+varies between invocations (sometimes the crate dir, sometimes the
+workspace root, sometimes wherever a CI runner launches from). A
+non-AFM cwd silently lands on a different `.browserslistrc` walk
+result — or none, falling through to the oxc-fallback `defaults` which
+drifts. Your byte-test will then fail for reasons that have nothing to
+do with the code under test. In every test that consumes
+`Browsers::new(...)`, set:
+
+```rust
+let opts = BrowsersOptions {
+    from: Some(/* ...absolute path to crates/browserslist-shim/tests/fixtures/afm... */),
+    ..Default::default()
+};
 ```
 
-**Implication for `Prefixes::new`.** `Browsers::new(query, ignore_unknown)`
-calls `browserslist_shim::resolve` to get the `selected` list. With the
-gate open, that list silently drifts from JS for any "current versions"
-query — which is most real-world queries. `Prefixes::new` consumes
-`selected` to build the `add_table` / `remove_table` maps. Drift in
-`selected` → drift in those maps → drift in every prefix decision
-downstream. **Closing this gate is a hard pre-condition for byte-testing
-`Prefixes::new` against a JS oracle.**
+Use a `workspace_root()` helper (mirror the one in
+`crates/autoprefixer/tests/browserslist_parity.rs`) to derive the path
+from `CARGO_MANIFEST_DIR`. Do NOT rely on cwd being any particular
+directory.
 
-**Closure options** (tracked as a TaskList unit; multi-day each, do NOT
-half-land):
-- (a) Inject the workspace `caniuse-db` snapshot into oxc_browserslist
-  (probably needs an upstream PR or fork).
-- (b) Re-port `browserslist@4.24.2`'s `index.js::resolve` line-by-line
-  against `caniuse-db` directly inside `browserslist-shim`, dropping the
-  `oxc_browserslist` dependency for query resolution. Matches what JS
-  does anyway.
-- (c) Downgrade the `oxc_browserslist` Cargo dep to a version whose
-  bundled snapshot matches 1.0.30001766. Cleanest if such a version
-  exists; risk: oxc may have made API-shape changes.
+**Don't:**
+- Remove the `oxc_browserslist` dep from `crates/browserslist-shim/Cargo.toml`.
+  The fallback is load-bearing for cssnano consumers. See
+  `crates/browserslist-shim/AFM_PORT_NOTES.md` "What NOT to remove".
+- Widen the AFM grammar opportunistically. Each new variant pins more
+  surface to caniuse-db semantics; only port what AFM actually consumes.
+- Delete the `Firefox ESR` rewrite — it's still defensive (oxc's
+  bundled `firefox_esr → firefox 140` differs from `browserslist@4.24.2`'s
+  `firefox 115, firefox 128`).
 
-Until one of those lands, `Prefixes::new` work has two paths:
-1. **Skip the JS-oracle gate** — port the constructor by reading
-   `prefixes.js` line-by-line and unit-test the data-shape transforms
-   only. Risk: silent byte-drift surfaces only at full-pipeline gate.
-2. **Mock-test against fixed `selected` lists** — bypass `Browsers::new`
-   in the test fixture and feed `Prefixes::new` a hand-curated `selected`
-   that matches the JS oracle's output for a known query. Pins the
-   constructor's logic without needing the gate closed.
-
-Path 2 is the recommended interim. Don't claim the unit byte-clean — it
-isn't, but it's logic-clean.
+**Reference:** `crates/browserslist-shim/AFM_PORT_NOTES.md` has the full
+architecture, the closure rationale, the test surface, and the protocol
+for adding a new atom when AFM's `.browserslistrc` evolves.
+`BROWSER_LIST_FROM_AFM.md` (workspace root) has the AFM dependency
+engineer's runtime-instrumentation report that this work was scoped against.
 
 ---
 

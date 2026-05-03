@@ -1,116 +1,152 @@
 ## Today's session — what landed
 
-**Picked Option D from the previous MORNING.md** (closing the
-browserslist-shim parity gate). The gate is now landed, with one slice
-green and the omnibus `#[ignore]`'d documenting real divergence.
+**Closed the browserslist-shim parity gate** (the OPEN gate from the
+previous MORNING.md / HANDOVER §6 / TaskList #2). The gate is now active
+and passing for AFM's actual surface; `Prefixes::new` is unblocked.
+
+Approach picked: **option (b), descoped to AFM's actual query surface**
+— the "Recommended" option from the prior planning chain. AFM's
+dependency engineer ran runtime instrumentation through the actual
+`jira/` build pipeline and reported (in `BROWSER_LIST_FROM_AFM.md`) that:
+
+- `@compiled/css@0.19.0` calls `autoprefixer()` with no args
+- Autoprefixer calls `browserslist(null, { path: cwd })`
+- That walks up to `jira/.browserslistrc` (SHA256
+  `08c8e1bf56ad773621c9b264971365f66f78a808d6d369a4ea9584a02da459cb`)
+- The file contains six lines, all `last N <browser> version[s]?` atoms
+- Resolved output: a frozen 14-entry list
+
+That tiny surface let the port collapse from "multi-day full-resolver
+re-port" into one session of focused work.
 
 What I did, in order:
-1. Read `PARITY_VERSIONS.md`, `PLUGIN_IMPLEMENTATION_GUIDE.md`,
-   `STATUS.md` Phase 7 sections, this crate's `HANDOVER.md`, the prior
-   `MORNING.md`. ~45 min.
-2. Verified floor: `cargo test -p autoprefixer` → 57 passing
-   (53 unit + 4 parity).
-3. Wrote `crates/autoprefixer/tests/browserslist_parity.rs` — two tests:
-   - `browserslist_shim_firefox_esr_matches_js_oracle` — active, passes.
-     Pins the `rewrite_firefox_esr` shim path against the JS oracle.
-   - `browserslist_shim_matches_js_oracle_for_canonical_queries` —
-     `#[ignore]`'d. Compares 6 canonical queries element-by-element.
-     Surfaces the open drift (see below).
-4. Documented findings in `STATUS.md` ("Phase 7 ship — browserslist-shim
-   parity gate"), `HANDOVER.md` §1 / §6 / §11, and TaskList (#2 + #3).
+1. Read the AFM agent's `BROWSER_LIST_FROM_AFM.md`, the prior
+   `MORNING.md`, `HANDOVER.md` §1 §6 §11 §12, and verified pin
+   alignment between `crates/PARITY_VERSIONS.md` and AFM (caught and
+   resolved a `@compiled/css@0.21.1 vs 0.19.0` false alarm — AFM
+   re-confirmed 0.19.0 from the nested install path).
+2. Verified floor: `cargo test -p autoprefixer` → 58 passing, 1 ignored
+   (53 unit + 4 data parity + 1 active browserslist + 1 ignored omnibus).
+3. Implemented hybrid resolver in `crates/browserslist-shim/`:
+   - `src/parse.rs` — `QueryAtom` enum, `try_parse_atom_afm` with
+     two AFM atoms (`LastNBrowserVersions`, `BrowserVersion`).
+   - `src/index.rs::resolve_with` — fast-path on full AFM grammar
+     match, oxc fallback otherwise. Per-atom Firefox ESR expansion
+     replaces the comma-string rewrite for internal use; the original
+     `rewrite_firefox_esr` helper is kept as a `pub fn` for backwards
+     compat with the existing test contract.
+4. Added `tests/fixtures/afm/.browserslistrc` (byte-copy from AFM,
+   SHA256-verified) and `tests/afm_parity.rs` with two integration
+   tests: SHA256 fixture-integrity check (with inline pure-Rust
+   SHA-256 to avoid a dev-dep) and end-to-end resolver byte-test
+   against the frozen 14-entry oracle.
+5. Plumbed `path` through `crates/autoprefixer/src/browsers.rs::Browsers::parse_static`
+   — defaults to `std::env::current_dir()` when `BrowsersOptions::from`
+   is unset (matches `browserslist@4.24.2`'s `prepareOpts` defaulting).
+6. Rewrote `crates/autoprefixer/tests/browserslist_parity.rs` — the
+   `#[ignore]`'d canonical-queries omnibus is replaced by an
+   AFM-fixture-driven omnibus that spawns bun against the SAME fixture
+   and compares element-by-element. Active, passing.
+7. Wrote `crates/browserslist-shim/AFM_PORT_NOTES.md` capturing
+   architecture, "what NOT to remove" (per the user's explicit
+   guidance), and the protocol for adding a new atom when AFM's
+   `.browserslistrc` evolves.
+8. Updated `HANDOVER.md` §1 (floor count), §6 (gate closure), §2 + §5
+   (stale `caniuse-lite: 1.0.30001690` → `1.0.30001766`).
+9. Updated `crates/STATUS.md` with the Phase 7 closure entry.
 
-**New floor:** `cargo test -p autoprefixer` → **58 passing, 1 ignored**.
+**New floor:** `cargo test -p autoprefixer` → **60 passing, 0 ignored**
+(53 unit + 4 data parity + 3 browserslist parity active).
+**Browserslist-shim floor:** `cargo test -p browserslist-shim` → **29
+passing, 0 ignored** (was 15).
 
-## Two pieces of DRIFT I observed
+## Two pieces of DRIFT I observed and addressed
 
-Both flagged in HANDOVER + STATUS + TaskList:
+### Drift #1 — `oxc_browserslist` bundled snapshot (THE GATE)
 
-### Drift #1 — browserslist-shim caniuse-lite snapshot (THE OPEN GATE)
+**Status: CLOSED for AFM's surface.** Hybrid resolver routes AFM atoms
+through caniuse-db directly (byte-correct); routes everything else
+through oxc as before (drift-tolerant, unchanged for cssnano consumers).
+See `AFM_PORT_NOTES.md`.
 
-`oxc_browserslist`'s bundled caniuse-lite snapshot is ~2 chrome
-releases newer than the workspace pin (1.0.30001766). Concrete numbers
-the `#[ignore]`'d test surfaced:
+### Drift #2 — stale caniuse-lite version in HANDOVER.md
 
-| Query                          | JS oracle                       | Rust shim                       |
-|--------------------------------|---------------------------------|---------------------------------|
-| `chrome >= 50`                 | `chrome 144 ... chrome 50` (94) | `chrome 146, chrome 145, ...` (96) |
-| `last 2 versions` (first 5)    | `and_chr 144, and_ff 147, ...`  | `and_chr 146, and_ff 149, ...`  |
-| `defaults` (first 5)           | `and_chr 144, and_ff 147, ...`  | `and_chr 146, and_ff 149, ...`  |
-
-Closure: TaskList #2 — three options laid out in HANDOVER §6 and
-STATUS "Phase 7 ship — browserslist-shim parity gate". All multi-day.
-
-### Drift #2 — workspace `browserslist` floats to 4.28.2
-
-`require('browserslist')` from workspace root resolves to **4.28.2**,
-not the pinned 4.24.2. Root cause: `package.json` lists browserslist in
-`overrides` but not `devDependencies`, so bun's isolated layout leaves
-no top-level symlink and resolution lands on whatever `.bun/` install
-wins (4.28.2 is pulled by `update-browserslist-db`).
-
-The new browserslist parity test bypasses this by globbing
-`node_modules/.bun/browserslist@4.24.2+*/` for the pinned hash dir.
-Proper fix: TaskList #3 — add `"browserslist": "4.24.2"` to root
-`package.json` `devDependencies` + `bun install`. ~10-min change.
+`HANDOVER.md` §2 line 73-77 + §5 line 165 referenced
+`caniuse-lite: 1.0.30001690` — but the workspace pin moved to
+`1.0.30001766` per AFM repin (captured in `PARITY_VERSIONS.md` line
+124 + root `package.json`). Fixed in this session. If you regenerate
+`data/prefixes.rs` and the pin assertion test fails, check those docs
+match `caniuse_db::CANIUSE_LITE_VERSION`.
 
 ## Your unit for this session
 
-**Read MORNING-PREVIOUS.md (if archived) or HANDOVER.md §1 + §6 + §11
-+ §12 first.** Same cardinal rule: take ONE unit 0 → 100% byte-clean.
-Stop.
+**Read `HANDOVER.md` §1 + §6 + §11 + §12 + `AFM_PORT_NOTES.md` first.**
+Same cardinal rule: take ONE unit 0 → 100% byte-clean. Stop.
 
-Recommended order, given today's findings:
+### Option A (RECOMMENDED) — `Prefixes::new` body
 
-### Option A (RECOMMENDED) — close browserslist-shim parity gate (Drift #1 above)
+Now unblocked. `Browsers::new(...)` returns byte-correct `selected` for
+the AFM surface; `Prefixes::new` can consume that and build the
+`add_table` / `remove_table` against the AFM-pinned data. No mocking
+needed for the AFM call site.
 
-This is the cleanest pre-condition for `Prefixes::new`. Multi-day
-unit. Three approaches in HANDOVER §6 — pick (b) "re-port
-`browserslist@4.24.2`'s `index.js::resolve` line-by-line against
-`caniuse-db`" if you want to maximize byte-control and minimize
-upstream-fork risk. The vendored source is at
-`crates/_vendor/browserslist-4.24.4/package/` (4.24.4, not 4.24.2;
-the diff between the two is captured in
-`crates/_vendor/BROWSERSLIST_4.24.4_TO_4.24.2_AUDIT.md`).
+Caveat: if you write tests that pass arbitrary browserslist queries
+(e.g. `defaults`, `> 1%`), those still go through the oxc fallback
+and drift. Either (a) pin tests to the AFM `.browserslistrc` fixture
+via `Browsers::new` with `from = Some("...crates/browserslist-shim/tests/fixtures/afm")`,
+or (b) hand-curate `selected` for non-AFM tests and bypass `Browsers::new`.
 
-Land the closure as: omnibus parity test flips from `#[ignore]` to
-active and passes. That's the gate.
+**ALWAYS set `from` explicitly in tests — DO NOT rely on cwd.** The
+gate-closure agent's `parse_static` change defaults `path` to
+`std::env::current_dir()` when `BrowsersOptions::from` is unset. Cargo's
+test-binary cwd varies between invocations (sometimes the crate dir,
+sometimes the workspace root, sometimes wherever a CI runner launches
+from). A non-AFM cwd silently lands on a different `.browserslistrc`
+walk result — or none, falling through to the oxc-fallback `defaults`
+which drifts ~2 chrome versions. Your byte-test will then fail for
+reasons that have nothing to do with `Prefixes::new`. Use:
 
-### Option B — `Prefixes::new` body, with the gate left open
+```rust
+let opts = BrowsersOptions {
+    from: Some(workspace_root().join("crates").join("browserslist-shim")
+        .join("tests").join("fixtures").join("afm")
+        .to_string_lossy().into_owned()),
+    ..Default::default()
+};
+let browsers = Browsers::new(query, opts);
+```
 
-Per HANDOVER §6 closing paragraph: write `Prefixes::new` against
-mock `selected` lists (hand-curated to match JS oracle output for a
-specific query). Pins the constructor's transform logic without
-needing the gate closed. Don't claim the unit byte-clean — it isn't,
-but it's logic-clean. The next agent who closes the gate then re-runs
-your tests with `Browsers::new(...)` providing real `selected` and
-gets the byte-clean confirmation for free.
+Mirror the `workspace_root()` helper from
+`crates/autoprefixer/tests/browserslist_parity.rs`.
 
-This is a fallback if Option A's scope feels too big. The risk is
-that the constructor's transform might have its own latent bugs that
-only surface against real `selected` data — mock tests can't catch
-that class of drift.
+The data shape: `Prefixes::new(browsers: &Browsers, data: &PREFIXES)`
+walks the 183-entry `PREFIXES` table built by Phase 7's `data/prefixes.rs`
+codegen, intersects each entry's `browsers` list with `browsers.selected`,
+and emits `add_table` / `remove_table` keyed on those intersections. The
+JS source is at `crates/_vendor/autoprefixer-10.4.14/package/lib/prefixes.js`.
 
-### Option C — Drift #2 fix (workspace browserslist devDep)
+Per `HANDOVER.md` §4: `Prefixes::group(decl)` lives on this same struct
+and shares the constructor's data shape — fill them in together.
 
-10 minutes of work but **trivial enough that you can pair it with
-either A or B**. Just don't make it your only unit — the project's
-hash output isn't affected today (data tables are codegen'd from
-vendored autoprefixer source, not from a `require('browserslist')`
-call), so this is hygiene for FUTURE oracle tests, not a hash-bytes
-fix. Add `"browserslist": "4.24.2"` to root `package.json`
-`devDependencies`, `bun install`, then verify
-`require('browserslist/package.json').version === '4.24.2'`.
+### Option B — `supports.rs` standalone
 
-### Options D-F — `supports.rs` / `transition.rs` / hacks
+302 LOC `@supports` rewriting. Depends on `Prefixes::new` for the
+data table only — can be ported in parallel by reading the data shape
+out of the constructor's design. Lower critical-path leverage than A.
 
-Same as the previous MORNING.md. **Do NOT pick these without
-confirming with the user that you want this rather than the engine
-path.** They are independent of the gate, but they're not on the
-critical path for `Prefixes::new` either.
+### Option C — `transition.rs` standalone
+
+329 LOC transition shorthand handling. Same shape as B — independent
+unit, lower critical-path leverage than A.
+
+### Options D-F — hacks / `info.rs` / parity-runner stage
+
+Same as the previous MORNING.md. Don't pick these without confirming
+with the user.
 
 ## What you will NOT do
 
-Same list as the previous MORNING.md, transcribed for visibility:
+Same list as before; transcribed for visibility:
 
 1. Do not port any hacks (parallel agent's territory).
 2. Do not edit `parity-runner/src/stages.rs`,
@@ -120,9 +156,6 @@ Same list as the previous MORNING.md, transcribed for visibility:
    scope until everything else is done).
 4. Do not bump any pinned version (`autoprefixer`, `caniuse-lite`,
    `browserslist`, `postcss`, anything in `PARITY_VERSIONS.md`).
-   "Do not bump" applies to BOTH the override AND the devDep value
-   — but adding a NEW devDep entry that matches the existing
-   override (the Drift #2 fix) is not a bump.
 5. Do not "fix" upstream bugs.
 6. Do not write your own tree walk — use
    `postcss_core::walk_*_mut_with_parent` family.
@@ -130,29 +163,31 @@ Same list as the previous MORNING.md, transcribed for visibility:
    `postcss_core::js_number_to_string`.
 8. Do not use `HashMap` on the hashing path. `IndexMap` only.
 9. Do not skip the verification gates. Before claiming done:
-   `cargo test -p autoprefixer` (≥58 active passing, 0 failing,
-   any `#[ignore]` count justified in HANDOVER), `cargo build -p
-   autoprefixer` (clean), `cargo check --workspace` (clean).
+   `cargo test -p autoprefixer` (≥60 passing, 0 failing, 0 ignored),
+   `cargo build -p autoprefixer` (clean), `cargo check --workspace` (clean).
+10. **Do not remove `oxc_browserslist` from `browserslist-shim/Cargo.toml`.**
+    The fallback is load-bearing for cssnano consumers. See
+    `AFM_PORT_NOTES.md` "What NOT to remove".
+11. **Do not widen the AFM grammar opportunistically.** Each new
+    `QueryAtom` variant pins more surface to caniuse-db semantics.
+    Only port what AFM actually consumes — confirm via runtime
+    instrumentation (the protocol in `AFM_PORT_NOTES.md`).
 
-## Sign-off checklist (same as previous MORNING)
+## Sign-off checklist
 
-1. `RUSTFLAGS="" cargo test -p autoprefixer` — must show ≥58 passing.
-   If you closed the omnibus gate, that becomes ≥59 (Option A) and
-   the `#[ignore]` count drops from 1 to 0.
-2. `RUSTFLAGS="" cargo build -p autoprefixer` — must be clean.
-3. `RUSTFLAGS="" cargo check --workspace` — must be clean.
-4. If you wired a new test for byte-equality vs JS oracle — run that
-   test specifically and read its output. Don't trust an aggregate
-   "≥58 passing" that hides a non-running parity test.
-5. Update `crates/STATUS.md` Phase 7 row + test count + the
+1. `RUSTFLAGS="" cargo test -p autoprefixer` — must show ≥60 passing, 0 ignored.
+2. `RUSTFLAGS="" cargo test -p browserslist-shim` — must show ≥29 passing, 0 ignored.
+3. `RUSTFLAGS="" cargo build -p autoprefixer` — must be clean.
+4. `RUSTFLAGS="" cargo check --workspace` — must be clean.
+5. If you wired a new test for byte-equality vs JS oracle — run that
+   test specifically and read its output.
+6. Update `crates/STATUS.md` Phase 7 row + test count + the
    "Foundation agent's responsibilities" checklist.
-6. Update `crates/autoprefixer/HANDOVER.md` §1 (test count floor) +
-   §6 (browserslist gate status) + §11 (any new JS quirk).
-7. Write a `MORNING.md`-style handoff for the NEXT agent — overwrite
-   this file with what you completed, what you observed about other
-   agents' work, and what the next-highest-leverage unit is.
-8. Mark TaskList items completed (#1 done; #2/#3 pending → in_progress
-   if you picked them up).
+7. Update `crates/autoprefixer/HANDOVER.md` §1 (test count floor) +
+   §11 (any new JS quirk).
+8. Write a `MORNING.md`-style handoff for the NEXT agent — overwrite
+   this file.
+9. Mark TaskList items completed; create new ones for follow-up work.
 
 ## When you're stuck
 
@@ -161,21 +196,20 @@ Vendored sources at:
 crates/_vendor/autoprefixer-10.4.14/package/lib/<file>.js
 crates/_vendor/postcss-8.5.6/package/lib/<file>.js
 crates/_vendor/browserslist-4.24.4/package/<file>.js   (closest to 4.24.2 we have)
+crates/_vendor/caniuse-lite-1.0.30001766/package/
 ```
 
-The 4.24.4 → 4.24.2 audit at
-`crates/_vendor/BROWSERSLIST_4.24.4_TO_4.24.2_AUDIT.md` is your friend
-if you take Option A — it surfaces every line-level diff between the
-two versions so you know what to back-port.
+The `BROWSER_LIST_FROM_AFM.md` runtime-instrumentation report and
+`AFM_PORT_NOTES.md` architecture doc are your friends if you have to
+extend the browserslist surface.
 
 ## Final note
 
-Drift #1 (the open gate) is the single biggest unblocker for the rest
-of Phase 7. Closing it gives EVERY downstream byte-test a trustworthy
-foundation. Don't skip it just because it's bigger than the previous
-units — the alternative is shipping `Prefixes::new` + `processor.rs`
-with mock-test only, then discovering the drift at full-pipeline gate
-when there's a 720-LOC walker between the bug and your repro. Pay it
-now.
+The browserslist gate was the single biggest unblocker for the rest
+of Phase 7. With it closed, every downstream byte-test against the JS
+oracle has a trustworthy foundation FOR AFM-SHAPED QUERIES. Don't
+extend that scope to non-AFM queries unless you also extend the AFM
+fast path — otherwise you'll re-introduce the drift through the oxc
+fallback.
 
 Good luck.

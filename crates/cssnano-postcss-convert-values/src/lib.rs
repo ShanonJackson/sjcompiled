@@ -374,11 +374,19 @@ mod tests {
     }
 
     #[test]
-    fn pc_to_pt() {
-        // 1pc = 16px = 12pt → "12pt" (4) tied with "16px" (4); reduce ties
-        // to b, so "12pt".
+    fn pc_keeps_original_when_no_shorter() {
+        // 1pc → transform_internal returns "12pt" (4), but value="1pc" (3)
+        // is shorter, so convert keeps "1pc". Bug-for-bug parity.
         let out = run("a { width: 1pc }");
-        assert!(out.contains(" 12pt"), "got: {out}");
+        assert!(out.contains(" 1pc"), "got: {out}");
+    }
+
+    #[test]
+    fn px_to_pc_via_tie() {
+        // 96px → transform: in=1in(3), pt=72pt(4), pc=6pc(3). reduce ties
+        // → "6pc". Then convert: value="96px"(4) vs "6pc"(3) → "6pc".
+        let out = run("a { width: 96px }");
+        assert!(out.contains(" 6pc"), "got: {out}");
     }
 
     #[test]
@@ -419,9 +427,10 @@ mod tests {
 
     #[test]
     fn calc_inner_words_processed() {
-        let out = run("a { width: calc(1000ms + 1pc) }");
+        // 1000ms inside calc → 1s. 96px inside calc → 6pc (tie → later).
+        let out = run("a { width: calc(1000ms + 96px) }");
         assert!(out.contains("1s"), "got: {out}");
-        assert!(out.contains("12pt"), "got: {out}");
+        assert!(out.contains("6pc"), "got: {out}");
     }
 
     #[test]

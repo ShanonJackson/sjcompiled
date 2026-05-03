@@ -28,8 +28,7 @@ pass, 112/112 postcss-nested, 6/6 compiled-css) make that clear by implication.
 ### Drifts to look into
 Two pieces of DRIFT detected (both flagged, none silently worked around)
 
-1. oxc_browserslist's caniuse-lite snapshot is ~2 chrome releases newer than the workspace pin (1.0.30001766). Concrete numbers in HANDOVER §6 + STATUS "Phase 7 ship — browserslist-shim parity gate". Closure has 3 multi-day   
-   options; tracked as Task #2. This is the hard pre-condition for Prefixes::new.
+1. ✅ **CLOSED 2026-05-03.** oxc_browserslist's caniuse-lite snapshot drift was the open gate. Closed via hybrid AFM-fast-path / oxc-fallback architecture in `crates/browserslist-shim/`. AFM's `.browserslistrc` atoms now resolve byte-correctly via `caniuse-db@1.0.30001766` directly; everything else still routes through oxc (drift-tolerant, used by cssnano consumers whose output is drift-stable). Pre-condition for Prefixes::new is satisfied. See `crates/browserslist-shim/AFM_PORT_NOTES.md` and `STATUS.md` "Phase 7 ship — browserslist-shim AFM parity gate CLOSED".
 
 ----
 - atomicify-rules selectors join. JS ${selectors} on an Array uses Array.prototype.toString() = Array.join(",") — comma, no space. The agent claimed Rust uses empty separator. If true, that's a hash-input divergence on
@@ -69,9 +68,10 @@ it.
 
 
 ### THIS IS THE FULL THING
-- ❌ Open gate (Task #2): oxc_browserslist's bundled caniuse-lite is ~2 chrome releases newer than the workspace pin — multi-day fix. Blocks byte-testing Prefixes::new against JS oracle.
+- ✅ CLOSED 2026-05-03: oxc_browserslist gate closed via hybrid AFM-fast-path resolver in browserslist-shim. Prefixes::new is unblocked. See `crates/browserslist-shim/AFM_PORT_NOTES.md`.
 - ⬜ Parity-runner Stage::Autoprefixer not wired
 - ⬜ NAPI bridge into crates/css/src/transform.rs not wired
+- ⬜ Prefixes::new body — now unblocked, tracked as next session's unit (autoprefixer/MORNING.md Option A).
 
 
 One stale doc — broader than this port, flagging not fixing: the legacy ## What's left to port (line 2747) and ## Recommended order for the next session (line 2767) sections still list minify-selectors, ordered-values,        

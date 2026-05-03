@@ -1,0 +1,4 @@
+@keyframes ringspin {
+  0% { stroke-dasharray: 0px 100%; }
+  100% { stroke-dasharray: 50% 100%; }
+}

@@ -142,7 +142,7 @@ These have no inter-dependencies. Each can be ported by a separate engineer.
 ### 1d. `crates/fraction-js` — `fraction.js@4.2.0`
 
 - Small library; port `node_modules/fraction.js/fraction.js`.
-- Used by `autoprefixer` and `postcss-convert-values`. The output of these depends on stringified fraction outputs, so byte parity matters.
+- Used by `autoprefixer`. (NOT by `postcss-convert-values@5.1.3` — verified during Phase 6f; upstream uses plain `Number`/`Math.round`, no fraction.js import.) The output depends on stringified fraction outputs, so byte parity matters.
 
 **Exit gate:** all public-API operations (`add`, `sub`, `mul`, `div`, `toString`, `toFraction`) byte-tested against fraction.js across a number corpus.
 
@@ -329,7 +329,7 @@ All 14 cssnano plugins from the `cssnano-preset-default@5.2.14` manifest in
 - `crates/cssnano-postcss-reduce-initial` (5.1.2) — 1 week.
 
 ### 6f. browserslist + value-parser — depends on Phase 2b, 2d, 3a
-- `crates/cssnano-postcss-convert-values` (5.1.3) — 1.5 weeks (uses `fraction-js`).
+- `crates/cssnano-postcss-convert-values` (5.1.3) — **DONE** Phase 6f. Pure `Number`/`Math.round` arithmetic (no fraction-js, despite earlier scaffold claim).
 - `crates/cssnano-postcss-minify-params` (5.1.4) — 2 weeks (params syntax + caniuse-api gating).
 
 ### 6g. Hardest — color + caniuse — depends on Phase 1c, 1d, 2b, 2e, 3a

@@ -127,7 +127,7 @@ must run on the same prettier version, otherwise the oracle drifts.
 | `cssnano-utils` | **3.1.0** | Shared helpers used by ~every cssnano plugin we run | `crates/cssnano-utils` |
 | `electron-to-chromium` | **1.5.41** | Feeds browserslist resolution. AFM-resolved (compiled@HEAD lockfile pins 1.5.76). | `crates/caniuse-db` (vendored alongside) |
 | `node-releases` | **2.0.18** | Feeds browserslist resolution. AFM-resolved (compiled@HEAD lockfile pins 2.0.19). | `crates/caniuse-db` (vendored alongside) |
-| `fraction.js` | **4.2.0** | Used in autoprefixer's grid math AND `postcss-convert-values` | `crates/fraction-js` |
+| `fraction.js` | **4.2.0** | Used in autoprefixer's grid math. **NOT** used by `postcss-convert-values@5.1.3` (the upstream source has no fraction.js import — pure `Number`/`Math.round` arithmetic; verified during the Phase 6f port). | `crates/fraction-js` |
 | `nanoid` | **3.3.6** | Source-id generation in postcss | port inline into `crates/postcss-core` (only if reachable from output bytes) |
 | `picocolors` | **1.1.1** | Error formatting in postcss | port inline into `crates/postcss-core` (errors are user-visible — match strings) |
 | `source-map-js` | **1.0.2** | Sourcemap generation in postcss | not on the hashing path; pin anyway |

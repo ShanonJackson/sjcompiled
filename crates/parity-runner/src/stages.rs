@@ -177,6 +177,20 @@ pub enum Stage {
     /// `isLessThan` actually returns ≥; replicated verbatim).
     PostcssMinifyGradients,
 
+    /// `parse → postcss-convert-values@5.1.3 (default opts) → stringify`.
+    /// Phase 6f. Browserslist-aware — `pluginCreator` resolves
+    /// `browsers = browserslist(null, { path: __dirname })` once. Under
+    /// the workspace's locked 4.24.2 defaults the result does not include
+    /// `'ie 11'`, so the `keepZeroPercent` IE-11 branch never fires.
+    /// `OnceExit` walks every Decl, skipping flex / `--*` / `notALength`
+    /// props; for each Word inside (excluding `url()` args), parses the
+    /// number+unit, converts to the shortest equivalent across length /
+    /// time / angle conv tables (ties favor LATER candidate per
+    /// upstream's strict-`<` reduce), and clamps `opacity` /
+    /// `shape-image-threshold` to `[0, 1]`. Default opts:
+    /// `precision: false` — px-precision rounding disabled.
+    PostcssConvertValues,
+
     /// `parse → postcss-calc@8.2.4 (default opts) → stringify`. Phase 6d.
     /// OnceExit walks every Decl, transforms `value` through value-parser
     /// looking for `(-vendor-)?calc(...)` function nodes, parses the inner
@@ -226,6 +240,7 @@ impl Stage {
             Stage::PostcssColormin => "postcss-colormin",
             Stage::PostcssMinifyGradients => "postcss-minify-gradients",
             Stage::PostcssCalc => "postcss-calc",
+            Stage::PostcssConvertValues => "postcss-convert-values",
             Stage::Sort => "sort",
         }
     }
@@ -428,6 +443,13 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             let opts = postcss_calc::Options::default();
             postcss_calc::postcss_calc(&mut root, &opts)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssConvertValues => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            let opts = cssnano_postcss_convert_values::ConvertValuesOpts::default();
+            cssnano_postcss_convert_values::postcss_convert_values(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }

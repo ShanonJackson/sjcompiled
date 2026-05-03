@@ -63,6 +63,7 @@ fn main() -> ExitCode {
         "postcss-colormin" => Stage::PostcssColormin,
         "postcss-minify-gradients" => Stage::PostcssMinifyGradients,
         "postcss-calc" => Stage::PostcssCalc,
+        "postcss-convert-values" => Stage::PostcssConvertValues,
         "sort" => Stage::Sort,
         s => {
             eprintln!("unknown stage: {s}");
