@@ -2,16 +2,21 @@
 //! Byte-for-byte port of `packages/babel-plugin/`.
 //! See `plugins/PLAN.md` — do not deviate from upstream behaviour.
 //!
-//! Phase 2 §2.3 status: dispatcher SKELETON landed. The visitor
-//! recognises Compiled imports and populates `state.compiledImports`,
-//! but does NOT mutate the AST. Output stays pass-through, so the
-//! §2.3 verification gate ("byte-equal output through the prettier
-//! oracle for every fixture, no handler logic yet") holds.
+//! Phase 2 §2.3 status:
+//!   * Skeleton (prior session): Compiled-import recognition. Output
+//!     stays pass-through.
+//!   * §2.3(a) (this checkpoint): JSX-pragma recognition (classic
+//!     `import { jsx }` site + `@jsx` / `@jsxImportSource` comment
+//!     scan). Recognition only — no AST mutations, no comment store
+//!     mutations. State writes are allowed.
 //!
 //! What's still to land:
-//! - JSX-pragma scan in `Program::enter` (regexes already in
-//!   `compiled_utils::jsx`; classic-pragma `path.remove()` gated
-//!   until §6.5 css-prop).
+//! - §2.3(b): the deferred mutations paired with §2.4 MutationRecorder
+//!   — `path.remove()` of the classic-pragma `jsx` specifier;
+//!   filtering the matched JSX-pragma comment from the comment store
+//!   so `@babel/plugin-transform-react-jsx`'s SWC analog ignores it.
+//! - §2.4: state encapsulation + `MutationRecorder::apply` as the only
+//!   mutator (per `STATE_MUTATIONS.md` / PLAN.md §3.9.8).
 //! - `Program::exit` `appendRuntimeImports` + banner + cleanup loop
 //!   (Phase 6, alongside the first real handler).
 //! - `ImportDeclaration` specifier removal (§2.4 MutationRecorder).
@@ -24,10 +29,11 @@ pub mod types;
 pub mod utils;
 
 use serde::Deserialize;
+use swc_core::common::comments::Comments;
 use swc_core::ecma::ast::Program;
 use swc_core::ecma::visit::VisitMutWith;
 use swc_core::plugin::plugin_transform;
-use swc_core::plugin::proxies::TransformPluginProgramMetadata;
+use swc_core::plugin::proxies::{PluginCommentsProxy, TransformPluginProgramMetadata};
 
 use crate::babel_plugin::BabelPluginVisitor;
 use crate::types::PluginOptions;
@@ -40,7 +46,13 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
         .and_then(|s| PluginOptions::deserialize(&mut serde_json::Deserializer::from_str(s)).ok())
         .unwrap_or_default();
 
-    let mut visitor = BabelPluginVisitor::new(opts);
+    // Mirror `babel-plugin-strip-runtime`'s comment-proxy wiring: real
+    // proxy in production, fallback unit-struct (no-op outside the
+    // plugin runtime). Keeps a single SWC-comment idiom across both
+    // plugins.
+    let comments: PluginCommentsProxy = meta.comments.clone().unwrap_or(PluginCommentsProxy);
+
+    let mut visitor = BabelPluginVisitor::new(opts, comments);
     let mut p = program;
     p.visit_mut_with(&mut visitor);
     p
@@ -49,8 +61,18 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
 /// In-process entry for workspace integration tests. Drives the
 /// dispatcher without going through the SWC plugin transport so we
 /// can inspect `state` after the run.
-pub fn run_dispatcher(program: &mut Program, opts: PluginOptions) -> BabelPluginVisitor {
-    let mut visitor = BabelPluginVisitor::new(opts);
+///
+/// Generic over `C: Comments` — tests typically pass
+/// `swc_common::comments::SingleThreadedComments::default()` (an
+/// in-process empty store) so the dispatcher's pragma scan reads
+/// safely without the SWC plugin runtime's thread-locals being
+/// initialised. Production paths go through `process` above.
+pub fn run_dispatcher<C: Comments>(
+    program: &mut Program,
+    opts: PluginOptions,
+    comments: C,
+) -> BabelPluginVisitor<C> {
+    let mut visitor = BabelPluginVisitor::new(opts, comments);
     program.visit_mut_with(&mut visitor);
     visitor
 }
