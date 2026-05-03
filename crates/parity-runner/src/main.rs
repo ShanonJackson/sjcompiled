@@ -66,6 +66,7 @@ fn main() -> ExitCode {
         "postcss-convert-values" => Stage::PostcssConvertValues,
         "sort" => Stage::Sort,
         "cssnano-band" => Stage::CssnanoBand,
+        "transform-css" => Stage::TransformCss,
         "autoprefixer" => Stage::Autoprefixer,
         s => {
             eprintln!("unknown stage: {s}");

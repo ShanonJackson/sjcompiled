@@ -24,22 +24,41 @@
 //! reveals it.
 
 use postcss_core::container::{walk_decls_mut, Mutation};
-use postcss_core::{NodeKind, PluginResult, Root};
+use postcss_core::{Node, NodeKind, PluginResult, Root};
 
 pub fn normalize_current_color(root: &mut Root) -> PluginResult {
     walk_decls_mut(&mut root.root, &mut |node, _ctx| {
-        if let NodeKind::Declaration(d) = &mut node.kind {
-            let lower = d.value.to_ascii_lowercase();
-            if lower == "currentcolor" || lower == "current-color" {
-                d.value = "currentColor".to_string();
-                // Drop the cached raw value so the stringifier re-emits
-                // the new value rather than the original bytes.
-                node.raws.value = None;
-            }
-        }
+        process_declaration(node);
         Mutation::Keep
     });
     Ok(())
+}
+
+/// Per-Declaration entry point. Mirrors the *body* of upstream's
+/// `Declaration(declaration)` visitor exactly:
+///
+/// ```ts
+/// const lowerValue = declaration.value.toLowerCase();
+/// if (lowerValue === 'currentcolor' || lowerValue === 'current-color') {
+///   declaration.value = 'currentColor';
+/// }
+/// ```
+///
+/// Used by `crates/css/src/transform.rs` to interleave this visitor with
+/// the other two Declaration visitors at each decl node in a single walk
+/// (per `crates/PHASE_8B_LIFECYCLE_AUDIT.md` walk round). No-op for any
+/// non-Declaration node so callers can pass arbitrary nodes from the
+/// walker without pre-checking.
+pub fn process_declaration(node: &mut Node) {
+    if let NodeKind::Declaration(d) = &mut node.kind {
+        let lower = d.value.to_ascii_lowercase();
+        if lower == "currentcolor" || lower == "current-color" {
+            d.value = "currentColor".to_string();
+            // Drop the cached raw value so the stringifier re-emits
+            // the new value rather than the original bytes.
+            node.raws.value = None;
+        }
+    }
 }
 
 #[cfg(test)]

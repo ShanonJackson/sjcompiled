@@ -90,6 +90,11 @@ const AFM_FROM = pathResolve(AFM_BROWSERSLIST_DIR, '_parity_input.css');
 // 14 cssnano sub-plugins + normalize-current-color as a unit.
 import { normalizeCSS } from '../src/plugins/normalize-css.ts';
 
+// Phase 8b end-to-end gate — `transformCss(css, opts)` in full. Imported
+// from `transform.ts` directly (not `index.ts`) so the JS oracle path is
+// unambiguous regardless of any future barrel re-export changes.
+import { transformCss } from '../src/transform.ts';
+
 // Sheets returned by extract-stylesheets are joined with U+001E (record
 // separator) so they ride the single-string bridge protocol unambiguously.
 // Real CSS never contains U+001E.
@@ -441,6 +446,53 @@ const STAGES = {
     } finally {
       if (previous === undefined) delete process.env.BROWSERSLIST;
       else process.env.BROWSERSLIST = previous;
+    }
+  },
+
+  // Phase 8b end-to-end gate — `transformCss(css, {})` in full. Mirrors
+  // the production JS pipeline byte-for-byte (default opts: `optimizeCss`
+  // implicitly true via `opts.optimizeCss === undefined`, no class-name
+  // compression map, no specificity bump, no class-hash prefix). The
+  // `COMPILED_CSS_ENGINE` env var is explicitly cleared so the JS pipeline
+  // runs as the parity oracle even under the `--engine` flag flip the
+  // verifier script uses.
+  //
+  // Browserslist is pinned to `chrome 100` per-call so the autoprefixer
+  // step + the 5 browserslist-aware cssnano plugins (colormin, convert-
+  // values, minify-params, normalize-unicode, reduce-initial) resolve
+  // to a known target on both engines. Without the pin, autoprefixer's
+  // `from: undefined` would fall through to `process.cwd()` walk-up
+  // resolution, which can drift across runs / machines / caniuse-lite
+  // versions.
+  //
+  // AUTOPREFIXER env var is explicitly cleared so autoprefixer DOES run
+  // (the JS check is `=== 'off'`; unset → runs). Both engines see the
+  // same env state.
+  //
+  // The result is JSON-stringified to carry both `sheets` and `classNames`
+  // through the single-string bridge protocol. Field order is `sheets`
+  // first then `classNames`, matching the object-literal construction
+  // order — JSON.stringify walks own-enumerable string keys in insertion
+  // order in V8.
+  'transform-css': (css) => {
+    const prevBrowserslist = process.env.BROWSERSLIST;
+    const prevAutoprefixer = process.env.AUTOPREFIXER;
+    const prevEngine = process.env.COMPILED_CSS_ENGINE;
+    process.env.BROWSERSLIST = 'chrome 100';
+    delete process.env.AUTOPREFIXER;
+    // Force the JS oracle path even if the harness was invoked with the
+    // engine flag flipped to rust at the parent shell level.
+    delete process.env.COMPILED_CSS_ENGINE;
+    try {
+      const { sheets, classNames } = transformCss(css, {});
+      return JSON.stringify({ sheets, classNames });
+    } finally {
+      if (prevBrowserslist === undefined) delete process.env.BROWSERSLIST;
+      else process.env.BROWSERSLIST = prevBrowserslist;
+      if (prevAutoprefixer === undefined) delete process.env.AUTOPREFIXER;
+      else process.env.AUTOPREFIXER = prevAutoprefixer;
+      if (prevEngine === undefined) delete process.env.COMPILED_CSS_ENGINE;
+      else process.env.COMPILED_CSS_ENGINE = prevEngine;
     }
   },
 };

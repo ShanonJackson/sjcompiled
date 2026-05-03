@@ -11,11 +11,17 @@ postcss-core = { workspace = true }
 postcss-selector-parser = { workspace = true }
 postcss-value-parser = { workspace = true }
 postcss-values-parser = { workspace = true }
-# `postcss-nested@5.0.6`, `postcss-normalize-whitespace@5.1.1`,
-# `autoprefixer@10.4.14`, `cssnano-preset-default@5.2.14`: NOT yet
-# declared as path-deps because those crates are still scaffolds.
-# Phase 5a/5b/6/7 will add them as `transform.rs` consumes them.
 postcss-discard-duplicates = { workspace = true }
+# Phase 8b — full transformCss pipeline. The 12-plugin composition wires
+# in postcss-nested@5.0.6, cssnano-preset-default@5.2.14, autoprefixer@10.4.14,
+# postcss-normalize-whitespace@5.1.1, plus the local plugins under
+# `compiled-css`. See `crates/PHASE_8B_LIFECYCLE_AUDIT.md` for the lifecycle
+# round-by-round recipe.
+postcss-nested = { workspace = true }
+postcss-normalize-whitespace = { workspace = true }
+autoprefixer = { workspace = true }
+cssnano-preset-default = { workspace = true }
+sjcompiled-utils = { workspace = true }
 compiled-css = { workspace = true }
 indexmap = { workspace = true }
 serde = { workspace = true }

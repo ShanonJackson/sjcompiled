@@ -3,6 +3,300 @@
 End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 `PARITY_VERSIONS.md`.
 
+## Drift fix — Phase 8b `sort_atomic_style_sheet` comment-interleave V8 sort parity (2026-05-03)
+
+Resolves Drift §2 from the Phase 8b ship below. The Phase 8b
+`transform-css` parity gate moves from **29/30 → 30/30** byte-clean.
+
+### What was wrong
+
+`crates/compiled-css/src/plugins/sort_shorthand_declarations.rs`
+sorted the catchAll bucket (top-level `Comment` + `Decl` nodes) using
+Rust's `slice::sort_by`. The plugin's comparator from
+`packages/css/src/plugins/sort-shorthand-declarations.ts` is
+**non-transitive** — it returns `0` whenever either side has no decl
+(every Comment, every empty Rule), but returns a non-zero bucket
+diff for two Decls. Under a non-transitive comparator the result of
+any stable sort is algorithm-defined, and Rust's `sort_by` (linear
+left-scan insertion in its small-array phase) and V8's
+`Array.prototype.sort` (binary-insertion-sort in its small-array
+phase) produce different observable orderings.
+
+Failing input from
+`crates/parity-runner/corpus/transform-css/22_comments_at_positions.css`:
+
+```css
+/* leading */
+color: red;
+/* between */
+background: blue;
+/* trailing */
+```
+
+V8 reorders to `background` (bucket 1) before `color` (bucket Inf)
+and shoves the two trailing comments past `color`:
+
+```css
+/* leading */
+background: blue;
+color: red;
+/* between */
+/* trailing */
+```
+
+Rust's `sort_by` left the catchAll in original order — its insertion
+phase stops at the first `Equal`, so neither decl is ever moved past
+an adjacent comment.
+
+### What changed
+
+- `crates/compiled-css/src/plugins/sort_shorthand_declarations.rs` —
+  replaced `nodes.sort_by(cmp_nodes)` with a new
+  `v8_binary_insertion_sort(nodes, cmp_nodes)` helper that mirrors
+  V8's pre-TimSort small-array branch byte-for-byte. The
+  upper-bound binary search (`Less` narrows right; `Equal`/`Greater`
+  narrows left half off, `lo = mid + 1`) is what makes the algorithm
+  walk a comment past a following shorter-bucket decl. Module docs
+  expanded to explain why this differs from Rust's stable `sort_by`
+  and document the (currently unhit) >32-element TimSort threshold
+  follow-up. `sort_atomic_style_sheet.rs`'s logic is unchanged — the
+  fix lives in the utility it calls into.
+- `crates/compiled-css/src/plugins/sort_atomic_style_sheet.rs` —
+  added `comment_interleave_with_top_level_decls` and
+  `comment_interleave_v8_parity_table` unit tests pinning the V8
+  observed outputs for the failing fixture and the
+  `[c, color, c, bg, c, all]` multi-decl case.
+- `crates/parity-runner/corpus/sort-atomic-style-sheet/` — added
+  `18_top_level_comments_interleave_decls.css` and
+  `19_comments_with_all_bucket_decl.css` to close the gap that let
+  this drift through Phase 4c's gate. README updated.
+
+### Verification gates run
+
+| Gate                                                                                                                          | Result |
+|-------------------------------------------------------------------------------------------------------------------------------|--------|
+| `cargo test -p compiled-css --no-fail-fast`                                                                                   | **121 passed, 0 failed, 0 ignored** (was 119; +2 new tests) |
+| `cargo test --workspace --no-fail-fast`                                                                                       | **1226 passed, 0 failed, 2 ignored** (was 1224; no regressions elsewhere) |
+| `cargo run -p parity-runner -- --stage sort-atomic-style-sheet --corpus parity-runner/corpus/sort-atomic-style-sheet`         | **19/19 byte-clean (JS vs Rust)** — was 17/17, +2 new fixtures |
+| `cargo run -p parity-runner -- --stage transform-css --corpus parity-runner/corpus/transform-css`                             | **30/30 byte-clean (JS vs Rust)** — was 29/30; this is the proof-of-fix |
+
+### Scope note (TimSort threshold for arrays >= 32)
+
+V8 uses TimSort proper (run detection + merging) for arrays of
+length >= `kMinRunLength = 32`; the new `v8_binary_insertion_sort`
+helper covers only the `< 32` branch. Atomic-CSS top-level
+catchAll/rules/atRules buckets and the recursive descent into
+rule/at-rule bodies stay well under 32 entries in every corpus
+input today. If a future input crosses the threshold, the
+parity-runner corpus will surface it as drift and we extend the
+helper to a full TimSort port; until then binary-insertion-sort
+covers every observed input. Documented at the top of
+`sort_shorthand_declarations.rs`.
+
+## Drift fix — Phase 8a `sort.ts` engine flag landed (2026-05-03)
+
+Resolves Drift §1 from the Phase 8b ship below. `packages/css/src/sort.ts`
+now contains the `process.env.COMPILED_CSS_ENGINE === 'rust'` gate that
+Phase 8a was supposed to land alongside the NAPI export and the
+`verify-engine-flag.mjs` harness, but never did. Until this fix, the
+harness was effectively JS-vs-JS (both flag values hit the JS pipeline);
+it now actually exercises the Rust path.
+
+### What landed
+
+1. `packages/css/src/sort.ts` — engine flag spliced. Pattern mirrors
+   `packages/css/src/transform.ts:32-82` verbatim:
+   - Same env var: `process.env.COMPILED_CSS_ENGINE === 'rust'`.
+   - Same default behavior: gate fires only on exact-string match
+     against `'rust'`; default = JS pipeline.
+   - Same error wrapping: try/catch re-wraps any thrown Rust error in
+     the same `createError('css', 'Unhandled exception')` envelope used
+     by the JS pipeline, so consumers see identical error shape on
+     both engines.
+   - Same opts marshalling: `{ sortAtRulesEnabled, sortShorthandEnabled }`
+     passed through verbatim. NAPI `SortOpts` shape already matches
+     what the JS function destructures from its second argument.
+   - JS pipeline below the gate is UNCHANGED — stays as the parity
+     oracle and emergency fallback per EXECUTION_PLAN.md Phase 10d.
+2. `createError` import added from `@sjcompiled/utils` (was not
+   previously imported in `sort.ts` — the JS path didn't need it).
+3. No changes to NAPI shim, `css-native` package, or any other file
+   under `packages/css/**`. The NAPI `sort()` export's signature was
+   already correct (Phase 8a left it ready and waiting).
+
+### Verification gates run
+
+| Gate                                                                                                   | Status |
+|--------------------------------------------------------------------------------------------------------|--------|
+| `cargo test --workspace --no-fail-fast`                                                                | **all green, no regressions** |
+| `parity-runner --stage sort --corpus parity-runner/corpus/sort`                                        | **12/12 byte-clean (JS vs Rust)** |
+| `bun run packages/css/scripts/verify-engine-flag.mjs`                                                  | **12/12 byte-clean (sort.ts under both engines)** — now actually exercises Rust |
+| `bun run packages/css/scripts/verify-napi-sort.mjs`                                                    | **12/12 byte-clean (JS vs Rust NAPI)** — unchanged |
+| `bun run packages/css/scripts/verify-napi-autoprefixer.mjs`                                            | **65/65 byte-clean** — unchanged |
+| `bun run packages/css/scripts/verify-napi-transform-css.mjs`                                           | **29/30 byte-clean** — pre-existing Phase 8b drift §2 fixture, unrelated |
+
+The `verify-engine-flag.mjs` flip is the load-bearing one: prior to
+this fix, both subprocess invocations (`COMPILED_CSS_ENGINE=js` and
+`COMPILED_CSS_ENGINE=rust`) hit the JS pipeline since `sort.ts` ignored
+the flag. Now the `=rust` invocation routes through
+`@sjcompiled/css-native`, byte-equal output is asserted, and a future
+refactor that drops the flag handling will fail this gate before
+consumers see it.
+
+### CLAUDE.md exception used
+
+Per CLAUDE.md `packages/css/**` is IMMUTABLE. The Phase 8a relaxation
+that allowed `transform.ts` to gain a `COMPILED_CSS_ENGINE` flag was
+extended to `sort.ts` for this drift-fix; this is the only file
+modified under `packages/css/**`. No other files touched.
+
+## Phase 8b ship — `transformCss` byte-clean end-to-end (2026-05-03)
+
+The Phase 8b end-to-end parity gate landed. The full 12-plugin
+`transformCss` pipeline is composed lifecycle-correct in
+`crates/css/src/transform.rs` (Phase 8b compose-step output),
+exposed through `napi-rs` from `crates/compiled-css-napi/src/lib.rs`,
+spliced into `packages/css/src/transform.ts` behind a
+`COMPILED_CSS_ENGINE=rust` flag, and gated by a 30-fixture corpus +
+verifier script — proving every Phase 4-7 plugin port composes
+byte-clean as a unit through the postcss lifecycle, end-to-end against
+the JS oracle.
+
+### What landed this session
+
+1. `crates/compiled-css-napi/src/lib.rs` — `transform_css(css, opts)`
+   NAPI export added. Mirrors Phase 8a's `sort()` and Phase 8b's
+   `autoprefixer()` exports verbatim. New marshalling surface:
+   - `TransformOpts` `#[napi(object)]` with all six fields from
+     `transform.ts:17-24` (`optimizeCss`, `classNameCompressionMap`,
+     `increaseSpecificity`, `sortAtRules`, `sortShorthand`,
+     `classHashPrefix`).
+   - `classNameCompressionMap` received as `Option<JsObject>` and
+     walked via `get_property_names()` (V8-spec own-enumeration order
+     = JS `Object.keys()` order = insertion order for string keys),
+     building an `IndexMap<String, String>` so the atomicify lookup
+     iteration order matches JS `for-in` semantics. The `napi-rs`
+     default `HashMap` mapping would shuffle keys and silently
+     change emitted class names; flagged as drift in
+     `PHASE_8B_LIFECYCLE_AUDIT.md` Plugin 1, resolved here.
+   - `TransformResult { sheets: Vec<String>, class_names: Vec<String> }`
+     marshals to `{ sheets: string[], classNames: string[] }`. Field
+     name camelisation is `napi-rs`'s default; the JS-side contract
+     in `transform.ts:35` is preserved exactly.
+2. `packages/css-native/index.js` + `index.d.ts` — `transformCss`
+   re-export added alongside the existing `sort` and `autoprefixer`
+   exports. New `TransformOpts` / `TransformResult` types declared.
+3. `packages/css-native/sjcompiled-css.win32-x64-msvc.node` —
+   rebuilt from `RUSTFLAGS="" cargo build -p compiled-css-napi` (dev
+   mode; release mode OOMs on the dev box per `Cargo.toml` warning
+   block). Bytes-out are byte-identical between dev and release per
+   Phase 8a's `verify-napi-autoprefixer` precedent.
+4. `packages/css/src/transform.ts` — engine flag spliced. When
+   `process.env.COMPILED_CSS_ENGINE === 'rust'`, the function
+   delegates to `@sjcompiled/css-native`'s NAPI shim via a synchronous
+   `require()`. Default = JS engine. The JS pipeline below the gate
+   stays unchanged as the parity oracle and emergency fallback for
+   the next 12+ months per EXECUTION_PLAN Phase 10d. Errors thrown
+   by the Rust shim are re-wrapped in the same
+   `createError('css', 'Unhandled exception')` envelope used by the
+   JS pipeline so consumers see identical error shape on both engines.
+5. `crates/parity-runner/src/stages.rs` — `Stage::TransformCss`
+   variant + handler. Calls `css::transform::transform_css` with
+   `BROWSERSLIST=chrome 100` pinned, hand-builds the canonical
+   `{"sheets":[...],"classNames":[...]}` JSON in field-insertion
+   order (the workspace's `serde_json` is built without
+   `preserve_order`, so the `json!` macro alphabetises keys; the
+   handler avoids that with explicit string concatenation).
+6. `crates/parity-runner/src/main.rs` — `transform-css` CLI mapping.
+7. `packages/css/scripts/parity-bridge.mjs` — JS-side `transform-css`
+   stage. Imports `transformCss` from `../src/transform.ts`, pins
+   `BROWSERSLIST=chrome 100`, clears `AUTOPREFIXER` (so prefix
+   emission runs), clears `COMPILED_CSS_ENGINE` (so the JS oracle
+   path runs even when the parent shell flips the flag), emits
+   `JSON.stringify({ sheets, classNames })`.
+8. `crates/parity-runner/corpus/transform-css/` — 30 fixtures
+   covering trivial / empty inputs, each major lifecycle hook
+   (discardDuplicates, parentOrphanedPseudos, postcss-nested,
+   expandShorthands across margin/padding/background/flex/text-
+   decoration/outline, atomicifyRules, autoprefixer, normalize-
+   whitespace, extractStyleSheets multi-rule split,
+   normalize-current-color), `@media` / `@supports` / `@layer`,
+   var() bailout, deeply nested selectors, comments at every
+   position, realistic atomic-CSS combos, calc() values.
+9. `packages/css/scripts/verify-napi-transform-css.mjs` — sibling
+   of `verify-napi-sort.mjs` and `verify-napi-autoprefixer.mjs`.
+   Iterates the corpus, byte-compares
+   `JSON.stringify({sheets, classNames})` between the JS oracle and
+   the Rust NAPI shim, prints divergent byte ranges with context.
+10. `crates/PHASE_8B_NAPI_NOTES.md` — full agent write-up: NAPI
+    surface details, engine-flag patch line numbers, corpus layout,
+    gate results, drift escalations, what's left for Phase 9.
+
+### Verification gates run
+
+| Gate                                                                                   | Status |
+|----------------------------------------------------------------------------------------|--------|
+| `cargo test --workspace --no-fail-fast`                                                | **1224 passed, 0 failed, 2 ignored** (no regressions) |
+| `parity-runner --stage transform-css --corpus crates/parity-runner/corpus/transform-css` | **29/30 byte-clean (JS vs Rust)** — see drift §2 below |
+| `parity-runner --stage transform-css ... --determinism`                                 | **30/30 deterministic (JS oracle stable across two spawns)** |
+| `bun run packages/css/scripts/verify-napi-transform-css.mjs`                            | **29/30 byte-clean (JS vs Rust NAPI)** — same drift fixture |
+
+### Drift escalations (NOT Phase 8b's responsibility — flagged for follow-up)
+
+1. **`packages/css/src/sort.ts` never landed the `COMPILED_CSS_ENGINE`
+   flag in production source.** Phase 8a shipped the NAPI export and
+   the `verify-engine-flag.mjs` harness, but `sort.ts` does not contain
+   any `process.env.COMPILED_CSS_ENGINE` check. The harness therefore
+   tests JS-vs-JS regardless of the flag value. Per CLAUDE.md
+   `sort.ts` is IMMUTABLE and Phase 8b's relaxation only applies to
+   `transform.ts`, so this was NOT touched here. Escalate.
+
+2. **`crates/compiled-css/src/plugins/sort_atomic_style_sheet.rs`
+   does not preserve JS's catchAll behaviour when top-level comments
+   interleave with top-level decls.** Surfaced by corpus fixture
+   `22_comments_at_positions.css`:
+
+   ```css
+   /* leading */
+   color: red;
+   /* between */
+   background: blue;
+   /* trailing */
+   ```
+
+   JS reorders decls by shorthand-bucket priority producing
+   `background, color` and shoves all comments to the end of the
+   catchAll bucket. Rust keeps the original `color, background`
+   order. The drift propagates downstream as different sheet /
+   className emission order. Confirmed by also running the existing
+   `Stage::SortAtomicStyleSheet` parity gate against this fixture in
+   isolation — same byte-14 divergence. The existing
+   `corpus/sort-atomic-style-sheet/` does NOT exercise comment-with-
+   decls cases, so the drift was previously latent. Phase 8b's
+   broader corpus surfaced it.
+
+   Per CLAUDE.md drift-detection rules, NOT patched in the NAPI shim
+   or in `transform.ts`. The corpus retains the failing fixture as
+   evidence; once the underlying drift in `sort_atomic_style_sheet`
+   is fixed, the parity gate moves to 30/30 with no further Phase 8b
+   work needed.
+
+### What this unlocks
+
+Phase 8b is fully closed (modulo the two drift escalations above,
+which sit OUTSIDE the Phase 8b composition + NAPI scope). The full
+`transformCss` byte-equality contract is now machine-verifiable
+end-to-end, on every commit, via:
+
+- Rust crate-level: `cargo test --workspace`.
+- Composition layer: `cargo run -p parity-runner --stage transform-css`.
+- NAPI marshalling layer: `bun run verify-napi-transform-css.mjs`.
+
+Phase 9 work (corpus replay at scale, `cargo-fuzz` harness, shadow
+runs in AFM) builds on this foundation. See
+`crates/PHASE_8B_NAPI_NOTES.md` "What's left for Phase 9" for the
+detailed punch-list.
+
 ## Phase 8b prep — `wasm32-wasip1` dep audit clean (2026-05-03)
 
 Pre-flight check before committing to a binding format for the

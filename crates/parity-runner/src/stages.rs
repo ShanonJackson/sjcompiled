@@ -224,6 +224,29 @@ pub enum Stage {
     /// default which can drift across caniuse-lite versions.
     CssnanoBand,
 
+    /// Phase 8b end-to-end gate — `packages/css/src/transform.ts` in full.
+    /// Runs `transformCss(css, { optimizeCss: true })` end-to-end, returning
+    /// `{ sheets, classNames }`. The bridge serializes the result via
+    /// `JSON.stringify({ sheets, classNames })` so the byte-comparison
+    /// covers BOTH the per-sheet stringification AND the class-name
+    /// emission order. This is the strongest parity gate in the project —
+    /// every Phase 4-7 plugin must compose byte-clean as a unit through
+    /// the lifecycle-correct ordering documented in
+    /// `crates/PHASE_8B_LIFECYCLE_AUDIT.md`.
+    ///
+    /// Browserslist is pinned to `chrome 100` for the gate (env var
+    /// `BROWSERSLIST=chrome 100` set by the bridge). `AUTOPREFIXER` is
+    /// left unset — the autoprefixer step runs on both engines (env var
+    /// equality check `=== 'off'` is false for unset). The Rust side
+    /// reads the same env var via `std::env::var("AUTOPREFIXER")`.
+    ///
+    /// Note: AUTOPREFIXER's browserslist resolution still walks from
+    /// `current_dir()` when no `from:` is given (matching JS where
+    /// `transform.ts:74` hardcodes `from: undefined`). Both engines run
+    /// in the same cwd (the parity-runner process cwd), so the walk-up
+    /// produces identical results.
+    TransformCss,
+
     /// `parse → autoprefixer@10.4.14 (AFM browserslist) → stringify`. Phase 7.
     /// Runs `Processor::remove(root) → Processor::add(root)` against a
     /// `Prefixes` built from AFM's pinned `.browserslistrc` fixture
@@ -274,6 +297,7 @@ impl Stage {
             Stage::PostcssConvertValues => "postcss-convert-values",
             Stage::Sort => "sort",
             Stage::CssnanoBand => "cssnano-band",
+            Stage::TransformCss => "transform-css",
             Stage::Autoprefixer => "autoprefixer",
         }
     }
@@ -525,6 +549,67 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             compiled_css::plugins::normalize_css::normalize_css(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
+        }
+        Stage::TransformCss => {
+            // Phase 8b end-to-end gate. Run the lifecycle-correct
+            // `css::transform::transform_css` and serialise the
+            // `{ sheets, classNames }` result to a canonical JSON
+            // shape that matches what the JS bridge emits via
+            // `JSON.stringify({ sheets, classNames })`.
+            //
+            // Field order is `sheets` first then `classNames`, matching
+            // the JS object-literal construction order — JSON.stringify
+            // walks own-enumerable string keys in insertion order in V8.
+            // We hand-build the JSON via serde_json::Value so the field
+            // order is pinned regardless of struct-field ordering.
+            //
+            // The opts are `TransformOpts::default()` which mirrors the
+            // bridge call site `transformCss(css, {})`: `optimizeCss`
+            // unset → defaults to `true`, all other flags unset.
+            //
+            // Browserslist is pinned to `chrome 100` for both engines.
+            // The JS bridge sets `process.env.BROWSERSLIST = 'chrome 100'`
+            // around its call; the Rust call here mirrors that pin via
+            // `std::env::set_var` (restored after). Both autoprefixer
+            // and the 5 browserslist-aware cssnano sub-plugins read
+            // this env var at call time.
+            //
+            // AUTOPREFIXER is explicitly removed so autoprefixer DOES
+            // run (the check is `!= "off"`; unset → runs). Both engines
+            // see identical env state.
+            let prev_browserslist = std::env::var("BROWSERSLIST").ok();
+            let prev_autoprefixer = std::env::var("AUTOPREFIXER").ok();
+            std::env::set_var("BROWSERSLIST", "chrome 100");
+            std::env::remove_var("AUTOPREFIXER");
+            let opts = css::transform::TransformOpts::default();
+            let result = css::transform::transform_css(css, &opts);
+            // Restore env state before unwinding the result, so the
+            // env mutation is scoped strictly to the call.
+            match prev_browserslist {
+                Some(v) => std::env::set_var("BROWSERSLIST", v),
+                None => std::env::remove_var("BROWSERSLIST"),
+            }
+            match prev_autoprefixer {
+                Some(v) => std::env::set_var("AUTOPREFIXER", v),
+                None => std::env::remove_var("AUTOPREFIXER"),
+            }
+            let result = result?;
+            // Hand-build the JSON string in `sheets` → `classNames`
+            // order. `serde_json::json!` uses `serde_json::Map` which
+            // requires the `preserve_order` feature to honour
+            // insertion order; the workspace's serde_json is built
+            // without it, so the macro alphabetises keys (`classNames`
+            // → `sheets`). Using `serde_json::to_string` on each Vec
+            // separately and concatenating with the literal field
+            // markers guarantees the JS-engine field order without
+            // adding a workspace-wide feature flag.
+            let sheets_arr = serde_json::to_string(&result.sheets)
+                .map_err(|e| format!("transform-css json error: {e}"))?;
+            let class_names_arr = serde_json::to_string(&result.class_names)
+                .map_err(|e| format!("transform-css json error: {e}"))?;
+            Ok(format!(
+                "{{\"sheets\":{sheets_arr},\"classNames\":{class_names_arr}}}"
+            ))
         }
         Stage::Autoprefixer => {
             // Mirror `autoprefixer.js`'s `OnceExit(root)` hook:

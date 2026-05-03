@@ -105,7 +105,14 @@ fn process_container(parent: &mut Node) -> bool {
 /// Mirrors upstream's `isValueEmpty`. The `'undefined' / 'null'` literal
 /// checks are byte-exact; the `value.trim() === ''` branch uses a
 /// JS-equivalent whitespace set (Rust `is_whitespace` + U+FEFF).
-fn is_value_empty(value: &str) -> bool {
+///
+/// Public so the outer transform.rs orchestrator can re-use the
+/// emptiness predicate when interleaving the three Declaration visitors
+/// per-node in a single hand-rolled walk (per
+/// `crates/PHASE_8B_LIFECYCLE_AUDIT.md` walk round). The behaviour is
+/// the same as upstream's local `isValueEmpty` lambda; exposing it as
+/// `pub` does NOT change the existing root-scoped entry point.
+pub fn is_value_empty(value: &str) -> bool {
     if value == "undefined" || value == "null" {
         return true;
     }

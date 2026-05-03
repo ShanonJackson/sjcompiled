@@ -1,0 +1,15 @@
+/*! keep me */
+.button {
+  color: red;
+  background: blue;
+  padding: 8px;
+  margin: 0 auto;
+  &:hover {
+    color: blue;
+  }
+}
+@media (min-width: 768px) {
+  .button {
+    padding: 16px;
+  }
+}

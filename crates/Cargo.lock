@@ -422,6 +422,7 @@ version = "0.0.1"
 dependencies = [
  "autoprefixer",
  "css",
+ "indexmap",
  "napi",
  "napi-build",
  "napi-derive",
@@ -476,14 +477,19 @@ dependencies = [
 name = "css"
 version = "0.0.1"
 dependencies = [
+ "autoprefixer",
  "compiled-css",
+ "cssnano-preset-default",
  "indexmap",
  "postcss-core",
  "postcss-discard-duplicates",
+ "postcss-nested",
+ "postcss-normalize-whitespace",
  "postcss-selector-parser",
  "postcss-value-parser",
  "postcss-values-parser",
  "serde",
+ "sjcompiled-utils",
 ]
 
 [[package]]

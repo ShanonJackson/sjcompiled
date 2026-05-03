@@ -295,4 +295,45 @@ mod tests {
         // sort plugin with one rule, no at-rules, no shorthands → no change.
         assert_eq!(run(css), css);
     }
+
+    /// Regression for Phase 8b NAPI drift §2 — when top-level Comment
+    /// nodes interleave with top-level Decl nodes in the catchAll
+    /// bucket, V8's `Array.prototype.sort` (binary-insertion-sort
+    /// branch) reorders decls by shorthand bucket while ALSO moving
+    /// trailing comments past the shorter shorthand-bucket decl. The
+    /// JS oracle output for the failing fixture
+    /// `crates/parity-runner/corpus/transform-css/22_comments_at_positions.css`
+    /// is what we assert here verbatim.
+    #[test]
+    fn comment_interleave_with_top_level_decls() {
+        let input =
+            "/* leading */\ncolor: red;\n/* between */\nbackground: blue;\n/* trailing */\n";
+        let expected =
+            "/* leading */\nbackground: blue;\ncolor: red;\n/* between */\n/* trailing */\n";
+        assert_eq!(run(input), expected, "actual: {:?}", run(input));
+    }
+
+    /// Tighter follow-up: every observed V8 small-array result for
+    /// the catchAll permutations we trace in
+    /// `PHASE_8B_NAPI_NOTES.md` § "Drift detected" §2. Locks in the
+    /// V8-parity binary-insertion-sort behaviour at the
+    /// sort_atomic_style_sheet level.
+    #[test]
+    fn comment_interleave_v8_parity_table() {
+        // [c, color, bg, c]
+        assert_eq!(
+            run("/* a */\ncolor: red;\nbackground: blue;\n/* b */\n"),
+            "/* a */\nbackground: blue;\ncolor: red;\n/* b */\n"
+        );
+        // [c, c, color, bg]  →  comments stay, decls reorder.
+        assert_eq!(
+            run("/* a */\n/* b */\ncolor: red;\nbackground: blue;\n"),
+            "/* a */\n/* b */\nbackground: blue;\ncolor: red;\n"
+        );
+        // [c, color, c, bg, c, all]  →  all bucket-0 first, comments shoved to end.
+        assert_eq!(
+            run("/* a */\ncolor: red;\n/* b */\nbackground: blue;\n/* c */\nall: unset;\n"),
+            "/* a */\nall: unset;\nbackground: blue;\ncolor: red;\n/* b */\n/* c */\n"
+        );
+    }
 }

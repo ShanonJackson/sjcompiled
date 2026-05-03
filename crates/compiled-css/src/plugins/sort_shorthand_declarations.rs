@@ -41,11 +41,52 @@
 //!   - else if it's a container, return the first direct-child Decl.
 //!   - else None (skip).
 //! - When either side has no decl, return `Equal` (no swap) — this is
-//!   how upstream's `return 0` interacts with stable sort to keep
+//!   how upstream's `return 0` interacts with V8's sort to keep
 //!   AtRules/comment positions intact.
 //! - Buckets default to a sentinel "infinity" (we use `i32::MAX`) when
 //!   the prop isn't in the table. This pushes non-shorthand decls
 //!   AFTER all shorthands at any given depth.
+//!
+//! ## V8-parity sort algorithm
+//!
+//! `Array.prototype.sort` in V8 uses TimSort, but for arrays smaller
+//! than `kMinRunLength = 32` it uses a pure binary-insertion-sort. The
+//! comparator above is **non-transitive** — it returns `0` whenever
+//! a Comment (or any node without a child decl) is one side, but
+//! returns a non-zero value for two Decls with different buckets. So
+//! the SET of pairs that compare equal is not closed under transitivity:
+//! `cmp(comment, color) = 0` and `cmp(comment, background) = 0` but
+//! `cmp(color, background) ≠ 0`.
+//!
+//! Under a non-transitive comparator the result of any stable sort is
+//! algorithm-defined. Rust's `slice::sort_by` uses a TimSort variant
+//! whose insertion-sort phase is a *linear* (left-scan) insertion that
+//! stops at the first `Less` (i.e. it's a lower-bound style scan). V8's
+//! binary-insertion phase uses a *binary* search that uses upper-bound
+//! semantics (equal elements go AFTER, so the scan continues into the
+//! left half only on strict `Less`). The two algorithms produce
+//! different observable orderings on the same non-transitive
+//! comparator.
+//!
+//! Concretely, on the `[comment, color, comment, background, comment]`
+//! catchAll bucket from `sortAtomicStyleSheet`, V8 rearranges to
+//! `[comment, background, color, comment, comment]` — the two trailing
+//! comments end up adjacent because the binary search for `comment@4`
+//! settles to upper-bound (end-of-array). Rust's linear insertion
+//! never moves either decl past a comment because it stops at the
+//! first `Equal`. To match the JS oracle byte-for-byte we re-implement
+//! V8's binary-insertion-sort here. See
+//! `crates/PHASE_8B_NAPI_NOTES.md` "Drift detected §2" for the gate
+//! that surfaced this.
+//!
+//! For arrays of length >= 32 V8 transitions to TimSort proper (run
+//! detection + merging). Atomic-CSS top-level catchAll/rules/atRules
+//! buckets are typically <10 entries; we have no fixture exercising
+//! 32+ elements, and the recursive descent into rule/at-rule bodies
+//! also stays small in practice. If a real-world input ever hits the
+//! TimSort threshold here, the parity-runner corpus will surface it
+//! as drift and we extend this helper to a full TimSort port. Until
+//! then binary-insertion-sort covers every observed corpus input.
 
 use std::cmp::Ordering;
 
@@ -88,7 +129,8 @@ fn cmp_nodes(a: &Node, b: &Node) -> Ordering {
     bucket_for(&ad.prop).cmp(&bucket_for(&bd.prop))
 }
 
-/// `sortShorthandDeclarations(nodes)` — depth-first stable sort.
+/// `sortShorthandDeclarations(nodes)` — depth-first sort matching V8's
+/// `Array.prototype.sort` behaviour (binary insertion sort).
 pub fn sort_shorthand_declarations(nodes: &mut [Node]) {
     if nodes.is_empty() {
         return;
@@ -103,7 +145,47 @@ pub fn sort_shorthand_declarations(nodes: &mut [Node]) {
             }
         }
     }
-    nodes.sort_by(cmp_nodes);
+    v8_binary_insertion_sort(nodes, cmp_nodes);
+}
+
+/// V8-parity binary insertion sort. Replicates the pre-TimSort branch
+/// of V8's `Array.prototype.sort` used for arrays of length < 32, and
+/// the per-run insertion-extension phase used inside TimSort proper.
+///
+/// For each `i` in `1..nodes.len()`, binary-searches the prefix
+/// `nodes[0..i]` for the upper-bound insertion point of `nodes[i]`
+/// (equal elements go AFTER), then rotates the element into place via
+/// `slice::rotate_right(1)`. The upper-bound semantics — `lo = mid + 1`
+/// on `Equal` or `Greater`, `hi = mid` only on `Less` — is what makes
+/// the algorithm move comments past following decls in the
+/// non-transitive comment-vs-decl comparator setup; see module docs.
+fn v8_binary_insertion_sort<T, F>(nodes: &mut [T], mut cmpf: F)
+where
+    F: FnMut(&T, &T) -> Ordering,
+{
+    let len = nodes.len();
+    for i in 1..len {
+        let mut lo = 0usize;
+        let mut hi = i;
+        while lo < hi {
+            let mid = lo + ((hi - lo) >> 1);
+            // Compare element-being-inserted (at index i) vs prefix[mid].
+            // The prefix is fully sorted at this point so `nodes[mid]`
+            // is the pivot and `nodes[i]` is the candidate. Match V8's
+            // ArrayTimSortImpl.tq `BinarySearch` upper-bound semantics:
+            // strict `Less` narrows right; `Equal`/`Greater` narrows
+            // left half off (lo = mid + 1) so equal keys land AFTER.
+            match cmpf(&nodes[i], &nodes[mid]) {
+                Ordering::Less => hi = mid,
+                Ordering::Equal | Ordering::Greater => lo = mid + 1,
+            }
+        }
+        // Move `nodes[i]` to position `lo`, shifting `nodes[lo..i]`
+        // one slot right.
+        if lo < i {
+            nodes[lo..=i].rotate_right(1);
+        }
+    }
 }
 
 #[cfg(test)]

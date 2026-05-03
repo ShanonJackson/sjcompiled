@@ -17,3 +17,12 @@ LVFHA pseudo sort, at-rule media-query sort, recursive at-rule sort.
 - `10` — blank input.
 - `11` — single rule (no-op).
 - `12` — interleaved min/max-width queries; tie-break order matters.
+- `18` — top-level Comment ↔ Decl interleave drives V8's binary-
+  insertion-sort branch in `sortShorthandDeclarations`. Locks down
+  Phase 8b NAPI drift §2 — see `crates/PHASE_8B_NAPI_NOTES.md`.
+  Without the V8-parity sort, Rust's stable `sort_by` would never
+  move a decl past an adjacent comment because its insertion-phase
+  scan stops at the first `Equal` from the non-transitive comparator.
+- `19` — comment interleave plus an `all` (bucket 0) decl drives the
+  multi-decl reorder path through V8's binary-insertion: `all` must
+  walk left past two decls + a comment to land at index 1.
