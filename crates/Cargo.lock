@@ -502,7 +502,6 @@ name = "cssnano-postcss-convert-values"
 version = "0.0.1"
 dependencies = [
  "browserslist-shim",
- "fraction-js",
  "postcss-core",
  "postcss-value-parser",
 ]

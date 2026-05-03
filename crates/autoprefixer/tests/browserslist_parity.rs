@@ -1,24 +1,29 @@
 //! Byte-level parity gate for `crates/browserslist-shim`.
 //!
-//! For each canonical query in [`CANONICAL_QUERIES`], spawns `bun` with
-//! the pinned `browserslist@4.24.2` (resolved via plain
-//! `require('browserslist')` from the workspace root — the workspace
-//! lists browserslist in BOTH `overrides` and `devDependencies` per
-//! HANDOVER §2 pattern, so the top-level symlink is byte-exact 4.24.2),
-//! captures the JSON `["chrome 144", ...]` array, and compares it
-//! element-by-element against `browserslist_shim::resolve(query, true)`.
+//! ## Status (post-AFM fast-path landing)
 //!
-//! Why this gate exists: `browserslist-shim` wraps `oxc_browserslist`
-//! whose bundled caniuse-lite snapshot may drift from the workspace pin
-//! (1.0.30001766). Without this gate, `Prefixes::new` (next session's
-//! Option A) would consume a silently-wrong `Browsers::new(...)` result
-//! and produce drifted prefix bytes downstream — the kind of divergence
-//! the parity contract considers a hash-rotation event.
+//! The previous canonical-queries omnibus gate (which was `#[ignore]`'d
+//! because `oxc_browserslist`'s bundled caniuse-lite drifted ~2 chrome
+//! releases ahead of our pin) is **closed for AFM's surface**. The
+//! shim now has a hybrid AFM-fast-path / oxc-fallback architecture:
+//! AFM's `.browserslistrc` atoms (`last N <browser> version[s]?`) and
+//! the Firefox ESR rewrite (`firefox 115, firefox 128`) resolve via
+//! `caniuse-db@1.0.30001766` directly, byte-correct. Anything else
+//! (defaults, `> X%`, `<= 15`, `not all`) still routes through
+//! `oxc_browserslist` — drift-tolerant, used by Phase 6 cssnano
+//! consumers whose output reduces to a drift-stable boolean.
 //!
-//! Reference: `crates/autoprefixer/HANDOVER.md` §6,
-//! `crates/autoprefixer/MORNING.md` Option D.
+//! See `crates/browserslist-shim/AFM_PORT_NOTES.md` and
+//! `crates/autoprefixer/HANDOVER.md` §6 for the architecture rationale.
 //!
-//! Pre-conditions:
+//! This test now resolves bun's pinned `browserslist@4.24.2` against
+//! the AFM `.browserslistrc` fixture (the SAME fixture the shim's own
+//! integration test uses) and compares element-by-element against
+//! `browserslist_shim::resolve_with("", { path: fixture_dir })`. Drift
+//! between bun's JS oracle and our Rust shim on the AFM surface is a
+//! hash-rotation event.
+//!
+//! ## Pre-conditions
 //! - `bun` on PATH.
 //! - `bun install` has populated `node_modules/.bun/browserslist@4.24.2+*`.
 //!
@@ -67,86 +72,73 @@ fn workspace_browserslist_pin_is_424_2() {
     );
 }
 
-/// Canonical browserslist queries that `Prefixes::new` will consume.
-/// Drawn from MORNING.md Option D + the queries `transform.ts` reaches.
+/// **Closure of the previously-OPEN browserslist-shim parity gate (AFM surface).**
 ///
-/// `"not dead"` standalone is intentionally absent: browserslist@4.24.2
-/// throws `Write any browsers query (for instance, `defaults`) before
-/// `not dead`` for negative-only queries. The Rust shim swallows that
-/// error to `Vec::new()` (`index.rs::resolve_with`) — different error
-/// semantics, but not a hashing-path divergence because no real consumer
-/// passes `"not dead"` alone. Coverage for the `not dead` clause is via
-/// `"last 2 versions, not dead"` below (which is the real-world form).
-const CANONICAL_QUERIES: &[&str] = &[
-    "defaults",
-    "> 1%",
-    "chrome >= 50",
-    "last 2 versions",
-    "Firefox ESR",
-    "last 2 versions, not dead",
-];
-
-/// **Gate status: OPEN.** Marked `#[ignore]` so the floor stays intact;
-/// the test code is the closure-tool for the agent who fixes the shim.
+/// Spawns bun against `browserslist@4.24.2` with the AFM `.browserslistrc`
+/// fixture as the resolver's `path` opt, captures the JSON
+/// `["chrome 144", ...]` array, and compares it element-by-element
+/// against `browserslist_shim::resolve_with("", { path: fixture_dir })`.
 ///
-/// Run on demand with:
-/// ```text
-/// cargo test -p autoprefixer --test browserslist_parity -- --ignored
-/// ```
+/// Pre-conditions:
+/// - The shim's `tests/fixtures/afm/.browserslistrc` SHA256 must match
+///   AFM's pinned hash. The shim's `afm_parity.rs` integration test
+///   asserts this independently — if THAT test fails, this test's
+///   bun-side input has also drifted.
 ///
-/// Last-observed divergence (this session, run on caniuse-lite 1.0.30001766
-/// + `oxc_browserslist` whichever version the workspace pulls):
-/// - `defaults`, `> 1%`, `last 2 versions`, `last 2 versions, not dead`,
-///   `chrome >= 50`: oxc_browserslist's bundled caniuse-lite snapshot is
-///   ~2 chrome releases newer than our pin, so RUST returns
-///   `chrome 145, chrome 146` for "current versions" while JS returns
-///   `chrome 143, chrome 144`. Same shape on android/edge/firefox/etc.
-/// - `Firefox ESR`: byte-clean (rewrite_firefox_esr forces the literal
-///   `firefox 115, firefox 128` pair, bypassing caniuse-lite). Pinned
-///   independently by `browserslist_shim_firefox_esr_matches_js_oracle`.
-///
-/// To close: either (a) override oxc_browserslist's snapshot to point at
-/// our pinned `caniuse-db` data, (b) fork/extend `browserslist-shim` to
-/// resolve queries against caniuse-db directly instead of delegating to
-/// oxc_browserslist, or (c) downgrade oxc_browserslist to a version
-/// whose bundled snapshot matches 1.0.30001766. Any path that closes
-/// this is a multi-day unit — DO NOT half-land it.
+/// On failure, in priority order:
+/// 1. Did `caniuse_db::CANIUSE_LITE_VERSION` change? Bun is reading the
+///    workspace `node_modules/caniuse-lite`; the shim is reading
+///    `crates/caniuse-db/data/features.snapshot.json`. They must
+///    agree on the snapshot version.
+/// 2. Did the AFM-fast-path resolver regress? Run
+///    `cargo test -p browserslist-shim --test afm_parity` first.
 #[test]
-#[ignore = "browserslist-shim parity gate is open — see HANDOVER §6 and the doc-comment on this fn"]
-fn browserslist_shim_matches_js_oracle_for_canonical_queries() {
+fn browserslist_shim_matches_js_oracle_for_afm_browserslistrc() {
     let workspace_root = workspace_root();
-
-    let mut failures: Vec<String> = Vec::new();
-    for query in CANONICAL_QUERIES {
-        let oracle = run_oracle(&workspace_root, query);
-        let rust = browserslist_shim::resolve(query, true);
-        if oracle != rust {
-            failures.push(format!(
-                "Query {:?} diverges:\n  JS  ({} entries): {:?}\n  RUST({} entries): {:?}\n  diff: {}\n",
-                query,
-                oracle.len(),
-                truncate_list(&oracle, 8),
-                rust.len(),
-                truncate_list(&rust, 8),
-                describe_diff(&oracle, &rust),
-            ));
-        }
-    }
+    let fixture_dir = workspace_root
+        .join("crates")
+        .join("browserslist-shim")
+        .join("tests")
+        .join("fixtures")
+        .join("afm");
     assert!(
-        failures.is_empty(),
-        "browserslist-shim diverges from JS oracle (browserslist@4.24.2):\n\n{}",
-        failures.join("\n")
+        fixture_dir.join(".browserslistrc").is_file(),
+        "AFM fixture missing at {:?}",
+        fixture_dir
+    );
+
+    let oracle = run_oracle_against_fixture(&workspace_root, &fixture_dir);
+
+    let opts = browserslist_shim::index::ResolveOpts {
+        path: Some(&fixture_dir),
+        env: None,
+        ignore_unknown_versions: true,
+    };
+    let rust = browserslist_shim::index::resolve_with("", &opts);
+
+    assert_eq!(
+        rust, oracle,
+        "browserslist-shim diverges from JS oracle on AFM .browserslistrc.\n\
+         JS  ({} entries): {:?}\n\
+         RUST({} entries): {:?}\n\
+         diff: {}\n\
+         See AFM_PORT_NOTES.md for triage steps.",
+        oracle.len(),
+        truncate_list(&oracle, 16),
+        rust.len(),
+        truncate_list(&rust, 16),
+        describe_diff(&oracle, &rust),
     );
 }
 
 /// Drift-monitor: a separate test that exercises just the `Firefox ESR`
 /// path. Failing this without the omnibus failing would mean the
 /// `rewrite_firefox_esr` shim path regressed independently of the rest
-/// of oxc_browserslist's resolution.
+/// of the resolver.
 #[test]
 fn browserslist_shim_firefox_esr_matches_js_oracle() {
     let workspace_root = workspace_root();
-    let oracle = run_oracle(&workspace_root, "Firefox ESR");
+    let oracle = run_oracle_with_query(&workspace_root, "Firefox ESR");
     let rust = browserslist_shim::resolve("Firefox ESR", true);
     assert_eq!(
         rust, oracle,
@@ -157,13 +149,7 @@ fn browserslist_shim_firefox_esr_matches_js_oracle() {
 
 /// Spawn bun against a one-line script that requires the workspace's
 /// pinned `browserslist@4.24.2` and dumps the resolved query as JSON.
-///
-/// Pre-condition: `workspace_browserslist_pin_is_424_2` must pass — i.e.
-/// root `package.json` has `"browserslist": "4.24.2"` in BOTH `overrides`
-/// AND `devDependencies` so `node_modules/browserslist` symlinks to the
-/// pinned install. Without the direct devDep, plain `require('browserslist')`
-/// resolves to 4.28.2 (transitive of `update-browserslist-db`).
-fn run_oracle(workspace_root: &Path, query: &str) -> Vec<String> {
+fn run_oracle_with_query(workspace_root: &Path, query: &str) -> Vec<String> {
     let escaped_query = json_escape_string(query);
     let script = format!(
         "const bl = require('browserslist');\n\
@@ -171,9 +157,6 @@ fn run_oracle(workspace_root: &Path, query: &str) -> Vec<String> {
         q = escaped_query,
     );
 
-    // Anchor the script inside the workspace so any UP-walk for
-    // node_modules stays local. Mirrors data_parity.rs's tmp_dir
-    // anchoring.
     let tmp_dir = workspace_root
         .join("crates")
         .join("target")
@@ -199,6 +182,43 @@ fn run_oracle(workspace_root: &Path, query: &str) -> Vec<String> {
         panic!(
             "oracle JSON parse failed for query {:?}: {e}\nraw stdout was: {}",
             query, stdout
+        )
+    })
+}
+
+/// Spawn bun against `browserslist(null, { path: <fixture_dir> })` —
+/// mirrors autoprefixer's `browserslist(null, { path })` call exactly.
+/// JS will walk up from `path` and discover the AFM `.browserslistrc`
+/// at that location.
+fn run_oracle_against_fixture(workspace_root: &Path, fixture_dir: &Path) -> Vec<String> {
+    let escaped_path = json_escape_string(&fixture_dir.to_string_lossy());
+    let script = format!(
+        "const bl = require('browserslist');\n\
+         process.stdout.write(JSON.stringify(bl(null, {{ path: {p} }})));\n",
+        p = escaped_path,
+    );
+
+    let tmp_dir = workspace_root
+        .join("crates")
+        .join("target")
+        .join("browserslist_parity_tmp");
+    std::fs::create_dir_all(&tmp_dir).expect("create tmp_dir");
+    let script_path = tmp_dir.join("browserslist_oracle_afm_fixture.js");
+    std::fs::write(&script_path, &script).expect("write oracle script");
+
+    let output = run_bun(&script_path, workspace_root);
+    if !output.status.success() {
+        panic!(
+            "bun oracle exited non-zero against AFM fixture (code {:?}). stderr: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let stdout = String::from_utf8(output.stdout).expect("oracle stdout was not UTF-8");
+    serde_json::from_str(&stdout).unwrap_or_else(|e| {
+        panic!(
+            "oracle JSON parse failed against AFM fixture: {e}\nraw stdout was: {}",
+            stdout
         )
     })
 }
@@ -275,8 +295,6 @@ fn truncate_list(v: &[String], max: usize) -> Vec<String> {
 }
 
 /// Summarize what diverges between two browserslist outputs.
-/// Reports the count of entries only in JS, only in Rust, and the
-/// first-positional mismatch (if same length).
 fn describe_diff(oracle: &[String], rust: &[String]) -> String {
     use std::collections::BTreeSet;
     let oset: BTreeSet<&String> = oracle.iter().collect();

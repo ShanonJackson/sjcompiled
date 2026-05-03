@@ -88,16 +88,28 @@ impl Browsers {
     /// JS: `parse(requirements)` — calls `browserslist(requirements, opts)`.
     /// `opts.path = this.options.from`. We split out the static helper so
     /// the constructor can call it without holding `&self`.
+    ///
+    /// `options.from` is plumbed through to the shim as `ResolveOpts::path`,
+    /// matching `browserslist@4.24.2`'s `prepareOpts` (index.js:366) which
+    /// defaults `opts.path` to `path.resolve('.')` when absent. We mirror
+    /// that fallback by reading `std::env::current_dir()` if `from` is
+    /// unset — this is what AFM's autoprefixer call sees at build time
+    /// (`browserslist(null, { path: cwd })`, see `BROWSER_LIST_FROM_AFM.md`).
     fn parse_static(
         requirements: &[String],
         options: &BrowsersOptions,
         browserslist_opts: &BrowserslistOpts,
     ) -> Vec<String> {
-        let _ = options.from; // path option not yet plumbed through shim
         let query = requirements.join(", ");
+        let path_owned: Option<std::path::PathBuf> = options
+            .from
+            .as_ref()
+            .map(std::path::PathBuf::from)
+            .or_else(|| std::env::current_dir().ok());
         let opts = browserslist_shim::index::ResolveOpts {
+            path: path_owned.as_deref(),
+            env: None,
             ignore_unknown_versions: browserslist_opts.ignore_unknown_versions,
-            ..Default::default()
         };
         browserslist_shim::index::resolve_with(&query, &opts)
     }
