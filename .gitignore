@@ -14,3 +14,13 @@ parity-harness/strip-runtime/fixtures/synthesized/
 # §2.0 babel-plugin fixtures are regenerable from the source tests via
 # extract-fixtures.mjs. The harness self-bootstraps if absent.
 parity-harness/babel-plugin/fixtures/
+# Phase 3 §3.2 hash corpus is regenerable from the deterministic seed
+# in parity-harness/hash/oracle.mjs (mulberry32 seed=1). Run
+# `bun parity-harness/hash/oracle.mjs` to rehydrate before
+# `cargo test -p babel-plugin --test hash_parity`.
+crates/babel-plugin/tests/hash_corpus.json
+# Phase 4 §4.1 transform-css corpus is regenerable from the JS oracle
+# crossing 30 fixtures × 4 opts. Run
+# `bun parity-harness/transform-css/oracle.mjs` to rehydrate before
+# `cargo test -p babel-plugin --test transform_css_integration`.
+crates/babel-plugin/tests/transform_css_corpus.json

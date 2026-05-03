@@ -9,6 +9,7 @@
 use crate::fast_match::SelectorRegexp;
 
 /// View of a `Selector` instance — only the bits OldSelector consumes.
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct SelectorView {
     pub prefixed: String,
@@ -18,6 +19,7 @@ pub struct SelectorView {
     pub name_regexp: SelectorRegexp,
 }
 
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct OldSelector {
     pub prefix: String,

@@ -26,7 +26,7 @@ pub const CLONE_STRIP_KEYS: &[&str] = &[
 ];
 
 /// Shared state every Prefixer carries.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PrefixerBase {
     pub name: String,
     pub prefixes: Vec<String>,

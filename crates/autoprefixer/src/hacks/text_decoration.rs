@@ -38,6 +38,7 @@ const BASIC: &[&str] = &[
     "unset",
 ];
 
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 pub struct TextDecoration {
     pub base: DeclarationBase,
 }

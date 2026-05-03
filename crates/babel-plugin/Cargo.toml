@@ -21,6 +21,14 @@ indexmap = { workspace = true }
 # the babel-plugin port and the utils crate is impossible.
 compiled-utils = { path = "../compiled-utils" }
 
+[dev-dependencies]
+# Phase 4 §4.1 — integration parity gate against `css::transform_css`
+# from this plugin's POV. Dev-only: the plugin doesn't yet wire
+# `transform_css` into the visitor (that's §4.6); the dependency exists
+# solely to prove the consumer-side contract holds before the wiring
+# lands. Once §4.6 ships, this entry is promoted to `[dependencies]`.
+css = { path = "../css" }
+
 [package.metadata.swc]
 # When bumped, update PARITY_VERSIONS.md AND re-run the corpus.
 swc_core = "=54.0.0"

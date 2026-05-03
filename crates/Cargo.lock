@@ -115,6 +115,7 @@ name = "babel-plugin"
 version = "0.0.1"
 dependencies = [
  "compiled-utils",
+ "css",
  "indexmap",
  "serde",
  "serde_json",

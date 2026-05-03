@@ -221,6 +221,38 @@ pub struct TransformOpts {
     /// Rust we treat them as opaque blobs handed to autoprefixer.
     #[serde(skip)]
     pub precomputed_prefixes: Option<Vec<u8>>,
+
+    /// **Optional perf knob — NOT part of the upstream `TransformOpts`
+    /// surface.** Filesystem-path delivery for the precomputed
+    /// snapshot. When set and [`Self::precomputed_prefixes`] is
+    /// `None`, the file is read on each call and decoded as a
+    /// snapshot. When the file lives in the OS page cache (the
+    /// expected steady-state in a CI / build host with one snapshot
+    /// written per build), the read is a few microseconds.
+    ///
+    /// **WASI design intent:** SWC tears down the WASI linear-memory
+    /// instance between every transform — no in-memory cache of the
+    /// `Prefixes` struct survives. The host writes the snapshot bytes
+    /// to a known path once per build; every WASI plugin instance
+    /// reads from that path on each call. The OS page cache amortises
+    /// the disk read; the WASI sandbox's filesystem-access cost is
+    /// negligible vs the work this elides (~345 µs/call without V2).
+    ///
+    /// **Precedence:**
+    ///   1. If [`Self::precomputed_prefixes`] is `Some`, use those
+    ///      bytes (inline delivery wins).
+    ///   2. Else if `precomputed_prefixes_path` is `Some`, read the
+    ///      file. Read failure is a hard error — we do NOT silently
+    ///      fall back to the slow path, because in production that
+    ///      would mask config errors (e.g., snapshot missing) behind
+    ///      a 100x perf regression.
+    ///   3. Else fall back to [`build_prefixes_default`] (slow path).
+    ///
+    /// `#[serde(skip)]` for the same reason as
+    /// [`Self::precomputed_prefixes`] — Rust-internal control knob,
+    /// not part of the JS-side TransformOpts.
+    #[serde(skip)]
+    pub precomputed_prefixes_path: Option<std::path::PathBuf>,
 }
 
 /// Mirrors upstream return shape: `{ sheets: string[]; classNames: string[] }`.
@@ -373,11 +405,32 @@ pub fn transform_css(css: &str, opts: &TransformOpts) -> Result<TransformResult,
     //     Internal lifecycle: `prepare` → loadPrefixes; OnceExit calls
     //     `prefixes.processor.remove(root)` then `prefixes.processor.add(root)`.
     if autoprefixer_enabled {
-        // Fast path when caller supplied a precomputed postcard
-        // snapshot: skip filesystem walk + browserslist resolution +
-        // full PREFIXES iteration. Byte-equal to the slow path
-        // (`autoprefixer::precomputed::tests::snapshot_rebuild_matches_slow_path_inputs`).
-        let prefixes = match opts.precomputed_prefixes.as_deref() {
+        // Fast path: precomputed postcard snapshot. Two delivery
+        // surfaces — inline bytes (NAPI Buffer round-trip) and
+        // filesystem path (WASI host-writes-once pattern). Precedence
+        // is inline > path > slow build. Path-read failure is a HARD
+        // error (not silent slow-path fallback) so production config
+        // mistakes don't hide behind a 100x perf regression.
+        let path_bytes;
+        let prefixes_bytes: Option<&[u8]> = match (
+            opts.precomputed_prefixes.as_deref(),
+            opts.precomputed_prefixes_path.as_deref(),
+        ) {
+            (Some(bytes), _) => Some(bytes),
+            (None, Some(path)) => {
+                path_bytes = std::fs::read(path).map_err(|e| {
+                    format!(
+                        "autoprefixer precomputed_prefixes_path read error \
+                         (path={}): {e}",
+                        path.display(),
+                    )
+                })?;
+                Some(path_bytes.as_slice())
+            }
+            (None, None) => None,
+        };
+
+        let prefixes = match prefixes_bytes {
             Some(bytes) => build_prefixes_from_precomputed(bytes)
                 .map_err(|e| format!("autoprefixer precomputed load error: {e}"))?,
             None => build_prefixes_default(None)

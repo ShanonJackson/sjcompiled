@@ -71,6 +71,19 @@ export interface TransformOpts {
    * once at process startup, pass the bytes on every `transformCss`.
    */
   precomputedPrefixes?: Buffer;
+  /**
+   * Filesystem-path delivery for the precomputed snapshot. The file
+   * is read on each `transformCss` call. Designed for the WASI host
+   * pattern: write the snapshot to a known path once per build, and
+   * every plugin instance reads from there on each call (the OS page
+   * cache amortises the read).
+   *
+   * Inline `precomputedPrefixes` takes precedence when both are set.
+   * Read failure is surfaced as a `transformCss` error — NOT a silent
+   * fallback to the slow path — so production config errors don't
+   * hide behind a 100x perf regression.
+   */
+  precomputedPrefixesPath?: string;
 }
 
 export interface TransformResult {

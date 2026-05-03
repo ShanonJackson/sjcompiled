@@ -25,15 +25,208 @@
 
 ## Resume here
 
-**Next checkpoint:** Phase 1 ☑. Phase 2 ☑ (§2.0–§2.5 all closed).
-§2.3(b) is a dangling sub-checkpoint (the two deferred AST /
-comment-store mutations from §2.3(a)) — NOT a Phase 2 gate; it
-lands alongside the first §6.5 css-prop handler that needs the
-classic-pragma divergence. **Next active phase: Phase 3** (hash
-parity test corpus → reuse `crates/compiled-utils::hash`).
-Phase 4 is gated on the parallel CSS-port agent shipping
-`transform_css` as a callable `pub fn` (per `plugins/PLAN.md`);
-that's not yet ready, so Phase 3 is what's startable now.
+**Next checkpoint:** Phase 1 ☑. Phase 2 ☑. Phase 3 ☑ (§3.1–§3.4
+all closed). Phase 4 §4.1 ☑ (this session). §2.3(b) is a dangling
+sub-checkpoint (the two deferred AST / comment-store mutations from
+§2.3(a)) — NOT a phase gate; it lands alongside the first §6.5
+css-prop handler that needs the classic-pragma divergence.
+**Next active phase: Phase 4 §4.2** (`COMPAT_GENERATOR_COVERAGE.md`)
++ §4.3 (`compat/generator.rs`). Both startable now — neither
+depends on the autoprefixer drift §4.1 captured.
+
+### Phase 4 §4.1 closure summary (this session)
+
+`crates/babel-plugin/tests/transform_css_integration.rs` (3 tests)
+locks the consumer-side parity contract for `css::transform_css`.
+116/120 corpus entries byte-equal vs JS oracle; 4 entries
+(`14_autoprefixer_user_select.css` × 4 opts) flagged
+`expected_to_fail` because the SOURCE build of `crates/autoprefixer`
+currently has 16 files of in-progress V2 / fast-match work
+(`git diff --stat crates/autoprefixer/` → 492 insertions across
+`precomputed.rs`, `prefixer.rs`, `prefixes.rs`, `value.rs`,
+`selector.rs`, `old_selector.rs`, `old_value.rs`, `resolution.rs`,
+`fast_match.rs`, hacks/*) that adds vendor prefixes (`-webkit-`,
+`-moz-`) for `user-select` under `BROWSERSLIST=chrome 100` —
+prefixes that JS and the SHIPPED NAPI binary (`packages/css-native/
+compiled-css.win32-x64-msvc.node`) correctly omit.
+
+**Drift watch point — RESOLVED, kept for the lesson:** The
+initial brief at `plugins/AUTOPREFIXER_DRIFT_BRIEF.md` reported
+that the source build adds an extra `-moz-user-select` under
+AFM. That report was based on a real test failure but a wrong
+diagnosis — the failure was a TEST-HARNESS BUG in
+`crates/babel-plugin/tests/transform_css_integration.rs`, not a
+port bug in `crates/autoprefixer`. Three independent direct-call
+repros (the autoprefixer agent's
+`crates/css/examples/repro_user_select.rs` under both `dev` and
+`bench-fast` profiles, plus a `BROWSERSLIST_CONFIG`-mode standalone)
+all produced JS-equivalent bytes. The integration test was the
+only environment that failed.
+
+Root cause: `EnvPin::new()` mutates process-global env vars
+(`BROWSERSLIST_CONFIG` etc.). Cargo runs test functions in the
+same binary in parallel by default; three test functions all
+constructing an `EnvPin` raced — one thread's `set_var` collided
+with another thread's `Drop` `remove_var`, and `transform_css`
+ended up calling autoprefixer with `BROWSERSLIST_CONFIG`
+unset. Under default browserslist (much older Firefox versions),
+`-moz-user-select` is legitimately required, so autoprefixer
+correctly emitted it — but the test was comparing against the
+JS oracle output captured under AFM (which doesn't need it).
+Hence the apparent divergence.
+
+Fix landed: `EnvPin` is now confined to the single test that
+calls `transform_css`. The two schema-shape tests
+(`corpus_covers_required_opts_permutations`,
+`corpus_covers_full_pipeline_shapes`) don't construct an
+`EnvPin` because they don't read env state, so no race remains.
+A `CRITICAL` rustdoc block on `EnvPin` documents the hazard for
+any future test added to this file. **5 consecutive
+`cargo test` runs all 120/120 byte-equal** post-fix.
+
+Apology owed + delivered to the autoprefixer agent — their
+working tree was correct the whole time. `AUTOPREFIXER_DRIFT_BRIEF.md`
+deleted (replaced by this resolved-drift note in STATUS.md).
+
+**Pin choice (corrected this session after user flag):** initial
+oracle used `BROWSERSLIST=chrome 100` (matches the parity-runner's
+TransformCss stage at `crates/parity-runner/src/stages.rs:582`).
+That's a non-production isolation pin. The user pointed at
+`BROWSER_LIST_FROM_AFM.md`, which documents the EXACT production
+AFM `.browserslistrc` (`last 2 Edge / last 2 Firefox / last 5
+Chrome / last 2 Safari / last 2 iOS / last 2 ChromeAndroid`).
+Switched the pin to `BROWSERSLIST_CONFIG=<crates/browserslist-shim/
+tests/fixtures/afm/.browserslistrc>` — the production-accurate
+mechanism. Both engines honor `BROWSERSLIST_CONFIG`
+(`crates/browserslist-shim/src/node.rs:143` for Rust). The
+autoprefixer drift narrowed under AFM (extra `-moz-user-select`
+only) but persists, confirming the WIP source bug is independent
+of the browserslist pin.
+
+**Why expected_to_fail (not skip):** mirrors strip-runtime's §1.4
+`EXPECTED_TO_FAIL` precedent. Per CLAUDE.md drift-detection
+("Drift is the enemy. ... DONT try and 'WORK AROUND' drift"),
+silently skipping the fixture would hide the divergence forever.
+The inverted-assertion pattern keeps the divergence load-bearing
+in code — any silent oracle regeneration that drops
+`EXPECTED_TO_FAIL` makes the parity assertion catch real drift,
+and any real fix to autoprefixer makes the inverted assertion
+catch the unstuck state automatically.
+
+Phase 3 closure summary follows below for context.
+
+
+
+- `crates/css/src/transform.rs` is the FULLY assembled plugin
+  chain, NOT identity-passthrough (1037 lines; commit `be17def
+  "trasnform css is ready"` added 949 lines that compose every
+  plugin per `crates/PHASE_8B_LIFECYCLE_AUDIT.md`'s Round 1
+  (Once) → Round 2 (Walk) → Round 3 (OnceExit) recipe).
+- `packages/css/src/transform.ts:36` dispatches
+  `if (process.env.COMPILED_CSS_ENGINE === 'rust') return
+  require('@compiled/css-native').transformCss(css, opts);` —
+  flag is wired.
+- `packages/css-native/compiled-css.win32-x64-msvc.node` is
+  fresh (May 4, 19 MB) and exposes `transformCss` directly via
+  `index.js:34`.
+- `bun run packages/equality-harness/scripts/verify.mjs` →
+  **336/336 byte-equal** across the full fixture set. (Note:
+  the harness has a `require.resolve`-in-ESM bug under raw
+  `node`; under `bun` `require` is polyfilled and the harness
+  runs the real test path. Bug-fixing the Node path is out of
+  scope for plugins/* — that's an equality-harness owner task.)
+- Direct call sanity:
+  `bun -e "require('./index.js').transformCss('.foo {color:red;
+  padding:10px}', {optimizeCss:true})"` returns 5 atomic sheets
+  with real hashed class names (`_x5wp19bv` etc), not the input.
+
+**Drift watch point:** `crates/STATUS.md:3303` row 8b still says
+"PARTIAL — currently identity-passthrough". That's stale —
+`transform.rs` shipped in commit `be17def`, and the `transform.ts`
+dispatch citation (line 70) was a wrong line number; it's at
+line 36. The CSS-port agent should be informed so they can
+flip row 8b to DONE. `plugins/*` does not edit `crates/STATUS.md`.
+
+Phase 4 §4.1 plan: build a `crates/babel-plugin/tests/transform_css_integration.rs`
+that runs every CSS-input fixture from `crates/parity-runner/corpus/transform-css/`
+through `compiled_css::transform::transform_css` and asserts byte-equal output
+versus the JS oracle (already captured per parity-runner). This locks the
+contract from the consumer (babel-plugin) side, complementing the
+producer-side gate verify.mjs already provides. Hard precondition:
+`crates/css` exposes `transform_css` as a callable `pub fn` — already met
+(`crates/css/src/transform.rs:280`).
+
+### Phase 3 closure summary (this session)
+
+§3.1 ☑ — confirmed `pub fn hash(input: &str) -> String` at
+`crates/compiled-utils/src/hash.rs:52`, re-exported at
+`crates/compiled-utils/src/lib.rs:34`. Symbol stable since Phase 1.
+
+§3.2 ☑ — built `parity-harness/hash/oracle.mjs` (mirrors the
+strip-runtime synth precedent: deterministic mulberry32 seed=1,
+re-runs produce a byte-identical corpus). Imports the upstream
+JS `hash` via `@compiled/utils` (workspace dep, resolves to
+`packages/utils/src/hash.ts`) and emits
+`crates/babel-plugin/tests/hash_corpus.json` (gitignored — same
+pattern as `parity-harness/strip-runtime/fixtures/synthesized/`).
+Composition (10037 entries):
+- **4 real-call-shape entries** — one per `hash()` call site in
+  `packages/babel-plugin/src/`: `hash(generate(expression).code)`
+  (css-builders.ts:464), `hash(variableName)` (css-builders.ts:639,
+  869), composite atomicify key (atomicify-rules.ts:41), CSS value
+  (atomicify-rules.ts:44).
+- **~33 categorical entries** — empty / single char / NUL
+  (leading, trailing, embedded, all-NUL) / leading-trailing
+  whitespace / UTF-8 multibyte (2/3/4-byte) / surrogate-pair
+  boundaries / length-tail (`l mod 4 ∈ {0,1,2,3}`, all four murmur2
+  branches) / >4 KiB ASCII / >4 KiB mixed.
+- **10000 random entries** — 5000 ASCII + 5000 valid Unicode
+  scalar values (skips surrogate range U+D800..U+DFFF — those are
+  legal JS string elements but not RFC-valid JSON; the consuming
+  Babel plugin only ever passes valid UTF-8 to `hash()`, so the
+  parity contract is over scalar values).
+
+§3.3 ☑ — Rust integration test at
+`crates/babel-plugin/tests/hash_parity.rs` reads the JSON corpus
+and asserts byte-equality via `compiled_utils::hash`. Four tests:
+`rust_hash_matches_js_corpus` (the gate),
+`corpus_includes_real_call_shapes` (lock the four call-site
+fingerprints), `corpus_covers_phase3_categories` (lock the §3.2
+acceptance set), `corpus_has_at_least_10k_random_entries` (lock
+the §3.3 ≥10K acceptance). All four pass over 10037 entries —
+zero divergence. The pure-Rust gate (no WASM, no JS bridge) is
+the cheapest shape for a pure-data parity check; matches the
+previous agent's recommendation.
+
+Drift fixed in `crates/compiled-utils/src/hash.rs::tests::known_vectors`:
+the comment in that test (lines 198-201 prior) explicitly
+telegraphed the §3.3 migration ("Once we have a Node verification
+step (parity-runner) we'll cross-check them against the JS hash
+and lock in the bytes from JS instead. For now the values lock
+current behaviour against future drift."). Replaced the
+self-referential `hash(input)` lines with five hardcoded
+JS-locked byte vectors pulled directly from the corpus
+(`""→"0"`, `"a"→"14mfbry"`, `"abcd"→"aougpt"`,
+`"color: red"→"1wszpi4"`, `"@media (max-width: 100px)"→"w2cthn"`).
+Five-vector smoke is still in-process (faster iteration loop
+than reading the 1.7 MB JSON corpus); the JSON corpus remains
+the authoritative parity contract.
+
+§3.4 ☑ — Phase 3 exit gate met. Final test state:
+- `RUSTFLAGS="" cargo test -p compiled-utils --lib` → 31/31.
+- `RUSTFLAGS="" cargo test -p babel-plugin --lib` → 43/43
+  (unchanged from §2.4).
+- `RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity`
+  → 4/4 over 10037 entries.
+- `RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib`
+  → 56/56 (unchanged from §1.9).
+- `bun test parity-harness/strip-runtime/harness.test.ts` →
+  1132/1132 (unchanged).
+- `BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1
+  bun test parity-harness/babel-plugin/harness.test.ts` →
+  954/954 (unchanged from §2.5).
+- Encapsulation lint still clean (zero matches outside
+  `state.rs`/`mutation_recorder.rs`).
 
 ### Phase 2 closure summary (multi-session)
 
@@ -211,29 +404,55 @@ sign-off (this session):
 
 ### Hand-off — what the next session should do
 
-**Active checkpoint:** Phase 3 (hash compatibility). All
-Phase 0/1/2 gates met. Phase 3 is the smallest remaining piece
-that's startable without the parallel CSS-port agent's
-`transform_css` callable shipping (Phase 4 prerequisite).
+**Active checkpoint:** Phase 4 §4.2 (`COMPAT_GENERATOR_COVERAGE.md`)
++ §4.3 (`compat/generator.rs`). Phase 0/1/2/3 + §4.1 closed.
+Neither §4.2 nor §4.3 depends on the CSS-port agent — both are
+pure investigation + port over `packages/babel-plugin/src/utils/babel-plugin/`'s
+existing `generate(...)` call sites.
 
-Phase 3 plan (per the table below):
-- §3.1 confirm `crates/compiled-utils::hash` exists (per
-  `crates/STATUS.md` line 243).
-- §3.2 build `crates/babel-plugin/tests/hash_corpus.json` with
-  ≥30 entries: ASCII, UTF-8 multibyte, empty, embedded NUL, >4 KB,
-  leading/trailing whitespace, real keyframe-expression inputs.
-- §3.3 diff Rust `hash` vs JS `hash` over the corpus + 10K random
-  inputs — `crates/babel-plugin/tests/hash_parity.rs` (or a bun
-  test).
-- §3.4 sign-off when zero divergence holds.
+Phase 4 §4.2 plan:
+1. Grep `packages/babel-plugin/src/` for every `generate(...)` /
+   `@babel/generator` call site (start with `utils/css-builders.ts`
+   `keyframes(...)` path — `hash(generate(expression).code)` —
+   that's the highest-value site).
+2. For each, classify the AST node kinds reachable from the
+   inputs (consumer-monorepo greps acceptable; AFM corpus already
+   in tree).
+3. Emit `crates/babel-plugin/COMPAT_GENERATOR_COVERAGE.md` with
+   one row per AST node kind + a parity fixture under
+   `crates/babel-plugin/tests/compat-generator/`.
 
-If the parallel CSS-port agent ships `transform_css` as a callable
-during this session, Phase 4 unblocks and §4.1 (integration parity
-test) is the natural next checkpoint — but Phase 3 is independent
-and can land in parallel.
+§4.3 follows: port `compat/generator.rs` line-by-line against
+`@babel/generator@7.x`'s output for every node kind in the
+manifest. The strip-runtime `compat/scope.rs` pattern is the
+template — small, well-isolated, byte-locked to upstream.
 
-§2.3(b) (dangling sub-checkpoint) is NOT urgent — it lands with
-the first §6.5 css-prop handler.
+Other items deliberately deferred (NOT urgent, NOT blockers):
+- §2.3(b) — two AST/comment-store mutations from §2.3(a). Bundles
+  with the first §6.5 css-prop handler that consumes pragma
+  divergence.
+- §0.10 / §0.11 / §0.12 — Phase 0 hardening tasks. Land before
+  Phase 5 ships, not before it starts.
+
+If a fresh session needs to verify Phase 3 still holds before
+moving on:
+1. `bun parity-harness/hash/oracle.mjs` — regenerates the corpus
+   (mulberry32 seed=1 is deterministic; identical bytes).
+2. `cd crates && RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity`
+   — 4/4 over 10037 entries.
+3. `cd crates && RUSTFLAGS="" cargo test -p compiled-utils --lib hash`
+   — 7/7.
+
+To re-verify Phase 4 §4.1 still holds:
+1. `bun parity-harness/transform-css/oracle.mjs` — regenerates
+   the corpus (deterministic given fixed input set + JS hash).
+2. `cd crates && RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration`
+   — 3/3 (116 parity entries + 4 expected-to-fail).
+
+To re-verify the CSS-port producer gate (Phase 4 unblock proof):
+1. `bun run packages/equality-harness/scripts/verify.mjs` →
+   336/336 pass (must be `bun`, not `node` — see Drift watch point
+   in Resume block above for the harness `require.resolve` ESM bug).
 
 ### Phase 1 closure (prior session, kept for context)
 
@@ -477,10 +696,10 @@ done before declaring Phase 0 fully signed off across the platform set.
 
 | ID | Status | Checkpoint | Owner | Artefacts | Verification |
 |---|---|---|---|---|---|
-| §3.1 | ☐ | Confirm `crates/compiled-utils` exposes `pub fn hash(input: &str) -> String` | — | `crates/compiled-utils/src/lib.rs` already does this per `crates/STATUS.md` line 243 | `cargo doc -p compiled-utils` shows the public symbol |
-| §3.2 | ☐ | Build hash test-vector corpus: ASCII, UTF-8 multibyte, empty, embedded NUL, >4KB, leading/trailing whitespace, real keyframe-expression inputs | — | `crates/babel-plugin/tests/hash_corpus.json` | Corpus has ≥30 entries covering every above case |
-| §3.3 | ☐ | Diff Rust `hash` vs JS `hash` over the corpus + 10K random inputs | — | `crates/babel-plugin/tests/hash_parity.rs` (or bun test) | `cargo test -p babel-plugin hash_parity` passes; 10K random inputs all match |
-| §3.4 | ☐ | **Phase 3 exit gate:** zero divergence | — | This STATUS.md updated | Parity test green |
+| §3.1 | ☑ | Confirm `crates/compiled-utils` exposes `pub fn hash(input: &str) -> String` | claude-2026-05-04 | `crates/compiled-utils/src/hash.rs:52` (signature `pub fn hash(input: &str) -> String`); re-exported via `crates/compiled-utils/src/lib.rs:34` (`pub use hash::hash;`). | `grep -n 'pub fn hash' crates/compiled-utils/src/hash.rs` → line 52; `grep -n 'pub use hash' crates/compiled-utils/src/lib.rs` → line 34 |
+| §3.2 | ☑ | Build hash test-vector corpus: ASCII, UTF-8 multibyte, empty, embedded NUL, >4KB, leading/trailing whitespace, real keyframe-expression inputs | claude-2026-05-04 | `parity-harness/hash/oracle.mjs` (mulberry32 seed=1 — deterministic; re-runs produce a byte-identical corpus) → emits `crates/babel-plugin/tests/hash_corpus.json` (10037 entries, gitignored — same regenerable-corpus precedent as the §1.8 strip-runtime synth set). Composition: 4 real-call-shape entries (one per `hash()` call site in `packages/babel-plugin/src/`), ~33 categorical entries (empty / NUL variants / whitespace / UTF-8 multibyte / surrogate-pair boundaries / >4 KiB / length-tail coverage for every murmur2 `(l mod 4)` branch), 10000 random entries (5000 ASCII + 5000 valid Unicode scalar values, surrogate range skipped — JS allows lone surrogates in strings but they're not RFC-valid JSON and the consuming plugin never passes them). | `bun parity-harness/hash/oracle.mjs` writes 10037 entries; manifest version=1; entry counts match: ≥30 categorical (`grep` + recount), 10000 `random-` prefixed, 4 `real:` prefixed |
+| §3.3 | ☑ | Diff Rust `hash` vs JS `hash` over the corpus + 10K random inputs | claude-2026-05-04 | `crates/babel-plugin/tests/hash_parity.rs` (4 tests: `rust_hash_matches_js_corpus` parity gate; `corpus_includes_real_call_shapes` locks the 4 call-site fingerprints; `corpus_covers_phase3_categories` locks §3.2 acceptance; `corpus_has_at_least_10k_random_entries` locks §3.3 ≥10K acceptance). Pure-Rust integration test reading the JSON oracle — no WASM bridge, no Node round-trip; cheapest shape for a pure-data parity check. Also replaces the self-referential `crates/compiled-utils/src/hash.rs::tests::known_vectors` (which the existing comment flagged for migration) with five JS-locked byte vectors pulled from the corpus (`""→"0"`, `"a"→"14mfbry"`, `"abcd"→"aougpt"`, `"color: red"→"1wszpi4"`, `"@media (max-width: 100px)"→"w2cthn"`) — fast in-process smoke alongside the JSON-driven gate. | `RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity` → 4/4 over 10037 entries; `RUSTFLAGS="" cargo test -p compiled-utils --lib hash` → 7/7 |
+| §3.4 | ☑ | **Phase 3 exit gate:** zero divergence | claude-2026-05-04 | This STATUS.md updated (Phase 3 closure summary + this row + §3.1–§3.3 rows). | Phase 3 final-state command outputs preserved in the "Phase 3 closure summary" block above (cargo + bun parity harnesses; sibling suites unchanged) |
 
 ---
 
@@ -495,7 +714,7 @@ done before declaring Phase 0 fully signed off across the platform set.
 
 | ID | Status | Checkpoint | Owner | Artefacts | Verification |
 |---|---|---|---|---|---|
-| §4.1 | ☐ | `transform_css` integration parity test — every JS-corpus input produces byte-identical Rust output from this plugin's perspective | — | `crates/babel-plugin/tests/transform_css_integration.rs` | Diff is zero across the parallel agent's full fixture corpus |
+| §4.1 | ☑ | `transform_css` integration parity test — every JS-corpus input produces byte-identical Rust output from this plugin's perspective | claude-2026-05-04 | `parity-harness/transform-css/oracle.mjs` (imports `@compiled/css.transformCss` directly; pins `BROWSERSLIST_CONFIG` to `crates/browserslist-shim/tests/fixtures/afm/.browserslistrc` — the EXACT production AFM pin per `BROWSER_LIST_FROM_AFM.md`, resolves to the 14-entry list `and_chr 144 / chrome 144..140 / edge 144..143 / firefox 147..146 / ios_saf 26.2..26.1 / safari 26.2..26.1` under workspace-pinned `caniuse-lite@1.0.30001766` + `browserslist@4.24.2`. Unsets `BROWSERSLIST` (would short-circuit the config-file path), `AUTOPREFIXER`, and `COMPILED_CSS_ENGINE`) → emits `crates/babel-plugin/tests/transform_css_corpus.json` (gitignored — same regenerable-corpus pattern as §3.2 hash corpus). Composition: 30 hand-curated CSS fixtures from `crates/parity-runner/corpus/transform-css/` × 4 opts permutations spanning the babel-plugin's real call shape from `packages/babel-plugin/src/utils/{transform-css-items,build-styled-component}.ts` (`{}` default, `{optimizeCss:false}`, `{increaseSpecificity:true}`, `{classHashPrefix:'x'}`). **120/120 entries byte-equal** with `css::transform_css` after the test-harness fix described below. New `[dev-dependencies]` entry on `crates/css` in `crates/babel-plugin/Cargo.toml` (will promote to `[dependencies]` when §4.6 wires `transform_css` into the visitor). Earlier `chrome 100` pin (initial first cut) replaced with AFM after user flag — chrome 100 was a non-production isolation pin from the parity-runner's TransformCss stage; AFM is what the actual Jira build runs. | `RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration` → 3/3 (120/120 parity, no expected-to-fail). 5 consecutive runs all green confirms the env-race fix is stable. Sibling suites unchanged. |
 | §4.2 | ☐ | Build `crates/babel-plugin/COMPAT_GENERATOR_COVERAGE.md` enumerating every AST node kind reachable from `keyframes(...)` (and any other `generate(...)` call site) in the consuming monorepo | — | The coverage manifest + parity fixtures under `crates/babel-plugin/tests/compat-generator/` | Manifest reviewed; one parity fixture per node kind |
 | §4.3 | ☐ | Port `compat/generator.rs` covering every node kind in the manifest | — | `crates/babel-plugin/src/compat/generator.rs` | All compat-generator parity fixtures byte-clean |
 | §4.4 | ☐ | Port `utils/css_builders.rs` line-for-line | — | `crates/babel-plugin/src/utils/css_builders.rs` | Harness fixtures exercising `keyframes`, `css`, `cssMap` are byte-clean |

@@ -21,10 +21,14 @@ use crate::prefixer::{clone_node, PrefixerBase};
 /// `rule.attrs[_autoprefixerPrefixeds]: { name → { prefix → selector } }`.
 pub const ATTR_PREFIXEDS: &str = "_autoprefixerPrefixeds";
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct SelectorBase {
     pub prefixer: PrefixerBase,
     /// `regexpCache: Map<prefix, RegExp>` — `prefix` here is the JS
     /// argument (`undefined` keyed under the empty string).
+    /// Skipped on serde — same reasoning as `ValueBase::regexp_cache`:
+    /// runtime cache rebuilt deterministically on demand.
+    #[serde(skip)]
     regexp_cache: RefCell<HashMap<String, SelectorRegexp>>,
 }
 

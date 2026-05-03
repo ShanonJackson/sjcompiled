@@ -180,33 +180,29 @@ mod tests {
         assert_eq!(base36(1295), "zz");
     }
 
-    /// Vectors produced by running the upstream JS:
-    /// `node -e "console.log(require('./packages/utils/dist/hash').hash('color: red'))"`
-    /// Locked here to catch any byte drift in the port.
+    /// JS-locked vectors. Bytes captured by running the upstream
+    /// `@compiled/utils.hash()` directly (Phase 3 §3.3 oracle at
+    /// `parity-harness/hash/oracle.mjs`). Full corpus (10037 entries
+    /// covering ASCII, UTF-8 multibyte, embedded NUL, surrogate pairs,
+    /// >4 KiB, length-tail branches, and 10K random inputs) lives at
+    /// `crates/babel-plugin/tests/hash_corpus.json` and gates via
+    /// `crates/babel-plugin/tests/hash_parity.rs`. These five are an
+    /// in-process smoke for fast iteration; the JSON corpus is the
+    /// authoritative parity contract.
     ///
-    /// To regenerate (only if upstream changes — which it should not):
-    /// ```bash
-    /// cd packages/utils && tsc && node -e "
-    ///   const { hash } = require('./dist/hash');
-    ///   for (const s of ['color: red', 'background: blue', 'font-size: 12px',
-    ///                    '.foo .bar', '@media (max-width: 100px)']) {
-    ///     console.log(JSON.stringify(s), '=>', JSON.stringify(hash(s)));
-    ///   }
-    /// "
-    /// ```
+    /// To regenerate (only if upstream changes — which it must not):
+    ///   bun parity-harness/hash/oracle.mjs
     #[test]
     fn known_vectors() {
-        // These are computed by THIS implementation. Once we have a Node
-        // verification step (parity-runner) we'll cross-check them against
-        // the JS hash and lock in the bytes from JS instead.
-        // For now the values lock current behaviour against future drift.
         let vectors = [
-            ("color: red", hash("color: red")),
-            ("background: blue", hash("background: blue")),
-            ("font-size: 12px", hash("font-size: 12px")),
+            ("", "0"),
+            ("a", "14mfbry"),
+            ("abcd", "aougpt"),
+            ("color: red", "1wszpi4"),
+            ("@media (max-width: 100px)", "w2cthn"),
         ];
         for (input, expected) in vectors {
-            assert_eq!(hash(input), expected);
+            assert_eq!(hash(input), expected, "hash({:?}) drift", input);
         }
     }
 }

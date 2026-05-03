@@ -20,6 +20,7 @@ static SPLIT: once_cell::sync::Lazy<Regex> = once_cell::sync::Lazy::new(|| {
         .unwrap()
 });
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct ResolutionBase {
     pub prefixer: PrefixerBase,
     pub bad: Vec<String>,

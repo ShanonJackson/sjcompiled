@@ -51,6 +51,7 @@
 /// In other words: insert `prefix` between the leading boundary and
 /// NAME, leaving everything else unchanged. [`WordMatcher::replace_all_with_prefix`]
 /// implements that.
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone)]
 pub struct WordMatcher {
     /// The ASCII name (already lowercased so we can compare with
@@ -148,6 +149,7 @@ struct Match {
 ///     `replace_all(selector, |caps| format!("{}{prefixed}", caps[1]))`
 ///   - `OldSelector.regexp` / `name_regexp` / `prefixeds[*].1` —
 ///     `is_match` only
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone)]
 pub struct SelectorMatcher {
     name_lower: Vec<u8>,
@@ -230,6 +232,7 @@ impl SelectorMatcher {
 /// `tests/intrinsic_regexp_parity.rs::fit_content_open_paren_must_not_match`
 /// pins this single-byte asymmetry as a named test so any drift here
 /// surfaces immediately.
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone)]
 pub struct IntrinsicMatcher {
     name_lower: Vec<u8>,
@@ -789,6 +792,7 @@ fn ascii_eq_ignore_case(a: &[u8], b_lowered: &[u8]) -> bool {
 /// cache. Construction cost is what we're attacking: with `fast-match`
 /// the wrapper is a `WordMatcher` (no regex compile); without it, we
 /// fall back to the original regex compile path (slow but parity-safe).
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct WordRegexp {
     #[cfg(feature = "fast-match")]
@@ -855,6 +859,7 @@ impl WordRegexp {
 /// Hot-path used by `SelectorBase`'s regexp cache, `OldSelector` /
 /// `SelectorView` fields, and the prefixed-form check loop in
 /// `OldSelector::is_hack`.
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct SelectorRegexp {
     #[cfg(feature = "fast-match")]
@@ -919,7 +924,7 @@ impl SelectorRegexp {
 /// every input. The single-byte trailing-class asymmetry vs WORD is
 /// load-bearing — see `IntrinsicMatcher` doc + `tests/intrinsic_regexp_parity.rs`.
 #[cfg(feature = "fast-match")]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IntrinsicRegexp {
     inner: IntrinsicMatcher,
 }
@@ -1019,10 +1024,11 @@ mod tests {
         let m = WordMatcher::new("flex");
         assert!(m.is_match("display: flex"));
         assert!(m.is_match("flex"));
-        assert!(m.is_match("(flex)"));
+        assert!(m.is_match("(flex,"));         // trailing ',' IS in [\s(,]
         assert!(m.is_match("flex,wrap"));
+        assert!(!m.is_match("(flex)"));        // trailing ')' NOT in [\s(,]
         assert!(!m.is_match("flexbox"));
-        assert!(!m.is_match("display:flex")); // ':' not in left set
+        assert!(!m.is_match("display:flex"));  // leading ':' NOT in [\s,(]
     }
 
     #[test]
@@ -1044,9 +1050,19 @@ mod tests {
             m.replace_all_with_prefix("flex", "-webkit-"),
             "-webkit-flex"
         );
+        // Non-overlapping consumption: first match consumes `(flex,`
+        // (leading `(` and trailing `,` are CONSUMED by `caps[0]` per
+        // regex semantics). Cursor advances to pos 6; the second `flex`
+        // at pos 6 has no remaining leading-boundary char before it
+        // (the `,` at pos 5 was consumed) and `^` doesn't anchor at
+        // non-zero positions, so no second match. Output: only the
+        // first `flex` gets prefixed.
+        //
+        // Verified byte-equal to JS `'(flex,flex)'.replace(re, '$1-webkit-$2')`
+        // and Rust `regex::Regex::replace_all`.
         assert_eq!(
             m.replace_all_with_prefix("(flex,flex)", "-webkit-"),
-            "(-webkit-flex,-webkit-flex)"
+            "(-webkit-flex,flex)"
         );
     }
 

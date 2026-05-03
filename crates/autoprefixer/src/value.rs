@@ -15,9 +15,15 @@ use crate::prefixer::PrefixerBase;
 /// `decl.attrs[_autoprefixerValues]: { prefix → value-with-prefixed-tokens }`.
 pub const ATTR_VALUES: &str = "_autoprefixerValues";
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct ValueBase {
     pub prefixer: PrefixerBase,
     /// `regexpCache` — JS uses a per-instance lazy field. We cache once.
+    /// Skipped on serde because it's a runtime cache, not load-bearing
+    /// state. Decoded `ValueBase` starts with an empty cache; first
+    /// `regexp()` call rebuilds it via `WordRegexp::new(name)` —
+    /// byte-identical to a freshly-constructed instance.
+    #[serde(skip)]
     regexp_cache: OnceCell<WordRegexp>,
 }
 

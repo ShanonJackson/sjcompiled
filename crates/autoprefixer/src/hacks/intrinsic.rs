@@ -67,6 +67,7 @@ use crate::value::ValueBase;
 use once_cell::sync::OnceCell;
 use postcss_core::{Node, NodeKind};
 
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 pub struct Intrinsic {
     pub base: ValueBase,
     /// JS lazy `this.regexpCache`. Distinct from `ValueBase`'s own cache
@@ -74,6 +75,9 @@ pub struct Intrinsic {
     /// the WORD pattern's `[\s(,]`). Routed through `IntrinsicRegexp`
     /// — the hand-rolled fast-match wrapper — so the lazy rebuild on
     /// first access stays cheap (no regex compile).
+    /// Skipped on serde — runtime cache; deserialized instances start
+    /// `OnceCell::new()` and rebuild on demand (byte-equivalent).
+    #[cfg_attr(feature = "fast-match", serde(skip))]
     regexp_cache: OnceCell<IntrinsicRegexp>,
 }
 

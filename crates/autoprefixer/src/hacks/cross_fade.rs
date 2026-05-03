@@ -39,6 +39,7 @@
 use crate::value::ValueBase;
 use postcss_core::list;
 
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 pub struct CrossFade {
     pub base: ValueBase,
 }

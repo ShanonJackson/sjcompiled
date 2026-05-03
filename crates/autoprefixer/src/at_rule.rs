@@ -6,6 +6,7 @@ use postcss_core::{insert_before_at_path, parent_some, NodeKind};
 
 use crate::prefixer::{clone_node, parent_prefix_cached_mut, ParentPrefix, PrefixerBase};
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct AtRuleBase {
     pub prefixer: PrefixerBase,
 }

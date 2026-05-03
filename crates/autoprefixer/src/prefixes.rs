@@ -299,6 +299,7 @@ impl std::error::Error for NotYetImplemented {}
 /// `decl.cascade_option`) falls through `Deref` to the underlying
 /// `DeclarationBase` so the existing processor.rs / values() / etc.
 /// code paths compile unchanged.
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 pub enum DeclPrefixer {
     Base(DeclarationBase),
     TextDecoration(crate::hacks::text_decoration::TextDecoration),
@@ -562,6 +563,7 @@ impl std::ops::DerefMut for DeclPrefixer {
 /// happens via `check` / `add` defined on this type; field access falls
 /// through `Deref` to the underlying `ValueBase` so processor.rs's
 /// `v.prefixer.prefixes.clone()` compiles unchanged.
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 pub enum ValuePrefixer {
     Base(ValueBase),
     CrossFade(crate::hacks::cross_fade::CrossFade),
@@ -667,6 +669,7 @@ impl std::ops::DerefMut for ValuePrefixer {
 
 /// JS `add[name]` polymorphic value. Each variant matches one branch
 /// of `prefixes.js::preprocess` (lines 234-263).
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 pub enum AddBucket {
     /// JS: `add['@keyframes'] = new AtRule(name, prefixes)` /
     /// `add['@viewport'] = ...`. Same shape — both use `AtRuleBase`.
@@ -690,6 +693,7 @@ pub enum AddBucket {
 
 /// JS `remove[name]` polymorphic value. Each variant matches one
 /// branch of `prefixes.js::preprocess` (lines 266-321).
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 pub enum RemoveBucket {
     /// JS: `remove[name] = new Resolution(name, prefixes)`.
     Resolution(ResolutionBase),
@@ -728,6 +732,7 @@ impl RemoveBucket {
 /// Populated dispatch table — JS `add` map after `preprocess()`. Keyed
 /// by the property/at-rule/value name from the static `PREFIXES` table
 /// PLUS, when a Value-with-props entry runs, the prop names it claims.
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Default)]
 pub struct AddTable {
     /// JS: `add.selectors` — array of Selector instances. Iterated in
@@ -740,6 +745,7 @@ pub struct AddTable {
 
 /// Populated stale-prefix dispatch table — JS `remove` map after
 /// `preprocess()`. Used by the processor's remove walk.
+#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Default)]
 pub struct RemoveTable {
     /// JS: `remove.selectors` — array of `OldSelector` instances.

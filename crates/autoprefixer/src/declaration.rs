@@ -14,6 +14,7 @@ pub const ATTR_CASCADE: &str = "_autoprefixerCascade";
 /// Per-decl int memo for max prefix length (used by `calcBefore`).
 pub const ATTR_MAX: &str = "_autoprefixerMax";
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct DeclarationBase {
     pub prefixer: PrefixerBase,
     pub cascade_option: bool,

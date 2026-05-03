@@ -159,6 +159,22 @@ pub struct TransformOpts {
     /// `Buffer` round-trips zero-copy through NAPI. The Rust side
     /// passes the bytes opaquely to `autoprefixer::precomputed`.
     pub precomputed_prefixes: Option<Buffer>,
+
+    /// **Optional perf knob** — filesystem-path delivery for the
+    /// precomputed snapshot. When `precomputedPrefixes` is `None`
+    /// and this field is `Some(path)`, the file is read on each
+    /// `transformCss` call and decoded as the snapshot.
+    ///
+    /// Designed for the WASI host pattern: the host writes the
+    /// snapshot to a known path once per build, every WASI plugin
+    /// instance reads from that path on each call. The OS page
+    /// cache amortises the read.
+    ///
+    /// Inline `precomputedPrefixes` takes precedence when both are
+    /// set. Read failure is surfaced as a `transformCss` error —
+    /// not a silent fallback to the slow path — so production
+    /// config errors don't hide.
+    pub precomputed_prefixes_path: Option<String>,
 }
 
 /// JS-shaped `TransformResult`. Field naming matches the JS contract in
@@ -201,6 +217,7 @@ pub fn transform_css(css: String, opts: Option<TransformOpts>) -> Result<Transfo
             // lifetime management trivial. The cost is one alloc +
             // memcpy per call (the snapshot is small, kilobyte-range).
             precomputed_prefixes: o.precomputed_prefixes.map(|b| b.as_ref().to_vec()),
+            precomputed_prefixes_path: o.precomputed_prefixes_path.map(std::path::PathBuf::from),
         },
         None => RustTransformOpts::default(),
     };
