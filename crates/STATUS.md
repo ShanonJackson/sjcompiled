@@ -3,6 +3,95 @@
 End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 `PARITY_VERSIONS.md`.
 
+## Phase 8b prep — `wasm32-wasip1` dep audit clean (2026-05-03)
+
+Pre-flight check before committing to a binding format for the
+`transformCss` bridge. Goal: confirm every Rust dep on the
+`transformCss` hashing path compiles to `wasm32-wasip1` so the
+eventual SWC-plugin end state (`packages/babel-plugin` → ONE WASI
+SWC plugin) has no hidden dep blocker.
+
+### What ran
+
+```
+RUSTFLAGS="" cargo build --target wasm32-wasip1 -p css         # 14.69s, 0 errors
+RUSTFLAGS="" cargo build --target wasm32-wasip1 -p autoprefixer # 18.09s, 0 errors
+```
+
+`-p css` pulls in: `postcss-core`, `postcss-selector-parser`,
+`postcss-value-parser`, `postcss-values-parser`, all 14 cssnano sub-
+plugins, `cssnano-preset-default`, `compiled-css` (all local plugins),
+`postcss-discard-duplicates`, `colord`, `caniuse-db`, `caniuse-api`,
+`browserslist-shim` + `oxc-browserslist` + `icu_*` + `url` + `idna`,
+`regex`, `serde`, `indexmap`, `once_cell`, `postcard`. Plus
+`autoprefixer` separately covers `fraction-js` and the prefixer engine.
+
+**Every transitive dep compiled.** Only one cosmetic clippy warning
+on `autoprefixer/src/supports.rs:384` (`for _checker in
+cleaner.values(...)` — preexisting, not WASI-specific). No
+`std::os::*` / threading / FS-syscall blockers surfaced.
+
+### What this means for Phase 8b
+
+- **NAPI is the right choice for the test bridge** under the
+  Windows-only single-platform constraint: matches Phase 8a's
+  `sort()` pattern verbatim, faster iteration, JS-exception
+  ergonomics. WASI's main payoff (one `.wasm` for all platforms)
+  doesn't apply when we're targeting one platform.
+- **WASI is unblocked for the eventual SWC-plugin port.** When AFM
+  consolidates `packages/babel-plugin` → SWC WASI plugin, the same
+  Rust core ships unchanged through a different binding shell. No
+  dep work needed; this probe pays for itself once.
+- The probe build is idempotent — re-run before Phase 8b ships if
+  any new dep lands between now and then. Surface area to watch:
+  `compiled-css-napi` (currently x86-only via `napi-build`), any
+  new crate added to the transformCss path.
+
+### Phase 6 BAND ship gate not yet wired into parity-runner via env
+
+Spotted while reading `compiled-css/src/plugins/normalize_css.rs` —
+the orchestrator + 6/6 unit tests already exist. Phase 6 BAND
+parity-runner stage `cssnano-band` is also wired (see "Phase 6 BAND
+ship" below). No work needed; logging here so the next session
+doesn't redo it.
+
+### Phase 8b scope discovery
+
+`packages/css/src/transform.ts:32-100` chains **12 plugins** (vs
+`sort.ts`'s 3). The naive "iterate-and-apply" approach silently
+diverges per `sort.rs`'s "Lifecycle ordering — load-bearing"
+docblock — postcss runs ALL `Once` hooks first (in array order),
+then ONE depth-first walk firing all visitors (in array order at
+each node), then ALL `OnceExit` hooks. Phase 8b therefore needs:
+
+1. **Per-plugin lifecycle audit.** For each of the 12 plugins
+   (`discardDuplicates`, `discardEmptyRules`, `parentOrphanedPseudos`,
+   `postcss-nested`, `normalizeCSS` — already lifecycle-correct
+   internally per Phase 6 BAND, `expandShorthands`, `atomicifyRules`,
+   `increaseSpecificity`, `sortAtomicStyleSheet`, `autoprefixer`,
+   `postcss-normalize-whitespace`, `extractStyleSheets`), classify
+   `Once` / per-node visitor / `OnceExit` from upstream source.
+2. **Compose lifecycle-correct in `crates/css/src/transform.rs`** —
+   replace today's identity passthrough. Pattern: `sort.rs`'s
+   manual interleaving (Once round → walk round merging all
+   visitors → OnceExit round). Risky to get wrong; produces silent
+   byte drift on the FINAL hashing gate.
+3. **NAPI export** in `compiled-css-napi` mirroring the Phase 8a
+   `sort` export.
+4. **Engine flag** in `packages/css/src/transform.ts` (per
+   `crates/autoprefixer/AGENT_6_DONE.md`'s note that the IMMUTABLE
+   rule on transform.ts relaxes for Phase 8b only).
+5. **Byte-clean parity gate** end-to-end: a `transform-css`
+   parity-runner stage + verifier script analogous to
+   `verify-napi-autoprefixer.mjs`.
+
+This is genuinely a session-worth of careful work — recommended
+approach is the same multi-agent split that closed Phase 7
+(see `crates/autoprefixer/AGENT_{1..6}_DONE.md`):
+- Audit agent: classify all 12 plugins' lifecycle hooks.
+- Compose agent: write `transform.rs` body + tests.
+- NAPI agent: export + verifier script + corpus build-out.
+
 ## Phase 6 BAND ship — `normalize-css.ts` byte-clean end-to-end
 
 The Phase 6 cssnano band exit gate landed. The 14 sub-plugin Rust ports
@@ -3484,21 +3573,25 @@ wraps the preset filter + lifecycle, 20/20 byte-clean (JS vs Rust) /
 20/20 deterministic. See "Phase 6 BAND ship — `normalize-css.ts`
 byte-clean end-to-end" at the top of this file.
 
-**Phase 7 (in progress, parallel agents):**
+**Phase 7: COMPLETE.** `autoprefixer@10.4.14` is end-to-end byte-clean
+for AFM's surface — 65/65 parity-runner inputs + 65/65 NAPI inputs
+byte-clean against the `autoprefixer@10.4.14` JS oracle. 5/58 hacks
+ported (the AFM-instrumentation-confirmed in-scope set);
+remaining 53 stay stubbed because AFM never reaches them per
+`crates/autoprefixer/AFM_HACKS_INSTRUMENTATION.md`. 231 active tests
+passing. See "Phase 7 ship — autoprefixer end-to-end byte-clean" at
+the top of this file (and `crates/autoprefixer/AGENT_{1..6}_DONE.md`
+for the per-agent breakdown).
 
-5. `autoprefixer@10.4.14` — single largest port. Base classes +
-   `data/prefixes.rs` byte-clean; still stubbed: `supports.rs`,
-   `transition.rs`, `processor.rs`, `info.rs`, `autoprefixer.rs`,
-   `Prefixes::new` body, all 58 hacks. See "Phase 7 split contract"
-   for the agent split.
+**Phase 8b (only remaining work):**
 
-**Phase 8b (blocks on Phase 6 + 7):**
-
-6. `transformCss` NAPI export + `transform.ts` engine flag, mirroring
+5. `transformCss` NAPI export + `transform.ts` engine flag, mirroring
    the Phase 8a (`sort()`) pattern. The full `transform.ts` plugin
    chain composition + lifecycle ordering classification (see Phase 8a
    "Lifecycle ordering — load-bearing" — applies to every plugin in
-   `transform.ts`).
+   `transform.ts`). Doubles as the Phase 6 *band* exit gate — once
+   `transformCss` runs end-to-end, the cssnano subset's full-pipeline
+   byte-clean check rides along.
 
 **Already DONE** across previous sessions (do not re-port):
 postcss-nested, postcss-normalize-whitespace, postcss-discard-duplicates,
@@ -3506,7 +3599,8 @@ postcss-discard-comments, postcss-normalize-string, postcss-normalize-
 positions, postcss-normalize-timing-functions, postcss-normalize-url,
 postcss-normalize-unicode, postcss-minify-selectors, postcss-ordered-values,
 postcss-reduce-initial, postcss-calc, postcss-colormin, postcss-minify-params,
-postcss-convert-values, postcss-minify-gradients, cssnano-preset-default.
+postcss-convert-values, postcss-minify-gradients, cssnano-preset-default,
+autoprefixer.
 
 ## Recommended order for the next session
 
@@ -3515,21 +3609,31 @@ remaining work is all `transformCss`-bound. The cardinal-rule guidance
 holds: **a session must take a unit from 0% → 100% byte-clean**.
 Half-done ports become silent byte-drift hazards across agent handoffs.
 
-1. **Phase 6 BAND exit gate** — corpus diff with the entire cssnano
-   subset spliced into the JS pipeline (Rust replaces
-   `normalize-css.ts`'s output) zero-byte. Now feasible (all sub-plugins
-   + orchestrator landed). Needs a thin Rust wrapper that consumes
-   `default_preset()`, runs the `BASE_PLUGINS ∪ PROD_PLUGINS` filter,
-   and applies the survivors in source order — OR direct wiring
-   through Phase 8b's NAPI bridge.
-2. **Phase 7 — autoprefixer** — runs in parallel under the existing
-   two-agent split. See "Phase 7 split contract".
-3. **Phase 8b — `transformCss` NAPI export** — mirrors Phase 8a's
-   `sort()` pattern. Blocks on Phase 7 finishing. Every plugin in
-   `transform.ts` must be classified by its postcss lifecycle hooks
-   before composition (see Phase 8a "Lifecycle ordering —
-   load-bearing"); the mistake is trivial to make and produces silent
-   byte drift.
+1. **Phase 8b — `transformCss` engine flag + binding.** Phases 5/6/7
+   are all closed; the only remaining deliverable is wiring the Rust
+   pipeline behind `transform.ts`. **Binding decision: NAPI** under
+   the current Windows-only single-platform constraint (mirrors
+   Phase 8a's `sort()` pattern verbatim). WASI is dep-clean (probe
+   landed 2026-05-03 — see "Phase 8b prep — `wasm32-wasip1` dep
+   audit clean" above) and unblocked for the eventual SWC-plugin
+   port; no work needed there now. Phase 6 *band* exit gate already
+   landed standalone — Phase 8b rolls up the FULL `transform.ts`
+   chain byte-clean, of which the cssnano band is one slice.
+
+   **Recommended approach: multi-agent split** mirroring Phase 7's
+   AGENT_{1..6} pattern (per `crates/autoprefixer/AGENT_6_DONE.md`):
+   (i) audit agent classifies all 12 plugins' postcss hooks
+   (`Once` / visitor / `OnceExit`) from upstream source;
+   (ii) compose agent writes the lifecycle-correct body of
+   `crates/css/src/transform.rs` + unit tests using `sort.rs`'s
+   manual interleaving pattern; (iii) NAPI agent exports
+   `transform_css` from `compiled-css-napi`, adds the engine flag
+   to `packages/css/src/transform.ts` (relaxing IMMUTABLE rule per
+   AGENT_6_DONE.md), wires `verify-napi-transform-css.mjs` +
+   parity-runner `transform-css` stage. Naive
+   "iterate-and-apply" produces silent byte drift on the FINAL
+   hashing gate — the failure mode CLAUDE.md warns about ("if many
+   things have slight drift the WHOLE will have MAJOR drift").
 
 ## Phase 5a ship — `postcss-nested@5.0.6` byte-clean
 
