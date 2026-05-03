@@ -239,7 +239,7 @@ Total: ~6–9 months. Anyone quoting less is underestimating autoprefixer.
   ---
 What I need from you before writing any code
 
-1. Confirm the JS dep versions to pin (current package-lock.json snapshot, or do you want to bump first?).
+1. Confirm the JS dep versions to pin (current package-lock.jso n snapshot, or do you want to bump first?).
 2. Access (or representative samples) of your largest internal consumer's CSS for the corpus.
 3. Are there CSS inputs whose hashes are already committed somewhere that we must preserve? If so, they're the highest-priority corpus entries.
 4. Are you OK with the "JS stays as fallback for ≥1 year" rollout shape, or do you need an earlier delete?
