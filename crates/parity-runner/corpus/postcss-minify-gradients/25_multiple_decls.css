@@ -1,0 +1,4 @@
+a {
+  background: linear-gradient(red 0%, blue 100%);
+  background-image: radial-gradient(red 50%, blue 25%);
+}

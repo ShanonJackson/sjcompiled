@@ -521,8 +521,10 @@ version = "0.0.1"
 dependencies = [
  "colord",
  "cssnano-utils",
+ "once_cell",
  "postcss-core",
  "postcss-value-parser",
+ "regex",
 ]
 
 [[package]]
@@ -582,7 +584,7 @@ name = "cssnano-postcss-normalize-unicode"
 version = "0.0.1"
 dependencies = [
  "browserslist-shim",
- "caniuse-api",
+ "indexmap",
  "postcss-core",
  "postcss-value-parser",
 ]
@@ -1469,11 +1471,13 @@ dependencies = [
  "css",
  "cssnano-postcss-colormin",
  "cssnano-postcss-discard-comments",
+ "cssnano-postcss-minify-gradients",
  "cssnano-postcss-minify-params",
  "cssnano-postcss-minify-selectors",
  "cssnano-postcss-normalize-positions",
  "cssnano-postcss-normalize-string",
  "cssnano-postcss-normalize-timing-functions",
+ "cssnano-postcss-normalize-unicode",
  "cssnano-postcss-normalize-url",
  "cssnano-postcss-ordered-values",
  "cssnano-postcss-reduce-initial",

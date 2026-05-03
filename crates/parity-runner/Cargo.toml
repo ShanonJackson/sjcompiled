@@ -21,11 +21,13 @@ cssnano-postcss-normalize-string = { workspace = true }
 cssnano-postcss-normalize-positions = { workspace = true }
 cssnano-postcss-normalize-timing-functions = { workspace = true }
 cssnano-postcss-normalize-url = { workspace = true }
+cssnano-postcss-normalize-unicode = { workspace = true }
 cssnano-postcss-minify-selectors = { workspace = true }
 cssnano-postcss-minify-params = { workspace = true }
 cssnano-postcss-ordered-values = { workspace = true }
 cssnano-postcss-reduce-initial = { workspace = true }
 cssnano-postcss-colormin = { workspace = true }
+cssnano-postcss-minify-gradients = { workspace = true }
 postcss-calc = { workspace = true }
 css = { workspace = true }
 serde = { workspace = true }

@@ -11,3 +11,5 @@ postcss-core = { workspace = true }
 postcss-value-parser = { workspace = true }
 colord = { workspace = true }
 cssnano-utils = { workspace = true }
+regex = { workspace = true }
+once_cell = { workspace = true }

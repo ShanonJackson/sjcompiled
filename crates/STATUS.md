@@ -3,6 +3,229 @@
 End-of-session snapshot. Read with `EXECUTION_PLAN.md` and
 `PARITY_VERSIONS.md`.
 
+## Phase 6g ship — `cssnano-postcss-minify-gradients@5.1.1` byte-clean (2026-05-03)
+
+Linear / radial / `-webkit-(repeating-)?(linear|radial)-gradient` stop
+normalizer. `colord`-backed `isColorStop` predicate. Now byte-clean
+end-to-end against the AFM-pinned JS oracle on a 39-entry corpus.
+
+### What landed this session
+
+1. `crates/_vendor/postcss-minify-gradients-5.1.1/` — vendored upstream
+   `src/index.js` (225 LOC) + `src/isColorStop.js` (62 LOC) + `types/` +
+   `package.json` + `LICENSE-MIT` + `README.md`. Two source files map
+   1:1 to two Rust modules.
+2. `crates/cssnano-postcss-minify-gradients/src/lib.rs` — full port of
+   `src/index.js`. Public surface: `postcss_minify_gradients(root)`.
+   Module-level helpers mirror upstream verbatim (`is_less_than`,
+   `value_parser_unit`, `get_arguments_indices`, plus three branch
+   handlers `handle_linear` / `handle_radial` / `handle_webkit_radial`).
+3. `crates/cssnano-postcss-minify-gradients/src/is_color_stop.rs` —
+   port of `src/isColorStop.js`. Public surface:
+   `is_color_stop(color, stop?)`. Length-unit set, calc anchored regex,
+   `colord(color).is_valid()` gate.
+4. `crates/cssnano-postcss-minify-gradients/Cargo.toml` — added `regex`
+   and `once_cell` workspace deps for the calc predicate.
+5. `crates/parity-runner/Cargo.toml` — added
+   `cssnano-postcss-minify-gradients` workspace dep.
+6. `crates/parity-runner/src/stages.rs` — `Stage::PostcssMinifyGradients`
+   variant + handler. Default opts (no opts upstream).
+7. `crates/parity-runner/src/main.rs` — `postcss-minify-gradients`
+   stage-name dispatch.
+8. `packages/css/scripts/parity-bridge.mjs` — added
+   `import postcssMinifyGradients from 'postcss-minify-gradients'` and
+   the matching STAGES entry running the plugin with default opts.
+9. Root `package.json` — added `postcss-minify-gradients` to
+   `devDependencies` (`5.1.1`) and `overrides` (`5.1.1`) so bun pins
+   the AFM-resolved version. `bun install` re-locked cleanly.
+10. `crates/parity-runner/corpus/postcss-minify-gradients/` — 39
+    fixtures: blank, non-gradient, `var(`/`env(` bailout, all four
+    `to <side>` rewrites, leading `0%` / `0em` / `0px` strip,
+    `0deg` preserved (deg unit-check), descending stops normalized
+    to `0`, mixed-unit stops, `100%` final-stop strip, repeating
+    linear, `-webkit-linear` / `-webkit-repeating-linear`, basic
+    radial, radial-with-`at`, repeating-radial, `-webkit-radial-`
+    {basic,named-stops,calc-stop,function-color}, repeating-radial
+    with `at`, multiple decls, nested in `@media`, uppercase
+    function name, uppercase `TO TOP`, color-function stops,
+    negative-percent stop, two-arg `to <side>`, two-arg final-stop
+    early-return, empty value.
+
+### Bug-for-bug parity preserved
+
+- **`isLessThan` is misnamed — returns ≥, not <.** Replicated verbatim;
+  the call site treats "true" as "lastStop is at or past thisStop, so
+  normalize thisStop to `0`."
+- **`to <side>` rewrite uses pre-slice `args` reference.** Upstream
+  `args = getArguments(node)` is computed once BEFORE
+  `node.nodes = node.nodes.slice(2)`. After the slice, the OLD `args`
+  array still holds 3 references in `args[0]` (two now-orphaned, plus
+  the angle node which is also `node.nodes[0]` post-mutation). The
+  forEach loop reads `arg[2].value` (the angle), so `lastStop` is set
+  to the angle's `{number,unit}` for the next iteration — preventing
+  the leading-zero strip from firing on the next arg's stop.
+  Index-based Rust port mimics by snapshotting args before slice and
+  shifting every retained index by `-2` (saturating at 0). The first
+  arg's first two indices collapse to 0 (the angle node), but they're
+  never read; only `arg[2]` reads + `arg[1]/arg[2]` writes happen, and
+  the leading-zero strip can never fire on an angle (top→"0deg"
+  satisfies number-eq but not unit-neq; right/bottom/left have number
+  != "0").
+- **`lastStop === undefined` early-return suppresses final-stop strip
+  on the first 3-token arg.** Two-arg inputs like
+  `linear-gradient(red, blue 100%)` keep their `100%` because the
+  first 3-token arg always takes the `lastStop === undefined` branch
+  which `return`s.
+- **`-webkit-radial-gradient` no-stop branch has a dead conditional.**
+  Upstream computes `color = `function-stringified${arg[0]}`` only to
+  immediately overwrite with `color = arg[0].value` on the next line.
+  Replicated literally — both lines retained, the first as a `_maybe_func`
+  binding to make the dead-store visible.
+- **`angles[node.value.toLowerCase()]` returns `undefined` for any
+  non-cardinal side** (e.g. `to corner`); JS assigns the literal
+  string `"undefined"` to `node.value`, then `.length` on it throws
+  later in `valueParser.stringify`. Rust port writes the literal
+  `"undefined"` string (so the rest of the Decl pass survives — a
+  panic would block valid downstream inputs). The corresponding
+  corpus entry was REMOVED — it tests a JS-side crash path, not a
+  parity-testable input.
+- **Lowercased-only function-name match.** Upstream lowercases
+  `node.value` once and compares against canonical-cased branch names
+  (e.g. `'linear-gradient'`). Mixed-case in source CSS like
+  `LINEAR-GRADIENT` is normalized for the dispatch but the original
+  `node.value` capitalization is preserved on emit. Mirrored.
+
+### Verification gates run
+
+| Gate                                                                                 | Status |
+|--------------------------------------------------------------------------------------|--------|
+| `cargo build -p cssnano-postcss-minify-gradients`                                    | OK |
+| `cargo test  -p cssnano-postcss-minify-gradients`                                    | 16/16 unit tests pass |
+| `parity-runner --stage postcss-minify-gradients --corpus crates/parity-runner/corpus/postcss-minify-gradients` | 39/39 byte-clean |
+| `parity-runner --stage postcss-minify-gradients ... --determinism`                   | 39/39 deterministic |
+| `cargo test --workspace --no-fail-fast`                                              | 974/974 passed, 0 failed |
+| `parity-runner --stage postcss-normalize-positions --corpus ...`                     | 41/41 (no regression) |
+| `parity-runner --stage postcss-colormin --corpus ...`                                | 30/30 (no regression) |
+| `parity-runner --stage postcss-calc --corpus ...`                                    | 40/40 (no regression) |
+
+### Phase 6 remaining
+
+- `postcss-convert-values@5.1.3` (last cssnano sub-plugin — fraction-js
+  + browserslist-aware).
+- `cssnano-preset-default@5.2.14` orchestrator (blocks on convert-values).
+
+## Phase 6e ship — `cssnano-postcss-normalize-unicode@5.1.1` byte-clean (2026-05-03)
+
+Browserslist-aware unicode-range normalizer. Now byte-clean end-to-end
+against the AFM-pinned JS oracle on a 27-entry corpus.
+
+### What landed this session
+
+1. `crates/_vendor/postcss-normalize-unicode-5.1.1/` — vendored upstream
+   `src/index.js` + `types/` + `package.json` + `LICENSE-MIT` + `README.md`
+   (133 LOC source).
+2. `crates/cssnano-postcss-normalize-unicode/src/lib.rs` — full port.
+   Single source file maps 1:1. Public surface:
+   `postcss_normalize_unicode(root)`. Module-level helpers mirror
+   upstream verbatim (`unicode`, `merge_range_bounds`,
+   `replace_lower_case_u_prefix`, `transform`).
+3. `crates/cssnano-postcss-normalize-unicode/Cargo.toml` — added
+   `indexmap` for the per-call value cache (memo only — never iterated;
+   IndexMap chosen per cardinal-rule HashMap ban out of paranoia).
+4. `crates/parity-runner/Cargo.toml` — added `cssnano-postcss-normalize-unicode`
+   workspace dep so the stage handler can call into it.
+5. `crates/parity-runner/src/stages.rs` — `Stage::PostcssNormalizeUnicode`
+   variant + handler. Default opts (no opts upstream).
+6. `crates/parity-runner/src/main.rs` — `postcss-normalize-unicode`
+   stage-name dispatch.
+7. `packages/css/scripts/parity-bridge.mjs` — added
+   `import postcssNormalizeUnicode from 'postcss-normalize-unicode'` and
+   the matching `'postcss-normalize-unicode'` STAGES entry that runs the
+   plugin with default opts.
+8. Root `package.json` — added `postcss-normalize-unicode` to
+   `devDependencies` (`5.1.1`) and `overrides` (`5.1.1`) so bun pins to
+   the AFM-resolved version. `bun install` re-locked cleanly.
+9. `crates/parity-runner/corpus/postcss-normalize-unicode/` — 27
+   fixtures covering: blank input, no-unicode-range decls, simple
+   range (lowercase only), full-wildcard collapse (`u+0000-00ff` →
+   `u+00??`), 4/3/2/1/5-wildcard collapses, partial-wildcard run,
+   unequal-length passthrough, no-dash passthrough, comma-separated
+   multiple ranges, already-lowercase, mixed-case prop name (`Unicode-Range`),
+   uppercase prop name (`UNICODE-RANGE`), with sibling decls,
+   cache-hit duplicate values, distinct-value no-cache, `!important`,
+   inline comment after value, six-wildcards (rejected, passthrough),
+   three mixed ranges in one decl, nested in `@media`, decl outside
+   `@font-face`, partial-diff unmergeable, post-first-`?` non-`0`/`f`
+   passthrough.
+
+### Verification gates run
+
+| Gate                                                                                  | Status |
+|---------------------------------------------------------------------------------------|--------|
+| `cargo build -p cssnano-postcss-normalize-unicode`                                    | OK |
+| `cargo test  -p cssnano-postcss-normalize-unicode`                                    | 7/7 unit tests pass |
+| `parity-runner --stage postcss-normalize-unicode --corpus crates/parity-runner/corpus/postcss-normalize-unicode` | 27/27 byte-clean |
+| `parity-runner --stage postcss-normalize-unicode ... --determinism`                   | 27/27 deterministic |
+| `cargo build -p parity-runner`                                                        | OK (no regressions to other stages) |
+
+### Bug-for-bug parity preserved
+
+1. **Function children NOT walked.** Upstream cb returns `false`
+   unconditionally, which tells `postcss-value-parser`'s `walk` to skip
+   function recursion. The Rust port returns `Some(false)` from the
+   walk closure to match. Unicode-range tokens never appear inside
+   functions in practice (they're top-level tokens at parse time), but
+   the surface contract is preserved.
+2. **`/^u(?=\+)/` regex semantics.** The legacy IE/Edge `U` re-uppercase
+   only fires when the very next character is `+` — the lookahead is
+   load-bearing. The byte-comparison helper `replace_lower_case_u_prefix`
+   matches that exactly. (Under the AFM workspace's locked
+   `browserslist@4.24.2` defaults this branch never fires —
+   `isLegacy = false` — but the helper exists for parity.)
+3. **`mergeRangeBounds` early-return for question_counter == 6.** The
+   max-5-wildcards rule rejects the bound merge silently; range
+   passes through unchanged. The Rust port returns `None` at the same
+   threshold.
+4. **JS `String.toLowerCase()` vs Rust `str::to_lowercase()`.** Both use
+   Unicode default case folding. The unicode-range token grammar is
+   ASCII-only (`[a-fA-F0-9?\-uU+]`), so the case folding always
+   degenerates to ASCII tolower — byte-identical between the two
+   implementations.
+5. **Per-call cache.** Upstream `prepare(result)` instantiates a new
+   `Map` per `process()` invocation. Rust does the same: `cache` is
+   declared inside `postcss_normalize_unicode` and dies with the
+   function call. Cache key is the raw `decl.value`; cache hits short-
+   circuit `transform` and reassign the cached new-value.
+6. **Case-insensitive prop match.** Upstream `walkDecls(/^unicode-range$/i, ...)`.
+   Rust uses `decl.prop.eq_ignore_ascii_case("unicode-range")`. The CSS
+   property name is ASCII per spec; ascii-fold matches JS.
+7. **`raws` left alone on `decl.value =` write.** Same pattern as
+   `cssnano-postcss-colormin` and `cssnano-postcss-normalize-string`:
+   the postcss-core stringifier's `raws.value.value === decl.value`
+   raw fallback fires correctly on no-op transforms (preserves
+   trailing comments + raws.between exactly).
+
+### Drift candidates checked (none flagged)
+
+- **Browserslist resolution path.** Upstream `browserslist(null, { path: __dirname })`
+  walks up from `node_modules/postcss-normalize-unicode/src/`. With
+  no `.browserslistrc` and no `package.json#browserslist` field
+  anywhere on the walk chain, both engines fall through to
+  `browserslist@4.24.2` defaults (`> 0.5%, last 2 versions, Firefox ESR,
+  not dead`). The Rust port calls `browserslist_shim::resolve("", true)`
+  which also resolves the workspace default. Both sides see the same
+  browser list. `isLegacy` is `false` deterministically.
+- **`hasLowerCaseUPrefixBug` query (`'ie <=11, edge <= 15'`).** Resolved
+  via `browserslist_shim::resolve(LEGACY_BROWSERS_QUERY, true)`; we
+  intersect against the default list. The intersection is empty — IE
+  and Edge ≤ 15 are entirely outside the default-targeted set — so
+  `is_legacy` is false. The shim's existing `oxc-browserslist`-bundled
+  caniuse-lite drift gate (Phase 7 ship — browserslist-shim parity
+  gate, OPEN) does NOT affect this query: we're looking at IE / old
+  Edge versions which both snapshots agree on (frozen historical data).
+
+---
+
 ## Phase 6f ship — `cssnano-postcss-minify-params@5.1.4` byte-clean (2026-05-03)
 
 Browserslist-aware media/supports param minifier. Now byte-clean
@@ -2178,7 +2401,7 @@ header. **No code changes required** — all 489 tests still green.
 | 6c | postcss-minify-selectors@5.2.1 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. Required `postcss-selector-parser` descendant-Combinator drift fix; `postcss-nested` workaround dropped as a follow-up. |
 | 6d | postcss-ordered-values@5.1.3 | **DONE** — byte-clean across 36-entry corpus, deterministic JS oracle. 19 unit + 5 helper tests. |
 | 6d | postcss-calc@8.2.4 | **SCAFFOLDED** — calc expression evaluator; high diff risk on float math. |
-| 6e | postcss-normalize-unicode@5.1.1 | **SCAFFOLDED** — browserslist-aware. |
+| 6e | postcss-normalize-unicode@5.1.1 | **DONE** — byte-clean across 27-entry corpus, deterministic JS oracle. 7 unit tests. Browserslist-aware (`is_legacy = false` under default 4.24.2 query — no IE 10/11 / Edge ≤15). See "Phase 6e ship — postcss-normalize-unicode" above. |
 | 6e | postcss-reduce-initial@5.1.2 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. 12 unit tests. |
 | 6f | postcss-convert-values@5.1.3 | **SCAFFOLDED** — uses fraction-js. |
 | 6f | postcss-minify-params@5.1.4 | **DONE** — byte-clean across 42-entry corpus, deterministic JS oracle. 14 unit tests. Browserslist-aware (`legacy = false` under default 4.24.2 query — no IE 10/11). See "Phase 6f ship — postcss-minify-params" below. |
@@ -2744,11 +2967,10 @@ darwin-arm64 once `transformCss` is byte-clean.
 > The phase-progress table earlier in this file is the authoritative
 > per-row state. This section gives the same picture as a roadmap.
 
-**3 cssnano plugins still scaffolded** (Phase 6 band):
+**2 cssnano plugins still scaffolded** (Phase 6 band):
 
-1. `postcss-normalize-unicode@5.1.1` — moderate. Browserslist-aware.
-2. `postcss-convert-values@5.1.3` — hard. Uses fraction-js + browserslist.
-3. `postcss-minify-gradients@5.1.1` — hard. colord-heavy.
+1. `postcss-convert-values@5.1.3` — hard. Uses fraction-js + browserslist.
+2. `postcss-minify-gradients@5.1.1` — hard. colord-heavy.
 
 **Orchestrator (blocked on the 3 above):**
 
@@ -2776,8 +2998,8 @@ darwin-arm64 once `transformCss` is byte-clean.
 postcss-nested, postcss-normalize-whitespace, postcss-discard-duplicates,
 postcss-discard-comments, postcss-normalize-string, postcss-normalize-
 positions, postcss-normalize-timing-functions, postcss-normalize-url,
-postcss-minify-selectors, postcss-ordered-values, postcss-reduce-initial,
-postcss-calc, postcss-colormin, postcss-minify-params.
+postcss-normalize-unicode, postcss-minify-selectors, postcss-ordered-values,
+postcss-reduce-initial, postcss-calc, postcss-colormin, postcss-minify-params.
 
 ## Recommended order for the next session
 
@@ -2788,7 +3010,6 @@ Half-done ports become silent byte-drift hazards across agent handoffs.
 
 1. **Finish the Phase 6 cssnano band** — pick whichever fits the
    session's time box:
-   - `postcss-normalize-unicode@5.1.1` (browserslist-aware; moderate).
    - `postcss-convert-values@5.1.3` (fraction-js + browserslist; hard).
    - `postcss-minify-gradients@5.1.1` (colord-heavy; hard).
    One per session. Land byte-clean before starting the next.

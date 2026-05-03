@@ -40,6 +40,8 @@ import postcssNormalizePositions from 'postcss-normalize-positions';
 import postcssNormalizeTimingFunctions from 'postcss-normalize-timing-functions';
 // npm `postcss-normalize-url@5.1.0` — cssnano sub-plugin (Phase 6b).
 import postcssNormalizeUrl from 'postcss-normalize-url';
+// npm `postcss-normalize-unicode@5.1.1` — cssnano sub-plugin (Phase 6e).
+import postcssNormalizeUnicode from 'postcss-normalize-unicode';
 // npm `postcss-minify-selectors@5.2.1` — cssnano sub-plugin (Phase 6c).
 import postcssMinifySelectors from 'postcss-minify-selectors';
 // npm `postcss-minify-params@5.1.4` — cssnano sub-plugin (Phase 6f).
@@ -50,6 +52,8 @@ import postcssOrderedValues from 'postcss-ordered-values';
 import postcssReduceInitial from 'postcss-reduce-initial';
 // npm `postcss-colormin@5.3.1` — cssnano sub-plugin (Phase 6g).
 import postcssColormin from 'postcss-colormin';
+// npm `postcss-minify-gradients@5.1.1` — cssnano sub-plugin (Phase 6g).
+import postcssMinifyGradients from 'postcss-minify-gradients';
 // npm `postcss-calc@8.2.4` — cssnano sub-plugin (Phase 6d).
 import postcssCalc from 'postcss-calc';
 
@@ -221,6 +225,21 @@ const STAGES = {
     return result.css;
   },
 
+  // parse → npm postcss-normalize-unicode@5.1.1 (no opts) → stringify. Phase 6e.
+  // Browserslist-aware: `prepare(result)` resolves browserslist with
+  // `path: __dirname` → walks up from postcss-normalize-unicode/src/ and lands
+  // on the workspace's effective config (no .browserslistrc + no `browserslist`
+  // field in any package.json → 4.24.2 defaults). `isLegacy = browsers.some(b
+  // ∈ browserslist('ie <=11, edge <= 15'))` → false under defaults. OnceExit
+  // walks every Decl matching /^unicode-range$/i; lowercases each unicode-
+  // range token, attempts wildcard collapse via mergeRangeBounds (`0`/`f`
+  // pairs become `?`, max 5), and re-uppercases the leading `u` only when
+  // isLegacy. Per-call cache keyed on raw decl value.
+  'postcss-normalize-unicode': (css) => {
+    const result = postcss([postcssNormalizeUnicode()]).process(css, { from: undefined });
+    return result.css;
+  },
+
   // parse → npm postcss-minify-selectors@5.2.1 (no opts) → stringify.
   // OnceExit-only plugin: walks every Rule, runs each selector through a
   // postcss-selector-parser pipeline that clears spaces, dispatches per-kind
@@ -286,6 +305,20 @@ const STAGES = {
       if (previous === undefined) delete process.env.BROWSERSLIST;
       else process.env.BROWSERSLIST = previous;
     }
+  },
+
+  // parse → npm postcss-minify-gradients@5.1.1 (no opts) → stringify. Phase 6g.
+  // OnceExit walks every Decl. Bails on empty / `var(` / `env(` / no
+  // `gradient`. Otherwise value-parses and walks top-level Functions:
+  // linear-gradient (incl. `-webkit-` and `repeating-` variants) rewrites
+  // `to <side>` to angles and strips first 0<unit>/last 100%. Radial
+  // (with optional `at` skip) and `-webkit-radial-gradient` (gated by an
+  // isColorStop predicate via colord + length-unit/calc check) renormalize
+  // each stop to `0` when the previous stop's unit matches and number ≥
+  // current. Upstream's `isLessThan` is misnamed (returns ≥); replicated.
+  'postcss-minify-gradients': (css) => {
+    const result = postcss([postcssMinifyGradients()]).process(css, { from: undefined });
+    return result.css;
   },
 
   // parse → npm postcss-calc@8.2.4 (default opts) → stringify. Phase 6d.

@@ -98,6 +98,19 @@ pub enum Stage {
     /// `stripHash`/`stripWWW`/`stripTextFragment` all `false`).
     PostcssNormalizeUrl,
 
+    /// `parse → postcss-normalize-unicode@5.1.1 (no opts) → stringify`. Phase 6e.
+    /// Browserslist-aware: `prepare(result)` resolves
+    /// `browsers = browserslist(null, { path: __dirname, ... })` once,
+    /// computes `isLegacy = browsers.some(hasLowerCaseUPrefixBug)` where
+    /// `hasLowerCaseUPrefixBug(b)` ↔ `b ∈ browserslist('ie <=11, edge <= 15')`.
+    /// Under the workspace's locked 4.24.2 defaults (no IE, no Edge ≤15) →
+    /// `isLegacy = false`. `OnceExit` walks every Decl matching
+    /// `/^unicode-range$/i`; lowercases each `unicode-range` value-parser
+    /// token, attempts wildcard collapse via `mergeRangeBounds` (`0`/`f`
+    /// pairs become `?`, max 5), and re-uppercases the leading `u` only
+    /// when `isLegacy` is true. Per-call cache keyed on raw decl value.
+    PostcssNormalizeUnicode,
+
     /// `parse → postcss-minify-selectors@5.2.1 (no opts) → stringify`. Phase 6c.
     /// `OnceExit` walks every Rule, runs each selector through a
     /// postcss-selector-parser pipeline that clears spaces, dispatches
@@ -151,6 +164,19 @@ pub enum Stage {
     /// (value, options, browsers).
     PostcssColormin,
 
+    /// `parse → postcss-minify-gradients@5.1.1 (no opts) → stringify`. Phase 6g.
+    /// OnceExit walks every Decl. Bails when value is empty / contains
+    /// `var(` / `env(` / lacks `gradient`. Otherwise value-parses and walks
+    /// top-level Functions: linear-gradient (incl. `-webkit-` and
+    /// `repeating-` variants) rewrites `to <side>` to angles, strips a
+    /// non-deg `0<unit>` first stop and a final `100%` stop; radial-gradient
+    /// (with optional `at` skip) and `-webkit-radial-gradient` (uses
+    /// `isColorStop` predicate via `colord` + length-unit/calc check)
+    /// renormalize each stop to `0` when `lastStop.unit` matches AND
+    /// `lastStop.number >= thisStop.number` (upstream's misnamed
+    /// `isLessThan` actually returns ≥; replicated verbatim).
+    PostcssMinifyGradients,
+
     /// `parse → postcss-calc@8.2.4 (default opts) → stringify`. Phase 6d.
     /// OnceExit walks every Decl, transforms `value` through value-parser
     /// looking for `(-vendor-)?calc(...)` function nodes, parses the inner
@@ -192,11 +218,13 @@ impl Stage {
             Stage::PostcssNormalizePositions => "postcss-normalize-positions",
             Stage::PostcssNormalizeTimingFunctions => "postcss-normalize-timing-functions",
             Stage::PostcssNormalizeUrl => "postcss-normalize-url",
+            Stage::PostcssNormalizeUnicode => "postcss-normalize-unicode",
             Stage::PostcssMinifySelectors => "postcss-minify-selectors",
             Stage::PostcssMinifyParams => "postcss-minify-params",
             Stage::PostcssOrderedValues => "postcss-ordered-values",
             Stage::PostcssReduceInitial => "postcss-reduce-initial",
             Stage::PostcssColormin => "postcss-colormin",
+            Stage::PostcssMinifyGradients => "postcss-minify-gradients",
             Stage::PostcssCalc => "postcss-calc",
             Stage::Sort => "sort",
         }
@@ -348,6 +376,12 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
+        Stage::PostcssNormalizeUnicode => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            cssnano_postcss_normalize_unicode::postcss_normalize_unicode(&mut root)
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
         Stage::PostcssMinifySelectors => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             cssnano_postcss_minify_selectors::postcss_minify_selectors(&mut root)
@@ -381,6 +415,12 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             // (empty) query would resolve to the workspace default which
             // can drift; an explicit pin makes the contract explicit.
             cssnano_postcss_colormin::postcss_colormin_with_query(&mut root, None, "chrome 100")
+                .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::PostcssMinifyGradients => {
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            cssnano_postcss_minify_gradients::postcss_minify_gradients(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
