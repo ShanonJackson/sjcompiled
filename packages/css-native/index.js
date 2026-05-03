@@ -30,3 +30,4 @@ function platformBinaryName() {
 const binary = require(path.join(__dirname, platformBinaryName()));
 
 module.exports.sort = binary.sort;
+module.exports.autoprefixer = binary.autoprefixer;

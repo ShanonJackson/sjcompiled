@@ -152,6 +152,80 @@ pub fn register_hacks(reg: &mut HackRegistry) {
     // END HACKS REGISTRATION
 }
 
+/// JS `Declaration.load(name, prefixes, all)` factory. If a hack is
+/// registered for `name`, return the hack-routed wrapper; otherwise the
+/// plain base wrapper.
+pub fn load_decl(name: &str, prefixes: Vec<String>) -> DeclPrefixer {
+    if let Some(entry) = registry().lookup(HackBucket::Declaration, name) {
+        match entry.class_name {
+            "TextDecoration" => {
+                return DeclPrefixer::TextDecoration(
+                    crate::hacks::text_decoration::TextDecoration::new(
+                        name.to_string(),
+                        prefixes,
+                        0,
+                    ),
+                );
+            }
+            "TextDecorationSkipInk" => {
+                return DeclPrefixer::TextDecorationSkipInk(
+                    crate::hacks::text_decoration_skip_ink::TextDecorationSkipInk::new(
+                        name.to_string(),
+                        prefixes,
+                        0,
+                    ),
+                );
+            }
+            "UserSelect" => {
+                return DeclPrefixer::UserSelect(
+                    crate::hacks::user_select::UserSelect::new(
+                        name.to_string(),
+                        prefixes,
+                        0,
+                    ),
+                );
+            }
+            _ => {}
+        }
+    }
+    DeclPrefixer::Base(DeclarationBase::new(
+        name.to_string(),
+        prefixes,
+        0,
+    ))
+}
+
+/// JS `Value.load(name, prefixes, all)` factory. Hack registry routes
+/// `cross-fade` / `fit-content` / `min-content` / `max-content` /
+/// `fill` / `fill-available` / `stretch` to their respective Value
+/// hacks; everything else lands on the plain base wrapper.
+pub fn load_value(name: &str, prefixes: Vec<String>) -> ValuePrefixer {
+    if let Some(entry) = registry().lookup(HackBucket::Value, name) {
+        match entry.class_name {
+            "CrossFade" => {
+                return ValuePrefixer::CrossFade(
+                    crate::hacks::cross_fade::CrossFade::new(
+                        name.to_string(),
+                        prefixes,
+                        0,
+                    ),
+                );
+            }
+            "Intrinsic" => {
+                return ValuePrefixer::Intrinsic(
+                    crate::hacks::intrinsic::Intrinsic::new(
+                        name.to_string(),
+                        prefixes,
+                        0,
+                    ),
+                );
+            }
+            _ => {}
+        }
+    }
+    ValuePrefixer::Base(ValueBase::new(name.to_string(), prefixes, 0))
+}
+
 /// Singleton-built registry. Lazily populated on first access.
 pub fn registry() -> &'static HackRegistry {
     static REG: OnceCell<HackRegistry> = OnceCell::new();
@@ -213,6 +287,384 @@ impl std::fmt::Display for NotYetImplemented {
 
 impl std::error::Error for NotYetImplemented {}
 
+/// JS `Declaration.load(name, prefixes, all)` runtime dispatch. JS picks
+/// `Klass.hacks[name]` from the static hack table populated by
+/// `Declaration.hack(klass)` calls. We mirror via this enum:
+/// `DeclPrefixer::Base` for the no-hack case, one variant per registered
+/// hack class for the hack-routed cases.
+///
+/// Method dispatch: `process` is defined on this type (shadows the
+/// `Deref::Target = DeclarationBase` blanket); call sites that go through
+/// `decl.process(...)` get hack overrides. Field access (`decl.prefixer`,
+/// `decl.cascade_option`) falls through `Deref` to the underlying
+/// `DeclarationBase` so the existing processor.rs / values() / etc.
+/// code paths compile unchanged.
+pub enum DeclPrefixer {
+    Base(DeclarationBase),
+    TextDecoration(crate::hacks::text_decoration::TextDecoration),
+    TextDecorationSkipInk(crate::hacks::text_decoration_skip_ink::TextDecorationSkipInk),
+    UserSelect(crate::hacks::user_select::UserSelect),
+}
+
+impl DeclPrefixer {
+    /// Sole base accessor — used by the `Deref` impl below and by
+    /// preprocess's introspection (`prefixer.name`).
+    pub fn base(&self) -> &DeclarationBase {
+        match self {
+            DeclPrefixer::Base(b) => b,
+            DeclPrefixer::TextDecoration(h) => &h.base,
+            DeclPrefixer::TextDecorationSkipInk(h) => &h.base,
+            DeclPrefixer::UserSelect(h) => &h.base,
+        }
+    }
+    pub fn base_mut(&mut self) -> &mut DeclarationBase {
+        match self {
+            DeclPrefixer::Base(b) => b,
+            DeclPrefixer::TextDecoration(h) => &mut h.base,
+            DeclPrefixer::TextDecorationSkipInk(h) => &mut h.base,
+            DeclPrefixer::UserSelect(h) => &mut h.base,
+        }
+    }
+
+    /// JS `prefixer.process(decl, result)` dispatch. Routes through the
+    /// hack's overridden chain (`check` / `add` / `insert` / `set`) when
+    /// a hack is attached; otherwise delegates to the base.
+    pub fn process(
+        &self,
+        prefixes_all: &Prefixes,
+        root: &mut Node,
+        path: &[usize],
+    ) {
+        match self {
+            DeclPrefixer::Base(b) => b.process(prefixes_all, root, path),
+            DeclPrefixer::TextDecoration(_) => {
+                // TextDecoration overrides ONLY `check`. Re-implement
+                // the Declaration.process body inline so the hack's
+                // `check` gets consulted before any prefix work.
+                self.process_with_overrides(prefixes_all, root, path);
+            }
+            DeclPrefixer::TextDecorationSkipInk(_) | DeclPrefixer::UserSelect(_) => {
+                // Both override `set` (and UserSelect also `insert`).
+                // Re-implement the chain so the hack's set/insert fire
+                // in the cloned-decl mutation step.
+                self.process_with_overrides(prefixes_all, root, path);
+            }
+        }
+    }
+
+    /// Mirror of `DeclarationBase::process` + the inner Prefixer.process
+    /// loop, with hack hooks at the four override points: `check`,
+    /// `add`, `insert`, `set`.
+    fn process_with_overrides(
+        &self,
+        prefixes_all: &Prefixes,
+        root: &mut Node,
+        path: &[usize],
+    ) {
+        // First fire hack `check` (TextDecoration). For UserSelect /
+        // TextDecorationSkipInk that don't override check, fall through
+        // to base behaviour where `check` is implicit-true on Declaration
+        // (Prefixer.check returns true unless overridden, and Declaration
+        // doesn't override).
+        let check_passes = {
+            let here = match postcss_core::node_at_path(root, path) {
+                Some(n) => n,
+                None => return,
+            };
+            self.hack_check(here)
+        };
+        if !check_passes {
+            return;
+        }
+
+        // Compute parent prefix gate (mirror DeclarationBase::process).
+        let mut current_path = path.to_vec();
+        let parent =
+            crate::prefixer::parent_prefix_cached_mut(root, &current_path);
+        let prefixes: Vec<String> = self
+            .base()
+            .prefixer
+            .prefixes
+            .iter()
+            .filter(|p| match &parent {
+                crate::prefixer::ParentPrefix::None => true,
+                crate::prefixer::ParentPrefix::Some(s) => {
+                    s == utils::remove_note(p)
+                }
+            })
+            .cloned()
+            .collect();
+
+        let need_cascade = {
+            let here = match postcss_core::node_at_path_mut(root, &current_path)
+            {
+                Some(n) => n,
+                None => return,
+            };
+            self.base().need_cascade(here)
+        };
+
+        let mut added: Vec<String> = Vec::new();
+        for prefix in &prefixes {
+            let mut so_far = added.clone();
+            so_far.push(prefix.clone());
+            if self
+                .hack_add(root, &current_path, prefix, &so_far)
+                .is_some()
+            {
+                added.push(prefix.clone());
+                if let Some(last) = current_path.last_mut() {
+                    *last += 1;
+                }
+            }
+        }
+
+        if !need_cascade || added.is_empty() {
+            return;
+        }
+        // Restore-before pass + cascade calc — same as base.
+        self.base().restore_before(prefixes_all, root, &current_path);
+        let here = match postcss_core::node_at_path_mut(root, &current_path) {
+            Some(n) => n,
+            None => return,
+        };
+        here.raws.before = Some(self.base().calc_before(&added, here, ""));
+    }
+
+    fn hack_check(&self, decl: &Node) -> bool {
+        match self {
+            DeclPrefixer::TextDecoration(h) => h.check(decl),
+            // Default: Declaration's implicit-true check.
+            _ => true,
+        }
+    }
+
+    fn hack_add(
+        &self,
+        root: &mut Node,
+        path: &[usize],
+        prefix: &str,
+        prefixes: &[String],
+    ) -> Option<()> {
+        // Mirror Declaration.add: prefixed = self.prefixed(prop, prefix);
+        // if isAlready || otherPrefixes return undefined; else insert.
+        let (prop, value) = {
+            let here = postcss_core::node_at_path(root, path)?;
+            match &here.kind {
+                NodeKind::Declaration(d) => (d.prop.clone(), d.value.clone()),
+                _ => return None,
+            }
+        };
+        let prefixed = self.base().prefixed(&prop, prefix);
+        if self.base().is_already(root, path, &prefixed)
+            || self.base().other_prefixes(&value, prefix)
+        {
+            return None;
+        }
+        self.hack_insert(root, path, prefix, prefixes)
+    }
+
+    fn hack_insert(
+        &self,
+        root: &mut Node,
+        path: &[usize],
+        prefix: &str,
+        prefixes: &[String],
+    ) -> Option<()> {
+        // UserSelect overrides insert. Others fall through to a local
+        // inline of Declaration.insert that calls hack `set` instead of
+        // base `set`.
+        if let DeclPrefixer::UserSelect(h) = self {
+            // UserSelect.insert: -ms- + value === 'all' → undefined;
+            // else delegate to the base-shaped insert with hack set.
+            let value_is_all = match postcss_core::node_at_path(root, path) {
+                Some(n) => match &n.kind {
+                    NodeKind::Declaration(d) => d.value == "all",
+                    _ => return None,
+                },
+                None => return None,
+            };
+            if value_is_all && prefix == "-ms-" {
+                return None;
+            }
+            // Fall through to insert-with-hack-set.
+            let _ = h; // silence unused (set called below via dispatch)
+        }
+        self.insert_with_hack_set(root, path, prefix, prefixes)
+    }
+
+    fn insert_with_hack_set(
+        &self,
+        root: &mut Node,
+        path: &[usize],
+        prefix: &str,
+        prefixes: &[String],
+    ) -> Option<()> {
+        let original = postcss_core::node_at_path(root, path)?;
+        let mut cloned = crate::prefixer::clone_node(original);
+        // KEY DIVERGENCE FROM BASE — call hack.set(cloned, prefix), not base.set.
+        self.hack_set(&mut cloned, prefix)?;
+
+        let (cloned_prop, cloned_value) = match &cloned.kind {
+            NodeKind::Declaration(d) => (d.prop.clone(), d.value.clone()),
+            _ => return None,
+        };
+
+        let already = postcss_core::parent_some(root, path, |sibling| match &sibling.kind {
+            NodeKind::Declaration(s) => {
+                s.prop == cloned_prop && s.value == cloned_value
+            }
+            _ => false,
+        });
+        if already {
+            return None;
+        }
+
+        let need_cascade = {
+            let here = postcss_core::node_at_path_mut(root, path)?;
+            self.base().need_cascade(here)
+        };
+        if need_cascade {
+            let here = postcss_core::node_at_path_mut(root, path)?;
+            cloned.raws.before =
+                Some(self.base().calc_before(prefixes, here, prefix));
+        }
+        postcss_core::insert_before_at_path(root, path, cloned);
+        Some(())
+    }
+
+    fn hack_set(&self, cloned: &mut Node, prefix: &str) -> Option<()> {
+        match self {
+            DeclPrefixer::TextDecorationSkipInk(h) => h.set(cloned, prefix),
+            DeclPrefixer::UserSelect(h) => h.set(cloned, prefix),
+            // TextDecoration / Base: default Declaration.set (just renames prop).
+            _ => self.base().set(cloned, prefix),
+        }
+    }
+}
+
+impl std::ops::Deref for DeclPrefixer {
+    type Target = DeclarationBase;
+    fn deref(&self) -> &DeclarationBase {
+        self.base()
+    }
+}
+
+impl std::ops::DerefMut for DeclPrefixer {
+    fn deref_mut(&mut self) -> &mut DeclarationBase {
+        self.base_mut()
+    }
+}
+
+/// JS `Value.load(name, prefixes, all)` runtime dispatch — twin of
+/// `DeclPrefixer`. Two registered hacks (`CrossFade`, `Intrinsic`)
+/// override `add` / `replace` / `regexp` / `check`. Method dispatch
+/// happens via `check` / `add` defined on this type; field access falls
+/// through `Deref` to the underlying `ValueBase` so processor.rs's
+/// `v.prefixer.prefixes.clone()` compiles unchanged.
+pub enum ValuePrefixer {
+    Base(ValueBase),
+    CrossFade(crate::hacks::cross_fade::CrossFade),
+    Intrinsic(crate::hacks::intrinsic::Intrinsic),
+}
+
+impl ValuePrefixer {
+    pub fn base(&self) -> &ValueBase {
+        match self {
+            ValuePrefixer::Base(b) => b,
+            ValuePrefixer::CrossFade(h) => &h.base,
+            ValuePrefixer::Intrinsic(h) => &h.base,
+        }
+    }
+    pub fn base_mut(&mut self) -> &mut ValueBase {
+        match self {
+            ValuePrefixer::Base(b) => b,
+            ValuePrefixer::CrossFade(h) => &mut h.base,
+            ValuePrefixer::Intrinsic(h) => &mut h.base,
+        }
+    }
+
+    /// JS `value.check(decl)`. Intrinsic uses its own (different)
+    /// regexp; CrossFade inherits base behaviour.
+    pub fn check(&self, decl: &Node) -> bool {
+        match self {
+            ValuePrefixer::Intrinsic(h) => {
+                // Mirror ValueBase.check but with Intrinsic's regexp.
+                let value = match &decl.kind {
+                    NodeKind::Declaration(d) => &d.value,
+                    _ => return false,
+                };
+                if !value.contains(&h.base.prefixer.name) {
+                    return false;
+                }
+                h.regexp().is_match(value)
+            }
+            _ => self.base().check(decl),
+        }
+    }
+
+    /// JS `value.add(decl, prefix)`. Routes through hack `replace` /
+    /// `add` overrides via the per-variant call.
+    pub fn add(&mut self, decl: &mut Node, prefix: &str) {
+        match self {
+            ValuePrefixer::Intrinsic(h) => h.add(decl, prefix),
+            ValuePrefixer::CrossFade(h) => {
+                // CrossFade uses base ValueBase.add semantics (the loop)
+                // but with the override of `replace`. ValueBase.add
+                // calls `self.replace` — which is the BASE method when
+                // we route through the base instance directly. So we
+                // have to inline the loop here, calling
+                // `CrossFade::replace` instead of base.
+                let initial = decl
+                    .attrs
+                    .get_string_map(crate::value::ATTR_VALUES)
+                    .and_then(|m| m.get(prefix).cloned())
+                    .unwrap_or_else(|| h.base.value(decl));
+
+                let mut value = initial;
+                loop {
+                    let before = value.clone();
+                    value = h.replace(&before, prefix);
+                    if value == before {
+                        break;
+                    }
+                }
+
+                let map = decl
+                    .attrs
+                    .get_string_map_mut(crate::value::ATTR_VALUES);
+                match map {
+                    Some(m) => {
+                        m.insert(prefix.to_string(), value);
+                    }
+                    None => {
+                        let mut m = indexmap::IndexMap::new();
+                        m.insert(prefix.to_string(), value);
+                        decl.attrs.set(
+                            crate::value::ATTR_VALUES,
+                            postcss_core::AttrValue::StringMap(m),
+                        );
+                    }
+                }
+            }
+            ValuePrefixer::Base(b) => b.add(decl, prefix),
+        }
+    }
+}
+
+impl std::ops::Deref for ValuePrefixer {
+    type Target = ValueBase;
+    fn deref(&self) -> &ValueBase {
+        self.base()
+    }
+}
+
+impl std::ops::DerefMut for ValuePrefixer {
+    fn deref_mut(&mut self) -> &mut ValueBase {
+        self.base_mut()
+    }
+}
+
 /// JS `add[name]` polymorphic value. Each variant matches one branch
 /// of `prefixes.js::preprocess` (lines 234-263).
 pub enum AddBucket {
@@ -226,14 +678,14 @@ pub enum AddBucket {
     /// The `values` Vec is appended in source-order from the matching
     /// Value-prefixers.
     Declaration {
-        decl: DeclarationBase,
-        values: Vec<ValueBase>,
+        decl: DeclPrefixer,
+        values: Vec<ValuePrefixer>,
     },
     /// JS: `add[prop] = { values: [...] }` — value prefixers only,
     /// no underlying Declaration prefixer. Used when a Value-with-
     /// props entry adds entries for `prop` but no Declaration entry
     /// for the same name was processed.
-    Values(Vec<ValueBase>),
+    Values(Vec<ValuePrefixer>),
 }
 
 /// JS `remove[name]` polymorphic value. Each variant matches one
@@ -861,10 +1313,15 @@ impl Prefixes {
                 // byte-equivalent — the only observable cost is one
                 // extra regex compile per Value-with-props prop on
                 // first-access.
+                //
+                // Hack dispatch (Pass C): consult `HackRegistry::lookup`
+                // before constructing the bare `ValueBase` — names like
+                // `cross-fade` / `fit-content` / `stretch` route to a
+                // hack instance instead.
                 for prop in &entry.props {
                     let prop_key = prop.clone();
                     let v_for_prop =
-                        ValueBase::new(name.clone(), prefixes.clone(), 0);
+                        load_value(name, prefixes.clone());
                     match add.by_name.get_mut(&prop_key) {
                         Some(AddBucket::Values(vs)) => vs.push(v_for_prop),
                         Some(AddBucket::Declaration { values, .. }) => {
@@ -891,17 +1348,18 @@ impl Prefixes {
                 // matches JS for AFM-shaped inputs (the only case where
                 // prior values exist is `*`/global, which AFM doesn't
                 // exercise today).
-                let prior_values: Vec<ValueBase> =
+                let prior_values: Vec<ValuePrefixer> =
                     match add.by_name.shift_remove(name.as_str()) {
                         Some(AddBucket::Values(vs)) => vs,
                         Some(AddBucket::Declaration { values, .. }) => values,
                         _ => Vec::new(),
                     };
-                let decl = DeclarationBase::new(
-                    name.clone(),
-                    prefixes.clone(),
-                    0,
-                );
+                // Hack dispatch (Pass C): consult `HackRegistry::lookup`
+                // for Declaration-bucket hacks (text-decoration,
+                // text-decoration-skip-ink, user-select). The hack
+                // instance carries the same DeclarationBase shape +
+                // override hooks the wrapper consults.
+                let decl = load_decl(name, prefixes.clone());
                 add.by_name.insert(
                     name.clone(),
                     AddBucket::Declaration {

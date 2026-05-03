@@ -420,10 +420,12 @@ dependencies = [
 name = "compiled-css-napi"
 version = "0.0.1"
 dependencies = [
+ "autoprefixer",
  "css",
  "napi",
  "napi-build",
  "napi-derive",
+ "postcss-core",
  "serde_json",
 ]
 

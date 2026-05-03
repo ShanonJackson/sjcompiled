@@ -9,33 +9,75 @@ actually run before claiming a piece is byte-clean.
 
 ## 1. Where you actually are
 
-`cargo test -p autoprefixer` → **60 passing, 0 ignored** (53 unit + 4 data
-parity + 3 browserslist parity active — including the AFM-fixture
-omnibus, which CLOSED the previously-open canonical-queries gate; see
-§6 for the closure history). That number is the floor; your work must
-keep it there or grow it. Run it before EVERY commit.
+**Phase 7 SHIPPED end-to-end byte-clean for AFM** (2026-05-03). Six
+delegated subagents (AGENT_1..6, see `crates/autoprefixer/AGENTS_INDEX.md`
++ `AGENT_{1..6}_DONE.md`) closed the engine, hack subset, parity-runner
+stage, and NAPI binding in one wrap-up cycle.
 
-What's real (full bodies, real tests):
-- `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`,
-  `old_selector.rs`
+### Floor (do not regress)
+
+```
+cargo test -p autoprefixer                                          → 231 active passing, 0 failing, 0 ignored
+                                                                       (198 unit + 4 data parity + 3 browserslist parity + 26 transition integration)
+cargo build -p autoprefixer / cargo check --workspace               → clean (1 pre-existing supports.rs:384 warning, AGENT_2 follow-up)
+cargo run -p parity-runner -- --stage autoprefixer --corpus …       → OK — 65/65 byte-clean (Rust direct vs JS oracle)
+bun run packages/css/scripts/verify-napi-autoprefixer.mjs           → OK — 65/65 byte-clean (Rust NAPI vs JS oracle)
+```
+
+Run all four before EVERY commit that touches anything autoprefixer-adjacent.
+
+### What's real (full bodies, real tests)
+
+- All leaf utilities: `utils.rs`, `vendor.rs`, `brackets.rs`,
+  `old_value.rs`, `old_selector.rs`
 - `prefixer.rs` (parent walk + cache + clone-strip)
-- `browsers.rs` (caniuse-db agents + browserslist-shim)
-- `at_rule.rs` / `value.rs` / `selector.rs` / `declaration.rs` /
-  `resolution.rs` (full base classes)
-- `prefixes.rs` (HackRegistry skeleton; orchestrator body stubbed)
-- **`data/prefixes.rs`** — 183 entries, codegen via `build.rs` + `bun`,
-  4 parity gates byte-clean. See `crates/STATUS.md` "Phase 7 ship —
-  `data/prefixes.rs` codegen + caniuse-lite pin fix" for the full
-  story (including the workspace caniuse-lite pin fix that landed
-  alongside it).
+- `browsers.rs` (caniuse-db agents + browserslist-shim hybrid AFM-fast-path)
+- All base classes: `at_rule.rs`, `value.rs`, `selector.rs`,
+  `declaration.rs`, `resolution.rs`
+- `supports.rs` — full 1:1 port of `lib/supports.js` (302 LOC)
+- `transition.rs` — full 1:1 port of `lib/transition.js` (329 LOC)
+- `processor.rs` — full engine: `add` + `remove` walks, helpers
+  (`disabled`, `gridStatus`, `displayType`, `withHackValue`,
+  `reduceSpaces`), `value_save`. End-to-end byte-clean for AFM.
+- `prefixes.rs` — full orchestrator: `new`, `cleaner`, `select`,
+  `group`, `unprefixed`, `prefixed`, `values`, plus `preprocess()`
+  building `AddTable`/`RemoveTable` with `DeclPrefixer`/`ValuePrefixer`
+  enum dispatch via `HackRegistry::lookup`.
+- `info.rs` + `autoprefixer.rs` entry shell (`build_prefixes`,
+  `build_prefixes_default`, `AutoprefixerOptions`).
+- `data/prefixes.rs` — 183 entries codegen, 4 parity gates byte-clean.
+- **5/58 hacks ported** (the AFM-instrumentation-confirmed in-scope
+  set): `cross_fade.rs`, `intrinsic.rs`, `text_decoration.rs`,
+  `text_decoration_skip_ink.rs`, `user_select.rs`. Each registered in
+  `prefixes.rs::register_hacks`.
 
-What's stubbed (`unimplemented!()`):
-- `supports.rs`, `transition.rs`
-- `Prefixes` orchestrator methods inside `prefixes.rs`
-  (`new` / `cleaner` / `select` / `group` — depends on `data/prefixes.rs`
-  ✅ and `processor.rs` ⬜)
-- `processor.rs`, `info.rs`, `autoprefixer.rs`
-- All 58 hack files (parallel agent's territory)
+### What's still stubbed (out-of-scope for AFM)
+
+- **53/58 hacks remain 7-line stubs.** AFM never reaches them.
+  Confirmed empirically by `crates/autoprefixer/AFM_HACKS_INSTRUMENTATION.md`.
+  Re-run protocol at §7 of that file if AFM's `.browserslistrc` ever
+  widens (e.g., `last 10 Safari versions`, IE re-entry).
+- 10 of the 13 warning-only branches in `processor.rs::add` (diagnostic
+  `result.warn` calls — no byte impact). 3 of 13 (the short-circuit
+  branches) ARE implemented.
+- `transition` / `align-self` / `place-self` decl dispatch in
+  `processor.rs` (architecturally defined, not yet wired — affects
+  inputs AFM doesn't reach).
+- `insertAreas` from `lib/hacks/grid-utils.js` (grid-area helper;
+  AFM doesn't enable grid).
+
+### Outstanding follow-ups (do NOT block AFM byte-equality)
+
+1. `PrefixesOptions::flexbox` and `grid` should be enums, not
+   `Option<String>`. Two workarounds (`Supports::disabled`,
+   `processor::grid_status`).
+2. `supports.rs:384` `for_loops_over_fallibles` warning. Fix shape:
+   `if let Ok(checkers) = ... { for c in checkers { ... } }`.
+3. **Phase 8c** — release-mode NAPI build OOMs the host; dev `.dll`
+   shipped. See `AGENT_6_DONE.md` "Release-mode build OOM".
+4. **Phase 8b** — `COMPILED_CSS_ENGINE` flag dispatch in
+   `packages/css/src/transform.ts` deferred until full Phase 4-7
+   plugin chain assembles in `crates/css/src/transform.rs`.
 
 ---
 

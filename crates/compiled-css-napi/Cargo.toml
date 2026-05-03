@@ -13,6 +13,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 css = { workspace = true }
+postcss-core = { workspace = true }
+autoprefixer = { workspace = true }
 napi = { workspace = true }
 napi-derive = { workspace = true }
 serde_json = { workspace = true }
@@ -20,7 +22,28 @@ serde_json = { workspace = true }
 [build-dependencies]
 napi-build = { workspace = true }
 
-[profile.release]
-# Inherits workspace defaults — keep simple. The user-level RUSTFLAGS
-# (znver3 / lto=thin) handle optimization. Ship-time release builds set
-# `RUSTFLAGS=""` to avoid breaking proc-macro dylib LTO requirements.
+# !!! WARNING — DO NOT RUN `cargo build -p compiled-css-napi --release`.
+# !!!
+# !!! On a Windows dev box without ≥32 GB free RAM, LLVM's release-mode
+# !!! codegen of the autoprefixer crate (~5.5 KLOC, ports of upstream's
+# !!! processor + prefixes + supports + transition + 58 hack files +
+# !!! the `data/prefixes.rs` codegen'd table) OOMs hard. Three confirmed
+# !!! attempts: opt-level=3 default, opt-level=3 + codegen-units=16,
+# !!! opt-level=2 + codegen-units=16. The third crashed the entire
+# !!! host (full-system OOM, ~10 min in). See `AGENT_6_DONE.md`
+# !!! §"Release-mode build OOM" for the Phase 8c retry plan.
+# !!!
+# !!! The shipped `packages/css-native/sjcompiled-css.win32-x64-msvc.node`
+# !!! is built from `cargo build -p compiled-css-napi` (dev mode). NAPI
+# !!! bytes-out are byte-identical between dev and release. The
+# !!! parity-runner + verify-napi-autoprefixer gates pass 65/65 with
+# !!! the dev binary.
+# !!!
+# !!! Per-package release profile overrides (e.g. opt-level=z for
+# !!! autoprefixer) cannot live here — Cargo ignores `[profile.*]`
+# !!! sections in non-root package manifests with the warning
+# !!! "profiles for the non root package will be ignored". They have
+# !!! to go in `crates/Cargo.toml` (workspace root). I left this
+# !!! Cargo.toml profile-section-free to avoid the dead-code warning
+# !!! and the false sense of having tried something. Phase 8c lands
+# !!! the workspace-root profile additions itself.

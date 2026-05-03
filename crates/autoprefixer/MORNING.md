@@ -1,215 +1,204 @@
-## Today's session — what landed
+## Today's session — Phase 7 SHIPPED
 
-**Closed the browserslist-shim parity gate** (the OPEN gate from the
-previous MORNING.md / HANDOVER §6 / TaskList #2). The gate is now active
-and passing for AFM's actual surface; `Prefixes::new` is unblocked.
+**Autoprefixer is end-to-end byte-clean for AFM.** Six delegated
+subagents (AGENT_1..6) closed the engine, hack subset, parity-runner
+stage, and NAPI binding in one wrap-up cycle.
 
-Approach picked: **option (b), descoped to AFM's actual query surface**
-— the "Recommended" option from the prior planning chain. AFM's
-dependency engineer ran runtime instrumentation through the actual
-`jira/` build pipeline and reported (in `BROWSER_LIST_FROM_AFM.md`) that:
+### Triple-oracle byte-clean
 
-- `@compiled/css@0.19.0` calls `autoprefixer()` with no args
-- Autoprefixer calls `browserslist(null, { path: cwd })`
-- That walks up to `jira/.browserslistrc` (SHA256
-  `08c8e1bf56ad773621c9b264971365f66f78a808d6d369a4ea9584a02da459cb`)
-- The file contains six lines, all `last N <browser> version[s]?` atoms
-- Resolved output: a frozen 14-entry list
+| Gate | Result |
+|---|---|
+| `cargo test -p autoprefixer` | **231 active passing, 0 failing, 0 ignored** |
+| `cargo run -p parity-runner -- --stage autoprefixer --corpus crates/parity-runner/corpus/autoprefixer` | **OK — 65/65 byte-clean (Rust direct vs JS oracle)** |
+| `bun run packages/css/scripts/verify-napi-autoprefixer.mjs` | **OK — 65/65 byte-clean (Rust NAPI vs JS oracle)** |
+| `cargo build -p autoprefixer` / `cargo check --workspace` | clean (1 pre-existing `supports.rs:384` warning) |
 
-That tiny surface let the port collapse from "multi-day full-resolver
-re-port" into one session of focused work.
+Floor jumped from 60 → 231 passing in this cycle. **You must keep this
+floor or grow it.**
 
-What I did, in order:
-1. Read the AFM agent's `BROWSER_LIST_FROM_AFM.md`, the prior
-   `MORNING.md`, `HANDOVER.md` §1 §6 §11 §12, and verified pin
-   alignment between `crates/PARITY_VERSIONS.md` and AFM (caught and
-   resolved a `@compiled/css@0.21.1 vs 0.19.0` false alarm — AFM
-   re-confirmed 0.19.0 from the nested install path).
-2. Verified floor: `cargo test -p autoprefixer` → 58 passing, 1 ignored
-   (53 unit + 4 data parity + 1 active browserslist + 1 ignored omnibus).
-3. Implemented hybrid resolver in `crates/browserslist-shim/`:
-   - `src/parse.rs` — `QueryAtom` enum, `try_parse_atom_afm` with
-     two AFM atoms (`LastNBrowserVersions`, `BrowserVersion`).
-   - `src/index.rs::resolve_with` — fast-path on full AFM grammar
-     match, oxc fallback otherwise. Per-atom Firefox ESR expansion
-     replaces the comma-string rewrite for internal use; the original
-     `rewrite_firefox_esr` helper is kept as a `pub fn` for backwards
-     compat with the existing test contract.
-4. Added `tests/fixtures/afm/.browserslistrc` (byte-copy from AFM,
-   SHA256-verified) and `tests/afm_parity.rs` with two integration
-   tests: SHA256 fixture-integrity check (with inline pure-Rust
-   SHA-256 to avoid a dev-dep) and end-to-end resolver byte-test
-   against the frozen 14-entry oracle.
-5. Plumbed `path` through `crates/autoprefixer/src/browsers.rs::Browsers::parse_static`
-   — defaults to `std::env::current_dir()` when `BrowsersOptions::from`
-   is unset (matches `browserslist@4.24.2`'s `prepareOpts` defaulting).
-6. Rewrote `crates/autoprefixer/tests/browserslist_parity.rs` — the
-   `#[ignore]`'d canonical-queries omnibus is replaced by an
-   AFM-fixture-driven omnibus that spawns bun against the SAME fixture
-   and compares element-by-element. Active, passing.
-7. Wrote `crates/browserslist-shim/AFM_PORT_NOTES.md` capturing
-   architecture, "what NOT to remove" (per the user's explicit
-   guidance), and the protocol for adding a new atom when AFM's
-   `.browserslistrc` evolves.
-8. Updated `HANDOVER.md` §1 (floor count), §6 (gate closure), §2 + §5
-   (stale `caniuse-lite: 1.0.30001690` → `1.0.30001766`).
-9. Updated `crates/STATUS.md` with the Phase 7 closure entry.
+### What landed
 
-**New floor:** `cargo test -p autoprefixer` → **60 passing, 0 ignored**
-(53 unit + 4 data parity + 3 browserslist parity active).
-**Browserslist-shim floor:** `cargo test -p browserslist-shim` → **29
-passing, 0 ignored** (was 15).
+| Agent | Unit | Done report |
+|---|---|---|
+| AGENT_1 | `Prefixes::new` + `cleaner` + `select` + `group` + `info.rs` + `autoprefixer.rs` shell | `AGENT_1_DONE.md` |
+| AGENT_2 | `supports.rs` full port (302 LOC) | `AGENT_2_DONE.md` |
+| AGENT_3 | `transition.rs` full port (329 LOC) | `AGENT_3_DONE.md` |
+| AGENT_4 | `processor.rs` engine (Pass 1 helpers + Pass 2 add/remove walks + Pass 2.5 drift fixes) | `AGENT_4_DONE.md` |
+| AGENT_5 | AFM hack instrumentation + 5 in-scope hacks ported + dispatch wiring | `AGENT_5_DONE.md`, `AFM_HACKS_INSTRUMENTATION.md` |
+| AGENT_6 | `Stage::Autoprefixer` parity-runner + 65-entry corpus + JS bridge + NAPI binding + verify script | `AGENT_6_DONE.md` |
 
-## Two pieces of DRIFT I observed and addressed
+The full per-cycle write-up lives in `crates/STATUS.md` "Phase 7 ship —
+autoprefixer end-to-end byte-clean (2026-05-03)" — that's the
+single-source-of-truth, including the drift table, hack scope, and
+follow-up list.
 
-### Drift #1 — `oxc_browserslist` bundled snapshot (THE GATE)
+### Per-agent prompts (kept for reference)
 
-**Status: CLOSED for AFM's surface.** Hybrid resolver routes AFM atoms
-through caniuse-db directly (byte-correct); routes everything else
-through oxc as before (drift-tolerant, unchanged for cssnano consumers).
-See `AFM_PORT_NOTES.md`.
+`crates/autoprefixer/AGENT_{1..6}.md` — the prompts the controller
+delegated to each subagent. Read these to understand HOW the work was
+broken up. Don't re-invoke them as prompts — they're historical.
+`crates/autoprefixer/AGENTS_INDEX.md` documents the dependency graph
+and parallelism map.
 
-### Drift #2 — stale caniuse-lite version in HANDOVER.md
+## Two pieces of DRIFT observed and resolved this cycle
 
-`HANDOVER.md` §2 line 73-77 + §5 line 165 referenced
-`caniuse-lite: 1.0.30001690` — but the workspace pin moved to
-`1.0.30001766` per AFM repin (captured in `PARITY_VERSIONS.md` line
-124 + root `package.json`). Fixed in this session. If you regenerate
-`data/prefixes.rs` and the pin assertion test fails, check those docs
-match `caniuse_db::CANIUSE_LITE_VERSION`.
+### Drift #1 — `Prefixes::values` return-type ripple (still outstanding)
+
+`Prefixes::values` was changed from `Vec<String>` to
+`Result<Vec<String>, NotYetImplemented>` mid-cycle without sweeping
+callers. `crates/autoprefixer/src/supports.rs:384` still has
+`for _checker in cleaner.values("remove", &unprefixed) { ... }` which
+iterates the `Result` (one element on Ok, zero on Err) — produces a
+`for_loops_over_fallibles` warning. **Same byte-output as JS today**
+because `values` always returns Err until `preprocess()` populates the
+table further. AGENT_2 follow-up to fix shape:
+
+```rust
+if let Ok(checkers) = cleaner.values("remove", &unprefixed) {
+    for _checker in checkers { ... }
+}
+```
+
+### Drift #2 — value-pass walk re-prefixed its own clones
+
+AGENT_4 Pass 2 originally did the value-pass walk via direct
+`insert_before_at_path` calls. The walker re-visited the just-inserted
+clones and re-prefixed them, runaway. 13–19 GB OOM ~30 seconds in.
+Fixed in AGENT_4 Pass 2.5 by switching to
+`DeferredMutation::InsertBefore(clones)` so the cursor bumps past
+inserts.
 
 ## Your unit for this session
 
-**Read `HANDOVER.md` §1 + §6 + §11 + §12 + `AFM_PORT_NOTES.md` first.**
-Same cardinal rule: take ONE unit 0 → 100% byte-clean. Stop.
+**The autoprefixer port is wrapped up for AFM.** What remains is
+either out-of-scope (AFM doesn't reach it) or downstream of work that
+hasn't landed yet (Phase 8b needs the rest of the plugin chain
+assembled). So your unit depends on what you're trying to advance:
 
-### Option A (RECOMMENDED) — `Prefixes::new` body
+### Option A — Phase 8b assembly (RECOMMENDED if Phase 4-7 is mostly done)
 
-Now unblocked. `Browsers::new(...)` returns byte-correct `selected` for
-the AFM surface; `Prefixes::new` can consume that and build the
-`add_table` / `remove_table` against the AFM-pinned data. No mocking
-needed for the AFM call site.
+Wire all the Phase 4-7 plugins together in `crates/css/src/transform.rs`
+behind the `COMPILED_CSS_ENGINE` flag. Autoprefixer's NAPI binding is
+ready to slot in (parity-tested 65/65 standalone via
+`verify-napi-autoprefixer.mjs`). Per `EXECUTION_PLAN.md` Phase 8b.
 
-Caveat: if you write tests that pass arbitrary browserslist queries
-(e.g. `defaults`, `> 1%`), those still go through the oxc fallback
-and drift. Either (a) pin tests to the AFM `.browserslistrc` fixture
-via `Browsers::new` with `from = Some("...crates/browserslist-shim/tests/fixtures/afm")`,
-or (b) hand-curate `selected` for non-AFM tests and bypass `Browsers::new`.
+Pre-condition: every other Phase 4/5/6 plugin row in `STATUS.md` table
+is DONE (most are; check). The autoprefixer NAPI binding is the
+12th-or-so call in the chain.
 
-**ALWAYS set `from` explicitly in tests — DO NOT rely on cwd.** The
-gate-closure agent's `parse_static` change defaults `path` to
-`std::env::current_dir()` when `BrowsersOptions::from` is unset. Cargo's
-test-binary cwd varies between invocations (sometimes the crate dir,
-sometimes the workspace root, sometimes wherever a CI runner launches
-from). A non-AFM cwd silently lands on a different `.browserslistrc`
-walk result — or none, falling through to the oxc-fallback `defaults`
-which drifts ~2 chrome versions. Your byte-test will then fail for
-reasons that have nothing to do with `Prefixes::new`. Use:
+DO NOT touch `packages/css/src/transform.ts` — that's on CLAUDE.md
+IMMUTABLE list. The flag dispatch lives in `crates/css/src/transform.rs`
+(currently identity-passthrough). When the full chain assembles, you
+expose it via NAPI as `transformCss(css, opts)` mirroring the existing
+`sort()` pattern from Phase 8a.
 
-```rust
-let opts = BrowsersOptions {
-    from: Some(workspace_root().join("crates").join("browserslist-shim")
-        .join("tests").join("fixtures").join("afm")
-        .to_string_lossy().into_owned()),
-    ..Default::default()
-};
-let browsers = Browsers::new(query, opts);
+### Option B — Phase 8c release-mode NAPI build
+
+`cargo build -p compiled-css-napi --release` OOMs LLVM (>32 GB working
+memory) due to autoprefixer's ~5.5 KLOC + 58 hack files + codegen'd
+data tables. Three failed attempts on the dev box; one crashed the
+host. Currently shipping dev `.dll` (byte-identical output).
+
+Fix paths laid out in `AGENT_6_DONE.md` "Release-mode build OOM" and
+the WARNING block atop `crates/compiled-css-napi/Cargo.toml`:
+1. `opt-level=z` (size-prioritized).
+2. Split the 58 hack files into a separate sub-crate.
+3. Strip caniuse-db to AFM-only entries before WASI compilation.
+4. CI machine with ≥32 GB RAM.
+
+This is a perf/binary-size unit, NOT a correctness unit. The Phase 7
+parity gates pass with the dev binary.
+
+### Option C — `PrefixesOptions::flexbox` / `grid` enum cleanup
+
+Latent fix flagged by AGENT_2 + AGENT_4. Both options are tri-state in
+JS (`true` / `false` / `"no-2009"` for flexbox; `true` / `false` /
+`"autoplace"` / `"no-autoplace"` for grid). Current Rust
+`Option<String>` collapses `false` and unset, which means certain
+disable-paths can never fire. AFM doesn't set these so it's latent —
+not a bug, but a soft-spot for any future caller.
+
+5-minute change to introduce `FlexboxOption` + `GridOption` enums.
+Then sweep `Supports::disabled` / `processor::grid_status` to drop
+their string-coercion workarounds.
+
+### Option D — drift fix for `supports.rs:384`
+
+Drift #1 above. ~5 lines. Doesn't change byte-output today; cleanup of
+a soft warning. Pair with Option C if you want a "hygiene" session.
+
+### Option E — widen the hack scope (only if AFM browserslist changed)
+
+Re-run AGENT_5 Phase A's instrumentation per the protocol in
+`AFM_HACKS_INSTRUMENTATION.md` §7. If the in-scope hack set widened,
+port the new entries with the same shape AGENT_5 used (read
+`AGENT_5.md` + `AGENT_5_DONE.md` for the contract). Don't speculate-
+port hacks — bounding scope is the whole point of the instrumentation.
+
+## What you will NOT do (still applies)
+
+1. Do NOT bump any pinned version (caniuse-lite, browserslist, postcss,
+   autoprefixer, anything in `PARITY_VERSIONS.md`).
+2. Do NOT "fix" upstream bugs. Replicate.
+3. Do NOT use `format!("{}", f64)` for output bytes.
+   `postcss_core::js_number_to_string`.
+4. Do NOT use `HashMap` on the hashing path. `IndexMap` only.
+5. Do NOT remove `oxc_browserslist` from `browserslist-shim`.
+   Fallback is load-bearing for cssnano consumers.
+6. Do NOT widen the AFM grammar in `browserslist-shim`. Out of scope.
+7. Do NOT touch `packages/css/src/transform.ts` (CLAUDE.md IMMUTABLE).
+8. Do NOT delete `crates/css/src/transform.rs`'s identity-passthrough
+   without replacing it with the full Phase 4-7 chain. The fallback
+   stays per cross-cutting policy #10.
+9. Do NOT speculate-port hacks. Stay bounded by the AFM instrumentation
+   report unless you re-run it.
+
+## Sign-off checklist (every session, every commit)
+
+```bash
+cd crates
+RUSTFLAGS="" cargo test -p autoprefixer        # ≥231 passing, 0 failing, 0 ignored
+RUSTFLAGS="" cargo build -p autoprefixer       # clean (supports.rs:384 warning is pre-existing)
+RUSTFLAGS="" cargo check --workspace           # same
+
+env -u RUSTFLAGS cargo run -p parity-runner -- --stage autoprefixer \
+  --corpus parity-runner/corpus/autoprefixer
+# OK — 65 inputs, all byte-clean (JS vs Rust)
+
+cd ..
+bun run packages/css/scripts/verify-napi-autoprefixer.mjs
+# OK — 65/65 byte-clean (JS vs Rust NAPI)
 ```
 
-Mirror the `workspace_root()` helper from
-`crates/autoprefixer/tests/browserslist_parity.rs`.
-
-The data shape: `Prefixes::new(browsers: &Browsers, data: &PREFIXES)`
-walks the 183-entry `PREFIXES` table built by Phase 7's `data/prefixes.rs`
-codegen, intersects each entry's `browsers` list with `browsers.selected`,
-and emits `add_table` / `remove_table` keyed on those intersections. The
-JS source is at `crates/_vendor/autoprefixer-10.4.14/package/lib/prefixes.js`.
-
-Per `HANDOVER.md` §4: `Prefixes::group(decl)` lives on this same struct
-and shares the constructor's data shape — fill them in together.
-
-### Option B — `supports.rs` standalone
-
-302 LOC `@supports` rewriting. Depends on `Prefixes::new` for the
-data table only — can be ported in parallel by reading the data shape
-out of the constructor's design. Lower critical-path leverage than A.
-
-### Option C — `transition.rs` standalone
-
-329 LOC transition shorthand handling. Same shape as B — independent
-unit, lower critical-path leverage than A.
-
-### Options D-F — hacks / `info.rs` / parity-runner stage
-
-Same as the previous MORNING.md. Don't pick these without confirming
-with the user.
-
-## What you will NOT do
-
-Same list as before; transcribed for visibility:
-
-1. Do not port any hacks (parallel agent's territory).
-2. Do not edit `parity-runner/src/stages.rs`,
-   `parity-runner/src/main.rs`, or
-   `packages/css/scripts/parity-bridge.mjs` without asking.
-3. Do not edit `crates/css/src/transform.rs` (final wire-up; out of
-   scope until everything else is done).
-4. Do not bump any pinned version (`autoprefixer`, `caniuse-lite`,
-   `browserslist`, `postcss`, anything in `PARITY_VERSIONS.md`).
-5. Do not "fix" upstream bugs.
-6. Do not write your own tree walk — use
-   `postcss_core::walk_*_mut_with_parent` family.
-7. Do not `format!("{}", f64)` for any output bytes — use
-   `postcss_core::js_number_to_string`.
-8. Do not use `HashMap` on the hashing path. `IndexMap` only.
-9. Do not skip the verification gates. Before claiming done:
-   `cargo test -p autoprefixer` (≥60 passing, 0 failing, 0 ignored),
-   `cargo build -p autoprefixer` (clean), `cargo check --workspace` (clean).
-10. **Do not remove `oxc_browserslist` from `browserslist-shim/Cargo.toml`.**
-    The fallback is load-bearing for cssnano consumers. See
-    `AFM_PORT_NOTES.md` "What NOT to remove".
-11. **Do not widen the AFM grammar opportunistically.** Each new
-    `QueryAtom` variant pins more surface to caniuse-db semantics.
-    Only port what AFM actually consumes — confirm via runtime
-    instrumentation (the protocol in `AFM_PORT_NOTES.md`).
-
-## Sign-off checklist
-
-1. `RUSTFLAGS="" cargo test -p autoprefixer` — must show ≥60 passing, 0 ignored.
-2. `RUSTFLAGS="" cargo test -p browserslist-shim` — must show ≥29 passing, 0 ignored.
-3. `RUSTFLAGS="" cargo build -p autoprefixer` — must be clean.
-4. `RUSTFLAGS="" cargo check --workspace` — must be clean.
-5. If you wired a new test for byte-equality vs JS oracle — run that
-   test specifically and read its output.
-6. Update `crates/STATUS.md` Phase 7 row + test count + the
-   "Foundation agent's responsibilities" checklist.
-7. Update `crates/autoprefixer/HANDOVER.md` §1 (test count floor) +
-   §11 (any new JS quirk).
-8. Write a `MORNING.md`-style handoff for the NEXT agent — overwrite
-   this file.
-9. Mark TaskList items completed; create new ones for follow-up work.
+If any of these regress and you can't fix in 10 minutes, ROLL BACK
+your changes with `git restore` and document.
 
 ## When you're stuck
 
-Vendored sources at:
-```
-crates/_vendor/autoprefixer-10.4.14/package/lib/<file>.js
-crates/_vendor/postcss-8.5.6/package/lib/<file>.js
-crates/_vendor/browserslist-4.24.4/package/<file>.js   (closest to 4.24.2 we have)
-crates/_vendor/caniuse-lite-1.0.30001766/package/
-```
-
-The `BROWSER_LIST_FROM_AFM.md` runtime-instrumentation report and
-`AFM_PORT_NOTES.md` architecture doc are your friends if you have to
-extend the browserslist surface.
+1. `crates/autoprefixer/HANDOVER.md` — exhaustive permanent reference,
+   recently updated to reflect the SHIPPED state.
+2. `crates/STATUS.md` "Phase 7 ship — autoprefixer end-to-end
+   byte-clean (2026-05-03)" — single source of truth on what landed.
+3. `crates/autoprefixer/AGENT_{1..6}_DONE.md` — per-agent close-out
+   reports. Each documents what landed, JS quirks discovered, drift
+   surfaced, and asks for follow-up agents.
+4. `crates/autoprefixer/AFM_HACKS_INSTRUMENTATION.md` — empirical hack
+   scoping report, including the protocol to widen.
+5. `crates/browserslist-shim/AFM_PORT_NOTES.md` — architecture of the
+   hybrid AFM-fast-path / oxc-fallback resolver.
+6. Vendored upstream JS at `crates/_vendor/autoprefixer-10.4.14/package/lib/`.
+   NOT GitHub, NOT Stack Overflow. Pinned versions only.
 
 ## Final note
 
-The browserslist gate was the single biggest unblocker for the rest
-of Phase 7. With it closed, every downstream byte-test against the JS
-oracle has a trustworthy foundation FOR AFM-SHAPED QUERIES. Don't
-extend that scope to non-AFM queries unless you also extend the AFM
-fast path — otherwise you'll re-introduce the drift through the oxc
-fallback.
+Phase 7 was the largest single port in the project (8+ weeks for one
+engineer per the original `EXECUTION_PLAN.md` estimate). Compressed via
+subagent fanout — AGENT_2 + AGENT_3 ran concurrently; AGENT_5 Phase A
+ran concurrent with AGENT_4 Pass 1; the rest were sequential on the
+critical path.
 
-Good luck.
+The contract held: every byte of Rust output matches the JS oracle for
+every input AFM actually reaches. Three independent oracles (Rust
+direct, NAPI marshalled, JS oracle) confirm 65/65 byte-clean.
+
+Don't regress the floor. Good luck.

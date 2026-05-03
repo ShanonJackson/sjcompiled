@@ -1,9 +1,11 @@
 //! crates/compiled-css-napi
 //!
 //! NAPI bridge exposing the Rust `sort()` orchestrator from `crates/css`
-//! to Node/Bun. Phase 8a per `crates/EXECUTION_PLAN.md`.
+//! and the autoprefixer port from `crates/autoprefixer` to Node/Bun.
+//! Phase 8a (sort) + Phase 8b (autoprefixer) per
+//! `crates/EXECUTION_PLAN.md`.
 //!
-//! ## Surface (Phase 8a — sort only)
+//! ## Surface
 //!
 //! ```ts
 //! export interface SortOpts {
@@ -11,9 +13,17 @@
 //!   sortShorthandEnabled?: boolean;
 //! }
 //! export function sort(stylesheet: string, opts?: SortOpts | null): string;
-//! ```
 //!
-//! `transformCss` follows in Phase 8b once Phase 5/6/7 plugin ports land.
+//! export interface AutoprefixerOpts {
+//!   /// Mirrors `result.opts.from` from postcss — autoprefixer reads
+//!   /// `path.dirname(from)` and passes it to browserslist's `path`
+//!   /// option for the directory walk-up. Pass an absolute file path
+//!   /// inside the directory whose `.browserslistrc` should be picked
+//!   /// up. AFM passes the source `.css` path here in production.
+//!   from?: string;
+//! }
+//! export function autoprefixer(stylesheet: string, opts?: AutoprefixerOpts | null): string;
+//! ```
 //!
 //! ## Why a separate crate?
 //!
@@ -32,6 +42,9 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
 use ::css::sort::{sort as rust_sort, SortOpts as RustSortOpts};
+use ::autoprefixer::autoprefixer::build_prefixes_default;
+use ::autoprefixer::processor::Processor as AutoprefixerProcessor;
+use ::postcss_core::{parse as postcss_parse, stringify as postcss_stringify};
 
 /// JS-shaped sort options. `undefined`/missing → `None`, mirroring the
 /// `undefined`-default semantics in `packages/css/src/sort.ts:18-26`
@@ -55,4 +68,38 @@ pub fn sort(stylesheet: String, opts: Option<SortOpts>) -> Result<String> {
         None => RustSortOpts::default(),
     };
     rust_sort(&stylesheet, &rust_opts).map_err(|e| Error::from_reason(e))
+}
+
+/// JS-shaped autoprefixer options. `from` mirrors postcss's
+/// `result.opts.from`. AFM passes the source `.css` file path so
+/// autoprefixer's internal `browserslist(reqs, { path: dirname(from) })`
+/// walks up to the project's pinned `.browserslistrc`. The Rust port
+/// threads the same value into `BrowsersOptions::from`.
+#[napi(object)]
+pub struct AutoprefixerOpts {
+    pub from: Option<String>,
+}
+
+/// `autoprefixer(stylesheet, opts?)` — byte-for-byte port of
+/// `autoprefixer()` from `autoprefixer@10.4.14`. Mirrors
+/// `autoprefixer.js`'s `OnceExit` hook: `prefixes.processor.remove(root)`
+/// then `prefixes.processor.add(root)`. Output is parity-tested via the
+/// `Stage::Autoprefixer` corpus in `crates/parity-runner/`.
+///
+/// `opts.from` is passed to `build_prefixes_default` which threads it
+/// through `BrowsersOptions::from`. When `None`, browserslist resolves
+/// from `std::env::current_dir()` matching `browserslist@4.24.2`'s
+/// `prepareOpts` defaulting (HANDOVER.md §6).
+#[napi]
+pub fn autoprefixer(stylesheet: String, opts: Option<AutoprefixerOpts>) -> Result<String> {
+    let from = opts.and_then(|o| o.from);
+    let mut root = postcss_parse(&stylesheet)
+        .map_err(|e| Error::from_reason(format!("parse error: {e}")))?;
+    let prefixes = build_prefixes_default(from)
+        .map_err(|e| Error::from_reason(format!("autoprefixer build error: {e}")))?;
+    let proc = AutoprefixerProcessor::new(&prefixes);
+    let mut warnings: Vec<String> = Vec::new();
+    proc.remove(&mut root.root, &mut warnings);
+    proc.add(&mut root.root, &mut warnings);
+    Ok(postcss_stringify(&root))
 }

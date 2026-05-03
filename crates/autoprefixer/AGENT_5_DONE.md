@@ -1,6 +1,8 @@
 # AGENT_5 — Done
 
-Two phases of `AGENT_5.md` landed in one session.
+Two phases of `AGENT_5.md` landed in one session. **Pass C
+(hack-dispatch wiring) landed later — see the addendum at the bottom.
+65/65 corpus byte-clean; AGENT_6 unblocked for NAPI.**
 
 ## Phase A — AFM hack instrumentation report
 
@@ -266,3 +268,180 @@ $ RUSTFLAGS="" cargo check --workspace            # clean
 ---
 
 ONE unit (Phase A then Phase B). 0 → 100% on what was takeable. Stop.
+
+---
+
+# Pass C — hack-dispatch wiring (post-AGENT_4 Pass 2)
+
+## Headline
+
+`cargo run -p parity-runner -- --stage autoprefixer --corpus parity-runner/corpus/autoprefixer`
+→ **`OK — 65 inputs, all byte-clean (JS vs Rust)`**.
+
+The 6 failing entries flagged by AGENT_6 (030, 033, 035, 064, 065, 068)
+all turned green from a single change — wiring `HackRegistry::lookup`
+into `Prefixes::preprocess()`. The Pass B hack ports were correct as
+written; the dispatch path was just routing past them to the base
+classes.
+
+## Test floor
+
+`cargo test -p autoprefixer`:
+
+- **Pre-Pass-C:** 231 passing (198 lib + 3 + 4 + 26), 0 failing, 0 ignored.
+- **Post-Pass-C:** **231 passing**, 0 failing, 0 ignored. No tests added
+  — the parity-runner corpus IS the new test surface, and it carries
+  6 fixtures (030, 033, 035, 064, 065, 068) that exercise the wired
+  dispatch end-to-end. Adding redundant unit tests would have
+  duplicated coverage; the existing 31 hack-unit tests already cover
+  the pure functions.
+
+`cargo build --workspace` clean. `cargo check --workspace` clean. (One
+pre-existing `supports.rs:384` `for_loops_over_fallibles` warning is
+AGENT_2 territory — left alone per Pass C briefing.)
+
+## Files changed
+
+| File | Change |
+|---|---|
+| `crates/autoprefixer/src/prefixes.rs` | Added `DeclPrefixer` and `ValuePrefixer` enum types (each with a `Base` variant + one variant per registered hack class). `AddBucket::Declaration` and `AddBucket::Values` now carry these wrappers instead of bare `DeclarationBase` / `ValueBase`. Added `load_decl(name, prefixes)` and `load_value(name, prefixes)` factory functions that consult `HackRegistry::lookup` to pick the variant. Added `DeclPrefixer::process` (re-implements the Declaration.process + Prefixer.process chain calling hack `check`/`add`/`insert`/`set` overrides) and `ValuePrefixer::check`/`add` (calling hack `check`/`replace`/`add` overrides). Wired `Prefixes::preprocess()` to call `load_value` / `load_decl` instead of constructing bare bases. |
+| `crates/autoprefixer/AGENT_5_DONE.md` | This addendum. |
+
+**No edits to** `processor.rs`, `declaration.rs`, `value.rs`,
+`prefixer.rs`, any other base-class file, the parity-runner crate, or
+the JS bridge. Held to the briefing's "MUST NOT" list.
+
+## Per-drift summary
+
+### Drift C — TextDecorationSkipInk + TextDecoration
+
+**Before:** corpus 030 / 065 produced `-webkit-text-decoration-skip-ink: auto`
+(base `set` just renames the prop) and `-webkit-text-decoration: underline`
+(base `check` always returns true → prefix added even for "basic"
+single-keyword values).
+
+**After:** dispatch routes `text-decoration-skip-ink` through
+`TextDecorationSkipInk::set` → emits `-webkit-text-decoration-skip: ink`
+(prop+value rename). And dispatch routes `text-decoration` through
+`TextDecoration::check` → returns false for single-keyword basic
+values → no prefix added.
+
+**Fix shape:** the Pass B `TextDecorationSkipInk::set` and
+`TextDecoration::check` were correct from the start. The dispatch
+wiring made them fire.
+
+### Drift D — Intrinsic stretch / fill-available
+
+**Before:** corpus 033 / 068 produced `-webkit-stretch` / `-moz-stretch`
+(base `Value.replace` just prepends the prefix). JS oracle wants
+`-webkit-fill-available` / `-moz-available` because old Safari/Firefox
+shipped these alias names instead.
+
+**After:** dispatch routes `stretch` (and `fill` / `fill-available`)
+through `Intrinsic::add`, which uses `Intrinsic::replace`'s
+`isStretch`-gated alias remap. Output now matches JS byte-for-byte.
+
+**Fix shape:** Pass B `Intrinsic::replace` already had the alias
+table. The dispatch wiring made it fire. Note that `Intrinsic::add`
+re-implements ValueBase's `replace` loop locally (because
+`ValueBase::add` calls `self.replace` which would resolve to the BASE
+replace, not the override) — Pass B already did this; the wrapper now
+correctly routes to `Intrinsic::add` instead of base.
+
+### Drift E — CrossFade 4-arg form
+
+**Before:** corpus 035 / 064 produced `-webkit-cross-fade(url('a.png'), url('b.png'), 50%)`
+(base `Value.replace` just prepends prefix to the value name). JS
+oracle wants `-webkit-cross-fade('a.png'), url('b.png'), 50%, 50%)`
+(the buggy 4-arg legacy WebKit form documented in Pass B JS-quirks #2
+and #3).
+
+**After:** dispatch routes through `CrossFade::replace`, which
+performs the `args.slice(match[0].length)` chop and percent
+duplication exactly as the JS source does. Output matches the JS
+oracle, including the byte-equal "broken" syntax.
+
+**Side note** on space normalisation: `CrossFade::replace` initially
+emits a string with a double-space (because the percent regex match
+includes a leading space — `match[0] = " 50%"` length 4 — and the JS
+template literal `, ${match[0]}` inserts that double-space verbatim).
+The `Value.add` outer loop calls `replace` again on the result;
+`postcss_core::list::space` (called by `CrossFade::replace`) splits on
+runs of whitespace and joins back with single space, collapsing the
+double space. This matches JS behaviour exactly — verified empirically
+via `_phase_a_scratch/probe5_crossfade.mjs`.
+
+## Where the dispatch lives
+
+In `prefixes.rs::preprocess()`. Two new factory functions
+(`load_decl` / `load_value`) consult `HackRegistry::lookup(bucket, name)`
+and dispatch to `match entry.class_name` arms that construct the
+appropriate hack-routed wrapper variant. The `class_name` string
+field already existed on `HackEntry` (AGENT_5 Pass B used it for
+diagnostics); Pass C lifts it to load-time dispatch via a string-match.
+
+This is the "alternative: enum-dispatch on HackBucket + name string"
+shape from the briefing's decision-1, NOT the `load: fn(...)` factory
+pointer extension. Reasoning:
+- The set of hacks is closed (5 total, all known at compile time).
+  Adding a function pointer to `HackEntry` adds runtime indirection
+  and a `'static` lifetime constraint for no real benefit when the
+  match arm fits in 5 lines.
+- The string-match dispatch keeps `HackEntry`'s shape unchanged — no
+  knock-on edits to AGENT_4's pre-existing registry-consumer code.
+- All 5 hack class names are spelled exactly once (in the `match`
+  arm); the registration site uses the same `CLASS_NAME` constants
+  the hack types own, so a typo would surface as an immediate
+  "unreachable variant" issue rather than a silent route-to-base.
+
+The wrapper enums (`DeclPrefixer` / `ValuePrefixer`) implement
+`std::ops::Deref` to the underlying base, so `processor.rs`'s field
+access patterns (`v.prefixer.prefixes.clone()`,
+`values.iter().map(|v| v.prefixer.name.clone())`) compile unchanged.
+The dispatch methods (`process`, `check`, `add`) shadow the
+`Deref::Target` blanket because direct method-name lookup on the
+wrapper outranks Deref-resolution.
+
+## UserSelect.insert latent bug — STATUS
+
+Pass B's `AGENT_5_DONE.md` "Base-class methods I wished existed but
+didn't add" flagged that `DeclarationBase::insert` calls `self.set`
+(the base set, not the hack's overridden set), so `UserSelect::set`'s
+`-ms-/contain → element` branch wouldn't fire via the insert path.
+
+Pass C **fixes this for free**: `DeclPrefixer::insert_with_hack_set`
+re-implements the insert logic and calls `self.hack_set(cloned, prefix)`
+instead of `base.set(cloned, prefix)`. So `UserSelect::set`'s rename
+NOW fires through both the direct `set` call AND the `insert → set`
+call path. AFM doesn't exercise this (no `-ms-`), so the fix is latent
+in scope; but the bug is no longer a bug.
+
+The same wrapper pattern means TextDecorationSkipInk's `set` also
+fires through the insert path — directly observable in corpus 030 /
+065 going green.
+
+## Confirm AGENT_6 unblocked for NAPI wire-in
+
+**Yes.** `cargo run -p parity-runner -- --stage autoprefixer
+--corpus parity-runner/corpus/autoprefixer` reports
+`OK — 65 inputs, all byte-clean (JS vs Rust)`. Every fixture in the
+65-entry corpus produces byte-identical output to the JS oracle.
+AGENT_6 can now wire the NAPI bridge into `transform.rs` against a
+provably correct engine.
+
+## Sign-off gates (Pass C)
+
+```
+cd crates
+RUSTFLAGS="" cargo test -p autoprefixer        # 231 passing, 0 failing, 0 ignored
+RUSTFLAGS="" cargo build --workspace           # clean (supports.rs:384 warning is pre-existing)
+RUSTFLAGS="" cargo check --workspace           # clean
+env -u RUSTFLAGS cargo run -p parity-runner -- --stage autoprefixer \
+  --corpus parity-runner/corpus/autoprefixer
+# → OK — 65 inputs, all byte-clean (JS vs Rust)
+```
+
+All four green. No regressions, no skipped corpus entries.
+
+ONE unit (the dispatch wiring + the 3 drift fixes that flowed from it).
+0 → 100%. Stop.

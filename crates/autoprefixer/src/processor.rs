@@ -1068,6 +1068,30 @@ block, not to the next rules."
 
         // JS line 385-396: second walkDecls — disabled-value gate +
         // value-pass + `Value::save`.
+        //
+        // **Cursor-shift bug fix (Drift A from AGENT_6):** previously
+        // this callback called `value_save` which used
+        // `insert_before_at_path` directly. The walker then re-visited
+        // the original decl (cursor stayed at the same logical
+        // position despite the inserted clone shifting it forward),
+        // re-firing `v.add` (which read stale `_autoprefixerValues`
+        // cache) and `value_save` (which produced ANOTHER clone).
+        // Result: unbounded loop on `width: fit-content`-style inputs;
+        // 13-19GB allocation before OOM.
+        //
+        // Fix: collect clones from `value_save` and return them via
+        // `DeferredMutation::InsertBefore(clones)`. The walker bumps
+        // cursor by `len + 1` past inserts, so the original is NOT
+        // re-visited. Mirrors JS postcss `each` behaviour where
+        // `handleInsert` bumps `indexes[id]` past the cloneBefore
+        // insertion site.
+        //
+        // The in-place mutation case (`prefixed === prop`) — when the
+        // decl is already vendor-prefixed and `Value.save` updates
+        // `decl.value` in place — applies BEFORE the cursor advance.
+        // Re-visits of mutated-in-place decls are filtered by the JS
+        // regex check (`(^|[\s,(])(name($|[\s(,]))` doesn't match
+        // already-prefixed forms), so re-firing is naturally inert.
         walk_decls_mut_with_parent(root, |r, path, _ctx| {
             if self.disabled_value(r, path, warnings) {
                 return DeferredMutation::Keep;
@@ -1083,9 +1107,9 @@ block, not to the next rules."
             let unprefixed = self.prefixes.unprefixed_prop(&prop);
 
             // JS line 389-394: iterate `prefixes.values('add', unprefixed)`,
-            // calling `value.process(decl)` for each. We dispatch
-            // through `add[unprefixed]` (Values or Declaration with
-            // attached values).
+            // calling `value.process(decl)` for each. Stores prefixed
+            // forms into `decl.attrs[ATTR_VALUES]` for `value_save` to
+            // flush.
             let value_count = match self
                 .prefixes
                 .add
@@ -1107,17 +1131,11 @@ block, not to the next rules."
                     _ => None,
                 };
                 if let Some(v) = v {
-                    // ValueBase doesn't have a `process(decl, result)`
-                    // method — it has `add(decl, prefix)`. The JS
-                    // `value.process(decl)` iterates the value's
-                    // prefixes and calls `add` per prefix; replicate
-                    // that loop inline.
                     let prefixes_for_v = v.prefixer.prefixes.clone();
                     let here = match node_at_path_mut(r, path) {
                         Some(n) => n,
                         None => break,
                     };
-                    // `check(decl)` — JS gate before any add fires.
                     if !v.check(here) {
                         continue;
                     }
@@ -1127,17 +1145,41 @@ block, not to the next rules."
                 }
             }
 
-            // JS line 395: `Value.save(this.prefixes, decl)`.
-            value_save(self.prefixes, r, path);
-
-            DeferredMutation::Keep
+            // JS line 395: `Value.save(this.prefixes, decl)`. Returns
+            // the clones to insert; in-place value mutations have
+            // already been applied. Clear the per-decl
+            // `_autoprefixerValues` cache so a subsequent walker pass
+            // (e.g., a different walk over the same tree) doesn't
+            // re-flush.
+            let clones = value_save_collect(self.prefixes, r, path);
+            if let Some(here) = node_at_path_mut(r, path) {
+                here.attrs.remove(crate::value::ATTR_VALUES);
+            }
+            if clones.is_empty() {
+                DeferredMutation::Keep
+            } else {
+                DeferredMutation::InsertBefore(clones)
+            }
         });
     }
 
     /// JS: `remove(css, result)` — `processor.js` lines 402-485.
     ///
-    /// The `remove` pass uses `prefixes.cleaner()` (a `Prefixes` keyed
-    /// by an empty browser list — every prefix is treated as stale).
+    /// **Drift B fix (corpus 051):** previously this pass used
+    /// `prefixes.cleaner()` (a `Prefixes` keyed by an empty browser
+    /// list — every prefix is treated as stale). JS does NOT use
+    /// `cleaner` here — it reads `this.prefixes.remove` (the USER's
+    /// remove table), which contains only the prefixes that aren't
+    /// needed by the user's selected browsers. For AFM, `-webkit-`
+    /// for user-select is still needed (some Safari/Chrome), so JS
+    /// keeps it; my prior code dropped it via `cleaner`'s "all
+    /// prefixes are stale" semantics, then the next add-pass fired
+    /// cascade-align on the now-orphaned bare prop, padding 8 spaces.
+    ///
+    /// `cleaner` is a JS-side method on `Prefixes` (still ported, but
+    /// unused by the processor walks; reserved for future test/tooling
+    /// callers).
+    ///
     /// JS dispatches three sub-passes:
     /// 1. `walkAtRules` — drop at-rules whose name matches a
     ///    `remove[@<prefix><name>]` marker; clean resolution params.
@@ -1146,7 +1188,9 @@ block, not to the next rules."
     /// 3. `walkDecls` — drop decls whose prop matches a remove marker
     ///    (with cascade/raw-before adjustments).
     pub fn remove(&self, root: &mut Node, warnings: &mut Vec<String>) {
-        let cleaner = self.prefixes.cleaner();
+        // Use `self.prefixes` (the user's), NOT `self.prefixes.cleaner()`.
+        // JS lines 404, 407, 421, 444 all read `this.prefixes.remove`.
+        let cleaner = self.prefixes;
 
         // JS line 406-418: walkAtRules.
         let has_resolution = cleaner
@@ -1397,6 +1441,16 @@ block, not to the next rules."
 /// - the original decl's `value` (for prefixes that DO equal the decl's
 ///   own prop, i.e. the unprefixed version when the decl IS unprefixed).
 ///
+/// **Refactor (Pass 2 + Drift A fix):** the function APPLIES the
+/// in-place value mutation directly on `root` but RETURNS the clones
+/// to insert (instead of inserting them via
+/// `insert_before_at_path`). The caller is the walkDecls value-pass
+/// which returns `DeferredMutation::InsertBefore(clones)` so the
+/// walker bumps cursor past them — this is the JS-equivalent
+/// behaviour (postcss `each` bumps `indexes[id]` on cloneBefore via
+/// `handleInsert`). Without this split, the walker re-visits the
+/// original and re-fires the loop unboundedly.
+///
 /// JS body:
 /// ```js
 /// static save(prefixes, decl) {
@@ -1420,12 +1474,11 @@ block, not to the next rules."
 ///   return result
 /// }
 /// ```
-fn value_save(prefixes: &Prefixes, root: &mut Node, path: &[usize]) {
-    static VENDOR_RE: once_cell::sync::Lazy<Regex> =
-        once_cell::sync::Lazy::new(|| {
-            Regex::new(r"-(o|moz|ms|webkit|khtml)-").unwrap()
-        });
-
+fn value_save_collect(
+    prefixes: &Prefixes,
+    root: &mut Node,
+    path: &[usize],
+) -> Vec<Node> {
     // Snapshot the values map and the decl's own prop / value.
     let (prop, decl_value, values_map) = match node_at_path(root, path) {
         Some(n) => match &n.kind {
@@ -1437,35 +1490,44 @@ fn value_save(prefixes: &Prefixes, root: &mut Node, path: &[usize]) {
                     .cloned()
                     .unwrap_or_default(),
             ),
-            _ => return,
+            _ => return Vec::new(),
         },
-        None => return,
+        None => return Vec::new(),
     };
 
     if values_map.is_empty() {
-        return;
+        return Vec::new();
     }
 
-    // Track whether we're modifying the original (so subsequent prefix
-    // entries see the updated decl.value when comparing against `value
-    // === decl.value`).
+    static WS_RE: once_cell::sync::Lazy<Regex> =
+        once_cell::sync::Lazy::new(|| Regex::new(r"\s+").unwrap());
+
     let mut current_decl_value = decl_value.clone();
-    // Path of the original decl (shifts up by 1 for each cloneBefore
-    // we apply — same cursor-shift pattern as `at_rule.rs::process`).
-    let mut current_path = path.to_vec();
+    let mut clones: Vec<Node> = Vec::new();
+
+    // JS line 22: `let propPrefix = vendor.prefix(prop)`.
+    let prop_prefix = crate::vendor::prefix(&prop);
 
     for (prefix, value) in values_map.iter() {
         if value == &current_decl_value {
             continue;
         }
-        let prefixed = if VENDOR_RE.is_match(&prop) {
-            prop.clone()
-        } else {
-            prefixes.prefixed(&prop, prefix)
-        };
-        if prefixed == prop {
-            // JS: `decl.value = value` — modify original in place.
-            if let Some(here) = node_at_path_mut(root, &current_path) {
+
+        // JS line 24: `if (propPrefix === '-pie-') continue`.
+        if prop_prefix == "-pie-" {
+            continue;
+        }
+
+        // JS line 28-32: `if (propPrefix === prefix) { decl.value = value; ... }`.
+        // The decl's own vendor prefix matches the current prefix
+        // we're flushing → mutate in-place. (Used when the decl is
+        // already prefixed AND its value picked up a value-prefixer
+        // for the same vendor.) Index doesn't shift; the walker's
+        // natural Keep behaviour would re-visit this decl, but
+        // `Value::check`'s regex doesn't match already-prefixed
+        // values, so re-firing is inert.
+        if prop_prefix == *prefix {
+            if let Some(here) = node_at_path_mut(root, path) {
                 if let NodeKind::Declaration(ref mut d) = here.kind {
                     d.value = value.clone();
                     current_decl_value = value.clone();
@@ -1474,34 +1536,64 @@ fn value_save(prefixes: &Prefixes, root: &mut Node, path: &[usize]) {
             continue;
         }
 
-        // JS: `let cloned = decl.cloneBefore({ value })`. JS
-        // cloneBefore inserts a NEW decl before this one and copies
-        // ALL fields except those overridden in the second arg.
-        let original = match node_at_path(root, &current_path) {
+        // JS line 34: `let prefixed = prefixes.prefixed(prop, prefix)`.
+        // Used ONLY for the sibling-presence check below — does NOT
+        // become the cloned decl's prop (the clone keeps the ORIGINAL
+        // prop). This was the Drift A residue: prior version set
+        // `cloned.prop = prefixed`, producing `-moz-width: -moz-fit-content`
+        // where JS produces `width: -moz-fit-content`.
+        let prefixed = prefixes.prefixed(&prop, prefix);
+
+        // JS line 37-40: `if (!rule.every(i => i.prop !== prefixed)) continue`.
+        // Any sibling already carries the prefixed prop → skip.
+        let parent_kids = match postcss_core::parent_nodes(root, path) {
+            Some(p) => p,
+            None => return clones,
+        };
+        let prefixed_prop_exists =
+            parent_kids.iter().any(|sib| match &sib.kind {
+                NodeKind::Declaration(d) => d.prop == prefixed,
+                _ => false,
+            });
+        if prefixed_prop_exists {
+            continue;
+        }
+
+        // JS line 42-45: `let trimmed = value.replace(/\s+/, ' ')`
+        // — JS's String.prototype.replace WITHOUT global flag only
+        // replaces the FIRST whitespace run. Mirror with a
+        // `replacen(1, ...)`-equivalent via `Regex::replace` (regex
+        // crate's `replace` without `_all` is single-replacement).
+        let trimmed = WS_RE.replace(value, " ").into_owned();
+        let already_same_prop_same_value =
+            parent_kids.iter().any(|sib| match &sib.kind {
+                NodeKind::Declaration(d) => {
+                    d.prop == prop
+                        && WS_RE.replace(&d.value, " ").into_owned() == trimmed
+                }
+                _ => false,
+            });
+        if already_same_prop_same_value {
+            continue;
+        }
+
+        // JS line 52: `let cloned = this.clone(decl, { value })`.
+        // JS's static clone (Prefixer.prototype.clone) does a deep
+        // clone with the autoprefixer-internal attr keys stripped
+        // (CLONE_STRIP_KEYS), then overrides `value` from the
+        // overrides arg. NOTE: prop is NOT touched.
+        let original = match node_at_path(root, path) {
             Some(n) => n,
-            None => return,
+            None => return clones,
         };
         let mut cloned = crate::prefixer::clone_node(original);
         if let NodeKind::Declaration(ref mut d) = cloned.kind {
             d.value = value.clone();
         }
-        // JS line: `if (prefixed === decl.prop) ...` — JS doesn't set
-        // cloned.prop in that branch (the prefix matched the decl's
-        // own prop, so the value-replace branch above already fired).
-        // The else branch: `cloned.prop = prefixed`.
-        if prefixed != prop {
-            if let NodeKind::Declaration(ref mut d) = cloned.kind {
-                d.prop = prefixed.clone();
-            }
-        }
-        // JS: `decl.parent.insertBefore(decl, cloned)`. Cursor-shift:
-        // the original moves from `current_path[-1]` to
-        // `current_path[-1] + 1`.
-        postcss_core::insert_before_at_path(root, &current_path, cloned);
-        if let Some(last) = current_path.last_mut() {
-            *last += 1;
-        }
+        clones.push(cloned);
     }
+
+    clones
 }
 
 #[cfg(test)]
@@ -1967,6 +2059,58 @@ mod tests {
         );
         // Original :fullscreen still present.
         assert!(out.contains(":fullscreen"));
+    }
+
+    #[test]
+    fn drift_a_value_pass_terminates_on_fit_content() {
+        // Corpus 031 — `width: fit-content` exercised the value-pass
+        // walker bug: each insertBefore-via-value_save shifted the
+        // original up; the walker re-visited it, ATTR_VALUES cache
+        // re-fired value_save → unbounded clones. Pre-fix this
+        // allocated 13-19GB before OOM; post-fix the
+        // `DeferredMutation::InsertBefore` channel bumps the walker
+        // past the inserts.
+        //
+        // The test simply asserts the call TERMINATES with finite
+        // output. Byte-clean parity against JS oracle is verified by
+        // AGENT_6's parity-runner; this test only pins
+        // termination-and-bounded-output.
+        let input = ".x { width: fit-content; }\n";
+        let mut r = parse(input).unwrap();
+        let p = afm_prefixes();
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.add(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        // Output finite — no unbounded clones. At most a handful of
+        // siblings (one prefixed clone per prefix in the value list).
+        let occurrences = out.matches("fit-content").count();
+        assert!(
+            occurrences <= 8,
+            "value-pass produced unbounded clones: {} occurrences of \
+fit-content in output:\n{}",
+            occurrences,
+            out
+        );
+    }
+
+    #[test]
+    fn drift_b_already_prefixed_user_select_round_trips() {
+        // Corpus 051 — input has both prefixed and unprefixed siblings.
+        // JS (against AFM browsers — only -webkit- needed) leaves untouched
+        // because isAlready short-circuits add → no cascade fires.
+        // Rust must do the same; this regression-pins it.
+        // Mirrors the parity-runner stage: `proc.remove` then `proc.add`.
+        let input = ".x {\n  -webkit-user-select: none;\n  user-select: none;\n}\n.y {\n  user-select: none;\n  -webkit-user-select: none;\n}\n";
+        let mut r = parse(input).unwrap();
+        let p = afm_prefixes();
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.remove(&mut r.root, &mut warnings);
+        proc.add(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        // Bytes match input exactly — no cascade-align padding.
+        assert_eq!(out, input, "drift B: cascade fired on already-prefixed input");
     }
 
     #[test]

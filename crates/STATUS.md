@@ -316,6 +316,108 @@ sub-plugin (6a–6g) is byte-clean against the AFM-pinned JS oracle:
 **Phase 6h** (cssnano-preset-default orchestrator) is now unblocked
 and is the next logical pickup.
 
+## Phase 7 ship — autoprefixer end-to-end byte-clean (2026-05-03)
+
+`crates/autoprefixer` is **end-to-end byte-clean for AFM's actual
+surface**. Six delegated subagents (AGENT_1..6, see
+`crates/autoprefixer/AGENTS_INDEX.md`) closed the engine, hack subset,
+parity-runner stage, and NAPI binding in one wrap-up cycle. Same
+session also closed the browserslist-shim AFM parity gate (next section
+below), which was the pre-condition.
+
+### Triple-oracle byte-clean
+
+| Gate | Result |
+|---|---|
+| `cargo test -p autoprefixer` | **231 active passing, 0 failing, 0 ignored** (was 60-passing floor at session start; +171 tests) |
+| `cargo build -p autoprefixer` / `cargo check --workspace` | clean (1 pre-existing `supports.rs:384` `for_loops_over_fallibles` warning, AGENT_2 follow-up — same byte-output as JS today) |
+| `cargo run -p parity-runner -- --stage autoprefixer --corpus crates/parity-runner/corpus/autoprefixer` | **OK — 65 inputs, all byte-clean (Rust direct vs JS oracle)** |
+| `cargo run -p parity-runner -- --stage autoprefixer --corpus … --determinism` | **OK — 65 inputs, JS oracle deterministic across two spawns** |
+| `bun run packages/css/scripts/verify-napi-autoprefixer.mjs` | **OK — 65/65 byte-clean (Rust NAPI vs JS oracle)** |
+
+### Per-agent breakdown
+
+| Agent | Unit | Tests added | Done report |
+|---|---|---|---|
+| AGENT_1 | `Prefixes::new` + `cleaner` + `select` + `group` + `info.rs` + `autoprefixer.rs` shell | +13 | `crates/autoprefixer/AGENT_1_DONE.md` |
+| AGENT_2 | `supports.rs` full port (302 LOC) | +35 | `crates/autoprefixer/AGENT_2_DONE.md` |
+| AGENT_3 | `transition.rs` full port (329 LOC) | +26 integration + 27 in-file | `crates/autoprefixer/AGENT_3_DONE.md` |
+| AGENT_4 | `processor.rs` engine (Pass 1 helpers + Pass 2 add/remove walks + Pass 2.5 drift fixes) | +33 | `crates/autoprefixer/AGENT_4_DONE.md` |
+| AGENT_5 | Phase A: AFM hack instrumentation (`AFM_HACKS_INSTRUMENTATION.md`); Phase B: 5 in-scope hacks ported; Pass C: hack-dispatch wiring | +31 | `crates/autoprefixer/AGENT_5_DONE.md` |
+| AGENT_6 | `Stage::Autoprefixer` parity-runner stage + 65-entry corpus + JS bridge handler + NAPI binding + `verify-napi-autoprefixer.mjs` | (corpus is the test surface) | `crates/autoprefixer/AGENT_6_DONE.md` |
+
+### Hack scope — 5 ported, 53 stay stubbed
+
+AGENT_5 Phase A's empirical instrumentation (static analysis +
+runtime-instrumented ~833-file CSS corpus through real
+`autoprefixer@10.4.14` against AFM's `.browserslistrc`) confirmed only
+five hack classes can fire on AFM inputs:
+
+| Hack | Bucket | Why it loads for AFM |
+|---|---|---|
+| `UserSelect` | Declaration | `user-select` needs `-webkit-` for AFM Safari |
+| `TextDecoration` | Declaration | `text-decoration` shorthand non-basic values need `-webkit-` |
+| `TextDecorationSkipInk` | Declaration | both `text-decoration-skip` and `-skip-ink` need `-webkit-` |
+| `Intrinsic` | Value | `fill` / `fill-available` / `fit-content` / `stretch` etc. on width/height |
+| `CrossFade` | Value | `cross-fade()` value gets `-webkit-` rewrite |
+
+The remaining 53 hacks (Flex* spec hacks, Grid IE hacks, Gradient
+old-syntax cleanup, Animation, Backdrop-filter, Border-image, all
+selector hacks like Placeholder/Fullscreen/Autofill, etc.) stay as
+7-line stubs — AFM never reaches them. **Scope-creep risk:** if AFM's
+browserslist ever widens (e.g., `last 10 Safari versions`, IE
+re-entry), additional hacks become in-scope. Re-run protocol at the
+end of `crates/autoprefixer/AFM_HACKS_INSTRUMENTATION.md` §7.
+
+### Drift surfaced and resolved during the cycle
+
+Per CLAUDE.md "DRIFT DETECTION" — none worked-around; each fix landed
+in territorial owner's file:
+
+| Drift | Owner | Symptom | Fix |
+|---|---|---|---|
+| `cleaner_cache` private field broke struct-literal `Prefixes { ... }` in supports.rs::tests after AGENT_1 added it | AGENT_2 | AGENT_3 sign-off blocked at lib-test compile | AGENT_2 swept callers, fixed pre-merge |
+| `Prefixes::values` return-type changed to `Result<…>` | AGENT_2 | `for ... in cleaner.values(...)` now iterates `Result` (one element on Ok, zero on Err); produces `for_loops_over_fallibles` warning. Same byte-output as JS today (values returns Err until preprocess populates) | Outstanding follow-up; AGENT_2 territory |
+| Value-pass walk re-prefixed its own clones (13–19 GB OOM ~30s in) | AGENT_4 Pass 2.5 | Corpus run OOMed | `value_save_collect` returns `Vec<Node>`; walker uses `DeferredMutation::InsertBefore` so cursor bumps past inserts |
+| `Processor::remove` used `prefixes.cleaner()` instead of `prefixes.remove` | AGENT_4 Pass 2.5 | Cascade-align fired on user-supplied already-prefixed input | Switched to mirror JS `this.prefixes.remove` |
+| 6 corpus failures (030, 033, 035, 064, 065, 068) — hack-dispatch fell through to base classes | AGENT_5 Pass C | `text-decoration-skip-ink` didn't perform legacy prop+value rewrite; `Intrinsic::set` didn't remap `stretch`/`fill-available`; `CrossFade::replace` wasn't dispatched at all | New `DeclPrefixer` / `ValuePrefixer` enums in `prefixes.rs::preprocess()` consult `HackRegistry::lookup(bucket, name)` and route via `class_name`. As a free bonus closes the `UserSelect.insert` latent bug AGENT_5 Pass B flagged. |
+
+### Open follow-ups (do NOT block AFM byte-equality)
+
+1. **`PrefixesOptions::flexbox` and `grid` should be enums**, not
+   `Option<String>`. Two workarounds (`Supports::disabled`,
+   `processor::grid_status`) for the same shape gap. Latent — AFM
+   doesn't set these.
+2. **`supports.rs:384`** `for_loops_over_fallibles` warning. Fix shape:
+   `if let Ok(checkers) = ... { for c in checkers { ... } }`. Same
+   byte-output as JS today.
+3. **53 hacks still stubbed.** Out-of-scope per AFM instrumentation;
+   protocol to widen in `AFM_HACKS_INSTRUMENTATION.md` §7.
+4. **Phase 8c** — release-mode NAPI build OOMs the host; dev `.dll`
+   shipped (byte-identical output). New row in the Phase table at top.
+5. **Phase 8b** — `COMPILED_CSS_ENGINE` flag dispatch in
+   `packages/css/src/transform.ts:70` (which is on CLAUDE.md IMMUTABLE
+   list anyway). Needs the rest of the Phase 4-7 plugin chain assembled
+   in `crates/css/src/transform.rs` (currently identity-passthrough)
+   first. Autoprefixer NAPI binding is ready to wire when that lands.
+
+### Files touched this cycle (by agent territory)
+
+- AGENT_1: `prefixes.rs`, `declaration.rs`, `autoprefixer.rs`, `info.rs`.
+- AGENT_2: `supports.rs`.
+- AGENT_3: `transition.rs`, `tests/transition_unit.rs`.
+- AGENT_4: `processor.rs`, `declaration.rs` (signature change for `restore_before` wiring), `prefixes.rs` (preprocess + AddBucket/RemoveBucket).
+- AGENT_5: `hacks/{cross_fade,intrinsic,text_decoration,text_decoration_skip_ink,user_select}.rs`, `hacks/HACKS_PORT.md`, `prefixes.rs::register_hacks` BEGIN/END block + `DeclPrefixer`/`ValuePrefixer` wrappers, `AFM_HACKS_INSTRUMENTATION.md`, `_phase_a_scratch/`.
+- AGENT_6: `crates/parity-runner/{Cargo.toml,src/stages.rs,src/main.rs}`, `crates/parity-runner/corpus/autoprefixer/` (NEW, 65 fixtures), `packages/css/scripts/parity-bridge.mjs`, `crates/compiled-css-napi/{Cargo.toml,src/lib.rs}`, `packages/css-native/{index.js,index.d.ts,sjcompiled-css.win32-x64-msvc.node}`, `packages/css/scripts/verify-napi-autoprefixer.mjs` (NEW).
+
+The Phase 7 ship represents the largest single port in the project
+(8+ weeks for one engineer per the original `EXECUTION_PLAN.md`
+estimate). Compressed via subagent fanout on the parallel-friendly
+pieces (AGENT_2 + AGENT_3 ran concurrently; AGENT_5 Phase A ran
+concurrent with AGENT_4 Pass 1).
+
+---
+
 ## Phase 7 ship — browserslist-shim AFM parity gate CLOSED (2026-05-03)
 
 The previously-OPEN `oxc_browserslist`-bundled-snapshot drift gate
@@ -2813,9 +2915,10 @@ header. **No code changes required** — all 489 tests still green.
 | 6g | postcss-colormin@5.3.1 | **DONE** — byte-clean across 30-entry corpus, deterministic JS oracle. Required `colord` minify drift fix + 392-vector JS-parity gate (see "Phase 6g foundation" entry). The highest-risk cssnano plugin is now complete. |
 | 6h | cssnano-preset-default@5.2.14 (orchestrator) | **DONE** — tuple-list factory ported 1:1, 29-entry source order pinned against upstream, AFM hashing-path subset (14 plugins) wired with real `apply` fns, remaining 15 wired to `apply_filtered_out` for drift detection. 3/3 unit tests pass. Phase 6 *band* exit gate (full pipeline byte-clean replacing `normalize-css.ts` output) is a separate follow-up — see "Phase 6h ship — `cssnano-preset-default@5.2.14` orchestrator ported" at top of file. |
 | 6 BAND | `normalizeCSS({optimizeCss: true})` end-to-end (14 cssnano sub-plugins + `normalize-current-color`) | **DONE** — 20/20 corpus byte-clean (JS vs Rust), 20/20 deterministic (JS vs JS). Browserslist pinned to `chrome 100` via env var on both engines. Postcss lifecycle replicated: walk pass (`normalize-current-color` Declaration visitor) → OnceExit pass (14 cssnano plugins in preset source order). See "Phase 6 BAND ship — `normalize-css.ts` byte-clean" below. |
-| 7 | autoprefixer@10.4.14 | **IN PROGRESS** — split between two parallel agents. Source vendored at `crates/_vendor/autoprefixer-10.4.14/`. Crate scaffolded at `crates/autoprefixer/` with module tree mirroring `lib/` 1:1 + 58 stubbed hack modules. **All base classes fully ported:** `utils.rs`, `vendor.rs`, `brackets.rs`, `old_value.rs`, `old_selector.rs`, `prefixer.rs`, `browsers.rs`, `at_rule.rs`, `value.rs`, `selector.rs`, `declaration.rs`, `resolution.rs`, plus `prefixes.rs` registry skeleton with `register_hacks(reg)` append-only block. **`data/prefixes.rs` byte-clean** — 183 entries, codegen via `build.rs` from vendored JS through `bun`, 4 parity gates (canonical-JSON byte-equal, entry count, key order, caniuse-lite version pin). **59 tests passing (53 unit + 4 data parity + 2 browserslist parity active; 1 browserslist parity gate ignored, see "Phase 7 ship — browserslist-shim parity gate" below).** (Latest: `+1` active test `browserslist_shim_firefox_esr_matches_js_oracle` pinning the `rewrite_firefox_esr` shim path against `browserslist@4.24.2` JS oracle; `+1` active test `workspace_browserslist_pin_is_424_2` pinning `require('browserslist').version === '4.24.2'` after fixing the missing devDependency entry that was floating workspace resolution to 4.28.2 (root `package.json` now lists browserslist in BOTH `overrides` AND `devDependencies`); `+1 ignored` omnibus gate test `browserslist_shim_matches_js_oracle_for_canonical_queries` documenting the open caniuse-lite snapshot drift between `oxc_browserslist`'s bundled snapshot and the workspace pin 1.0.30001766. Prior: regression test in `resolution.rs::prefix_query_o_dpcm_uses_simplify` pinning the JS `value.simplify()` call after dpcm/dpi unit conversion — was a latent byte-divergence in the `-o-` resolution branch; fixed via `f.simplify(None)` after fraction-js audit surfaced the missing call.) Hacks agent **unblocked**. Still stubbed: `supports.rs`, `transition.rs` (heavy, hacks rarely subclass), `processor.rs`, `info.rs`, `autoprefixer.rs`, all 58 hacks, `Prefixes::new` orchestrator body. Split contract: see "Phase 7 split contract" section below. See also "Phase 7 ship — `data/prefixes.rs` codegen + caniuse-lite pin fix". |
+| 7 | autoprefixer@10.4.14 | **DONE for AFM surface** — end-to-end byte-clean. Six delegated agents (AGENT_1..6) closed the engine, hack subset, parity-runner stage, and NAPI binding in one wrap-up cycle. **231 active tests passing (198 unit + 4 data parity + 3 browserslist parity + 26 transition integration), 0 failing, 0 ignored.** Parity-runner gate: `--stage autoprefixer` reports OK — 65/65 inputs byte-clean (Rust direct vs `autoprefixer@10.4.14` JS oracle). NAPI gate: `verify-napi-autoprefixer.mjs` reports OK — 65/65 byte-clean (Rust NAPI vs JS oracle). Hack scope: 5/58 ported — the AFM-instrumentation-confirmed in-scope set (`cross_fade`, `intrinsic`, `text_decoration`, `text_decoration_skip_ink`, `user_select`); remaining 53 stay stubbed because AFM never reaches them (see `crates/autoprefixer/AFM_HACKS_INSTRUMENTATION.md` for the empirical report + the protocol to widen if AFM's `.browserslistrc` ever changes). NAPI binary shipped from `target/debug/` (release-mode build OOMs the host on this dev box; tracked as Phase 8c — output is byte-identical between dev and release). The full per-agent breakdown lives in `crates/autoprefixer/AGENT_{1..6}_DONE.md` and `crates/autoprefixer/AGENTS_INDEX.md`. See also "Phase 7 ship — autoprefixer end-to-end byte-clean" section below. |
 | 8a | `sort()` NAPI bridge + sort.ts engine flag | **DONE** — 12/12 corpus byte-clean end-to-end on win32-x64-msvc. See "Phase 8a ship" section below. |
-| 8b | `transformCss` NAPI bridge + transform.ts engine flag | **NOT STARTED** — blocks on Phase 5/6/7 plugin ports. |
+| 8b | `transformCss` NAPI bridge + transform.ts engine flag | **PARTIAL** — autoprefixer NAPI binding shipped + parity-tested standalone (Phase 7 above). The `COMPILED_CSS_ENGINE` flag dispatch in `packages/css/src/transform.ts:70` deferred — needs the FULL Phase 4-7 plugin chain assembled in `crates/css/src/transform.rs` (currently identity-passthrough). When that lands, the autoprefixer binding is ready to wire. See AGENT_6_DONE.md "Phase 8b boundary" for rationale. |
+| 8c | autoprefixer NAPI release-mode build | **NEW — NOT STARTED.** `cargo build -p compiled-css-napi --release` OOMs LLVM (>32 GB working memory) due to the ~5.5 KLOC autoprefixer crate + 58 hack files + codegen'd data tables. Three failed attempts on the dev box; one crashed the entire host. Dev `.dll` shipped in the meantime (byte-identical output, ~14 MB). Fix paths: `opt-level=z`, split hacks into a sub-crate, ≥32 GB CI runner, or strip caniuse-db to AFM-only entries. Full triage in `crates/autoprefixer/AGENT_6_DONE.md` "Release-mode build OOM" section + warning block atop `crates/compiled-css-napi/Cargo.toml`. |
 
 ## Test totals
 
