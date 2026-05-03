@@ -154,7 +154,8 @@ export function swcEngine(source: string, opts: StripRuntimeOpts, preBaked?: str
   //      scratch dir before the SWC call to scope writes there.
   //   2. `compiledRequireExclude=true` writes `<callScratch>/style-rules.json`.
   //      We mkdir the scratch dir under repo cwd; the plugin sees it
-  //      via the `/cwd/<rel>` mount.
+  //      via the `/cwd/<rel>` mount. Sidecar schema source of truth:
+  //      `plugins/SIDECAR_SCHEMA.md` §2 (`{version:1, rules:[...]}`).
   const fs = require('node:fs') as typeof import('node:fs');
   const path = require('node:path') as typeof import('node:path');
 
@@ -172,6 +173,10 @@ export function swcEngine(source: string, opts: StripRuntimeOpts, preBaked?: str
     process.chdir(ensureScratchDir());
   }
 
+  // The body executor is wrapped in try/finally so we always restore
+  // cwd, drain the call-scratch sidecar (when present), and remove
+  // the per-call dir. Babel's analogue is mock-fs in jest tests; here
+  // the writes are real, so cleanup matters or `_scratch` accumulates.
   let result;
   try {
     result = swcTransformSync(input, {
@@ -211,6 +216,18 @@ export function swcEngine(source: string, opts: StripRuntimeOpts, preBaked?: str
   } finally {
     if (previousCwd) {
       process.chdir(previousCwd);
+    }
+    if (callScratch) {
+      // PLAN.md §3.9.13.2 — host's `finally` block clears the per-call
+      // scratch. Sidecar contents (style-rules.json) have already been
+      // observed by the plugin's panic-or-write path; the harness
+      // doesn't drain them today (gate is JS-byte parity).
+      try {
+        fs.rmSync(callScratch, { recursive: true, force: true });
+      } catch {
+        // best-effort: the dir may not exist if the plugin bailed
+        // before mkdir; ignore.
+      }
     }
   }
 

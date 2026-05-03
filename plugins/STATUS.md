@@ -25,22 +25,31 @@
 
 ## Resume here
 
-**Next checkpoint:** §1.5 — sidecar handlers. Two distinct outputs:
-(1) `compiledRequireExclude=true` writes the accumulated `style_rules`
-to `<callScratch>/style-rules.json`; (2) `extractStylesToDirectory.dest`
-writes `.compiled.css` files via the `/cwd` preopen. Validate `dest`
-against the preopen at plugin entry; fail loudly if outside.
+**Next checkpoint:** §1.8 — generate ≥1000 synthesised already-baked
+fixtures under `parity-harness/strip-runtime/fixtures/synthesized/`
+(run JS babel-plugin against random inputs to produce CC/CS-wrapped
+code, freeze as fixtures). The corpus expansion stresses the
+dispatcher visitor under inputs the hand-curated 38-fixture set
+doesn't cover. §1.9 (Phase 1 exit gate) follows once that run is
+zero-divergence. §1.7 was retired (parcel-transformer integration is
+EXAMPLE consumer shape, not a Phase 1 deliverable).
 
 **Prerequisites met:** all of Phase 0 except probes 9 and audit
 (both Phase 5 gates, not Phase 1).
 
-**Last completed:** §1.4. Phase 1 §1.0–§1.4 are all ☑. Final state on
+**Last completed:** §1.6. Phase 1 §1.0–§1.6 are all ☑. Final state on
 sign-off: `RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib`
-→ 44/44 pass; `bun test parity-harness/strip-runtime/harness.test.ts`
-→ 82/82 pass (41 determinism + 41 parity, with 13 fixtures gated
-`expectedToFail` via `generate-fixtures.mjs`'s `EXPECTED_TO_FAIL` map
-and explicit `failureReason` strings naming the phase that graduates
-each: 4 on §1.5, 3 on Phase 2, 6 on Phase 7).
+→ 55/55 pass (44 prior + 11 §1.5 helpers: parse_name, dirname,
+path_join, validate_dest_under_cwd); `bun test
+parity-harness/strip-runtime/harness.test.ts` → 82/82 pass (41
+determinism + 41 parity, with 9 fixtures still gated `expectedToFail`:
+3 on Phase 2 compiledBabelPlugin/bake parity, 6 on Phase 7
+directive-prologue blank-line). The 4 prior §1.5-gated fixtures
+(A01–A04) now pass through the extractStylesToDirectory port:
+`/cwd/<dest>/<rel>/<basename>.compiled.css` write, source-dir-not-found
+diagnostic via `swc_common::errors::HANDLER`, AST `import './x.compiled.css'`
+injection, `preserveLeadingComments`-style banner re-anchoring on the
+injected import.
 
 **End-of-session notes for next pickup:**
 
@@ -95,6 +104,46 @@ done before declaring Phase 0 fully signed off across the platform set.
 
 ### Phase 1 findings (write-once notes)
 
+- **§1.5 — `.compiled.css` postcss `sort()` deferred to Phase 4.**
+  Babel's `extractStylesToDirectory` write path calls
+  `sort(styleRules.sort().join('\n'), sortConfig)` from `@sjcompiled/css`.
+  The Rust port lives at `crates/css/src/sort.rs` and depends on
+  `compiled-css` + the postcss-* crates (`postcss-core`,
+  `postcss-discard-duplicates`, `cssnano-preset-default`, …).
+  Pulling that into `babel-plugin-strip-runtime` would inflate the
+  WASM binary several-fold *now*, before Phase 4 wires the same
+  CSS Rust port into `babel-plugin` proper (PLAN.md §3.5 says both
+  plugins link the CSS crate). For §1.5 the file write uses the
+  JS-level pre-sort only (`styleRules.sort().join('\n')`), which
+  produces a non-empty file with the rule set complete. The
+  postcss-level `sort(stylesheet, sortConfig)` will land alongside
+  Phase 4. The harness gate for §1.5 is JS-byte parity (the
+  `import './<basename>.compiled.css'` injection on the AST side);
+  `.compiled.css` contents are NOT diffed against Babel today.
+  When Phase 4 lands `crates/css` into `babel-plugin`, the same dep
+  becomes available here and the postcss sort lands as a single
+  follow-up commit.
+- **§1.5 — `swc_common::errors::HANDLER` for plugin-side throws.**
+  A raw `panic!()` in a SWC plugin is wrapped by the runner as
+  `plugin failed to invoke plugin on '<filename>'` — the original
+  message is dropped. Use
+  `HANDLER.with(|h| h.struct_span_err(span, msg).emit())` and
+  return early for any error that needs to be visible to the host
+  (e.g. the `Source directory '<source>' was not found relative to
+  source file ('<sourceFileName>')` throw at A02). HANDLER-emitted
+  errors propagate cleanly through `swc.transformSync` to the
+  host's catch.
+- **§1.5 — host responsibilities the harness inlines.** Two
+  concerns the production Parcel transformer wrapper will own
+  (PLAN.md §3.9.13) but the harness re-implements: (a)
+  `extractStylesToDirectory` writes use process.cwd() as the WASI
+  `/cwd` preopen, so the harness `process.chdir`s into a scratch
+  dir around the SWC call to scope writes; (b) `compiledRequireExclude`
+  needs `<callScratch>/style-rules.json`, so the harness mkdirs a
+  per-call dir under `_scratch`, host-translates to `/cwd/<rel>`
+  via `toWasiPath`, threads it as `callScratch` plugin config, and
+  rmSyncs in `finally`. The plugin only ever sees `/cwd`-prefixed
+  paths (PLAN.md §3.2 contract).
 - **Phase 7 breadcrumb — `/*#__PURE__*/` duplicates after CC-replacement.**
   When `StripRuntimeVisitor` replaces `/*#__PURE__*/_jsxs(CC,...)` with
   the inner `/*#__PURE__*/_jsx('div',...)`, SWC's codegen emits TWO
@@ -170,8 +219,8 @@ done before declaring Phase 0 fully signed off across the platform set.
 | §1.2 | ☑ | Port `utils/is_automatic_runtime.rs`, `utils/is_cc_component.rs`, `utils/is_create_element.rs` predicates | claude-2026-05-02 | three `.rs` files under `crates/babel-plugin-strip-runtime/src/utils/`, `mod.rs` declarations updated, tests construct AST nodes via `swc_core::ecma::ast` builders (no parser dep — keeps `wasm32-wasip1` build minimal) | `RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib` → 32/32 pass (10 + 10 + 6 + 6) |
 | §1.3 | ☑ | Port `utils/remove_style_declarations.rs` + create `compat/scope.rs` for SWC binding lookup | claude-2026-05-02 | `crates/babel-plugin-strip-runtime/src/compat/{mod.rs,scope.rs}` (module-scope binding index with deferred `apply_removals`), `crates/babel-plugin-strip-runtime/src/utils/remove_style_declarations.rs` (handles `React.createElement(CS, ..., [..])`, `_jsx(CS, { children: [..] })`, `<CS>{[..]}</CS>`), `lib.rs` declares `pub mod compat;` | `RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib` → 44/44 pass (10 to_uri + 10 is_automatic_runtime + 6 is_cc + 6 is_create_element + 6 scope + 6 remove_style_declarations) |
 | §1.4 | ☑ | Port `lib.rs` entry + dispatcher: `Program::exit`, `ImportSpecifier`, `JSXElement`, `CallExpression`. Lock `Program::exit` ordering (banner → preserveLeadingComments → require-OR-css-OR-metadata, never two) | claude-2026-05-02 | `crates/babel-plugin-strip-runtime/src/lib.rs` rewritten — `StripRuntimeVisitor` (CC/CS replacement, `take_leading` mirroring Babel's `path.node.leadingComments=null`, ImportSpecifier filter for CC/CS), `make_require_stmt` + `first_non_directive_index` for the `styleSheetPath` injection path, `unwrap_paren` in `is_automatic_runtime` for CommonJS-interop callees `(0, _jsxRuntime.jsx)(...)`. Visitor scope cleanup runs BEFORE require-injection so binding indices stay valid. The auto-`expectedToFail` heuristic is removed; per-fixture `expectedToFail` + `failureReason` (in `generate-fixtures.mjs`'s `EXPECTED_TO_FAIL` map) now gates the 13 fixtures that depend on later phases — 4 on §1.5 (extractStylesToDirectory file write), 3 on Phase 2 (compiledBabelPlugin errors / babelJSXImportSource bake), 6 on Phase 7 (directive-prologue blank-line). | `RUSTFLAGS="" cargo build -p babel-plugin-strip-runtime --target wasm32-wasip1 --release` clean; `bun test parity-harness/strip-runtime/harness.test.ts` → 82/82 pass (41 determinism + 41 parity, 13 of which gated `expectedToFail` with explicit reasons) |
-| §1.5 | ☐ | Sidecar handlers: `compiledRequireExclude=true` writes `<callScratch>/style-rules.json`; `extractStylesToDirectory.dest` writes `.compiled.css` files via `/cwd` preopen | — | sidecar write code in `lib.rs` Program::exit; validation of `dest` against preopen at plugin entry; clear error if outside | Harness fixtures with `compiledRequireExclude: true` produce non-empty `style-rules.json`; fixtures with `extractStylesToDirectory` produce non-empty `.compiled.css` |
-| §1.6 | ☐ | Lock `plugins/SIDECAR_SCHEMA.md` v1 (PLAN.md §7) | — | `plugins/SIDECAR_SCHEMA.md` with versioned schemas for `style-rules.json`, `included-files.json`, `cache.bin` | Schema file present; both Rust serde structs and JS host parser reference it |
+| §1.5 | ☑ | Sidecar handlers: `compiledRequireExclude=true` writes `<callScratch>/style-rules.json`; `extractStylesToDirectory.dest` writes `.compiled.css` files via `/cwd` preopen | claude-2026-05-03 | `crates/babel-plugin-strip-runtime/src/lib.rs` extends `PluginOptions` with `call_scratch` + `source_file_name` (host-threaded — Babel reads `file.opts.generatorOpts.sourceFileName` natively, SWC has no equivalent), adds `parse_name`/`dirname`/`path_join` helpers, `validate_dest_under_cwd` (rejects absolute, drive-prefixed, `..`-escape paths) called at plugin entry, `make_side_effect_import` (with banner-span re-anchoring trick), `StyleRulesSidecar` v1 (`{version, rules}`); Program::exit branch wires both side-effect outputs and uses `swc_common::errors::HANDLER` for the source-not-found error path so the message survives plugin-runner wrapping. `parity-harness/strip-runtime/engines.ts` threads `sourceFileName` + `callScratch` (mkdir + cleanup, host-translated `/cwd/<rel>` form) into the SWC plugin config and `process.chdir`s into `_scratch` for `extractStylesToDirectory` fixtures so plugin writes scope under the WASI preopen. `generate-fixtures.mjs` ungates A01–A04. | `RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib` → 55/55 pass (44 prior + 11 §1.5 helpers); `bun test parity-harness/strip-runtime/harness.test.ts` → 82/82 pass; manual inspection: `_scratch/dist/app.compiled.css` non-empty (4 sorted rules), per-call `<callScratch>/style-rules.json` non-empty with v1 shape `{"version":1,"rules":[...]}` |
+| §1.6 | ☑ | Lock `plugins/SIDECAR_SCHEMA.md` v1 (PLAN.md §7) | claude-2026-05-03 | `plugins/SIDECAR_SCHEMA.md` (v1 schema for `style-rules.json` §2, `included-files.json` §1, `cache.bin` §3 + plugin-config shape §4); Rust `StyleRulesSidecar` struct doc-comment in `crates/babel-plugin-strip-runtime/src/lib.rs` cites SIDECAR_SCHEMA.md §2; harness reader comment in `parity-harness/strip-runtime/engines.ts` cites the same. Versioning policy + drift watch points documented. | `plugins/SIDECAR_SCHEMA.md` exists; `grep -n SIDECAR_SCHEMA crates/babel-plugin-strip-runtime/src/lib.rs parity-harness/strip-runtime/engines.ts` non-empty (Rust writer + JS host both back-reference); harness 82/82 unchanged. |
 | §1.7 | — | ~~Inline the SWC wrapper in `packages/parcel-transformer/`~~ | — | Parcel-transformer integration is an EXAMPLE consumer shape (`plugins/PARCEL_USAGE_EXAMPLE.md`), not a Phase 1 deliverable. Removed from gate. | n/a |
 | §1.8 | ☐ | Generate ≥1000 synthesised already-baked fixtures (run JS babel-plugin against random inputs to produce CC/CS-wrapped code, freeze as fixtures) | — | `parity-harness/strip-runtime/fixtures/synthesized/*.json` | Harness `bun test parity-harness/strip-runtime/harness.test.ts` runs across all synthesised fixtures with zero divergence |
 | §1.9 | ☐ | **Phase 1 exit gate:** all checkpoints above closed; full corpus is byte-clean | — | A `phase1-signoff.md` (or update to this STATUS.md) summarising the corpus run | All harness tests pass; ≥1038 fixtures run zero-divergence |

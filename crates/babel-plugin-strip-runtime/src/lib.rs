@@ -74,11 +74,18 @@ pub struct ExtractToDirOpts {
     pub dest: String,
 }
 
-/// Sidecar schema v1 — see PLAN.md §7. The host parser at
-/// `parcel-transformer/.../style-rules.json` reads this exact shape.
+/// `<callScratch>/style-rules.json` writer.
+///
+/// Schema source of truth: `plugins/SIDECAR_SCHEMA.md` §2 (locked in
+/// Phase 1 §1.6). Any change to field names, types, or version MUST
+/// update that doc in the same commit; the JS host parser reads from
+/// the same spec. See PLAN.md §7 for the cross-plugin overview.
 #[derive(Debug, serde::Serialize)]
 struct StyleRulesSidecar<'a> {
+    /// Hard-coded `1`. A bump is a coordinated plugin/host release;
+    /// see SIDECAR_SCHEMA.md "Versioning policy".
     version: u32,
+    /// Atomic CSS rule strings, in visitor accumulation order.
     rules: &'a [String],
 }
 
@@ -496,10 +503,10 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
     scope.apply_removals(&mut module);
 
     if opts.compiled_require_exclude {
-        // PLAN.md §7 sidecar: <callScratch>/style-rules.json.
-        // Mirrors `file.metadata.styleRules` Babel writes — the host
-        // re-exposes as `result.styleRules` and Parcel assigns to
-        // `asset.meta.styleRules` (§3.4 cross-mapping).
+        // <callScratch>/style-rules.json. Schema: SIDECAR_SCHEMA.md §2
+        // (PLAN.md §7 cross-reference). Mirrors `file.metadata.styleRules`
+        // Babel writes — the host re-exposes as `result.styleRules` and
+        // Parcel assigns to `asset.meta.styleRules` (§3.4 cross-mapping).
         //
         // Only write when there's something to write. Babel's analogue:
         // `if (!file.metadata?.styleRules) file.metadata.styleRules = []; this.styleRules.forEach(push)`.
