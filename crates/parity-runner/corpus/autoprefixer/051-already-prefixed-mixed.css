@@ -1,0 +1,8 @@
+.x {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.y {
+  user-select: none;
+  -webkit-user-select: none;
+}

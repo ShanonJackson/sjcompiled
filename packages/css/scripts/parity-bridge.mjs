@@ -58,6 +58,31 @@ import postcssMinifyGradients from 'postcss-minify-gradients';
 import postcssCalc from 'postcss-calc';
 // npm `postcss-convert-values@5.1.3` — cssnano sub-plugin (Phase 6f).
 import postcssConvertValues from 'postcss-convert-values';
+// npm `autoprefixer@10.4.14` — Phase 7. Browserslist resolution mirrors
+// AFM's production path: postcss's `from:` option is set to a file inside
+// the AFM `.browserslistrc` fixture directory so autoprefixer's internal
+// `browserslist(reqs, { path: dirname(from) })` walks up and finds the
+// pinned config. The Rust side does the same via `BrowsersOptions::from =
+// afm_browserslist_dir()` (see `crates/parity-runner/src/stages.rs`). Both
+// engines exercise the directory-walk resolution path, NOT a forced
+// config-file env var (`BROWSERSLIST_CONFIG`) — env-pinning would diverge
+// from AFM's production resolution and would silently mask any future
+// regression in the walk-up logic. HANDOVER.md §6 documents the closure.
+import autoprefixer from 'autoprefixer';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve as pathResolve } from 'node:path';
+
+// __dirname is `<workspace>/packages/css/scripts/`, so two parents up is
+// the workspace root. The synthetic `<afm-dir>/_parity_input.css` `from:`
+// value never has to exist on disk — postcss only uses it for resolving
+// `result.opts.from` and downstream consumers use `path.dirname(from)`.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const AFM_BROWSERSLIST_DIR = pathResolve(
+  __dirname,
+  '..', '..', '..',
+  'crates', 'browserslist-shim', 'tests', 'fixtures', 'afm',
+);
+const AFM_FROM = pathResolve(AFM_BROWSERSLIST_DIR, '_parity_input.css');
 
 // Phase 6 band exit gate — full `normalizeCSS(opts)` from the local
 // `packages/css/src/plugins/normalize-css.ts`. Spread inside `transform.ts`
@@ -367,6 +392,33 @@ const STAGES = {
       sortAtomicStyleSheet({ sortAtRulesEnabled: undefined, sortShorthandEnabled: undefined }),
     ]).process(css, { from: undefined });
     return result.css;
+  },
+
+  // parse → autoprefixer@10.4.14 (AFM browserslist) → stringify. Phase 7.
+  // Browserslist resolution exercises the production walk: postcss's
+  // `from:` option is set to a file inside the AFM `.browserslistrc`
+  // fixture directory; autoprefixer reads `result.opts.from` and calls
+  // `browserslist(reqs, { path: dirname(from) })`, walking up to find
+  // the pinned config. The Rust side does the equivalent via
+  // `BrowsersOptions::from = afm_browserslist_dir()`. Both engines hit
+  // the same 14-entry resolution through the same path AFM uses in
+  // production. HANDOVER.md §6 documents the closure.
+  //
+  // We also clear `BROWSERSLIST` (the query env var) and
+  // `BROWSERSLIST_CONFIG` (the forced-config env var) for the call so
+  // neither short-circuits the walk.
+  'autoprefixer': (css) => {
+    const prevQuery = process.env.BROWSERSLIST;
+    const prevConfig = process.env.BROWSERSLIST_CONFIG;
+    delete process.env.BROWSERSLIST;
+    delete process.env.BROWSERSLIST_CONFIG;
+    try {
+      const result = postcss([autoprefixer()]).process(css, { from: AFM_FROM });
+      return result.css;
+    } finally {
+      if (prevQuery !== undefined) process.env.BROWSERSLIST = prevQuery;
+      if (prevConfig !== undefined) process.env.BROWSERSLIST_CONFIG = prevConfig;
+    }
   },
 
   // Phase 6 band exit gate — `normalizeCSS({optimizeCss: true})` in

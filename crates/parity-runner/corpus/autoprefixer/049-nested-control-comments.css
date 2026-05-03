@@ -1,0 +1,6 @@
+/* autoprefixer: off */
+.outer {
+  display: flex;
+  /* autoprefixer: on */
+  user-select: none;
+}

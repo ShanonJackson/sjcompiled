@@ -30,6 +30,7 @@ cssnano-postcss-convert-values = { workspace = true }
 cssnano-postcss-colormin = { workspace = true }
 cssnano-postcss-minify-gradients = { workspace = true }
 postcss-calc = { workspace = true }
+autoprefixer = { workspace = true }
 css = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

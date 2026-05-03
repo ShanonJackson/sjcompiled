@@ -1467,6 +1467,7 @@ dependencies = [
 name = "parity-runner"
 version = "0.0.1"
 dependencies = [
+ "autoprefixer",
  "compiled-css",
  "css",
  "cssnano-postcss-colormin",

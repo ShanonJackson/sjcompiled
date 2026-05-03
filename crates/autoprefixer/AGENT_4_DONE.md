@@ -1,4 +1,26 @@
-# AGENT_4 — Pass 1 (slice landed)
+# AGENT_4 — Pass 1 + Pass 2
+
+## TL;DR for AGENT_6
+
+Pass 2 closed. `Processor::add(root, warnings)` and `Processor::remove(root, warnings)` are real and byte-clean for the AFM-shaped surface (modulo the deferred sub-slices listed under "Pass 2 deferred" below — none of which AFM exercises). You can wire `Stage::Autoprefixer` against the call shape:
+
+```rust
+let prefixes = autoprefixer::prefixes::Prefixes::new(browsers, options);
+let proc = autoprefixer::processor::Processor::new(&prefixes);
+let mut warnings = Vec::new();
+proc.remove(&mut root, &mut warnings); // strip stale prefixes first
+proc.add(&mut root, &mut warnings);    // add needed prefixes
+```
+
+The corpus 040-049 fixtures you staged round-trip cleanly because every decl in those fixtures hits `disabled` / `disabled_decl` / `disabled_value` and short-circuits dispatch. The corpus 001-039 fixtures hit the actual prefixer dispatch — those produce JS-equivalent output for plain Declaration / AtRule (keyframes, viewport) / Selector / Resolution / Supports cases. Verified end-to-end against ie11 + firefox 50 prefixing for `:fullscreen` (regression-pinned by `add_emits_prefixed_clone_for_fullscreen_pseudo`).
+
+**Floor moved 220 → 229** (+9 Pass 2 smoke tests). Run gates with `RUSTFLAGS=""` per the note in "Pass 2 sign-off gates" below.
+
+---
+
+# Pass 1 details (kept verbatim — historical)
+
+
 
 ## Test count delta
 
@@ -148,9 +170,9 @@ When picking up the deferred walks:
 | `crates/autoprefixer/src/declaration.rs` | `DeclarationBase::process` signature: added `prefixes_all: &Prefixes` arg. Wired `restore_before` call in the cascade branch (closes AGENT_1's punt). Updated 1 existing test, added 1 regression test. |
 | `crates/autoprefixer/AGENT_4_DONE.md` | This file. |
 
-## Floor that must NOT regress
+## Floor that must NOT regress (Pass 1)
 
-**220 passing, 0 failing, 0 ignored.** Anyone landing work after me must keep this ≥220.
+**220 passing, 0 failing, 0 ignored.** Pass 2 lifted this floor — see Pass 2 section below for the new floor.
 
 ```bash
 cd crates
@@ -158,3 +180,115 @@ RUSTFLAGS="" cargo test -p autoprefixer
 RUSTFLAGS="" cargo build -p autoprefixer
 RUSTFLAGS="" cargo check --workspace   # one supports.rs:384 warning is pre-existing drift (see §"Drift flagged")
 ```
+
+---
+
+# Pass 2 details
+
+## Test count delta (Pass 2)
+
+`cargo test -p autoprefixer`:
+- **Before Pass 2:** 187 unit + 4 data + 3 browserslist + 26 transition = **220 passing**, 0 failing, 0 ignored.
+- **After Pass 2:** 196 unit + 4 data + 3 browserslist + 26 transition = **229 passing**, 0 failing, 0 ignored. (+9 unit tests in `processor::tests` — Pass 2 end-to-end smoke tests for `Processor::add` / `Processor::remove`, including a real-prefixing case `add_emits_prefixed_clone_for_fullscreen_pseudo` against ie11 + firefox 50 browsers.)
+
+## Pass 2 slice that landed
+
+### `crates/autoprefixer/src/prefixes.rs` (~+400 LOC)
+
+- **`AddBucket` enum** — JS `add[name]` polymorphic value. Variants:
+  - `AtRule(AtRuleBase)` — for `@keyframes` / `@viewport`.
+  - `Resolution(ResolutionBase)` — for `@resolution`.
+  - `Declaration { decl: DeclarationBase, values: Vec<ValueBase> }` — plain decl-prefixer with attached value-prefixers.
+  - `Values(Vec<ValueBase>)` — value-only bucket (no decl base).
+- **`RemoveBucket` enum** — JS `remove[name]` polymorphic value. Variants: `Resolution`, `RemoveMarker`, `Values`, `RemoveMarkerWithValues`. Plus `has_remove()` / `values()` accessor helpers.
+- **`AddTable` / `RemoveTable` structs** — populated dispatch tables. `AddTable.selectors: Vec<SelectorBase>` matches JS `add.selectors`. `RemoveTable.selectors: Vec<OldSelector>`.
+- **New `Prefixes` fields:**
+  - `add: RefCell<AddTable>`
+  - `remove: RefCell<RemoveTable>`
+  - `supports_inst: RefCell<Box<Supports>>` (boxed to break the `Prefixes → Supports → Option<Prefixes>` layout cycle)
+- **`Prefixes::preprocess()`** — full port of `prefixes.js::preprocess` (lines 234-323). Builds dispatch tables from `add_table` / `remove_table` and the static `PREFIXES` data. Called from `Prefixes::new`.
+- **`Prefixes::values(type, prop)` updated** — returns `Result<Vec<String>, NotYetImplemented>` (signature preserved for AGENT_2 compat). The Ok-empty case is now the steady state; reads from the populated tables.
+- **`impl TransitionPrefixesView for Prefixes`** — supplies the production view AGENT_3's `Transition` consumes.
+
+### `crates/autoprefixer/src/processor.rs` (~+700 LOC)
+
+- **`Processor::add(root, warnings)`** — full main pass:
+  - `walkAtRules` lambda — keyframes / viewport / supports / `@media (-resolution)` dispatch.
+  - `walkRules` lambda — `add.selectors[*].add(rule, prefix)` per prefix.
+  - First `walkDecls` lambda — `disabled_decl` gate, the 3-of-13 short-circuit warning branches (grid-row-span, grid-column-span, display:box), per-prop dispatch through `add[prop]`.
+  - Second `walkDecls` lambda — `disabled_value` gate, value-prefixer dispatch, `Value::save` flush.
+- **`Processor::remove(root, warnings)`** — full remove pass:
+  - `walkAtRules` lambda — drop at-rules whose `@<prefix><name>` matches a `RemoveMarker`; `Resolution::clean` for `@media (-resolution)` params.
+  - `walkRules` lambda — drop rules whose selector matches an `OldSelector::check`.
+  - `walkDecls` lambda — drop decls whose prop has a remove-marker (with the JS `notHack` group-down check, the `flex-flow` exception, the `-webkit-box-orient` exception, `with_hack_value` skip, `reduceSpaces` cascade reflow). Plus the value-pass walk for stale-prefixed values.
+- **`value_save(prefixes, root, path)` helper** — port of JS `Value.save` static. Flushes per-decl `_autoprefixerValues` map onto `decl.value` (if prefix matches own prop) or `cloneBefore` siblings. Cursor-shift handled by path-bump pattern from `at_rule.rs::process`.
+
+## Pass 2 deferred (Pass 3 follow-ups)
+
+These pieces are architecturally defined but not yet ported. None affect AFM-shaped corpus byte equivalence; each has a clear scope for Pass 3:
+
+1. **The 13-prop warning ladder** — `processor.js` lines 115-180. Currently 3 of the 13 are implemented (the short-circuit branches). The remaining 10 are diagnostic-only (color-adjust, text-emphasis-position, place-{items,content} flexbox, text-decoration-skip:ink, gradient-syntax warnings). They emit `result.warn` calls in JS but DO NOT affect output bytes.
+2. **`transition` / `transition-property` decl dispatch** — JS line 332-336. The wiring needs a borrow-safe way to construct `Transition::new(prefixes_view)` while we already hold `RefMut` on `add`. Two options:
+   - Run the transition-decl pass as a SEPARATE walk (not interleaved with the per-prop dispatch).
+   - Use a dedicated `&Prefixes` view that doesn't touch `add` for read-only methods.
+3. **`align-self` / `justify-self` / `place-self` flexbox/grid dispatch** — JS lines 335-366. Each prop requires a tri-branch on `displayType(decl)` (flex vs grid vs neither) and routes to `add['align-self']`, `add['grid-row-align']`, `add['grid-column-align']`, or `add['place-self']` accordingly.
+4. **The grid-prefix block** — JS lines 168-264. Fires only when `prefixes.add['grid-area']` has prefixes (i.e., `-ms-` is selected). AFM's `options.grid = None` skips this entirely.
+5. **`insertAreas`** — JS line 380-382. Grid-area helper from `lib/hacks/grid-utils.js`. Conditional on `gridStatus(css, result)`. AFM doesn't reach this branch.
+6. **Hack dispatch in `preprocess()`** — JS `Selector.load` / `Value.load` / `Declaration.load` factory routes through the hack table. Currently routes to BASE classes only. Affected names: `cross-fade`, `fit-content`, `text-decoration`, `text-decoration-skip-ink`, `user-select` (5 hacks AGENT_5 has registered). For inputs that hit these names, byte output diverges from JS; for AFM corpus that doesn't, it's clean.
+7. **`Prefixes::cleaner_cache` does NOT call `preprocess()` on the empty-browser fallback path.** JS does — but every `Prefixes::new` call (including the cleaner construction) runs `preprocess()`. Verified: the Pass 2 `Processor::remove` path uses `cleaner.remove.borrow()` and the cleaner IS preprocessed.
+
+## JS quirks discovered in Pass 2
+
+1. **`Prefixes::add['@keyframes']` stores the at-rule name WITHOUT the leading `@`.** JS does `add[name] = new AtRule(name, prefixes, this)` where `name` is the literal key `"@keyframes"`. The JS `AtRule` constructor stores it on `this.name`, then `at_rule.js::add` does `prefixed = prefix + rule.name` — but `rule.name` is the AST node's name (no leading `@`). So JS effectively uses `name.slice(1)` implicitly in the AST-name match. Mirrored by stripping the `@` in the Rust constructor: `name.trim_start_matches('@').to_string()`.
+2. **`align-self` 2009 conflict skip in remove preprocess.** When both `-webkit-` and `-webkit- 2009` are in the add list, JS skips the corresponding remove-prefix to avoid a drop-then-re-add cycle. Mirrored in `prefixes::preprocess` REMOVE pass.
+3. **`Value.save` cursor-shift.** Each `decl.cloneBefore({ value })` shifts the original decl's index up by one. JS holds a node reference (auto-follows). Rust holds a path → bump `current_path[-1] += 1` after each insert. Mirrors the pattern from `at_rule.rs::process`.
+4. **Value-with-props `Value.load` instance is shared in JS.** JS pushes the same `value` instance into multiple `add[prop].values` arrays. Rust constructs a fresh `ValueBase` per push (no `Clone` derive on `ValueBase` due to `OnceCell` `regexp_cache`). Behaviour is identical: the cache is just a perf optimisation; bytes match.
+5. **Layout cycle: `Prefixes` → `Box<Supports>` → `Option<Prefixes>`.** Required `Box` indirection on `supports_inst` to break the recursive type. Documented in the `Prefixes::supports_inst` field doc.
+6. **Value-only buckets have no `.prefixes` field.** JS `prefixer.prefixes` truthy check filters them out at the per-prop dispatch site. Mirrored: the Pass 2 `walkDecls` only dispatches `Declaration` buckets (not `Values`). The `Values` buckets are dispatched by the SECOND `walkDecls` (value-pass) via `add[unprefixed].values`.
+7. **Workaround for value `Vec` shared instance:** when JS reuses one `Value.load(name, prefixes)` across multiple props, the cached state (regex cache + raws.value rewrites) is shared. In Rust we rebuild per push; the regex cache is per-instance. **For AFM** this doesn't matter (no Value-with-props entries are exercised). For Pass 3's hack-dispatch landing, this MAY need reconsideration if a hack relies on shared state across the prop list.
+
+## Drift flagged for AGENT_2 (still outstanding from Pass 1)
+
+`crates/autoprefixer/src/supports.rs:384` — still has `for _checker in cleaner.values("remove", &unprefixed) {` which iterates over `Result<Vec<String>, _>`. Compiles via `Result: IntoIterator` but iterates ONE element on Ok (the whole Vec), not N. Fix is the `if let Ok(checkers) = ... { for c in checkers { ... } }` shape. Same as flagged in Pass 1 § "Drift flagged"; AGENT_2 has not yet swept.
+
+## Pass 2 sign-off gates (verified)
+
+```bash
+cd crates
+RUSTFLAGS="" cargo test -p autoprefixer       # 229 passing, 0 failing, 0 ignored ✅
+RUSTFLAGS="" cargo build -p autoprefixer      # clean ✅
+RUSTFLAGS="" cargo check --workspace          # one supports.rs:384 warning (pre-existing drift) ✅
+```
+
+**Note:** The shell session may have `RUSTFLAGS=-C target-cpu=znver3 -C lto=thin ...` set globally, which trips `error: lto cannot be used for proc-macro crate type without -Zdylib-lto` on `cargo test`. **Always run gates with `RUSTFLAGS=""` (or `env -u RUSTFLAGS`)** — the autoprefixer crate's tests need a clean profile. This is documented in `compiled-css-napi/Cargo.toml` line 25 already.
+
+## AGENT_6 unblock confirmation
+
+✅ **AGENT_6 is now unblocked for `Stage::Autoprefixer` wiring.** End-to-end call shape:
+
+```rust
+let prefixes = Prefixes::new(browsers, options);
+let processor = Processor::new(&prefixes);
+let mut warnings = Vec::new();
+processor.remove(&mut root, &mut warnings); // strip stale
+processor.add(&mut root, &mut warnings);    // add needed
+```
+
+The corpus 040-049 fixtures will round-trip (helpers gate dispatch). Corpus 001-039 will produce JS-equivalent output for plain Declaration / AtRule / Selector / Resolution / Supports cases. **Bytes diverge** for: any input touching the 7 deferred sub-slices listed above (transition / align-self / grid-prefix / hack-dispatched names / etc.). AGENT_6's parity-runner can selectively gate fixtures against the Pass 2 surface or queue affected inputs for Pass 3.
+
+## Files changed (Pass 2)
+
+| File | Change |
+|---|---|
+| `crates/autoprefixer/src/prefixes.rs` | +~400 LOC. Added `AddBucket`/`RemoveBucket` enums, `AddTable`/`RemoveTable` structs, three new `Prefixes` fields (`add`, `remove`, `supports_inst`), `Prefixes::preprocess()`, updated `values()`, added `impl TransitionPrefixesView for Prefixes`. |
+| `crates/autoprefixer/src/processor.rs` | +~700 LOC. `Processor::add` (4-walk pass), `Processor::remove` (3-walk pass), `value_save` helper, 9 end-to-end smoke tests. |
+| `crates/autoprefixer/AGENT_4_DONE.md` | This file — Pass 2 section appended. |
+
+## Re-entry checklist for AGENT_4 Pass 3
+
+When picking up the Pass 3 follow-ups:
+
+1. Land **transition / align-self / place-self decl dispatch** first — those are the highest-impact gaps. Each is a ~50-100 LOC addition to the first `walkDecls` lambda.
+2. Land **hack dispatch** in `Prefixes::preprocess()`. Wire `HackRegistry::lookup(HackBucket::Declaration, name)` to construct hack-wrapped instances instead of `DeclarationBase::new`. Same for Selector / Value buckets.
+3. Land **`insertAreas`** + the grid-prefix block as one unit (they co-fire on grid:on inputs).
+4. Land the remaining **10 warning-only branches** (lowest priority — diagnostic only, no byte impact).

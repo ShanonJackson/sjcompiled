@@ -23,13 +23,24 @@
 //! own those signatures. If your hack needs a method that isn't
 //! there, file a note in `hacks/HACKS_PORT.md` and pause.
 
+use std::cell::RefCell;
+
 use indexmap::IndexMap;
 use once_cell::sync::OnceCell;
 use postcss_core::{Node, NodeKind};
 
+use crate::at_rule::AtRuleBase;
 use crate::browsers::Browsers;
 use crate::data::prefixes::{PrefixEntry, PREFIXES};
+use crate::declaration::DeclarationBase;
+use crate::old_selector::OldSelector;
+use crate::old_value::OldValue;
+use crate::resolution::ResolutionBase;
+use crate::selector::SelectorBase;
+use crate::supports::Supports;
+use crate::transition::FlexboxOption;
 use crate::utils;
+use crate::value::ValueBase;
 use crate::vendor;
 
 /// Bucket a hack registers into. JS-side static methods:
@@ -202,14 +213,99 @@ impl std::fmt::Display for NotYetImplemented {
 
 impl std::error::Error for NotYetImplemented {}
 
+/// JS `add[name]` polymorphic value. Each variant matches one branch
+/// of `prefixes.js::preprocess` (lines 234-263).
+pub enum AddBucket {
+    /// JS: `add['@keyframes'] = new AtRule(name, prefixes)` /
+    /// `add['@viewport'] = ...`. Same shape — both use `AtRuleBase`.
+    AtRule(AtRuleBase),
+    /// JS: `add['@resolution'] = new Resolution(name, prefixes)`.
+    Resolution(ResolutionBase),
+    /// JS: `add[name] = Declaration.load(name, prefixes)` with
+    /// `add[name].values` aggregated from prior Value-with-props passes.
+    /// The `values` Vec is appended in source-order from the matching
+    /// Value-prefixers.
+    Declaration {
+        decl: DeclarationBase,
+        values: Vec<ValueBase>,
+    },
+    /// JS: `add[prop] = { values: [...] }` — value prefixers only,
+    /// no underlying Declaration prefixer. Used when a Value-with-
+    /// props entry adds entries for `prop` but no Declaration entry
+    /// for the same name was processed.
+    Values(Vec<ValueBase>),
+}
+
+/// JS `remove[name]` polymorphic value. Each variant matches one
+/// branch of `prefixes.js::preprocess` (lines 266-321).
+pub enum RemoveBucket {
+    /// JS: `remove[name] = new Resolution(name, prefixes)`.
+    Resolution(ResolutionBase),
+    /// JS: `remove[prefixed] = { remove: true }`. Set by both the
+    /// `@keyframes`/`@viewport` branch and the bare-Declaration
+    /// `remove[prefixed].remove = true` branch.
+    RemoveMarker,
+    /// JS: `remove[prop] = { values: [...] }` — value-only stale
+    /// prefixers without a remove marker.
+    Values(Vec<OldValue>),
+    /// JS: `remove[prefixed] = { remove: true, values: [...] }` —
+    /// both. The Value-with-props branch can populate `.values` on a
+    /// slot that another branch already marked `.remove = true`.
+    RemoveMarkerWithValues(Vec<OldValue>),
+}
+
+impl RemoveBucket {
+    /// JS: `remove[prop].remove === true`. Drives the `removeChild`
+    /// branch of the processor remove walk.
+    pub fn has_remove(&self) -> bool {
+        matches!(
+            self,
+            RemoveBucket::RemoveMarker | RemoveBucket::RemoveMarkerWithValues(_)
+        )
+    }
+
+    /// JS: `remove[prop].values || []`.
+    pub fn values(&self) -> &[OldValue] {
+        match self {
+            RemoveBucket::RemoveMarkerWithValues(v) | RemoveBucket::Values(v) => v,
+            _ => &[],
+        }
+    }
+}
+
+/// Populated dispatch table — JS `add` map after `preprocess()`. Keyed
+/// by the property/at-rule/value name from the static `PREFIXES` table
+/// PLUS, when a Value-with-props entry runs, the prop names it claims.
+#[derive(Default)]
+pub struct AddTable {
+    /// JS: `add.selectors` — array of Selector instances. Iterated in
+    /// `processor.js::add` to dispatch `selector.process(rule)` per
+    /// rule.
+    pub selectors: Vec<SelectorBase>,
+    /// JS: `add[name]` for non-selector, non-`@supports` entries.
+    pub by_name: IndexMap<String, AddBucket>,
+}
+
+/// Populated stale-prefix dispatch table — JS `remove` map after
+/// `preprocess()`. Used by the processor's remove walk.
+#[derive(Default)]
+pub struct RemoveTable {
+    /// JS: `remove.selectors` — array of `OldSelector` instances.
+    /// Iterated in `processor.js::remove` to detect prefixed
+    /// rule clones that should be dropped.
+    pub selectors: Vec<OldSelector>,
+    /// JS: `remove[name]` for non-selector entries.
+    pub by_name: IndexMap<String, RemoveBucket>,
+}
+
 /// Top-level orchestrator — JS `class Prefixes`. Instantiated once per
 /// `Browsers` selection. Holds the resolved add/remove tables for the
 /// session.
 ///
 /// `add_table` and `remove_table` are the post-`select()` per-name
-/// prefix lists. The JS `preprocess()` step that turns these into
-/// Selector/Value/Declaration subclass instances depends on the hack
-/// registry (AGENT_5) and is wired in by `processor.rs` (AGENT_4).
+/// prefix lists. The `add` and `remove` fields are the JS
+/// `preprocess()` outputs — populated dispatch tables consumed by the
+/// processor walks.
 pub struct Prefixes {
     pub browsers: Browsers,
     pub options: PrefixesOptions,
@@ -227,6 +323,28 @@ pub struct Prefixes {
     /// flagged. Outside-crate callers should prefer `Prefixes::new` or
     /// `Prefixes::with_empty` (test-only).
     pub(crate) cleaner_cache: OnceCell<Box<Prefixes>>,
+    /// JS `prefixes.add` — populated by `preprocess()`. Wrapped in
+    /// `RefCell` because some prefixer instances need `&mut self`
+    /// during `process()` (Resolution mutates `self.bad`; AtRuleBase
+    /// signature is `&mut self` even though the base body doesn't
+    /// strictly need it). The walk inside `processor.rs` borrows mutably
+    /// once per dispatch call; `&Prefixes` callers (e.g.,
+    /// `restore_before` via `Prefixes::group`) don't touch `add`, so
+    /// the runtime borrow check holds.
+    pub(crate) add: RefCell<AddTable>,
+    /// JS `prefixes.remove` — populated by `preprocess()`.
+    pub(crate) remove: RefCell<RemoveTable>,
+    /// JS `add['@supports']` — always created in preprocess (not driven
+    /// by `selected.add`). Stored separately to match JS access pattern
+    /// `prefixes.add['@supports']` and avoid threading it through the
+    /// `by_name` map (the type is heterogeneous with other `@`-keys).
+    ///
+    /// Boxed because `Supports` carries an `Option<Prefixes>` (its
+    /// internal `prefixer_cache`) — a direct field would create an
+    /// infinite-size struct via the `Prefixes → Supports → Prefixes`
+    /// cycle. The box breaks the layout chain at one level of
+    /// indirection.
+    pub(crate) supports_inst: RefCell<Box<Supports>>,
 }
 
 impl std::fmt::Debug for Prefixes {
@@ -237,6 +355,61 @@ impl std::fmt::Debug for Prefixes {
             .field("add_table", &self.add_table)
             .field("remove_table", &self.remove_table)
             .finish_non_exhaustive()
+    }
+}
+
+/// JS: `prefixes.transition.add(decl)` — `Transition` constructs a
+/// view over `Prefixes`. AGENT_3 left this as a trait so `Transition`
+/// stays independently testable; AGENT_4 supplies the production impl
+/// that consumes the populated `add` / `remove` tables. See
+/// `transition.rs::TransitionPrefixesView` for the contract.
+impl crate::transition::TransitionPrefixesView for Prefixes {
+    fn add_prefixes(&self, prop: &str) -> Option<&[String]> {
+        // JS: `this.prefixes.add[prop].prefixes` — the prefixes
+        // attached to the per-prop bucket. For
+        // `Declaration`/`AtRule`/`Resolution` buckets that's the
+        // underlying base's `prefixer.prefixes`; for `Values`-only
+        // buckets it's the union of value-prefixers' prefixes (matches
+        // JS where `add[prop] = { values: [...] }` has no `.prefixes`
+        // → `(add && add.prefixes)` is undefined, so JS yields `[]`).
+        //
+        // We can't return a borrow into `RefCell::borrow()` because
+        // the borrow lifetime is tied to a stack `Ref`. Instead, fall
+        // back to `Prefixes::add_table` which always owns its data —
+        // it's the same underlying prefix list that drove
+        // `preprocess()` and is stable across walks.
+        self.add_table.get(prop).map(|v| v.as_slice())
+    }
+
+    fn should_remove(&self, prop: &str) -> bool {
+        self.remove
+            .borrow()
+            .by_name
+            .get(prop)
+            .map(|b| b.has_remove())
+            .unwrap_or(false)
+    }
+
+    fn prefixed(&self, prop: &str, prefix: &str) -> String {
+        Prefixes::prefixed(self, prop, prefix)
+    }
+
+    fn unprefixed(&self, prop: &str) -> String {
+        self.unprefixed_prop(prop)
+    }
+
+    fn flexbox(&self) -> FlexboxOption {
+        // JS: `this.prefixes.options.flexbox`.
+        // - `undefined` (None) → On.
+        // - `false` (not representable in `Option<String>`) → Off
+        //   (currently unreachable; tracked AGENT_1 follow-up).
+        // - `'no-2009'` → No2009.
+        // - any other string → On.
+        match self.options.flexbox.as_deref() {
+            Some("no-2009") => FlexboxOption::No2009,
+            None => FlexboxOption::On,
+            _ => FlexboxOption::On,
+        }
     }
 }
 
@@ -259,10 +432,14 @@ impl Prefixes {
             add_table: IndexMap::new(),
             remove_table: IndexMap::new(),
             cleaner_cache: OnceCell::new(),
+            add: RefCell::new(AddTable::default()),
+            remove: RefCell::new(RemoveTable::default()),
+            supports_inst: RefCell::new(Box::new(Supports::new())),
         };
         let selected = p.select(&PREFIXES);
         p.add_table = selected.add;
         p.remove_table = selected.remove;
+        p.preprocess();
         p
     }
 
@@ -529,23 +706,334 @@ impl Prefixes {
 
     /// JS: `values(type, prop)` — return the merged value list for
     /// the prop across the global ('*') bucket and the prop-specific
-    /// bucket. Used by `processor.rs`. Returns `Err(NotYetImplemented)`
-    /// until `preprocess()` lands — AGENT_5's hacks that populate per-
-    /// bucket value lists will need a real implementation; surfacing
-    /// the gap as an error (rather than a silent empty Vec) makes the
-    /// "first hack populates a value bucket" moment loud at compile/
-    /// runtime instead of silently dropping prefixed values.
+    /// bucket. Used by `processor.rs`. The post-`preprocess()` answer
+    /// is the ValueBase NAMES (matching the keys you'd dispatch through
+    /// `add[prop].values[*].process(decl)`).
+    ///
+    /// The `Result<...>` shape is preserved for backward-compat with
+    /// AGENT_2's call site in `supports.rs`. With `preprocess()` now
+    /// landed, the `Ok` branch always fires; `Err(NotYetImplemented)`
+    /// remains only as the type-level marker that callers can match
+    /// against if they want to distinguish "preprocess hasn't run" from
+    /// "preprocess ran and the bucket is empty". In practice
+    /// `preprocess()` always runs from `Prefixes::new`, so the Ok-empty
+    /// case is the steady state.
     pub fn values(
         &self,
-        _type_: &str,
-        _prop: &str,
+        type_: &str,
+        prop: &str,
     ) -> Result<Vec<String>, NotYetImplemented> {
-        // TODO(AGENT_4): wire to preprocess()'s per-bucket value lists.
-        // Until then, the bucket is unconditionally empty — return Ok
-        // for the empty case so callers can chain it without an error
-        // path during the AGENT_4 build-out, but never silently coerce
-        // to Vec::new() at the type level.
-        Ok(Vec::new())
+        match type_ {
+            "add" => {
+                let add = self.add.borrow();
+                let global: Vec<String> = match add.by_name.get("*") {
+                    Some(AddBucket::Values(vs)) => vs
+                        .iter()
+                        .map(|v| v.prefixer.name.clone())
+                        .collect(),
+                    Some(AddBucket::Declaration { values, .. }) => values
+                        .iter()
+                        .map(|v| v.prefixer.name.clone())
+                        .collect(),
+                    _ => Vec::new(),
+                };
+                let local: Vec<String> = match add.by_name.get(prop) {
+                    Some(AddBucket::Values(vs)) => vs
+                        .iter()
+                        .map(|v| v.prefixer.name.clone())
+                        .collect(),
+                    Some(AddBucket::Declaration { values, .. }) => values
+                        .iter()
+                        .map(|v| v.prefixer.name.clone())
+                        .collect(),
+                    _ => Vec::new(),
+                };
+                if !global.is_empty() && !local.is_empty() {
+                    let mut merged = global;
+                    merged.extend(local);
+                    Ok(utils::uniq(&merged))
+                } else if !global.is_empty() {
+                    Ok(global)
+                } else {
+                    Ok(local)
+                }
+            }
+            "remove" => {
+                let remove = self.remove.borrow();
+                let global: Vec<String> = remove
+                    .by_name
+                    .get("*")
+                    .map(|b| b.values().iter().map(|v| v.prefixed.clone()).collect())
+                    .unwrap_or_default();
+                let local: Vec<String> = remove
+                    .by_name
+                    .get(prop)
+                    .map(|b| b.values().iter().map(|v| v.prefixed.clone()).collect())
+                    .unwrap_or_default();
+                if !global.is_empty() && !local.is_empty() {
+                    let mut merged = global;
+                    merged.extend(local);
+                    Ok(utils::uniq(&merged))
+                } else if !global.is_empty() {
+                    Ok(global)
+                } else {
+                    Ok(local)
+                }
+            }
+            _ => Ok(Vec::new()),
+        }
+    }
+
+    /// JS: `preprocess(selected)` — `prefixes.js` lines 234-323.
+    ///
+    /// Builds the populated dispatch tables (`add` / `remove` /
+    /// `supports_inst`) from the post-`select()` data
+    /// (`add_table` / `remove_table`).
+    ///
+    /// **Hack dispatch limitation (Pass 2):** the JS `Selector.load /
+    /// Value.load / Declaration.load` factory routes through the
+    /// `Klass.hacks[name]` table; AGENT_5 has registered 5 hacks (the
+    /// AFM in-scope set). This Rust port currently constructs BASE
+    /// classes only — hack-routed names get base behaviour. The
+    /// affected names are: `cross-fade`, `fit-content` (Value),
+    /// `text-decoration`, `text-decoration-skip-ink`, `user-select`
+    /// (Declaration). For AFM corpus that doesn't exercise these, the
+    /// output is byte-clean. For corpus that does, the bytes diverge.
+    /// Tracked as AGENT_4 Pass 3 follow-up: wire `HackRegistry::lookup`
+    /// into the load paths here.
+    fn preprocess(&mut self) {
+        let mut add = AddTable::default();
+        let mut remove = RemoveTable::default();
+
+        // JS: `let add = { 'selectors': [], '@supports': new Supports(...) }`.
+        // Supports is stored in `supports_inst`, not the by_name map (heterogeneous types).
+
+        // ADD pass.
+        for (name, prefixes) in self.add_table.iter() {
+            // Look up the static data entry to detect selector / props
+            // discriminator. Names not in PREFIXES (synthetic prop keys
+            // generated by Value-with-props branches) won't be in the
+            // outer add_table loop — they're populated as side effects.
+            let entry = match PREFIXES.get(name.as_str()) {
+                Some(e) => e,
+                None => continue,
+            };
+
+            if name == "@keyframes" || name == "@viewport" {
+                add.by_name.insert(
+                    name.clone(),
+                    AddBucket::AtRule(AtRuleBase::new(
+                        // JS: `new AtRule(name, prefixes, this)`. JS `name`
+                        // is the bare key like "@keyframes" — JS uses it
+                        // as the at-rule name with the leading `@`
+                        // stripped at the prefix concatenation site.
+                        // Strip the leading `@` here to match the
+                        // at-rule's `.name` field on a parsed AST.
+                        name.trim_start_matches('@').to_string(),
+                        prefixes.clone(),
+                        0,
+                    )),
+                );
+            } else if name == "@resolution" {
+                add.by_name.insert(
+                    name.clone(),
+                    AddBucket::Resolution(ResolutionBase::new(
+                        name.clone(),
+                        prefixes.clone(),
+                        0,
+                    )),
+                );
+            } else if entry.selector {
+                add.selectors.push(SelectorBase::new(
+                    name.clone(),
+                    prefixes.clone(),
+                    0,
+                ));
+            } else if !entry.props.is_empty() {
+                // JS: `let value = Value.load(name, prefixes, this)`.
+                // For each prop in `data[name].props`, push the value
+                // onto `add[prop].values`. JS reuses the SAME ValueBase
+                // instance across props (line 256: `add[prop].values.push(value)`).
+                // We construct a fresh `ValueBase` per push because
+                // `ValueBase` doesn't derive `Clone` (the `regexp_cache`
+                // is a `OnceCell`); rebuilding only loses the lazy
+                // regex cache, which is recomputed on demand and is
+                // byte-equivalent — the only observable cost is one
+                // extra regex compile per Value-with-props prop on
+                // first-access.
+                for prop in &entry.props {
+                    let prop_key = prop.clone();
+                    let v_for_prop =
+                        ValueBase::new(name.clone(), prefixes.clone(), 0);
+                    match add.by_name.get_mut(&prop_key) {
+                        Some(AddBucket::Values(vs)) => vs.push(v_for_prop),
+                        Some(AddBucket::Declaration { values, .. }) => {
+                            values.push(v_for_prop);
+                        }
+                        _ => {
+                            add.by_name.insert(
+                                prop_key,
+                                AddBucket::Values(vec![v_for_prop]),
+                            );
+                        }
+                    }
+                }
+            } else {
+                // JS: `let values = (add[name] && add[name].values) || []`
+                // — preserve any value list a prior Value-with-props
+                // pass attached to this slot.
+                // JS: `let values = (add[name] && add[name].values) || []`
+                // — preserve the value list a prior Value-with-props
+                // pass attached. Empty in practice on Pass 2 because
+                // we don't `Vec::clone()` `ValueBase` (no Clone derive
+                // on ValueBase — see Value-with-props branch above).
+                // Effectively this is the no-prior-values case which
+                // matches JS for AFM-shaped inputs (the only case where
+                // prior values exist is `*`/global, which AFM doesn't
+                // exercise today).
+                let prior_values: Vec<ValueBase> =
+                    match add.by_name.shift_remove(name.as_str()) {
+                        Some(AddBucket::Values(vs)) => vs,
+                        Some(AddBucket::Declaration { values, .. }) => values,
+                        _ => Vec::new(),
+                    };
+                let decl = DeclarationBase::new(
+                    name.clone(),
+                    prefixes.clone(),
+                    0,
+                );
+                add.by_name.insert(
+                    name.clone(),
+                    AddBucket::Declaration {
+                        decl,
+                        values: prior_values,
+                    },
+                );
+            }
+        }
+
+        // REMOVE pass.
+        for (name, prefixes) in self.remove_table.iter() {
+            let entry = match PREFIXES.get(name.as_str()) {
+                Some(e) => e,
+                None => continue,
+            };
+
+            if entry.selector {
+                // JS: build a Selector(name, prefixes), then for each
+                // prefix push `selector.old(prefix)` (an OldSelector).
+                let selector =
+                    SelectorBase::new(name.clone(), prefixes.clone(), 0);
+                for prefix in prefixes {
+                    remove.selectors.push(selector.old(prefix));
+                }
+            } else if name == "@keyframes" || name == "@viewport" {
+                // JS: for each prefix, set
+                // `remove['@' + prefix + name.slice(1)] = { remove: true }`.
+                // E.g., `@keyframes` + `-webkit-` → `@-webkit-keyframes`.
+                let bare = &name[1..]; // strip leading '@'
+                for prefix in prefixes {
+                    let prefixed = format!("@{prefix}{bare}");
+                    remove
+                        .by_name
+                        .insert(prefixed, RemoveBucket::RemoveMarker);
+                }
+            } else if name == "@resolution" {
+                remove.by_name.insert(
+                    name.clone(),
+                    RemoveBucket::Resolution(ResolutionBase::new(
+                        name.clone(),
+                        prefixes.clone(),
+                        0,
+                    )),
+                );
+            } else if !entry.props.is_empty() {
+                // JS: `let value = Value.load(name, [], this)`. Note JS
+                // passes empty prefixes here (the OldValue list comes
+                // from `value.old(prefix)` per remove-prefix).
+                let value =
+                    ValueBase::new(name.clone(), Vec::new(), 0);
+                for prefix in prefixes {
+                    let old = value.old(prefix);
+                    for prop in &entry.props {
+                        let prop_key = prop.clone();
+                        let entry =
+                            remove.by_name.entry(prop_key).or_insert_with(
+                                || RemoveBucket::Values(Vec::new()),
+                            );
+                        match entry {
+                            RemoveBucket::Values(vs) => {
+                                vs.push(old.clone());
+                            }
+                            RemoveBucket::RemoveMarker => {
+                                *entry = RemoveBucket::RemoveMarkerWithValues(
+                                    vec![old.clone()],
+                                );
+                            }
+                            RemoveBucket::RemoveMarkerWithValues(vs) => {
+                                vs.push(old.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            } else {
+                // JS: bare-Declaration remove — for each prefix, call
+                // `decl(name).old(name, p)` returning Vec<String> of
+                // prefixed prop names; for each, set
+                // `remove[prefixed].remove = true`. Also: special
+                // align-self skip when both `-webkit-` and
+                // `-webkit- 2009` are in the add list.
+                let add_for_name = match self.add_table.get(name.as_str()) {
+                    Some(v) => v.clone(),
+                    None => Vec::new(),
+                };
+                let decl =
+                    DeclarationBase::new(name.clone(), Vec::new(), 0);
+                for p in prefixes {
+                    if name == "align-self" {
+                        if p == "-webkit- 2009"
+                            && add_for_name.iter().any(|x| x == "-webkit-")
+                        {
+                            continue;
+                        }
+                        if p == "-webkit-"
+                            && add_for_name
+                                .iter()
+                                .any(|x| x == "-webkit- 2009")
+                        {
+                            continue;
+                        }
+                    }
+                    // JS line 301: `decl(name).old(name, p)` — passes
+                    // the prefix verbatim (including any " 2009" note).
+                    // For non-align-self the note never appears here;
+                    // for align-self the conflict-skip block above
+                    // already handled the only conflict case. Pass
+                    // `p` as-is to match JS bytes.
+                    let olds = decl.old(name, p);
+                    for prefixed in olds {
+                        let entry = remove.by_name.entry(prefixed).or_insert(
+                            RemoveBucket::RemoveMarker,
+                        );
+                        match entry {
+                            RemoveBucket::Values(vs) => {
+                                let vs_clone = vs.clone();
+                                *entry =
+                                    RemoveBucket::RemoveMarkerWithValues(
+                                        vs_clone,
+                                    );
+                            }
+                            // RemoveMarker / RemoveMarkerWithValues: already has remove flag.
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        *self.add.borrow_mut() = add;
+        *self.remove.borrow_mut() = remove;
     }
 
     /// JS: `group(decl)`. Returns a view that walks the decl's prefix

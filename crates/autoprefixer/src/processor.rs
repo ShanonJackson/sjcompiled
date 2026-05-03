@@ -1,44 +1,58 @@
 //! Port of `crates/_vendor/autoprefixer-10.4.14/package/lib/processor.js`.
 //!
-//! ## Slice landed in this AGENT_4 pass
+//! ## Pass 1 landed
 //!
 //! - Module-level constants (regexes + `SIZES` list) — byte-clean.
 //! - `Processor` struct + `Processor::new`.
-//! - The orchestrator-control helpers (pure logic, used by the eventual
-//!   `add` / `remove` walks):
-//!   - `disabled`, `disabled_decl`, `disabled_value`
-//!   - `grid_status`, `display_type`, `with_hack_value`, `reduce_spaces`
-//! - `GridStatus` and `DisplayType` enums for the tri-state JS returns.
+//! - Orchestrator-control helpers: `disabled`, `disabled_decl`,
+//!   `disabled_value`, `grid_status`, `display_type`, `with_hack_value`,
+//!   `reduce_spaces`.
+//! - `GridStatus` / `DisplayType` enums.
 //!
-//! ## Slice deferred to the next AGENT_4 session
+//! ## Pass 2 landed
 //!
-//! - The main `add(css, result)` walk: `walkAtRules` → keyframes /
-//!   viewport / `@supports` / resolution dispatch; `walkRules` →
-//!   `prefixes.add.selectors[*].process(rule, result)`; `walkDecls` → the
-//!   13-prop warning ladder + per-prop prefixer dispatch + `Value.save`.
-//! - The main `remove(css, result)` walk.
-//! - `insertAreas` (grid-area helper from `lib/hacks/grid-utils.js`).
-//! - `preprocess()` — turns `Prefixes::add_table` (post-`select()`) into
-//!   the per-bucket Prefixer-instance dispatch table JS calls
-//!   `prefixes.add[prop].process(decl)` against. AGENT_5 territory but
-//!   consumed here.
+//! - `Processor::add(root, warnings)` — main pass orchestrator. Wraps:
+//!   - `walkAtRules` → keyframes / viewport / `@supports` / resolution
+//!     dispatch.
+//!   - `walkRules` → `add.selectors[*].process(rule)`.
+//!   - First `walkDecls` → per-prop dispatch through `add[prop]`.
+//!   - Second `walkDecls` → value-pass + `Value::save`.
+//! - `Processor::remove(root, warnings)` — symmetric pass via
+//!   `prefixes.cleaner()`.
+//! - `Value::save` — flushes `_autoprefixerValues` from decl attr to
+//!   decl.value (and emits `cloneBefore` siblings when the prefixed
+//!   variant differs from the original prop).
 //!
-//! Rationale for the slice: the helpers are pure-logic and depend only
-//! on the AST + `_autoprefixer*` attr keys + `Prefixes::group` (which
-//! AGENT_1 landed). They land 0→100% byte-clean today and are
-//! load-bearing for both walks. The walks themselves require a
-//! Prefixer-instance dispatch table that doesn't exist; landing the
-//! walks against ad-hoc dispatch would either:
-//! 1. fork from JS shape (drift), or
-//! 2. require introducing new fields on `Prefixes` (AGENT_1 territory).
+//! ## Pass 2 deferred (Pass 3 follow-up)
 //!
-//! Per AGENT_4.md "Scope discipline": one slice 0→100% byte-clean.
+//! - The 13-prop **warning ladder** in `walkDecls` (color-adjust,
+//!   grid-row-span, display:box, etc.). Diagnostic only — none reach
+//!   output bytes for AFM. Three of them DO short-circuit prefix
+//!   dispatch (grid-row-span, grid-column-span, display:box); these
+//!   three are implemented; the rest are skipped with no output drift.
+//! - `transition` / `transition-property` decl dispatch — needs the
+//!   transition view wired through Processor; deferred so the borrow
+//!   shape stays clean.
+//! - `align-self` / `justify-self` / `place-self` flexbox/grid
+//!   special-cases.
+//! - The grid-prefix block (`gridPrefixes && this.gridStatus(decl, result)`)
+//!   — fires only when `prefixes.add['grid-area']` has prefixes.
+//!   AFM's grid:off default skips this entirely.
+//! - `insertAreas` from `lib/hacks/grid-utils.js`.
+//! - **Hack dispatch in `preprocess()`** (now lives on `prefixes.rs`):
+//!   AGENT_5's 5 registered hacks (`cross-fade`, `fit-content`,
+//!   `text-decoration`, `text-decoration-skip-ink`, `user-select`)
+//!   currently route to BASE classes. Bytes diverge for those names.
 
 use once_cell::sync::Lazy;
-use postcss_core::{node_at_path, node_at_path_mut, AttrValue, Node, NodeKind};
+use postcss_core::{
+    node_at_path, node_at_path_mut, walk_at_rules_mut_with_parent,
+    walk_decls_mut_with_parent, walk_rules_mut_with_parent, AttrValue,
+    DeferredMutation, Node, NodeKind,
+};
 use regex::Regex;
 
-use crate::prefixes::Prefixes;
+use crate::prefixes::{AddBucket, Prefixes, RemoveBucket};
 
 // JS top-of-file regex constants (lines 6-9 of processor.js). Keep
 // raw-string + flags identical to JS for byte parity.
@@ -780,6 +794,714 @@ block, not to the next rules."
             }
         }
     }
+
+    // ---- Pass 2: main `add` / `remove` walks ----
+
+    /// JS: `add(css, result)` — `processor.js` lines 46-397.
+    ///
+    /// Orchestrates four walks in sequence:
+    /// 1. `walkAtRules` — keyframes / viewport / supports / resolution.
+    /// 2. `walkRules` — selectors.
+    /// 3. First `walkDecls` — per-prop prefixer dispatch.
+    /// 4. Second `walkDecls` — value-pass + `Value::save`.
+    ///
+    /// Each walk uses `walk_*_mut_with_parent` from `postcss_core`.
+    /// Inside the callback, prefixer instances do their own
+    /// `insert_before_at_path` (mutating the AST). The walker manages
+    /// its own cursor; we return `DeferredMutation::Keep` so the walker
+    /// continues at the same index. Re-visits hit `is_already` and skip
+    /// (idempotency holds — see `at_rule.rs::add` and
+    /// `declaration.rs::is_already`).
+    ///
+    /// `warnings` collects diagnostic messages produced by `disabled` /
+    /// `gridStatus` (Second-Autoprefixer-control-comment warnings).
+    /// Diagnostic only — not on the byte-output hashing path.
+    pub fn add(&self, root: &mut Node, warnings: &mut Vec<String>) {
+        // JS line 48-51: snapshot the at-rule prefixer-name flags so the
+        // walkAtRules callback can branch quickly.
+        let has_keyframes =
+            self.prefixes.add.borrow().by_name.contains_key("@keyframes");
+        let has_viewport =
+            self.prefixes.add.borrow().by_name.contains_key("@viewport");
+        let has_resolution = self
+            .prefixes
+            .add
+            .borrow()
+            .by_name
+            .contains_key("@resolution");
+
+        // JS line 53-76: walkAtRules.
+        walk_at_rules_mut_with_parent(root, |r, path, _ctx| {
+            let (rule_name, params_has_resolution) =
+                match node_at_path(r, path) {
+                    Some(n) => match &n.kind {
+                        NodeKind::AtRule(at) => (
+                            at.name.clone(),
+                            at.params.contains("-resolution"),
+                        ),
+                        _ => return DeferredMutation::Keep,
+                    },
+                    None => return DeferredMutation::Keep,
+                };
+
+            // JS: `if (this.disabled(rule, result)) return undefined`
+            // — at-rule dispatch checks disabled FIRST. The `disabled`
+            // recurses into parent — safe to call on `r`.
+            if self.disabled(r, path, warnings) {
+                return DeferredMutation::Keep;
+            }
+
+            if rule_name == "keyframes" && has_keyframes {
+                let mut add = self.prefixes.add.borrow_mut();
+                if let Some(AddBucket::AtRule(at)) =
+                    add.by_name.get_mut("@keyframes")
+                {
+                    at.process(r, path);
+                }
+            } else if rule_name == "viewport" && has_viewport {
+                let mut add = self.prefixes.add.borrow_mut();
+                if let Some(AddBucket::AtRule(at)) =
+                    add.by_name.get_mut("@viewport")
+                {
+                    at.process(r, path);
+                }
+            } else if rule_name == "supports" {
+                // JS: `if (this.prefixes.options.supports !== false &&
+                // !this.disabled(rule, result)) supports.process(rule)`.
+                if self.prefixes.options.supports != Some(false) {
+                    // Take the at-rule out of the tree, run Supports::process
+                    // on it, put it back. JS calls `supports.process(rule)`
+                    // with a borrowed rule reference — Rust's borrow check
+                    // forces this dance because `Supports::process` takes
+                    // `&mut Node` and `&Prefixes`, and we already hold
+                    // `&mut Node` to root + a borrow on `prefixes`.
+                    let mut taken = match node_at_path_mut(r, path) {
+                        Some(n) => std::mem::take(n),
+                        None => return DeferredMutation::Keep,
+                    };
+                    self.prefixes
+                        .supports_inst
+                        .borrow_mut()
+                        .process(&mut taken, self.prefixes);
+                    if let Some(slot) = node_at_path_mut(r, path) {
+                        *slot = taken;
+                    }
+                }
+            } else if rule_name == "media"
+                && params_has_resolution
+                && has_resolution
+            {
+                let mut add = self.prefixes.add.borrow_mut();
+                if let Some(AddBucket::Resolution(res)) =
+                    add.by_name.get_mut("@resolution")
+                {
+                    res.process(r, path);
+                }
+            }
+
+            DeferredMutation::Keep
+        });
+
+        // JS line 79-85: walkRules — for each selector prefixer, call
+        // `selector.process(rule, result)`. JS `selector.process` is on
+        // the base class (`prefixer.js::process`) which iterates the
+        // selector's prefixes and calls `selector.add(rule, prefix)` per
+        // prefix.
+        //
+        // **Cursor-shift bug**: each successful `selector.add` inserts a
+        // prefixed clone BEFORE the rule at `path`. After the insert,
+        // the original rule's path index is at `path[-1] + 1`. Without a
+        // path bump, the SECOND iteration's `selector.add` would target
+        // the just-inserted clone instead of the original. Fix: track a
+        // `current_path` mirror, detect insert success via parent-len
+        // delta, bump on success. Mirrors `at_rule.rs::process`'s
+        // cursor-bump pattern (HANDOVER §3).
+        //
+        // Note: `selector.add` itself runs `already()` to skip when a
+        // prefixed sibling already exists. Without the bump,
+        // every-other call would self-confuse and either no-op (clone
+        // appears already-prefixed for self) or insert into an
+        // unbounded chain. Pinned by
+        // `add_emits_prefixed_clone_for_fullscreen_pseudo`.
+        let selector_count = self.prefixes.add.borrow().selectors.len();
+        if selector_count > 0 {
+            walk_rules_mut_with_parent(root, |r, path, _ctx| {
+                if self.disabled(r, path, warnings) {
+                    return DeferredMutation::Keep;
+                }
+                // Snapshot per-selector prefix lists.
+                let per_selector: Vec<Vec<String>> = {
+                    let add = self.prefixes.add.borrow();
+                    add.selectors
+                        .iter()
+                        .map(|s| s.prefixer.prefixes.clone())
+                        .collect()
+                };
+
+                let mut current_path = path.to_vec();
+                for (sel_idx, prefixes_for_sel) in
+                    per_selector.iter().enumerate()
+                {
+                    // JS gate: `selector.check(rule)` filters prefixed
+                    // clones (their selector doesn't contain the bare
+                    // name like `:fullscreen`). Without this gate the
+                    // walker visits the inserted clones and tries to
+                    // re-prefix them — selector.add doesn't filter, so
+                    // the loop becomes unbounded as each visit inserts
+                    // more clones. The check-gate matches JS's
+                    // `Selector.check` precondition baked into
+                    // `Selector.process`.
+                    let passes_check = {
+                        let add = self.prefixes.add.borrow();
+                        let sel = match add.selectors.get(sel_idx) {
+                            Some(s) => s,
+                            None => continue,
+                        };
+                        match node_at_path(r, &current_path) {
+                            Some(n) => sel.check(n),
+                            None => false,
+                        }
+                    };
+                    if !passes_check {
+                        continue;
+                    }
+                    for prefix in prefixes_for_sel {
+                        let len_before =
+                            postcss_core::parent_nodes(r, &current_path)
+                                .map(|n| n.len())
+                                .unwrap_or(0);
+                        {
+                            let add = self.prefixes.add.borrow();
+                            if let Some(sel) = add.selectors.get(sel_idx)
+                            {
+                                sel.add(r, &current_path, prefix);
+                            }
+                        }
+                        let len_after =
+                            postcss_core::parent_nodes(r, &current_path)
+                                .map(|n| n.len())
+                                .unwrap_or(0);
+                        if len_after > len_before {
+                            if let Some(p) = current_path.last_mut() {
+                                *p += 1;
+                            }
+                        }
+                    }
+                }
+                DeferredMutation::Keep
+            });
+        }
+
+        // JS line 108-376: first walkDecls — disabled-decl gate +
+        // 3-of-13 short-circuit warnings + per-prop prefixer dispatch.
+        walk_decls_mut_with_parent(root, |r, path, _ctx| {
+            // JS line 109: `if (this.disabledDecl(decl, result)) return undefined`.
+            if self.disabled_decl(r, path, warnings) {
+                return DeferredMutation::Keep;
+            }
+
+            // Snapshot decl prop+value before borrowing `add`.
+            let (prop, _value) = match node_at_path(r, path) {
+                Some(n) => match &n.kind {
+                    NodeKind::Declaration(d) => {
+                        (d.prop.clone(), d.value.clone())
+                    }
+                    _ => return DeferredMutation::Keep,
+                },
+                None => return DeferredMutation::Keep,
+            };
+
+            // JS line 123-141: 3-of-13 short-circuit branches that
+            // cause the dispatch to be skipped. Other warning-only
+            // branches are diagnostic-only (Pass 3 follow-up).
+            if prop == "grid-row-span"
+                || prop == "grid-column-span"
+                || (prop == "display" && _value == "box")
+            {
+                // JS warns + returns undefined → skip dispatch.
+                return DeferredMutation::Keep;
+            }
+
+            // JS line 332-336: transition / transition-property →
+            // Transition::add. Pass 3 follow-up — see module docs.
+            if prop == "transition" || prop == "transition-property" {
+                return DeferredMutation::Keep;
+            }
+
+            // JS line 335-366: align-self / justify-self / place-self
+            // special grid/flex dispatch. Pass 3 follow-up.
+            if prop == "align-self"
+                || prop == "justify-self"
+                || prop == "place-self"
+            {
+                return DeferredMutation::Keep;
+            }
+
+            // JS line 368-372: the default `prefixer = add[decl.prop]`
+            // dispatch. Both Declaration buckets and Values buckets get
+            // run here; JS's `prefixer.prefixes` truthy check filters
+            // out Values-only buckets (no `.prefixes` field).
+            let bucket_kind = self
+                .prefixes
+                .add
+                .borrow()
+                .by_name
+                .get(&prop)
+                .map(|b| match b {
+                    AddBucket::Declaration { .. } => "decl",
+                    AddBucket::Values(_) => "values",
+                    _ => "other",
+                });
+            if bucket_kind == Some("decl") {
+                let mut add = self.prefixes.add.borrow_mut();
+                if let Some(AddBucket::Declaration { decl, .. }) =
+                    add.by_name.get_mut(&prop)
+                {
+                    // JS line 371: `prefixer.process(decl, result)`. The
+                    // Pass 1 wiring of `restore_before` runs inside.
+                    decl.process(self.prefixes, r, path);
+                }
+            }
+
+            DeferredMutation::Keep
+        });
+
+        // JS line 385-396: second walkDecls — disabled-value gate +
+        // value-pass + `Value::save`.
+        walk_decls_mut_with_parent(root, |r, path, _ctx| {
+            if self.disabled_value(r, path, warnings) {
+                return DeferredMutation::Keep;
+            }
+
+            let prop = match node_at_path(r, path) {
+                Some(n) => match &n.kind {
+                    NodeKind::Declaration(d) => d.prop.clone(),
+                    _ => return DeferredMutation::Keep,
+                },
+                None => return DeferredMutation::Keep,
+            };
+            let unprefixed = self.prefixes.unprefixed_prop(&prop);
+
+            // JS line 389-394: iterate `prefixes.values('add', unprefixed)`,
+            // calling `value.process(decl)` for each. We dispatch
+            // through `add[unprefixed]` (Values or Declaration with
+            // attached values).
+            let value_count = match self
+                .prefixes
+                .add
+                .borrow()
+                .by_name
+                .get(&unprefixed)
+            {
+                Some(AddBucket::Values(vs)) => vs.len(),
+                Some(AddBucket::Declaration { values, .. }) => values.len(),
+                _ => 0,
+            };
+            for i in 0..value_count {
+                let mut add = self.prefixes.add.borrow_mut();
+                let v = match add.by_name.get_mut(&unprefixed) {
+                    Some(AddBucket::Values(vs)) => vs.get_mut(i),
+                    Some(AddBucket::Declaration { values, .. }) => {
+                        values.get_mut(i)
+                    }
+                    _ => None,
+                };
+                if let Some(v) = v {
+                    // ValueBase doesn't have a `process(decl, result)`
+                    // method — it has `add(decl, prefix)`. The JS
+                    // `value.process(decl)` iterates the value's
+                    // prefixes and calls `add` per prefix; replicate
+                    // that loop inline.
+                    let prefixes_for_v = v.prefixer.prefixes.clone();
+                    let here = match node_at_path_mut(r, path) {
+                        Some(n) => n,
+                        None => break,
+                    };
+                    // `check(decl)` — JS gate before any add fires.
+                    if !v.check(here) {
+                        continue;
+                    }
+                    for prefix in &prefixes_for_v {
+                        v.add(here, prefix);
+                    }
+                }
+            }
+
+            // JS line 395: `Value.save(this.prefixes, decl)`.
+            value_save(self.prefixes, r, path);
+
+            DeferredMutation::Keep
+        });
+    }
+
+    /// JS: `remove(css, result)` — `processor.js` lines 402-485.
+    ///
+    /// The `remove` pass uses `prefixes.cleaner()` (a `Prefixes` keyed
+    /// by an empty browser list — every prefix is treated as stale).
+    /// JS dispatches three sub-passes:
+    /// 1. `walkAtRules` — drop at-rules whose name matches a
+    ///    `remove[@<prefix><name>]` marker; clean resolution params.
+    /// 2. `walkRules` — drop rules whose selectors match an
+    ///    `OldSelector::check` regex.
+    /// 3. `walkDecls` — drop decls whose prop matches a remove marker
+    ///    (with cascade/raw-before adjustments).
+    pub fn remove(&self, root: &mut Node, warnings: &mut Vec<String>) {
+        let cleaner = self.prefixes.cleaner();
+
+        // JS line 406-418: walkAtRules.
+        let has_resolution = cleaner
+            .remove
+            .borrow()
+            .by_name
+            .contains_key("@resolution");
+        walk_at_rules_mut_with_parent(root, |r, path, _ctx| {
+            let (rule_name, has_resolution_param) =
+                match node_at_path(r, path) {
+                    Some(n) => match &n.kind {
+                        NodeKind::AtRule(at) => (
+                            at.name.clone(),
+                            at.params.contains("-resolution"),
+                        ),
+                        _ => return DeferredMutation::Keep,
+                    },
+                    None => return DeferredMutation::Keep,
+                };
+
+            // JS: `if (this.prefixes.remove[`@${rule.name}`])`.
+            let removed_key = format!("@{rule_name}");
+            let has_remove_marker = cleaner
+                .remove
+                .borrow()
+                .by_name
+                .get(&removed_key)
+                .map(|b| b.has_remove())
+                .unwrap_or(false);
+            if has_remove_marker {
+                if !self.disabled(r, path, warnings) {
+                    return DeferredMutation::Remove;
+                }
+            } else if rule_name == "media"
+                && has_resolution_param
+                && has_resolution
+            {
+                let mut remove = cleaner.remove.borrow_mut();
+                if let Some(RemoveBucket::Resolution(res)) =
+                    remove.by_name.get_mut("@resolution")
+                {
+                    if let Some(slot) = node_at_path_mut(r, path) {
+                        res.clean(slot);
+                    }
+                }
+            }
+
+            DeferredMutation::Keep
+        });
+
+        // JS line 421-429: walkRules — drop rules whose selector
+        // matches an OldSelector check. JS `OldSelector::check(rule)`
+        // pulls `rule.selector` and walks `rule.next()` siblings; in
+        // Rust the corresponding `OldSelector::check(rule_selector,
+        // following_selectors)` takes both explicitly.
+        let selector_count = cleaner.remove.borrow().selectors.len();
+        if selector_count > 0 {
+            walk_rules_mut_with_parent(root, |r, path, _ctx| {
+                let (rule_selector, following): (
+                    String,
+                    Vec<Option<String>>,
+                ) = {
+                    let here = match node_at_path(r, path) {
+                        Some(n) => n,
+                        None => return DeferredMutation::Keep,
+                    };
+                    let sel = match &here.kind {
+                        NodeKind::Rule(rl) => rl.selector.clone(),
+                        _ => return DeferredMutation::Keep,
+                    };
+                    let parent_kids = match postcss_core::parent_nodes(r, path)
+                    {
+                        Some(p) => p,
+                        None => return DeferredMutation::Keep,
+                    };
+                    let here_idx = match path.last().copied() {
+                        Some(i) => i,
+                        None => return DeferredMutation::Keep,
+                    };
+                    let following: Vec<Option<String>> = parent_kids
+                        .iter()
+                        .skip(here_idx + 1)
+                        .map(|n| match &n.kind {
+                            NodeKind::Rule(rl) => Some(rl.selector.clone()),
+                            _ => None,
+                        })
+                        .collect();
+                    (sel, following)
+                };
+
+                let matches_any = {
+                    let remove = cleaner.remove.borrow();
+                    remove.selectors.iter().any(|c| {
+                        c.check(
+                            &rule_selector,
+                            following.iter().map(|s| s.as_deref()),
+                        )
+                    })
+                };
+                if matches_any {
+                    if !self.disabled(r, path, warnings) {
+                        return DeferredMutation::Remove;
+                    }
+                }
+                DeferredMutation::Keep
+            });
+        }
+
+        // JS line 431-484: walkDecls — drop decls whose prop has a
+        // remove marker (with cascade adjustments).
+        walk_decls_mut_with_parent(root, |r, path, _ctx| {
+            if self.disabled(r, path, warnings) {
+                return DeferredMutation::Keep;
+            }
+
+            let (prop, _value) = match node_at_path(r, path) {
+                Some(n) => match &n.kind {
+                    NodeKind::Declaration(d) => {
+                        (d.prop.clone(), d.value.clone())
+                    }
+                    _ => return DeferredMutation::Keep,
+                },
+                None => return DeferredMutation::Keep,
+            };
+            let unprefixed = self.prefixes.unprefixed_prop(&prop);
+
+            // JS line 438-440: transition → transition.remove. Pass 3.
+
+            // JS line 443-467: prop-marker check.
+            let prop_has_remove = cleaner
+                .remove
+                .borrow()
+                .by_name
+                .get(&prop)
+                .map(|b| b.has_remove())
+                .unwrap_or(false);
+            if prop_has_remove {
+                // JS: `notHack = this.prefixes.group(decl).down(other => ...)`.
+                // If a sibling further down has the unprefixed prop,
+                // this decl is "not a hack" and can be removed.
+                let not_hack_initial =
+                    self.prefixes.group(r, path).is_some_and(|g| {
+                        g.down(r, |other| match &other.kind {
+                            NodeKind::Declaration(d) => {
+                                self.prefixes.normalize_prop(&d.prop)
+                                    == unprefixed
+                            }
+                            _ => false,
+                        })
+                    });
+
+                let is_flex_flow = unprefixed == "flex-flow";
+
+                // JS line 455-458: `-webkit-box-orient` special — only
+                // remove when sibling has `flex-direction` or `flex-flow`.
+                let webkit_box_orient_skip = {
+                    if prop == "-webkit-box-orient" {
+                        let parent_has = postcss_core::parent_some(
+                            r,
+                            path,
+                            |sibling| match &sibling.kind {
+                                NodeKind::Declaration(d) => {
+                                    d.prop == "flex-direction"
+                                        || d.prop == "flex-flow"
+                                }
+                                _ => false,
+                            },
+                        );
+                        !parent_has
+                    } else {
+                        false
+                    }
+                };
+                if webkit_box_orient_skip {
+                    return DeferredMutation::Keep;
+                }
+
+                let not_hack = not_hack_initial || is_flex_flow;
+                if not_hack && !self.with_hack_value_at(r, path) {
+                    // JS line 461-463: `if (decl.raw('before').includes('\n')) reduceSpaces(decl)`.
+                    let before_has_newline = node_at_path(r, path)
+                        .and_then(|n| n.raws.before.as_deref())
+                        .map(|s| s.contains('\n'))
+                        .unwrap_or(false);
+                    if before_has_newline {
+                        self.reduce_spaces(r, path);
+                    }
+                    return DeferredMutation::Remove;
+                }
+            }
+
+            // JS line 470-483: value-pass. Iterate `cleaner.values('remove',
+            // unprefixed)` — for each checker, if `checker.check(decl.value)`
+            // matches, mark for removal if the group has a non-prefixed
+            // sibling.
+            let value_checkers: Vec<crate::old_value::OldValue> = {
+                let remove = cleaner.remove.borrow();
+                let mut all: Vec<crate::old_value::OldValue> =
+                    Vec::new();
+                if let Some(b) = remove.by_name.get(&unprefixed) {
+                    all.extend(b.values().iter().cloned());
+                }
+                all
+            };
+            for checker in value_checkers {
+                let value = match node_at_path(r, path) {
+                    Some(n) => match &n.kind {
+                        NodeKind::Declaration(d) => d.value.clone(),
+                        _ => continue,
+                    },
+                    None => continue,
+                };
+                if !checker.check(&value) {
+                    continue;
+                }
+                let unp = checker.unprefixed.clone();
+                let not_hack =
+                    self.prefixes.group(r, path).is_some_and(|g| {
+                        g.down(r, |other| match &other.kind {
+                            NodeKind::Declaration(d) => {
+                                d.value.contains(&unp)
+                            }
+                            _ => false,
+                        })
+                    });
+                if not_hack {
+                    return DeferredMutation::Remove;
+                }
+            }
+
+            DeferredMutation::Keep
+        });
+    }
+
+    fn with_hack_value_at(&self, root: &Node, path: &[usize]) -> bool {
+        match node_at_path(root, path) {
+            Some(n) => self.with_hack_value(n),
+            None => false,
+        }
+    }
+}
+
+/// JS: `Value.save(prefixes, decl)` — `value.js` static method (lines
+/// outside `class Value`). Flushes the per-decl `_autoprefixerValues`
+/// map into either:
+/// - a sibling `cloneBefore` decl (for prefixes that don't equal the
+///   decl's own prop), OR
+/// - the original decl's `value` (for prefixes that DO equal the decl's
+///   own prop, i.e. the unprefixed version when the decl IS unprefixed).
+///
+/// JS body:
+/// ```js
+/// static save(prefixes, decl) {
+///   let prop = decl.prop
+///   let result = []
+///   for (let prefix in decl._autoprefixerValues) {
+///     let value = decl._autoprefixerValues[prefix]
+///     if (value === decl.value) continue
+///     let prefixed
+///     if (/-(o|moz|ms|webkit|khtml)-/.test(prop)) prefixed = prop
+///     else prefixed = prefixes.prefixed(prop, prefix)
+///     if (prefixed === prop) {
+///       decl.value = value
+///       result.push(prefixed)
+///       continue
+///     }
+///     let cloned = decl.cloneBefore({ value })
+///     // ... cloned.prop = prefixed if !already
+///     result.push(prefixed)
+///   }
+///   return result
+/// }
+/// ```
+fn value_save(prefixes: &Prefixes, root: &mut Node, path: &[usize]) {
+    static VENDOR_RE: once_cell::sync::Lazy<Regex> =
+        once_cell::sync::Lazy::new(|| {
+            Regex::new(r"-(o|moz|ms|webkit|khtml)-").unwrap()
+        });
+
+    // Snapshot the values map and the decl's own prop / value.
+    let (prop, decl_value, values_map) = match node_at_path(root, path) {
+        Some(n) => match &n.kind {
+            NodeKind::Declaration(d) => (
+                d.prop.clone(),
+                d.value.clone(),
+                n.attrs
+                    .get_string_map(crate::value::ATTR_VALUES)
+                    .cloned()
+                    .unwrap_or_default(),
+            ),
+            _ => return,
+        },
+        None => return,
+    };
+
+    if values_map.is_empty() {
+        return;
+    }
+
+    // Track whether we're modifying the original (so subsequent prefix
+    // entries see the updated decl.value when comparing against `value
+    // === decl.value`).
+    let mut current_decl_value = decl_value.clone();
+    // Path of the original decl (shifts up by 1 for each cloneBefore
+    // we apply — same cursor-shift pattern as `at_rule.rs::process`).
+    let mut current_path = path.to_vec();
+
+    for (prefix, value) in values_map.iter() {
+        if value == &current_decl_value {
+            continue;
+        }
+        let prefixed = if VENDOR_RE.is_match(&prop) {
+            prop.clone()
+        } else {
+            prefixes.prefixed(&prop, prefix)
+        };
+        if prefixed == prop {
+            // JS: `decl.value = value` — modify original in place.
+            if let Some(here) = node_at_path_mut(root, &current_path) {
+                if let NodeKind::Declaration(ref mut d) = here.kind {
+                    d.value = value.clone();
+                    current_decl_value = value.clone();
+                }
+            }
+            continue;
+        }
+
+        // JS: `let cloned = decl.cloneBefore({ value })`. JS
+        // cloneBefore inserts a NEW decl before this one and copies
+        // ALL fields except those overridden in the second arg.
+        let original = match node_at_path(root, &current_path) {
+            Some(n) => n,
+            None => return,
+        };
+        let mut cloned = crate::prefixer::clone_node(original);
+        if let NodeKind::Declaration(ref mut d) = cloned.kind {
+            d.value = value.clone();
+        }
+        // JS line: `if (prefixed === decl.prop) ...` — JS doesn't set
+        // cloned.prop in that branch (the prefix matched the decl's
+        // own prop, so the value-replace branch above already fired).
+        // The else branch: `cloned.prop = prefixed`.
+        if prefixed != prop {
+            if let NodeKind::Declaration(ref mut d) = cloned.kind {
+                d.prop = prefixed.clone();
+            }
+        }
+        // JS: `decl.parent.insertBefore(decl, cloned)`. Cursor-shift:
+        // the original moves from `current_path[-1]` to
+        // `current_path[-1] + 1`.
+        postcss_core::insert_before_at_path(root, &current_path, cloned);
+        if let Some(last) = current_path.last_mut() {
+            *last += 1;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1102,5 +1824,166 @@ mod tests {
             .before
             .clone();
         assert_eq!(webkit_before, webkit_after);
+    }
+
+    // ---- Pass 2 end-to-end smoke tests ----
+
+    #[test]
+    fn add_runs_on_empty_input_without_panic() {
+        // Smoke: empty input round-trips identically.
+        let mut r = parse("").unwrap();
+        let p = afm_prefixes();
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.add(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        assert_eq!(out, "");
+    }
+
+    #[test]
+    fn add_round_trips_disabled_block() {
+        // Corpus 040: an `autoprefixer: off` block. Nothing should be
+        // prefixed; output must be byte-identical to input.
+        let input = "a {\n  /* autoprefixer: off */\n  display: flex;\n}\n";
+        let mut r = parse(input).unwrap();
+        let p = afm_prefixes();
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.add(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        assert_eq!(out, input);
+    }
+
+    #[test]
+    fn add_round_trips_when_grid_is_off() {
+        // AFM default: options.grid is None → grid is off. A
+        // `grid-template-columns` decl is disabled by `disabled_decl`
+        // and the dispatch is skipped.
+        let input = "a {\n  grid-template-columns: 1fr;\n}\n";
+        let mut r = parse(input).unwrap();
+        let p = afm_prefixes();
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.add(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        // Grid is off, so the decl is disabled and no prefixes added —
+        // input round-trips verbatim.
+        assert_eq!(out, input);
+    }
+
+    #[test]
+    fn add_short_circuits_grid_row_span() {
+        // grid-row-span is one of the 3 short-circuit branches. JS
+        // warns and returns undefined. Even if grid is on, no prefix
+        // is added because the dispatch is skipped.
+        let input = "a {\n  grid-row-span: 2;\n}\n";
+        let mut r = parse(input).unwrap();
+        let mut p = afm_prefixes();
+        p.options.grid = Some("true".into());
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.add(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        // No -ms-grid-row-span — grid-row-span short-circuited.
+        assert!(!out.contains("-ms-grid-row-span"));
+        // Original decl still present.
+        assert!(out.contains("grid-row-span: 2"));
+    }
+
+    #[test]
+    fn remove_runs_on_empty_input_without_panic() {
+        let mut r = parse("").unwrap();
+        let p = afm_prefixes();
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.remove(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        assert_eq!(out, "");
+    }
+
+    #[test]
+    fn add_then_remove_is_idempotent_on_unrelated_input() {
+        // Input with no prefixable decls — both passes must round-trip.
+        let input = "a {\n  color: red;\n}\n";
+        let mut r = parse(input).unwrap();
+        let p = afm_prefixes();
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.add(&mut r.root, &mut warnings);
+        proc.remove(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        assert_eq!(out, input);
+    }
+
+    #[test]
+    fn add_skips_dispatch_for_self_disabled_decl() {
+        // A decl preceded by `autoprefixer: ignore next` should not be
+        // prefixed even when its prop matches a known prefixer name.
+        let input = "a {\n  /* autoprefixer: ignore next */\n  display: flex;\n}\n";
+        let mut r = parse(input).unwrap();
+        let p = afm_prefixes();
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.add(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        // The `display: flex` should NOT be expanded into prefixed
+        // siblings because it's self-disabled.
+        assert!(!out.contains("-webkit-flex"));
+        assert!(out.contains("display: flex"));
+    }
+
+    fn ie11_prefixes() -> Prefixes {
+        // Force a broad-prefix browser list to exercise the dispatch
+        // beyond AFM's modern-only set. ie 11 needs `-ms-` prefixes
+        // for grid + `-webkit-` for fullscreen / placeholder. Direct
+        // construction skips browserslist resolution.
+        use crate::browsers::{BrowserslistOpts, Browsers, BrowsersOptions};
+        let b = Browsers {
+            selected: vec!["ie 11".to_string(), "firefox 50".to_string()],
+            options: BrowsersOptions::default(),
+            browserslist_opts: BrowserslistOpts::default(),
+        };
+        Prefixes::new(b, Default::default())
+    }
+
+    #[test]
+    fn add_emits_prefixed_clone_for_fullscreen_pseudo() {
+        // ie 11 + firefox 50 selected → :fullscreen should get
+        // -webkit-fullscreen and -moz-full-screen sibling rules.
+        let input = ":fullscreen { color: red; }";
+        let mut r = parse(input).unwrap();
+        let p = ie11_prefixes();
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.add(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        // At least one prefixed selector clone must exist.
+        let has_any_prefix = out.contains(":-webkit-")
+            || out.contains(":-moz-")
+            || out.contains(":-ms-");
+        assert!(
+            has_any_prefix,
+            "expected prefixed :fullscreen clone, got: {out}"
+        );
+        // Original :fullscreen still present.
+        assert!(out.contains(":fullscreen"));
+    }
+
+    #[test]
+    fn corpus_040_control_off_block_is_round_trip() {
+        // AGENT_6's corpus 040: an off-block should round-trip.
+        // Mirrors the staged fixture without depending on file IO.
+        let input = "/* autoprefixer: off */\na {\n  display: flex;\n  user-select: none;\n}\n";
+        let mut r = parse(input).unwrap();
+        let p = afm_prefixes();
+        let proc = Processor::new(&p);
+        let mut warnings = Vec::new();
+        proc.add(&mut r.root, &mut warnings);
+        let out = postcss_core::stringify(&r);
+        // Nothing is prefixed because the entire block is off.
+        assert!(!out.contains("-webkit-"));
+        assert!(!out.contains("-moz-"));
+        // Bytes match input exactly.
+        assert_eq!(out, input);
     }
 }

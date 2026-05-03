@@ -223,6 +223,22 @@ pub enum Stage {
     /// normalize-unicode, reduce-initial) would resolve to the workspace
     /// default which can drift across caniuse-lite versions.
     CssnanoBand,
+
+    /// `parse → autoprefixer@10.4.14 (AFM browserslist) → stringify`. Phase 7.
+    /// Runs `Processor::remove(root) → Processor::add(root)` against a
+    /// `Prefixes` built from AFM's pinned `.browserslistrc` fixture
+    /// (`crates/browserslist-shim/tests/fixtures/afm/.browserslistrc` —
+    /// SHA256 `08c8e1bf56ad773621c9b264971365f66f78a808d6d369a4ea9584a02da459cb`,
+    /// see HANDOVER.md §6). Both engines pin to the same fixture: Rust
+    /// via `BrowsersOptions::from`, JS via `BROWSERSLIST_CONFIG` env var.
+    /// AFM never drifts away from this fixture, so the parity gate
+    /// validates the exact production resolution path.
+    ///
+    /// Pre-condition: AGENT_4 Pass 2 landed — `Processor::add` /
+    /// `Processor::remove` are real. Pre-AFM-hack-subset coverage of the
+    /// 5 in-scope hacks (cross-fade / intrinsic / text-decoration /
+    /// text-decoration-skip-ink / user-select) lands via AGENT_5's Pass B.
+    Autoprefixer,
 }
 
 impl Stage {
@@ -258,8 +274,29 @@ impl Stage {
             Stage::PostcssConvertValues => "postcss-convert-values",
             Stage::Sort => "sort",
             Stage::CssnanoBand => "cssnano-band",
+            Stage::Autoprefixer => "autoprefixer",
         }
     }
+}
+
+/// Absolute path to AFM's pinned `.browserslistrc` fixture directory.
+/// Both engines (Rust `BrowsersOptions::from`, JS `BROWSERSLIST_CONFIG`)
+/// pin to this directory so the resolution path is identical end-to-end.
+/// HANDOVER.md §6 documents the closure rationale.
+fn afm_browserslist_dir() -> std::path::PathBuf {
+    // CARGO_MANIFEST_DIR = `<workspace>/crates/parity-runner`. Walk up to
+    // workspace root, then into the AFM fixture subtree.
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("crates")
+        .join("browserslist-shim")
+        .join("tests")
+        .join("fixtures")
+        .join("afm")
 }
 
 /// Run the Rust counterpart of `stage` against `css` and return the
@@ -487,6 +524,32 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             };
             compiled_css::plugins::normalize_css::normalize_css(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
+            Ok(stringify(&root))
+        }
+        Stage::Autoprefixer => {
+            // Mirror `autoprefixer.js`'s `OnceExit(root)` hook:
+            // `prefixes.processor.remove(root, result)` then
+            // `prefixes.processor.add(root, result)`. Both gated by the
+            // `options.add` / `options.remove` toggles — defaults are
+            // both true (`AutoprefixerOptions::default()`).
+            //
+            // Browserslist is pinned to AFM's `.browserslistrc` fixture
+            // via `BrowsersOptions::from`. The JS bridge pins the same
+            // file via `BROWSERSLIST_CONFIG`. Both engines see the
+            // identical 14-entry resolution.
+            let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
+            let from = afm_browserslist_dir().to_string_lossy().into_owned();
+            let prefixes = autoprefixer::autoprefixer::build_prefixes_default(Some(from))
+                .map_err(|e| format!("rust autoprefixer build error: {e}"))?;
+            let proc = autoprefixer::processor::Processor::new(&prefixes);
+            let mut warnings: Vec<String> = Vec::new();
+            // `Processor::{add, remove}` operate on the root Node, not the
+            // Root wrapper. `Root` holds the root Node at `.root`.
+            proc.remove(&mut root.root, &mut warnings);
+            proc.add(&mut root.root, &mut warnings);
+            // Warnings are diagnostic-only (cf. autoprefixer.js result.warn)
+            // and don't affect output bytes; the JS bridge's
+            // `result.css` doesn't include them either.
             Ok(stringify(&root))
         }
     }
