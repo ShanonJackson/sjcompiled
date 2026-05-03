@@ -1,5 +1,0 @@
-import { ax, ix, CC, CS } from "@compiled/react/runtime";
-const responsiveStyles = {
-	mobile: "_ca0qftgi _u5f3ftgi _n3tdftgi _19bvftgi _1wybdlk8",
-	desktop: "_ca0q7vkz _u5f37vkz _n3td7vkz _19bv7vkz _1wybf6fq"
-};

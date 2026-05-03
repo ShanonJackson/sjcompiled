@@ -1,8 +1,0 @@
-import { ax, ix, CC, CS } from "@compiled/react/runtime";
-const _2 = "._bfhk13q2{background-color:blue}";
-const _ = "._syaz5scu{color:red}";
-const Component = () => <CC>
-  <CS>{[_, _2]}</CS>
-  {<div xcss={"_syaz5scu _bfhk13q2"} />}
-  </CC>;
-export default Component;

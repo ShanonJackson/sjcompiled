@@ -1,8 +1,0 @@
-import { ax, ix, CC, CS } from "@compiled/react/runtime";
-const _2 = "._vwz4183y{line-height:21px}";
-const _ = "._1wyb1f4h{font-size:28px}";
-const baseSize = 14;
-const MyComponent = () => <CC>
-  <CS>{[_, _2]}</CS>
-  {<div className={ax(["_1wyb1f4h _vwz4183y"])}>Hello</div>}
-  </CC>;
