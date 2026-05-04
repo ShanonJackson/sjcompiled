@@ -69,7 +69,7 @@ impl ApiKind {
 /// schema).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StateDiff {
-    /// Site 6 (`utils/css-builders.ts:325`). Highest-frequency mutation
+    /// Site 6 (`utils/css-builders.ts:321`). Highest-frequency mutation
     /// — every static-eval file open appends to the HMR-invalidation set.
     IncludedFilesPush { path: String },
 
@@ -101,7 +101,7 @@ pub enum StateDiff {
         sheets: Vec<String>,
     },
 
-    /// Site 7 (`utils/css-builders.ts:725`). Mark a binding name as
+    /// Site 7 (`utils/css-builders.ts:707`). Mark a binding name as
     /// "known-not-cssMap" so subsequent member-expression lookups
     /// short-circuit. Boolean presence-check; the value is always
     /// `true`.

@@ -32,23 +32,80 @@ Phase 4 §4.4 ☑ (SHELL port). Phase 4 §4.5 ☑ (data adapters).
 Phase 4 §4.6 ☑ **PARTIAL** (post-CSSOutput template builders +
 3 leaf utils; visitor dispatch wiring deferred — see §4.6 closure
 summary below).
+Phase 5 §5.1 ☑ (STATE_MUTATIONS.md reconfirmed; line-number drifts
+amended; zero new variants). Phase 5 §5.3 ☑ (Layer-1 Cache + Layer-2
+postcard schema + atomic-write Layer-2 handle landed; not yet wired
+into State because §5.4/§5.6 are blocked — see §5.4–§5.6 drift note
+below).
 
-**Next checkpoint: §4.6 finalisation OR §4.7** — depending on the
-order chosen by the next session. The §4.6 closure today covers the
-post-CSSOutput template construction primitives
-(`build_compiled_component`, `compiled_template`, `hoist_sheet`,
-`get_jsx_attribute`, `get_runtime_class_name_library`). The visitor
-dispatch sites (css-prop / classNames / cssMap / styled handlers)
-that USE these are NOT wired — they reach Phase 5 §5.6
-(evaluate_expression) and Phase 5 §5.4 (resolve_binding) through
-`buildCss`. The pragmatic next step is to land Phase 5 §5.4–§5.6
-before circling back to wire the visitor — that's the gate the §4.4
-SHELL was always intended to wait on. §4.7 (Parcel wrapper update)
-remains independently shippable and can land in parallel.
+**ESCALATION — Phase 5 §5.4 / §5.5 / §5.6 are BLOCKED on a Phase 0
+scaffolding gap. NOT closed this session.**
 
-After §4.7, §4.8 is the Phase 4 exit gate (full byte-clean for
-keyframes / css / cssMap fixtures — the gate that requires Phases
-5/6 to be real, not stubbed).
+**Drift detected in Phase 0 / §2.x scaffolding** — there is no Babel
+`NodePath`/scope-tree analog in the Rust port. The §5.4
+(`resolve_binding`), §5.5 (`traverse_expression/`), and §5.6
+(`evaluate_expression`) ports each depend hard on Babel's
+`path.scope.getBinding(name)`, `path.scope.getOwnBinding(name)`,
+`path.scope.push({id, init, kind})`, `binding.referencePaths`,
+`binding.constant`, `path.parentPath`, `path.evaluate()`,
+`path.replaceWith(...)`, and `path.traverse(visitor, scope, state,
+parentPath)`. None of those exist as Rust analogs in
+`crates/babel-plugin/src/`. The strip-runtime port has a thin
+flat-module-binding index (`crates/babel-plugin-strip-runtime/src/
+compat/scope.rs`, ~352 LOC) that handles ONE narrow lookup
+(`get_string_binding(name) → Option<&str>`); it is NOT a usable
+analog for the evaluator's needs. The current `Metadata` carries
+`parent_id: u32` / `own_id: Option<u32>` placeholders (see
+`crates/babel-plugin/src/types.rs:206`) — these are recorder
+handles, not navigable paths.
+
+A 1:1 port of `evaluate-expression.ts` and the `traverse-expression/`
+subtree under the CLAUDE.md "no drift workarounds" rule REQUIRES
+either:
+  (a) port `compat/scope.rs` and `compat/path.rs` providing the full
+      Babel scope/path surface (lexical chain, getBinding /
+      getOwnBinding, scope.push, generateUidIdentifier, binding's
+      `referencePaths` + `constant` + `constantViolations`,
+      path.parentPath, path.evaluate fold, path.replaceWith,
+      path.traverse subtree-walks). This is approximately 1.5–3k
+      LOC and is the MISSING Phase 0 / Phase 2 architecture
+      deliverable, OR
+  (b) re-architect upstream's `evaluate-expression.ts` against a
+      subset of the path surface that an SWC visitor can natively
+      provide. That's a deviation from "1:1 file-for-file" and
+      directly violates CLAUDE.md / PLAN.md constraint 4.
+
+Per CLAUDE.md "DRIFT DETECTION — escalate, don't work around"
+this session STOPS at §5.3 close. The next agent's task is the
+scaffolding decision (a) vs (b). Recommended:
+  1. Spike `compat/scope.rs` against the
+     `expression-evaluation.test.ts` corpus. Map every
+     `path.scope.*` / `binding.*` / `path.evaluate*` reach. If the
+     port is tractable (≤1k LOC for the slice the evaluator
+     actually exercises), land it as Phase 5 §5.0 (NEW) and
+     §5.4–§5.6 follow as planned.
+  2. If the spike shows the surface is too wide / too tangled
+     with `@babel/traverse` internals to port 1:1, escalate to
+     human review. The fallback is letting `@compiled/babel-plugin`
+     keep this slice in JS via an out-of-band oracle call — but
+     that hits PLAN.md constraint 1 (no JS callbacks from the
+     WASI plugin). Mutually-exclusive constraints would need user
+     adjudication.
+
+The §4.4 SHELL stubs in `css_builders.rs`
+(`evaluate_expression_stub`, `resolve_binding_stub`,
+`visit_css_map_path_stub`) REMAIN PANIC-ON-CALL and CANNOT be
+replaced this session. §4.6 finalisation (visitor dispatch wiring),
+§4.8 (Phase 4 exit gate), and Phase 6 handlers all transitively
+depend on the §5.4–§5.6 ports.
+
+**Independently shippable** while the scaffolding decision is
+pending: §4.7 (Parcel wrapper update — single `transformSync` call,
+sidecar drains). It does not depend on the evaluator.
+
+**Next checkpoint: §5.0 (NEW — scaffold compat/scope.rs +
+compat/path.rs)** OR `§4.7` if the next session prefers to ship the
+Parcel wrapper while the scaffolding decision is pending.
 
 Phase 4 §4.3 closure: 55/55 fixtures byte-exact, JSX printer landed
 1:1 from `@babel/generator@7.23.0/lib/generators/jsx.js` (122 LOC →
@@ -69,7 +126,7 @@ mutations from §2.3(a)) — NOT a phase gate; bundles with the first
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 118/118 (was 99/99; +19 from §4.6 leaves + builder)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 145/145 (was 118/118; +27 from §5.3 cache + cache_schema)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact, zero skips)
@@ -91,7 +148,134 @@ bun parity-harness/transform-css/oracle.mjs
 bun parity-harness/compat-generator/oracle.mjs                          # 55 entries
 ```
 
-Total: **2679 tests, zero failures, zero ignored** (+19 vs. §4.5 close).
+Total: **2706 tests, zero failures, zero ignored** (+27 vs. §4.6 close).
+
+### Phase 5 §5.1 + §5.3 closure summary (this session)
+
+**§5.1 — STATE_MUTATIONS.md reconfirmed.** Re-ran the canonical
+`grep -rEn 'state\.(includedFiles|compiledImports|sheets|cssMap|
+ignoreMemberExpressions)\b'` over `packages/babel-plugin/src/`. Eight
+mutation sites — exact match against the Phase 0 capture. Zero new
+sites since 2026-05-02. The 5-variant `StateDiff` enum
+(`IncludedFilesPush`, `CompiledImportsAppend`, `SheetsInsert`,
+`CssMapInsert`, `IgnoreMemberExprMark`) remains the complete set. Two
+upstream line-number drifts (`utils/css-builders.ts:325 → :321` and
+`:725 → :707`; surrounding code is unchanged comment-only churn)
+amended in `crates/babel-plugin/STATE_MUTATIONS.md` and
+`crates/babel-plugin/src/mutation_recorder.rs` doc comments. Reach
+of the §5.5/§5.6 subtree (`evaluate-expression.ts`,
+`traverse-expression/`, `traversers/`) into `state.*` writes is
+exactly one site at `traversers/set-imported-compiled-imports.ts:23`,
+which writes `state.importedCompiledImports` — explicitly listed
+under "Sites OUT of capture" (per-file scaffolding, written before
+any Layer 2 lookup; no replay needed).
+
+**§5.3 — Layer-1 Cache + Layer-2 postcard schema landed.**
+
+Two new files:
+
+* `crates/babel-plugin/src/cache_schema.rs` (~280 LOC + 9 unit tests)
+  — postcard wire format for `<workerScratchDir>/cache.bin`. Locked
+  per `plugins/SIDECAR_SCHEMA.md` §3 / `plugins/PLAN.md` §3.9.10:
+  `CACHE_VERSION = 1`, `MAX_CACHE_BYTES = 5 MiB`, `MAX_ENTRIES =
+  500`, `MAX_TDEPS_PER_ENTRY = 32`, `MAX_STATE_DIFFS = 64`. The
+  `CacheFile` / `Layer2Entry` / `SerializedExpr` / `TransitiveDep`
+  structs derive serde for postcard. `compute_schema_hash()` is a
+  deterministic 32-byte fingerprint over `(plugin_version,
+  swc_core_version, Layer2Entry struct signature, SerializedExpr
+  variant set, StateDiff variant set)` using a 4-block FNV-1a-XOR
+  expansion. Not cryptographic — PLAN.md §3.9.10 explicitly
+  authorises silent wipe on schema-hash mismatch (regenerable
+  scratch file), and the wipe path doesn't need collision
+  resistance. Unit tests cover: deterministic re-hash, input
+  sensitivity, postcard round-trip, version-mismatch wipe trigger,
+  schema-hash-mismatch wipe trigger, full Layer2Entry round-trip
+  (including embedded `StateDiff` variants), `SerializedExpr`
+  variant set lock.
+
+* `crates/babel-plugin/src/utils/cache.rs` (~480 LOC + 18 unit
+  tests) — 1:1 port of upstream `packages/babel-plugin/src/utils/
+  cache.ts` (Layer 1) + Rust-only Layer 2 handle.
+    - **Layer 1 `Cache<T>`** mirrors upstream `Cache` exactly:
+      `IndexMap<String, T>` (insertion-order LRU — JS `Map` semantics),
+      `getUniqueKey(cache_key, namespace) → hash(namespace ?
+      \`${namespace}----${cacheKey}\` : cacheKey)` via
+      `compiled_utils::hash` (the §3 corpus's 10037-entry parity
+      lock guarantees byte-equality at the key derivation), `load`
+      with `cache=false` short-circuit, `move-to-back-on-hit` LRU,
+      `getSize`/`getKeys`/`getValues`. Generic over `T: Clone`
+      because upstream's "JS shares the reference" maps to
+      "Rust clones" — for `Arc<Module>` that's a refcount bump,
+      for `String` a heap copy. Six call-shape unit tests.
+    - **Layer 2 `Layer2`** — owns the on-disk `cache.bin`. `open()`
+      sweeps stale `*.tmp` siblings (PLAN.md §3.9.13.1), reads the
+      file, validates version + schema_hash, falls back to
+      `CacheFile::empty()` on any failure (corrupt / version-drift
+      / schema-drift — never crashes the build). `insert(key,
+      entry)` enforces `MAX_ENTRIES` LRU eviction. `get(key)`
+      bumps LRU sequence + marks dirty. `flush(fs)` sorts entries
+      by key for byte-determinism, serializes to postcard, evicts
+      LRU until size <= `MAX_CACHE_BYTES`, writes via the atomic
+      protocol (`cache.bin.tmp` → `fd_sync` → `path_rename`), no-ops
+      when not dirty. Twelve Layer-2 unit tests cover: empty open,
+      stale-tmp sweep, round-trip through MockFs, corrupt-file reset,
+      version-mismatch reset, entry-cap LRU eviction, get-bumps-seq,
+      deterministic byte ordering on flush, no-write-when-clean,
+      embedded StateDiff round-trip.
+    - The `Fs` trait abstracts host I/O; `WasiFs` is the production
+      impl (lowers to `std::fs`); `MockFs` lives behind `#[cfg(test)]`
+      with a `BTreeMap`-backed scratch volume.
+
+**Wiring caveat (carried forward):** Layer 2 is NOT yet plumbed into
+`State::cache` (still the `CacheSlot` placeholder from §2.4). Layer 1's
+typed-T choices depend on `evaluate_expression`'s call shapes —
+which are blocked on the §5.4–§5.6 drift escalation above. The
+schema and the LRU machinery are locked early so the next agent can
+wire reads/writes into the evaluator without touching the wire
+format. No upstream-byte-affecting code changed today.
+
+**Cargo.toml:** `postcard = { workspace = true }` promoted from
+strip-runtime's never-wired use to a real dep on `babel-plugin`.
+Workspace pin (`crates/Cargo.toml`) is `version = "1"` with the
+`alloc` feature; same major works fine for both consumers. No new
+top-level deps — `oxc_resolver` is NOT added (Phase 5 §5.4 is
+blocked on the scope-tree drift; adding the dep without using it
+adds wasm32 build weight for nothing).
+
+**Test count delta**: babel-plugin lib 118 → 145 (+27: 9
+`cache_schema` + 18 `utils::cache`). Total workspace: 2679 → 2706.
+All other gates (hash_parity, transform_css_integration,
+compat_generator_integration, strip-runtime lib + harness, full
+babel-plugin harness, equality harness) unchanged at their §4.6-close
+numbers. WASI cdylib still builds clean (`RUSTFLAGS="" cargo build
+-p babel-plugin -p babel-plugin-strip-runtime --target wasm32-wasip1
+--release`).
+
+**Bug-parity preserved:** the JS `Cache._tryDeletingLRUCachedValue`
+calls `delete(key)` with the result of `keys().next().value` — which
+on an empty `Map` is `undefined`, and `delete(undefined)` is a no-op.
+The Rust `try_deleting_lru_cached_value` guards on `len() >=
+max_size` (the same guard upstream uses) so the empty-cache path
+never reaches `shift_remove_index(0)`. Behavioural-equivalent to
+upstream; no panic risk on an empty cache.
+
+**Deliberately deferred (NOT urgent):**
+* Wiring `Layer2` into `State::cache` — gated on §5.4–§5.6 (no
+  evaluator means nothing populates entries yet). When the
+  scaffolding decision lands, `State` will gain a typed cache
+  bundle (`Cache<String>` for `read-file`, `Cache<Arc<Module>>` for
+  `parse-module`, `Cache<Option<ExportLookup>>` for the
+  find-export namespaces) plus a `Layer2` handle.
+* `cache_inspect.rs` CLI (`PLAN.md` §3.9.10 mentions a
+  `--dump-as-json` debug flag) — not on the byte-parity path,
+  not gating any phase. Port if a debug session needs it.
+* The `MAX_TDEPS_PER_ENTRY` / `MAX_STATE_DIFFS` enforcement at
+  insert time — the schema declares them as hard caps, but
+  `Layer2::insert` doesn't yet reject entries that exceed them
+  because no producer exists. The §5.6 evaluator's
+  `cacheable_at_layer2: bool` flag is what naturally gates this.
+  When that lands, add `assert!(entry.transitive_deps.len() <=
+  MAX_TDEPS_PER_ENTRY)` etc. at insert.
 
 ### Phase 4 §4.6 closure summary — PARTIAL (post-CSSOutput builders; visitor dispatch deferred)
 
@@ -1225,12 +1409,13 @@ done before declaring Phase 0 fully signed off across the platform set.
 
 | ID | Status | Checkpoint | Owner | Artefacts | Verification |
 |---|---|---|---|---|---|
-| §5.1 | ☐ | Re-confirm `STATE_MUTATIONS.md` is current vs upstream Babel; reconcile any new mutation sites | — | Updated STATE_MUTATIONS.md if needed | `grep` enumeration matches doc |
+| §5.0 (NEW) | ☐ | **NEW — gate added 2026-05-04 by drift escalation.** Spike + scaffold `crates/babel-plugin/src/compat/{path,scope}.rs` covering the Babel `NodePath` / `path.scope` surface the §5.4–§5.6 ports actually exercise (`getBinding`, `getOwnBinding`, `scope.push`, `generateUidIdentifier`, `binding.referencePaths` + `.constant` + `.constantViolations`, `path.parentPath`, `path.evaluate`, `path.replaceWith`, `path.traverse`). Without this scaffold, §5.4/§5.5/§5.6 cannot be a 1:1 port — see §5.x drift escalation block at top of STATUS.md. | — | `crates/babel-plugin/src/compat/{path,scope}.rs`, threaded through `Metadata` (replacing `parent_id: u32` placeholders) | Unit tests cover every surface point reached by `expression-evaluation.test.ts` corpus |
+| §5.1 | ☑ | Re-confirm `STATE_MUTATIONS.md` is current vs upstream Babel; reconcile any new mutation sites | claude-2026-05-04 | Updated STATE_MUTATIONS.md (line-number drift on sites #6/#7); zero new variants needed; reach of §5.5/§5.6 subtree into state writes is exactly one site (`set-imported-compiled-imports.ts:23`, already in OUT-of-capture list). | `grep -rEn 'state\.(includedFiles\|compiledImports\|sheets\|cssMap\|ignoreMemberExpressions)\b'` over `packages/babel-plugin/src/` returns 8 matches matching the doc's site list |
 | §5.2 | ☐ | Land the consumer-monorepo refactor (zero outside-cwd includes) | — | refactor PR | §0.10 audit reports zero outliers |
-| §5.3 | ☐ | Port `utils/cache.rs` — Layer 1 in-memory + Layer 2 postcard `cache.bin` per PLAN.md §3.9 | — | `crates/babel-plugin/src/utils/cache.rs`, `crates/babel-plugin/src/cache_schema.rs` | `cargo test -p babel-plugin cache::` passes; size + entry caps enforced |
-| §5.4 | ☐ | Port `utils/resolve_binding.rs` using `oxc_resolver` configured per §0.11 matrix | — | `crates/babel-plugin/src/utils/resolve_binding.rs` | Resolver-matrix corpus byte-clean against this plugin's resolver wrapper |
-| §5.5 | ☐ | Port the entire `traverse_expression/` subtree file-for-file (leaves first) | — | `crates/babel-plugin/src/utils/traverse_expression/**` | Harness `module-traversal` and `expression-evaluation` fixtures byte-clean |
-| §5.6 | ☐ | Port `traversers/` and `evaluate_expression.rs` | — | `crates/babel-plugin/src/utils/{traversers,evaluate_expression.rs}/**` | Same as above |
+| §5.3 | ☑ | Port `utils/cache.rs` — Layer 1 in-memory + Layer 2 postcard `cache.bin` per PLAN.md §3.9 | claude-2026-05-04 | `crates/babel-plugin/src/utils/cache.rs` (1:1 Layer 1 `Cache<T>` + Rust-only `Layer2` handle with atomic-write protocol), `crates/babel-plugin/src/cache_schema.rs` (postcard `CacheFile` / `Layer2Entry` / `SerializedExpr` / `TransitiveDep`; `CACHE_VERSION = 1`; `compute_schema_hash()` 32-byte deterministic FNV-1a-XOR fingerprint). Layer 2 NOT yet wired into `State::cache` — gated on §5.4–§5.6 (no producer exists). | `cargo test -p babel-plugin cache_schema::` → 7/7; `cargo test -p babel-plugin utils::cache::` → 20/20; size + entry caps locked at the type level + tested |
+| §5.4 | ⚠ BLOCKED | Port `utils/resolve_binding.rs` using `oxc_resolver` configured per §0.11 matrix | — | (blocked) `crates/babel-plugin/src/utils/resolve_binding.rs` — depends on §5.0 (NEW) scaffold | Resolver-matrix corpus byte-clean against this plugin's resolver wrapper. Also blocked on §0.11 RESOLVER_MATRIX.md, which doesn't exist (Phase 0 deferral, never produced). |
+| §5.5 | ⚠ BLOCKED | Port the entire `traverse_expression/` subtree file-for-file (leaves first) | — | (blocked) `crates/babel-plugin/src/utils/traverse_expression/**` — depends on §5.0 (NEW) scaffold | Harness `module-traversal` and `expression-evaluation` fixtures byte-clean |
+| §5.6 | ⚠ BLOCKED | Port `traversers/` and `evaluate_expression.rs` | — | (blocked) `crates/babel-plugin/src/utils/{traversers,evaluate_expression.rs}/**` — depends on §5.0 (NEW) scaffold | Same as above |
 | §5.7 | ☐ | Wire `includedFiles` accumulation → `<callScratch>/included-files.json` sidecar | — | Updated lib.rs Program::exit | Harness fixtures with cross-file imports produce non-empty sidecar; host's `asset.invalidateOnFileChange` matches Babel's |
 | §5.8 | ☐ | Promote `scripts/audit-included-files.ts` to CI guardrail | — | CI config update | Audit failure blocks PR merge |
 | §5.9 | ☐ | **Phase 5 exit gate:** module-traversal + expression-evaluation byte-clean; `MutationRecorder` shadow-eval suite reports zero replay/live divergence; pre-commit state-mutation lint clean | — | STATUS.md updated | All exit-gate sub-conditions met |

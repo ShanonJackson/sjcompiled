@@ -34,6 +34,12 @@ once_cell = { workspace = true }
 # `[dev-dependencies]` (where §4.1 placed it for the integration
 # parity test) to `[dependencies]` to land the §4.4 wiring.
 css = { workspace = true }
+# §5.3 cache.bin postcard wire format. Workspace pin at
+# `crates/Cargo.toml` already carries `version = "1"` for
+# strip-runtime's never-written use; lifting it here is additive
+# (same major). PLAN.md §3.9.10 / SIDECAR_SCHEMA.md §3 lock the
+# format itself.
+postcard = { workspace = true }
 
 [dev-dependencies]
 # Phase 4 §4.2 — compat-generator parity gate needs to PARSE the

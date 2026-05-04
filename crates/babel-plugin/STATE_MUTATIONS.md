@@ -12,6 +12,18 @@ Generated 2026-05-02 from `packages/babel-plugin/src/`. Re-run
 ignoreMemberExpressions)\b'` and `'meta\.state\.(...)'` over the same
 tree before each Phase 5 commit (Phase 5 task 0 reconciliation).
 
+**Last reconciled:** 2026-05-04 (Phase 5 §5.1). Outcome: zero new
+mutation sites, zero new `StateDiff` variants required. Two line
+numbers drifted in upstream (`:325` → `:321`, `:725` → `:707`) —
+documented inline at the affected sites. The 5-variant `StateDiff`
+enum in `mutation_recorder.rs` remains the complete set. Reach of the
+Phase 5 §5.5/§5.6 subtree (`evaluate-expression.ts`,
+`traverse-expression/`, `traversers/`) into `state.*` writes is:
+exactly one site at `traversers/set-imported-compiled-imports.ts:23`,
+which writes `state.importedCompiledImports` — explicitly listed under
+"Sites OUT of capture" (per-file scaffolding, written before any
+Layer 2 lookup, no replay needed).
+
 ## State fields under capture
 
 From `packages/babel-plugin/src/types.ts:140-207`:
@@ -115,7 +127,7 @@ to `CssMapInsert` and constrain the value type from "any serialized
 value" to `Vec<String>` because that's the actual shape — bounding
 serialized size at the type level helps the §3.9.10 byte-cap.)
 
-### 6. `utils/css-builders.ts:325` — included-files push
+### 6. `utils/css-builders.ts:321` — included-files push
 
 ```ts
 meta.state.includedFiles.push(next.state.file.loc.filename);
@@ -128,7 +140,12 @@ frequency mutation in this list.**
 **StateDiff variant:** `IncludedFilesPush { path: String }`. Matches
 §3.9.8 exactly.
 
-### 7. `utils/css-builders.ts:725` — negative-cache mark
+(Line drift watch: was `:325` at Phase 0 capture; reconfirmed as `:321`
+on the Phase 5 §5.1 reconciliation pass. Surrounding code unchanged —
+the upstream edit was a few lines of comment-only churn above this
+mutation site.)
+
+### 7. `utils/css-builders.ts:707` — negative-cache mark
 
 ```ts
 meta.state.ignoreMemberExpressions[node.name] = true;
@@ -141,6 +158,9 @@ bytes (it's a presence check).
 **StateDiff variant:** `IgnoreMemberExprMark { name: String }`. **NEW**
 relative to §3.9.8 (which omitted this field — the encapsulation enum
 must add it).
+
+(Line drift watch: was `:725` at Phase 0 capture; reconfirmed as `:707`
+on the Phase 5 §5.1 reconciliation pass. Surrounding code unchanged.)
 
 ### 8. `utils/hoist-sheet.ts:32` — hoisted sheet record
 

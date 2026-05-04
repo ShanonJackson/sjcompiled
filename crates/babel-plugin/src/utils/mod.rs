@@ -23,6 +23,7 @@
 pub mod ast;
 pub mod build_compiled_component;
 pub mod build_css_variables;
+pub mod cache;
 pub mod compress_class_names_for_runtime;
 pub mod constants;
 pub mod css_builders;

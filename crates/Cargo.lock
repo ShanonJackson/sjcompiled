@@ -118,6 +118,7 @@ dependencies = [
  "css",
  "indexmap",
  "once_cell",
+ "postcard",
  "regex",
  "serde",
  "serde_json",
