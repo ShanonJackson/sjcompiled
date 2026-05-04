@@ -109,6 +109,15 @@ pub struct State {
     /// known not to be a Compiled API (avoids re-resolving across
     /// many references). Mirrors `state.ignoreMemberExpressions`.
     pub(crate) ignore_member_expressions: IndexMap<String, bool>,
+
+    /// Per-pass UID counter. The Rust analog of Babel's
+    /// `meta.parentPath.scope.generateUidIdentifier('')` — without
+    /// full scope tracking (Phase 5 §5.4 lands that). For §4.6 hoists
+    /// this is enough: every call to `next_uid_name` returns a fresh
+    /// `_<n>` string distinct from prior calls in the same pass.
+    /// Per-pass scope; SWC tears down the WASI instance between
+    /// transforms so a fresh visitor starts at 0 every time.
+    pub(crate) uid_counter: u32,
     // `resolver` is omitted: object form isn't reachable, string
     // form is in `opts`. `transformCache` (Babel WeakMap on
     // NodePath) is a Babel-only construct — the Rust visitor's
@@ -231,6 +240,17 @@ impl State {
     #[allow(dead_code)]
     pub(crate) fn queue_cleanup(&mut self, action: CleanupAction) {
         self.paths_to_cleanup.push(action);
+    }
+
+    /// Mint a fresh `_<n>` UID name for this pass. Mirrors Babel's
+    /// `scope.generateUidIdentifier('')` shape; see `uid_counter`
+    /// docs for the scope-tracking caveat (Phase 5 §5.4 makes this
+    /// fully scope-aware). Used by `utils::hoist_sheet` today;
+    /// future hoists can reuse the same counter.
+    pub(crate) fn next_uid_name(&mut self) -> String {
+        let name = format!("_{}", self.uid_counter);
+        self.uid_counter += 1;
+        name
     }
 }
 

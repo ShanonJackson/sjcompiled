@@ -28,16 +28,27 @@
 **Closed:** Phase 0 ☑ (modulo deferred §0.10–§0.12 hardening
 tasks — Phase 5 gates, NOT Phase 4 blockers). Phase 1 ☑. Phase 2 ☑.
 Phase 3 ☑ (§3.1–§3.4). Phase 4 §4.1 ☑. Phase 4 §4.2 ☑. Phase 4 §4.3 ☑.
-Phase 4 §4.4 ☑ (SHELL port — see closure summary below).
+Phase 4 §4.4 ☑ (SHELL port). Phase 4 §4.5 ☑ (data adapters).
+Phase 4 §4.6 ☑ **PARTIAL** (post-CSSOutput template builders +
+3 leaf utils; visitor dispatch wiring deferred — see §4.6 closure
+summary below).
 
-**Next checkpoint: §4.5** — port `utils/transform_css_items.rs` and
-`utils/build_css_variables.rs`. Both are pure-data adapters that
-consume the §4.4 shell's `CSSOutput` shape and the §4.1 integration's
-`css::transform_css`. After §4.5, §4.6 wires `transform_css` into the
-visitor single-pass, then §4.7 updates the Parcel wrapper, then §4.8
-is the Phase 4 exit gate (full byte-clean for keyframes / css /
-cssMap fixtures — the gate that actually requires Phases 5/6's
-evaluate/resolve/visitCssMap to be real, not stubbed).
+**Next checkpoint: §4.6 finalisation OR §4.7** — depending on the
+order chosen by the next session. The §4.6 closure today covers the
+post-CSSOutput template construction primitives
+(`build_compiled_component`, `compiled_template`, `hoist_sheet`,
+`get_jsx_attribute`, `get_runtime_class_name_library`). The visitor
+dispatch sites (css-prop / classNames / cssMap / styled handlers)
+that USE these are NOT wired — they reach Phase 5 §5.6
+(evaluate_expression) and Phase 5 §5.4 (resolve_binding) through
+`buildCss`. The pragmatic next step is to land Phase 5 §5.4–§5.6
+before circling back to wire the visitor — that's the gate the §4.4
+SHELL was always intended to wait on. §4.7 (Parcel wrapper update)
+remains independently shippable and can land in parallel.
+
+After §4.7, §4.8 is the Phase 4 exit gate (full byte-clean for
+keyframes / css / cssMap fixtures — the gate that requires Phases
+5/6 to be real, not stubbed).
 
 Phase 4 §4.3 closure: 55/55 fixtures byte-exact, JSX printer landed
 1:1 from `@babel/generator@7.23.0/lib/generators/jsx.js` (122 LOC →
@@ -58,7 +69,7 @@ mutations from §2.3(a)) — NOT a phase gate; bundles with the first
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 75/75 (was 43/43; +32 from §4.4 utils ports)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 118/118 (was 99/99; +19 from §4.6 leaves + builder)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact, zero skips)
@@ -80,7 +91,180 @@ bun parity-harness/transform-css/oracle.mjs
 bun parity-harness/compat-generator/oracle.mjs                          # 55 entries
 ```
 
-Total: **2636 tests, zero failures, zero ignored** (+74 vs. §4.3 close).
+Total: **2679 tests, zero failures, zero ignored** (+19 vs. §4.5 close).
+
+### Phase 4 §4.6 closure summary — PARTIAL (post-CSSOutput builders; visitor dispatch deferred)
+
+§4.6 as specified in PLAN.md task 4 says "update lib.rs so the
+visitor performs both extraction and substitution in a single
+traversal". The visitor's CssProp / ClassNames / Styled / CssMap
+dispatch sites all reach `buildCss`, which the §4.4 SHELL stubs at
+every `evaluate_expression` / `resolve_binding` / `visitCssMapPath`
+panic site. **Wiring the visitor today would force the SHELL stubs
+to be real → that's Phase 5 work.** The pragmatic split: §4.6 ships
+the post-CSSOutput AST builders (the primitives the future visitor
+calls), defers the visitor wiring itself to the Phase 5 / 6 close.
+
+This split is consistent with the previous-agent hand-off
+(§4.5 closure): "wire the call sequence inside the visitor, but
+ship only the parts where evaluation isn't required" — that constraint
+narrows §4.6 to the post-CSSOutput AST construction primitives.
+
+**New files this checkpoint** (all under
+`crates/babel-plugin/src/utils/`, all 1:1 ports of upstream
+`packages/babel-plugin/src/utils/` siblings):
+
+* `get_jsx_attribute.rs` (~50 LOC + 4 unit tests) — pure SWC AST
+  query. `get_jsx_attribute(&Expr, &str) -> (Option<&JSXAttr>, isize)`.
+  Returns `(None, -1)` for "not a JSXElement" or "no match" — exactly
+  Babel's `[undefined, -1]` tuple.
+* `get_runtime_class_name_library.rs` (~25 LOC + 2 unit tests) —
+  one-line opts read returning `"ac"` (compression) or `"ax"`.
+* `hoist_sheet.rs` (~75 LOC + 5 unit tests) — sheet-name registration
+  via `MutationRecorder::SheetsInsert`. Mints UIDs through a new
+  `state.next_uid_name()` mint (`_<n>` counter, fresh per pass —
+  Phase 5 §5.4 lands the scope-aware variant). The actual AST
+  insertion (insertBefore on Program.body's first non-import) is
+  NOT a `paths_to_cleanup` entry — the data lives on
+  `state.sheets()` and the Phase 6 Program::exit emit-pass reads it
+  there. Signature divergence: takes explicit
+  `&mut MutationRecorder` because the recorder isn't on `Metadata`.
+* `build_compiled_component.rs` (~340 LOC + 8 unit tests) — both
+  `compiled_template` and `build_compiled_component` from upstream's
+  `build-compiled-component.ts`. Hand-built JSX AST instead of a
+  `compat/template.rs` `@babel/template` analog (smaller blast
+  radius; the template-parser port is deferred to a future
+  checkpoint where `compat/template.rs` is genuinely needed).
+  Splices className + style onto the user's JSXElement, then wraps
+  in `<CC><CS>{cssArray}</CS>{jsxNode}</CC>`. Reuses every §4.5
+  adapter (`transform_css_items` + `build_css_variables`) and every
+  §4.6 leaf added above.
+
+**State-shape additions:**
+
+* `state.uid_counter: u32` + `state.next_uid_name() -> String` mint
+  the `_<n>` UID names. Fresh-per-pass (matches "SWC tears down the
+  WASI instance between transforms" constraint). NOT captured in
+  `StateDiff` — `uid_counter` is per-pass derivable, not part of the
+  cross-call cache schema.
+
+**Recorder threading**: the recorder lives on `BabelPluginVisitor`
+as a sibling field to `state` per the §2.4 split. `Metadata` does
+NOT carry it; functions that record state mutations
+(`hoist_sheet`, `compiled_template`, `build_compiled_component`)
+take `&mut MutationRecorder` as an explicit parameter. The visitor
+call shape becomes `fn(args, &mut Metadata, &mut MutationRecorder)`.
+
+**Deliberately deferred (NOT urgent, NOT §4.7 blockers):**
+
+* `build_styled_component.rs` — needs `pickFunctionBody`,
+  `@emotion/is-prop-valid` table verbatim, `findOpenSelectors`
+  regex helper, the larger forwardRef template. Defer until the
+  styled-handler dispatch site lands in Phase 6 §6.7.
+* `build_display_name.rs` — small leaf, ports alongside the
+  per-handler dispatch that consumes it.
+* `append_runtime_imports.rs` — Program::exit machinery, ports
+  alongside the §2.3(b) cleanup-queue work bundle.
+* `compat/template.rs` — the `@babel/template` analog. Hand-built
+  AST is sufficient for `compiled_template` / `compiled_styled`;
+  port `compat/template.rs` only when a future fixture needs full
+  template-string parsing.
+* The four visitor dispatch sites in `babel_plugin.rs` (css-prop,
+  classNames, cssMap, styled, xcss-prop) — all blocked on Phase 5
+  §5.4 (resolve_binding) + §5.6 (evaluate_expression). The §4.4
+  SHELL's `unimplemented!()` panics fire at the first reach.
+
+**Bug-parity preserved:**
+
+* `get_expression`'s panic on `JSXEmptyExpression` mirrors upstream's
+  `throw new Error('Empty expression not supported.')`. Unit-tested
+  via `build_compiled_component_concats_existing_classname` (the
+  positive path); the panic path lights up if a future fixture
+  surfaces an empty `className={}` value.
+
+**Test count delta**: babel-plugin lib 99 → 118 (+19: 4 + 2 + 5 + 8).
+Total workspace: 2660 → 2679. All other gates
+(hash_parity, transform_css_integration, compat_generator_integration,
+strip-runtime lib + harness, full babel-plugin harness, equality
+harness) unchanged at their §4.5-close numbers.
+
+### Phase 4 §4.5 closure summary (data adapters — transform_css_items, build_css_variables)
+
+Three new files at `crates/babel-plugin/src/utils/` mirror upstream
+1:1:
+
+* `transform_css_items.rs` (~110 LOC + 13 unit tests) — ports
+  `packages/babel-plugin/src/utils/transform-css-items.ts` 1:1.
+  Three exports: `transform_css_item` (private, recursive),
+  `transform_css_items` (public), `apply_selectors` (public). All
+  four CssItem-variant branches wired:
+  - Conditional → recurses both branches; folds to `<test|!test> &&
+    <classExpression || undefined>` for one-sided sheets, ternary
+    when both branches carry sheets, no-op when both are empty.
+  - Logical → `transform_css(get_item_css(item), opts)` then
+    `compress_class_names_for_runtime` on the join, wraps in
+    `LogicalExpression { op: l.operator, left: l.expression, right: <stringLit> }`.
+  - Map → reads `meta.state.css_map()[name]` for sheets, threads the
+    map's stored expression as classExpression.
+  - Default (Unconditional / Sheet) → same `transform_css` /
+    `compress_class_names_for_runtime` as Logical, but emits the
+    classExpression as a bare StringLiteral (or `None` when the
+    joined name is whitespace-only — matches JS's `className.trim()`
+    short-circuit).
+
+* `build_css_variables.rs` (~110 LOC + 7 unit tests) — ports
+  `packages/babel-plugin/src/utils/build-css-variables.ts` 1:1.
+  One export: `build_css_variables(variables, transform)`, returning
+  `Vec<PropOrSpread>`. Caller-side default (matches the JS default
+  arg) is `build_css_variables(&vars, |e| e)`. Bug-parity preserved:
+  the prefix is ONLY emitted when suffix is ALSO present (upstream's
+  `suffix && prefix && t.stringLiteral(prefix)` short-circuit).
+  Locked with a `drops_prefix_when_suffix_missing_bug_parity` test.
+
+* `compress_class_names_for_runtime.rs` (~50 LOC + 4 unit tests) —
+  ports
+  `packages/babel-plugin/src/utils/compress-class-names-for-runtime.ts`
+  1:1. Trivial pure-string helper that
+  `transform_css_items` depends on. Uses `chars().skip().take()` for
+  the JS `slice(1)` / `slice(1, 5)` translation (char-indexed; for
+  ASCII identical to byte slicing, but degrades gracefully on
+  non-ASCII rather than panicking on a non-char-boundary byte slice).
+
+**Helper changes:**
+
+* `crates/babel-plugin/src/utils/css_builders.rs`:
+  `logical_op_to_swc(op)` promoted from `fn` to `pub(crate) fn` so
+  `transform_css_items` can reuse the LogicalOperator → BinaryOp
+  translation. Single-line edit; same body.
+* `crates/compiled-utils/src/lib.rs`: re-export `unique_by`
+  alongside `unique` (was already present in `array.rs`, just not
+  surfaced). `build_css_variables` consumes upstream's
+  `unique(variables, (v) => v.name)` shape.
+
+**Babel→SWC field-name divergences documented inline at the file
+heads** (no behavioural drift, only the `t.identifier('undefined')`
+→ SWC Ident, `t.logicalExpression` → BinExpr+LogicalAnd/Or/NullishCoalescing,
+`t.conditionalExpression` → CondExpr.alt-not-alternate,
+`t.stringLiteral` → Lit::Str(Str{ raw: None }) shape mappings).
+
+**PluginOptions → TransformOpts conversion**: upstream JS plugin
+duck-types `meta.state.opts` straight into `transformCss`. Rust
+needs an explicit projection — `plugin_opts_to_transform_opts` in
+`transform_css_items.rs` covers the AFM-pinned 0.19.0 surface
+(no `flattenMultipleSelectors`; `sortShorthand` not on
+`PluginOptions` so threads as `None`). Per-call instantiation; no
+caching (matches "SWC tears down the WASI instance between calls"
+constraint).
+
+**Error semantics**: upstream JS lets `transformCss` throw and
+bubble. Rust port mirrors with `unwrap_or_else(|e| panic!(...))`.
+Phase 4 §4.6+ lands the proper visitor-level error channel.
+
+**Test count delta**: babel-plugin lib 75 → 99 (+24: 4 +
+7 + 13). Total workspace: 2636 → 2660. All other gates
+(hash_parity, transform_css_integration, compat_generator_integration,
+strip-runtime lib + harness, full babel-plugin harness, equality
+harness) unchanged at their §4.4-close numbers.
 
 ### Phase 4 §4.4 closure summary (SHELL port; 4 hash-call-shape sites end-to-end)
 
@@ -679,28 +863,42 @@ sign-off (this session):
 
 ### Hand-off — what the next session should do
 
-**Active checkpoint:** Phase 4 §4.5 — port
-`utils/transform_css_items.rs` and `utils/build_css_variables.rs`.
-Both are pure-data adapters consuming the §4.4 SHELL's `CSSOutput`
-shape. No new transitive-dep ports expected.
+**Active checkpoint:** Phase 4 §4.6 PARTIAL ☑ landed today. The
+post-CSSOutput template builders (`build_compiled_component`,
+`compiled_template`) and three leaf utils (`get_jsx_attribute`,
+`get_runtime_class_name_library`, `hoist_sheet`) are 1:1 ported and
+unit-tested. The visitor dispatch wiring is NOT done — that's
+blocked on Phase 5 §5.4 (resolve_binding) + §5.6 (evaluate_expression)
+because the css_builders SHELL's `unimplemented!()` stubs panic at
+the first reach.
 
-Order to land §4.5 → §4.8 cleanly:
-1. **§4.5** — port the two adapter files. They consume §4.4's
-   `CSSOutput` (which holds `Vec<CssItem>` + `Vec<Variable>`) and
-   `css::transform_css` (already wired via §4.1's `[dependencies]`
-   promotion landed at §4.4). Add unit tests that round-trip each
-   adapter against the §4.1 transform_css corpus.
-2. **§4.6** — wire `transform_css` into the visitor (single pass,
-   no scan/apply). The `[dev-dependencies]` → `[dependencies]`
-   promotion happened at §4.4; this checkpoint uses the dep at
-   the visitor layer.
-3. **§4.7** — update `packages/parcel-transformer/src/index.ts` to
+Recommended order for the next session(s):
+1. **§4.7** — update `packages/parcel-transformer/src/index.ts` to
    make a single `transformSync` call per PLAN.md §8 (Parcel
-   wrapper drains sidecars).
+   wrapper drains sidecars). **Independently shippable** — does
+   not depend on Phase 5/6 work. Smallest tractable next checkpoint.
+2. **Phase 5 §5.1–§5.6** — port the resolver + evaluator subtree.
+   This unblocks the §4.4 SHELL stubs and then §4.6's visitor
+   dispatch wiring becomes feasible.
+3. **§4.6 finalisation** — back-fill the visitor dispatch sites in
+   `babel_plugin.rs` (css-prop, classNames, cssMap, styled, xcss-prop
+   handlers) using the §4.6 builders + the freshly-ported
+   evaluate/resolve. Port `build_styled_component.rs` (with
+   `is_prop_valid` table verbatim) here too.
 4. **§4.8** — Phase 4 exit gate: keyframes / css / cssMap fixtures
-   byte-clean. THIS is the gate that requires the §4.4 SHELL's
-   evaluate / resolve / visitCssMap stubs to be real (Phases 5/6).
-   Don't try to land §4.8 ahead of those phases.
+   byte-clean.
+
+§4.6 deliberately deferred (NOT urgent at this checkpoint;
+required for §4.6 finalisation):
+- `build_styled_component.rs` — needs `pickFunctionBody`,
+  `@emotion/is-prop-valid` (a known-prop lookup table verbatim),
+  `findOpenSelectors` regex, larger forwardRef hand-built template.
+- `build_display_name.rs` — addComponentName-driven leaf.
+- `append_runtime_imports.rs` — Program::exit prepend machinery.
+- `compat/template.rs` — only port if a future fixture genuinely
+  needs full template-string parsing (the §4.6 builders are
+  hand-built, not template-parsed, so this is currently unused).
+- Visitor dispatch sites — blocked on Phase 5 §5.4–§5.6.
 
 Phase 4 §4.4 deliberately deferred (NOT urgent, NOT §4.5 blockers):
 - `arrow.body = firstExpression` mutation in

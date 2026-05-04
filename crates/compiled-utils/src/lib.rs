@@ -32,7 +32,7 @@ pub mod shorthand;
 pub mod jsx;
 
 pub use hash::hash;
-pub use array::{flatten, unique};
+pub use array::{flatten, unique, unique_by};
 pub use kebab_case::kebab_case;
 pub use to_boolean::to_boolean;
 pub use error::create_error;

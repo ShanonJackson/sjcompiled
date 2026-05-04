@@ -263,7 +263,7 @@ enum BranchKind {
     Alternate,
 }
 
-fn logical_op_to_swc(op: crate::utils::types::LogicalOperator) -> BinaryOp {
+pub(crate) fn logical_op_to_swc(op: crate::utils::types::LogicalOperator) -> BinaryOp {
     match op {
         crate::utils::types::LogicalOperator::And => BinaryOp::LogicalAnd,
         crate::utils::types::LogicalOperator::Or => BinaryOp::LogicalOr,
