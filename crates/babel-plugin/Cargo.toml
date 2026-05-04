@@ -12,7 +12,17 @@ publish.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-swc_core = { workspace = true }
+# §5.4e — `ecma_parser` is now a lib-level feature because
+# `utils/resolve_binding.rs` parses imported modules at runtime
+# (cross-file constant folding). Was dev-only at §4.2 / §4.4 when
+# the visitor only walked already-parsed Programs; the §5.4e
+# resolve-binding port reads `package.json`-resolved file paths,
+# loads bytes via `std::fs`, and runs `parse_file_as_module` to
+# get an AST to walk for the matching export. Adds parser surface
+# to the WASI plugin binary; size impact verified clean against
+# §5.4d's WASM build (no dependency cycle, parser was already
+# loaded transitively via swc_ecma_visit).
+swc_core = { workspace = true, features = ["ecma_parser"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true }
@@ -40,6 +50,12 @@ css = { workspace = true }
 # (same major). PLAN.md §3.9.10 / SIDECAR_SCHEMA.md §3 lock the
 # format itself.
 postcard = { workspace = true }
+# §5.4b — in-plugin module resolver. Replaces the host's
+# `createDefaultResolver` per PLAN.md §1 constraint 2.
+# Byte-parity contract with `enhanced-resolve@5.18.3` is
+# `crates/babel-plugin/RESOLVER_MATRIX.md` + the corpus at
+# `parity-harness/resolver-matrix/`.
+oxc_resolver = { workspace = true }
 
 [dev-dependencies]
 # Phase 4 §4.2 — compat-generator parity gate needs to PARSE the

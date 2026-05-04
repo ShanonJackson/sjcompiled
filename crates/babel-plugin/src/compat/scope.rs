@@ -52,8 +52,8 @@ use swc_core::ecma::ast::{
     ArrowExpr, AssignExpr, AssignTarget, BlockStmtOrExpr, CatchClause, ClassDecl,
     ClassExpr, Decl, ExportDecl, ExportDefaultDecl, Expr, FnDecl, FnExpr, ForHead, ForInStmt,
     ForOfStmt, ForStmt, Function, ImportDecl, ImportDefaultSpecifier, ImportNamedSpecifier,
-    ImportSpecifier, ImportStarAsSpecifier, ModuleDecl, ModuleItem, NamedExport, ObjectPat,
-    ObjectPatProp, Pat, Prop, SimpleAssignTarget, Stmt, SwitchStmt, UpdateExpr, VarDecl,
+    ImportSpecifier, ImportStarAsSpecifier, ModuleDecl, ModuleExportName, ModuleItem, NamedExport,
+    ObjectPat, ObjectPatProp, Pat, Prop, SimpleAssignTarget, Stmt, SwitchStmt, UpdateExpr, VarDecl,
     VarDeclKind, VarDeclOrExpr, VarDeclarator,
 };
 use swc_core::ecma::visit::{Visit, VisitWith};
@@ -223,6 +223,46 @@ pub struct Binding {
     /// Span of the binding's identifier — used for byte-position
     /// identity at lookup sites.
     pub span: Span,
+    /// **§5.4e addition** — for import-specifier bindings only:
+    /// the module specifier + import shape. Populated by
+    /// `register_import` for every binding it creates; `None`
+    /// for non-import bindings.
+    ///
+    /// The §5.4e cross-file resolver
+    /// (`utils/resolve_binding.rs`) reads this to find the source
+    /// module path + the imported-side export name. Without it the
+    /// resolver would have no way to walk from a local binding to
+    /// the imported AST. Same shape-extension precedent §5.0c used
+    /// for `init_expr` (gated population, single-purpose surface).
+    pub import_info: Option<ImportInfo>,
+}
+
+/// Cross-file import metadata attached to import-specifier
+/// bindings. Populated by [`ScopeIndex::register_import`] for
+/// `import { X }` / `import X` / `import * as X` shapes.
+#[derive(Debug, Clone)]
+pub struct ImportInfo {
+    /// The module specifier from `from 'X'` — what
+    /// `resolve.resolve_sync(from_file, source)` consumes.
+    pub source: String,
+    /// Discriminator: default / named / namespace. Maps to the
+    /// upstream `binding.path.isImport*Specifier()` predicates.
+    pub kind: ImportSpecifierKind,
+    /// For named imports only: the imported-side name (the LHS of
+    /// `as`, or the spec name when no alias). `None` for default
+    /// / namespace shapes — those have a fixed "imported name"
+    /// (`default` for default; n/a for namespace).
+    pub imported_name: Option<String>,
+}
+
+/// Discriminator for [`ImportInfo::kind`]. Mirrors Babel's
+/// `ImportDefaultSpecifier` / `ImportSpecifier` / `ImportNamespaceSpecifier`
+/// trio.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportSpecifierKind {
+    Default,
+    Named,
+    Namespace,
 }
 
 impl Binding {
@@ -615,6 +655,7 @@ impl ScopeIndex {
             binding_id_type: Some("Identifier"),
             scope,
             span,
+            import_info: None,
         };
         self.register_synthetic_binding(scope, name, binding);
     }
@@ -881,6 +922,7 @@ impl Builder {
                 binding_id_type: Some(binding_id_type),
                 scope: target_scope,
                 span,
+                import_info: None,
             };
 
             // Finding 4: isInitInLoop auto-reassigns var/hoisted bindings
@@ -916,6 +958,7 @@ impl Builder {
             binding_id_type: None,
             scope: target_scope,
             span,
+            import_info: None,
         };
         self.bindings_by_scope[target_scope as usize]
             .insert(fn_decl.ident.sym.to_string(), binding);
@@ -939,6 +982,7 @@ impl Builder {
             binding_id_type: None,
             scope: target_scope,
             span,
+            import_info: None,
         };
         self.bindings_by_scope[target_scope as usize]
             .insert(class_decl.ident.sym.to_string(), binding);
@@ -1037,6 +1081,7 @@ impl Builder {
                 } else {
                     pat_span
                 },
+                import_info: None,
             };
             self.bindings_by_scope[scope as usize].insert(name, binding);
         }
@@ -1225,6 +1270,7 @@ impl Builder {
                     } else {
                         pat_span
                     },
+                    import_info: None,
                 };
                 self.bindings_by_scope[scope as usize].insert(name, binding);
             }
@@ -1494,6 +1540,7 @@ impl Builder {
                 binding_id_type: None,
                 scope: scope_id,
                 span: ident.span,
+                import_info: None,
             };
             self.bindings_by_scope[scope_id as usize]
                 .insert(ident.sym.to_string(), binding);
@@ -1526,6 +1573,7 @@ impl Builder {
                 binding_id_type: None,
                 scope: scope_id,
                 span: ident.span,
+                import_info: None,
             };
             self.bindings_by_scope[scope_id as usize]
                 .insert(ident.sym.to_string(), binding);
@@ -1670,17 +1718,56 @@ impl Builder {
     fn register_import(&mut self, i: &ImportDecl) {
         let scope = self.current_scope();
         let import_decl_span = i.span;
+        // Wtf8Atom→str: see register_import comment below; module
+        // specifiers are valid UTF-8 in any real fixture.
+        let source: String = i.src.value.as_str().unwrap_or_default().to_string();
         for spec in &i.specifiers {
-            let (name, span, binding_node_type) = match spec {
-                ImportSpecifier::Named(ImportNamedSpecifier { local, .. }) => {
-                    (local.sym.to_string(), local.span, "ImportSpecifier")
+            let (name, span, binding_node_type, kind, imported_name) = match spec {
+                ImportSpecifier::Named(ImportNamedSpecifier {
+                    local, imported, ..
+                }) => {
+                    // For `import { foo as bar } from 'mod'`:
+                    //   local.sym = "bar" (local alias).
+                    //   imported = Some(Ident("foo") | Str("foo"))
+                    //     — the imported-side name.
+                    // For `import { foo } from 'mod'`:
+                    //   local.sym = "foo".
+                    //   imported = None (shorthand) — the imported
+                    //     name is the same as local.
+                    let imported_name = match imported.as_ref() {
+                        Some(ModuleExportName::Ident(id)) => id.sym.as_ref().to_string(),
+                        // `Wtf8Atom::as_str` returns None for surrogate-
+                        // paired strings; export names are always valid
+                        // UTF-8 identifiers in practice, so the
+                        // unwrap_or_default fallback is unreachable in
+                        // any real Compiled fixture.
+                        Some(ModuleExportName::Str(s)) => {
+                            s.value.as_str().unwrap_or_default().to_string()
+                        }
+                        None => local.sym.as_ref().to_string(),
+                    };
+                    (
+                        local.sym.to_string(),
+                        local.span,
+                        "ImportSpecifier",
+                        ImportSpecifierKind::Named,
+                        Some(imported_name),
+                    )
                 }
-                ImportSpecifier::Default(ImportDefaultSpecifier { local, .. }) => {
-                    (local.sym.to_string(), local.span, "ImportDefaultSpecifier")
-                }
-                ImportSpecifier::Namespace(ImportStarAsSpecifier { local, .. }) => {
-                    (local.sym.to_string(), local.span, "ImportNamespaceSpecifier")
-                }
+                ImportSpecifier::Default(ImportDefaultSpecifier { local, .. }) => (
+                    local.sym.to_string(),
+                    local.span,
+                    "ImportDefaultSpecifier",
+                    ImportSpecifierKind::Default,
+                    None,
+                ),
+                ImportSpecifier::Namespace(ImportStarAsSpecifier { local, .. }) => (
+                    local.sym.to_string(),
+                    local.span,
+                    "ImportNamespaceSpecifier",
+                    ImportSpecifierKind::Namespace,
+                    None,
+                ),
             };
             let binding = Binding {
                 kind: BindingKind::Module,
@@ -1695,6 +1782,11 @@ impl Builder {
                 binding_id_type: None,
                 scope,
                 span,
+                import_info: Some(ImportInfo {
+                    source: source.clone(),
+                    kind,
+                    imported_name,
+                }),
             };
             self.bindings_by_scope[scope as usize].insert(name, binding);
         }

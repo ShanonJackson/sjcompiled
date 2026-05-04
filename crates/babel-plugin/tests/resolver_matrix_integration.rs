@@ -43,9 +43,11 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+
+use babel_plugin::resolver::{build_default, build_from_config, ResolverConfig};
 
 const EXPECTED_ENHANCED_RESOLVE_VERSION: &str = "5.18.3";
 const EXPECTED_RESOLVE_VERSION: &str = "1.22.12";
@@ -80,12 +82,48 @@ struct Corpus {
 struct Entry {
     label: String,
     axis: String,
+    #[serde(rename = "fromFile")]
+    from_file: String,
+    request: String,
+    #[serde(default)]
+    extensions: Option<Vec<String>>,
     expected: serde_json::Value,
     observed: serde_json::Value,
-    // `fromFile`, `request`, `extensions` are present on every JSON
-    // entry but consumed only by `rust_resolver_matches_js_corpus`
-    // post-§5.4b — added back when that test grows a real body.
-    // serde ignores absent/extra fields by default.
+}
+
+fn repo_root() -> PathBuf {
+    // tests/ -> crate/ -> crates/ -> repo root
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("babel-plugin parent is crates/")
+        .parent()
+        .expect("crates/ parent is repo root")
+        .to_path_buf()
+}
+
+/// Convert a corpus-relative path (forward-slash, repo-rooted) into
+/// an absolute platform-native path. Mirrors `oracle.mjs::toAbs` —
+/// the corpus is portable across machines, the gate resolves it to
+/// this machine.
+fn to_abs(rel: &str) -> PathBuf {
+    let mut p = repo_root();
+    for seg in rel.split('/') {
+        p.push(seg);
+    }
+    p
+}
+
+/// Convert an absolute path back to a corpus-relative forward-slash
+/// path so `expected.path` (which is corpus-relative) compares
+/// byte-for-byte with the resolved output. Mirrors
+/// `oracle.mjs::toRel`.
+fn to_rel(abs: &Path) -> String {
+    let root = repo_root();
+    let rel = abs.strip_prefix(&root).unwrap_or(abs);
+    rel.components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 fn corpus_path() -> PathBuf {
@@ -205,32 +243,370 @@ fn corpus_observed_matches_expected_oracle_self_consistency() {
 /// Byte-parity gate. Compares `oxc_resolver` output against the
 /// `enhancedResolve` column of every corpus entry.
 ///
-/// **`#[ignore]`'d at §5.4a entry-gate** — the Rust resolver under
-/// `crates/babel-plugin/src/resolver/` doesn't exist yet. The §5.4b
-/// implementer:
+/// **§5.4b-LIVE.** Iterates the corpus, builds a default-config
+/// resolver per [`build_default`] (extensions from the fixture's
+/// `extensions` field, falling back to `DEFAULT_CODE_EXTENSIONS`),
+/// resolves each `(fromFile, request)` pair, and asserts the
+/// produced absolute path matches `expected.enhancedResolve.path`
+/// byte-for-byte after corpus-relative normalisation.
 ///
-/// 1. Lands `crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs`
-///    per `plugins/RESOLVER_SPEC_PART_TWO.md` and
-///    `crates/babel-plugin/RESOLVER_MATRIX.md`.
-/// 2. Wires this gate body to call into `resolver::build_default(...)`
-///    and `Resolver::resolve_sync(...)`.
-/// 3. Removes `#[ignore]` and runs.
-/// 4. Applies the divergence-action protocol from RESOLVER_MATRIX.md
-///    for every fixture that fails: match | shim | escalate.
+/// On divergence the test prints:
+///   - the fixture label + axis
+///   - what oxc_resolver returned
+///   - what enhanced-resolve returned
+///
+/// then panics. The §5.4b implementer / future agent applies the
+/// divergence-action protocol from
+/// `crates/babel-plugin/RESOLVER_MATRIX.md`: match (adjust
+/// `resolver::default::build_default` config), shim (wrap the
+/// resolver), or escalate (add a row to RESOLVER_MATRIX.md's
+/// "Confirmed unreachable" table).
 #[test]
-#[ignore]
 fn rust_resolver_matches_js_corpus() {
     let corpus = load_corpus();
+    let mut failures = Vec::new();
 
-    // Placeholder until §5.4b. The body below intentionally fails
-    // with a clear pointer to the next step so a future agent who
-    // accidentally un-ignores this test sees the right diagnostic.
-    panic!(
-        "Phase 5 §5.4a entry-gate placeholder — the Rust resolver \
-         under crates/babel-plugin/src/resolver/ has not been ported \
-         yet. Land §5.4b (the engine + default config) and replace \
-         this body. Corpus has {} entries across {} axes.",
-        corpus.entry_count,
-        corpus.axis_counts.len()
+    for entry in &corpus.entries {
+        let from_abs = to_abs(&entry.from_file);
+        let extensions: Option<Vec<String>> = entry.extensions.clone();
+        let resolver = build_default(extensions.as_deref());
+
+        let expected_enhanced = entry
+            .expected
+            .as_object()
+            .and_then(|obj| obj.get("enhancedResolve"))
+            .cloned();
+
+        // Skip entries where the fixture didn't pin enhancedResolve
+        // (defensive — the seed corpus pins all of them, but be
+        // permissive when the §5.4b implementer grows the corpus
+        // and stages a fixture without expectations).
+        let Some(expected_enhanced) = expected_enhanced else {
+            continue;
+        };
+
+        let actual = match resolver.resolve_sync(&from_abs, &entry.request) {
+            Ok(p) => Ok(to_rel(&p)),
+            Err(e) => Err(format!("{e:?}")),
+        };
+
+        let expected_kind = expected_enhanced
+            .get("kind")
+            .and_then(|k| k.as_str())
+            .unwrap_or("");
+
+        match (expected_kind, &actual) {
+            ("ok", Ok(actual_path)) => {
+                let expected_path = expected_enhanced
+                    .get("path")
+                    .and_then(|p| p.as_str())
+                    .unwrap_or("");
+                if actual_path != expected_path {
+                    failures.push(format!(
+                        "fixture `{}` (axis: {})\n  \
+                         expected (enhanced-resolve): {}\n  \
+                         actual   (oxc_resolver):     {}\n  \
+                         see crates/babel-plugin/RESOLVER_MATRIX.md \
+                         §Divergence-action-protocol",
+                        entry.label, entry.axis, expected_path, actual_path,
+                    ));
+                }
+            }
+            ("err", Err(_)) => {
+                // Both errored — coarse pass. Error-class match is
+                // captured by the oracle-self-consistency test; here
+                // we accept any error on either side.
+            }
+            ("ok", Err(actual_err)) => {
+                let expected_path = expected_enhanced
+                    .get("path")
+                    .and_then(|p| p.as_str())
+                    .unwrap_or("");
+                failures.push(format!(
+                    "fixture `{}` (axis: {})\n  \
+                     expected (enhanced-resolve): ok={}\n  \
+                     actual   (oxc_resolver):     err={}\n  \
+                     see crates/babel-plugin/RESOLVER_MATRIX.md \
+                     §Divergence-action-protocol",
+                    entry.label, entry.axis, expected_path, actual_err,
+                ));
+            }
+            ("err", Ok(actual_path)) => {
+                failures.push(format!(
+                    "fixture `{}` (axis: {})\n  \
+                     expected (enhanced-resolve): err\n  \
+                     actual   (oxc_resolver):     ok={}\n  \
+                     see crates/babel-plugin/RESOLVER_MATRIX.md \
+                     §Divergence-action-protocol",
+                    entry.label, entry.axis, actual_path,
+                ));
+            }
+            (other, _) => {
+                failures.push(format!(
+                    "fixture `{}`: expected.enhancedResolve.kind = {:?} (must be \"ok\" or \"err\")",
+                    entry.label, other,
+                ));
+            }
+        }
+    }
+
+    if !failures.is_empty() {
+        let count = failures.len();
+        let total = corpus.entry_count;
+        let body = failures.join("\n\n");
+        panic!(
+            "{count}/{total} fixture(s) diverged from enhanced-resolve@{}:\n\n{body}",
+            corpus.enhanced_resolve_version,
+        );
+    }
+}
+
+// ---------- §5.4c — packageJsonTransforms end-to-end ----------
+//
+// These tests exercise the [`build_from_config`] path (vs.
+// [`build_default`] which the corpus gate above covers). They
+// don't go through the JS oracle — `enhanced-resolve` doesn't have
+// a generic transform engine in its 5.x line, so the corpus shape
+// would diverge by design. Instead, the transform parity is locked
+// at three layers:
+//
+// 1. Per-op unit tests in `crates/babel-plugin/src/resolver/transforms.rs`
+//    (22 tests covering each op + composed Jira sequences) — pure
+//    JSON mutation, no FS.
+// 2. Engine-wiring round-trip in
+//    `crates/babel-plugin/src/resolver/engine.rs` (a no-op transform
+//    against an axis-1-style fixture).
+// 3. THIS module — end-to-end resolution against an on-disk
+//    `axis-10-package-json-transforms/` fixture, demonstrating that
+//    the bytes oxc_resolver consumes ARE the transformed bytes
+//    (resolution outcome differs based on whether the transform
+//    runs).
+//
+// If a future agent regresses the FS interception (e.g. by caching
+// the raw bytes outside the wrapper, or accidentally bypassing
+// `read()`), test (3) below fires.
+
+fn axis_10_consumer() -> PathBuf {
+    repo_root()
+        .join("parity-harness/resolver-matrix/fixtures-source")
+        .join("axis-10-package-json-transforms/delete-exports/consumer.js")
+}
+
+fn axis_10_main_entry_path() -> PathBuf {
+    repo_root()
+        .join("parity-harness/resolver-matrix/fixtures-source")
+        .join("axis-10-package-json-transforms/delete-exports")
+        .join("node_modules/parity-pkg-with-both-main-and-exports/main-entry.js")
+}
+
+fn axis_10_exports_entry_path() -> PathBuf {
+    repo_root()
+        .join("parity-harness/resolver-matrix/fixtures-source")
+        .join("axis-10-package-json-transforms/delete-exports")
+        .join("node_modules/parity-pkg-with-both-main-and-exports/exports-entry.js")
+}
+
+#[test]
+fn axis_10_no_transform_resolves_via_exports() {
+    // Sanity: with NO transform, the default-config resolver
+    // honours `exports` (modern Node behaviour) and lands at
+    // `exports-entry.js`. This baseline establishes the "with
+    // transform" test below has a meaningful delta.
+    let consumer = axis_10_consumer();
+    if !consumer.exists() {
+        return; // fixture not on disk
+    }
+    let resolver = build_default(Some(&[
+        ".js".to_string(),
+        ".jsx".to_string(),
+        ".ts".to_string(),
+        ".tsx".to_string(),
+    ]));
+    let resolved = resolver
+        .resolve_sync(&consumer, "parity-pkg-with-both-main-and-exports")
+        .expect("baseline resolution must succeed");
+    let expected = axis_10_exports_entry_path();
+    let resolved = std::fs::canonicalize(&resolved).unwrap_or(resolved);
+    let expected = std::fs::canonicalize(&expected).unwrap_or(expected);
+    assert_eq!(
+        resolved, expected,
+        "without transforms: expected `exports` field to win over `main`"
+    );
+}
+
+#[test]
+fn axis_10_delete_exports_transform_falls_back_to_main() {
+    // The §5.4c E2E gate. Build a config-driven resolver with a
+    // single `deleteKey "exports"` transform applied to every
+    // package.json read. The bytes oxc_resolver consumes for the
+    // target package.json are MUTATED (no `exports` field) — so
+    // resolution falls back to `main`.
+    let consumer = axis_10_consumer();
+    if !consumer.exists() {
+        return; // fixture not on disk
+    }
+
+    let cfg_value = serde_json::json!({
+        "extensions": [".js", ".jsx", ".ts", ".tsx"],
+        "packageJsonTransforms": [
+            { "op": "deleteKey", "key": "exports" }
+        ]
+    });
+    let cfg = ResolverConfig::parse_value(&cfg_value)
+        .expect("config schema parse")
+        .expect("config object");
+    let resolver = build_from_config(&cfg, &repo_root()).unwrap();
+
+    let resolved = resolver
+        .resolve_sync(&consumer, "parity-pkg-with-both-main-and-exports")
+        .expect("transformed resolution must succeed");
+    let expected = axis_10_main_entry_path();
+    let resolved = std::fs::canonicalize(&resolved).unwrap_or(resolved);
+    let expected = std::fs::canonicalize(&expected).unwrap_or(expected);
+    assert_eq!(
+        resolved, expected,
+        "with deleteKey transform: expected `main` to win because \
+         `exports` was stripped from the bytes oxc_resolver consumed. \
+         If this fails the FS-interception path in \
+         crates/babel-plugin/src/resolver/engine.rs is broken — see \
+         crates/babel-plugin/RESOLVER_MATRIX.md \
+         §Divergence-action-protocol."
+    );
+}
+
+// ---------- §5.4d — preferFirst dispatcher end-to-end ----------
+//
+// These tests exercise the [`build_from_config`] path with a
+// non-empty `preferFirst[]` array. The on-disk fixture
+// (axis-11-prefer-first/match-by-prefix/) has a package whose
+// resolved entry differs based on whether the dispatcher routes
+// through a rule resolver (which overrides `exports.fields` to
+// include `af:exports`) or falls through to the base resolver
+// (default `exports.fields = [["exports"]]`, falls back to `main`).
+//
+// Three tests:
+// 1. baseline — no preferFirst → resolves via main
+// 2. matched   — preferFirst matches → resolves via af:exports
+// 3. unmatched — preferFirst rule with non-overlapping prefix →
+//    fall-through to base → resolves via main
+
+fn axis_11_consumer() -> PathBuf {
+    repo_root()
+        .join("parity-harness/resolver-matrix/fixtures-source")
+        .join("axis-11-prefer-first/match-by-prefix/consumer.js")
+}
+
+fn axis_11_main_entry() -> PathBuf {
+    repo_root()
+        .join("parity-harness/resolver-matrix/fixtures-source")
+        .join("axis-11-prefer-first/match-by-prefix")
+        .join("node_modules/@matched/pkg-with-af-exports/main-entry.js")
+}
+
+fn axis_11_af_entry() -> PathBuf {
+    repo_root()
+        .join("parity-harness/resolver-matrix/fixtures-source")
+        .join("axis-11-prefer-first/match-by-prefix")
+        .join("node_modules/@matched/pkg-with-af-exports/af-entry.js")
+}
+
+#[test]
+fn axis_11_no_prefer_first_uses_main() {
+    let consumer = axis_11_consumer();
+    if !consumer.exists() {
+        return;
+    }
+    let resolver = build_default(Some(&[
+        ".js".to_string(),
+        ".jsx".to_string(),
+        ".ts".to_string(),
+        ".tsx".to_string(),
+    ]));
+    let resolved = resolver
+        .resolve_sync(&consumer, "@matched/pkg-with-af-exports")
+        .expect("baseline resolution must succeed");
+    let expected = axis_11_main_entry();
+    let resolved = std::fs::canonicalize(&resolved).unwrap_or(resolved);
+    let expected = std::fs::canonicalize(&expected).unwrap_or(expected);
+    assert_eq!(
+        resolved, expected,
+        "without preferFirst: default resolver doesn't know about `af:exports`, must walk `main`"
+    );
+}
+
+#[test]
+fn axis_11_matched_prefix_routes_to_af_exports() {
+    let consumer = axis_11_consumer();
+    if !consumer.exists() {
+        return;
+    }
+    // Inline `["@matched/"]` prefix — matches the consumer's
+    // `@matched/pkg-with-af-exports` request. `use.exportsFields`
+    // overrides the rule resolver to walk `af:exports` first.
+    let cfg_value = serde_json::json!({
+        "extensions": [".js", ".jsx", ".ts", ".tsx"],
+        "preferFirst": [
+            {
+                "match": { "specifierStartsWith": ["@matched/"] },
+                "use": { "exportsFields": ["af:exports", "exports"] }
+            }
+        ]
+    });
+    let cfg = ResolverConfig::parse_value(&cfg_value)
+        .expect("config schema parse")
+        .expect("config object");
+    let resolver = build_from_config(&cfg, &repo_root()).unwrap();
+
+    let resolved = resolver
+        .resolve_sync(&consumer, "@matched/pkg-with-af-exports")
+        .expect("matched resolution must succeed");
+    let expected = axis_11_af_entry();
+    let resolved = std::fs::canonicalize(&resolved).unwrap_or(resolved);
+    let expected = std::fs::canonicalize(&expected).unwrap_or(expected);
+    assert_eq!(
+        resolved, expected,
+        "with preferFirst matching `@matched/` and use.exportsFields=[\"af:exports\",\"exports\"]: \
+         expected resolver to walk af:exports → af-entry.js. If this fails, the dispatcher's \
+         per-rule resolver isn't honouring use.exportsFields. See \
+         crates/babel-plugin/RESOLVER_MATRIX.md §Divergence-action-protocol."
+    );
+}
+
+#[test]
+fn axis_11_unmatched_prefix_falls_through_to_base() {
+    let consumer = axis_11_consumer();
+    if !consumer.exists() {
+        return;
+    }
+    // Rule's prefix list is `["@nomatch/"]` — does NOT match the
+    // consumer's `@matched/...` request. dispatcher.match_request
+    // returns None → resolution falls through to base, which has
+    // the default `exports.fields = [["exports"]]` and walks
+    // `main` → main-entry.js.
+    let cfg_value = serde_json::json!({
+        "extensions": [".js", ".jsx", ".ts", ".tsx"],
+        "preferFirst": [
+            {
+                "match": { "specifierStartsWith": ["@nomatch/"] },
+                "use": { "exportsFields": ["af:exports", "exports"] }
+            }
+        ]
+    });
+    let cfg = ResolverConfig::parse_value(&cfg_value)
+        .expect("config schema parse")
+        .expect("config object");
+    let resolver = build_from_config(&cfg, &repo_root()).unwrap();
+
+    let resolved = resolver
+        .resolve_sync(&consumer, "@matched/pkg-with-af-exports")
+        .expect("fall-through resolution must succeed");
+    let expected = axis_11_main_entry();
+    let resolved = std::fs::canonicalize(&resolved).unwrap_or(resolved);
+    let expected = std::fs::canonicalize(&expected).unwrap_or(expected);
+    assert_eq!(
+        resolved, expected,
+        "with preferFirst's prefix list NOT matching the request: dispatcher must return None \
+         and resolution must fall through to the base resolver (default exports.fields, \
+         resolves via `main` → main-entry.js)."
     );
 }

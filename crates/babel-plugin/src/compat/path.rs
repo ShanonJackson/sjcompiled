@@ -767,6 +767,7 @@ pub fn scope_push(
         binding_id_type: Some(NodeKind::Identifier.type_str()),
         scope: arrow_scope,
         span: id_span,
+        import_info: None,
     };
     index.register_synthetic_binding(arrow_scope, &opts.id, binding);
 }

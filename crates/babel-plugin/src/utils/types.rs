@@ -21,8 +21,6 @@
 
 use swc_core::ecma::ast::Expr;
 
-use crate::types::Metadata;
-
 /// `{ type: 'unconditional', css: string }` — a static rule.
 #[derive(Debug, Clone)]
 pub struct UnconditionalCssItem {
@@ -114,20 +112,38 @@ pub struct CSSOutput {
     pub variables: Vec<Variable>,
 }
 
-/// `PartialBindingWithMeta` — what `resolveBinding` returns. The
-/// `path` field is a Babel `NodePath`; the Rust analog is an opaque
-/// recorder-issued handle (Phase 5 §5.4 lands the concrete type).
-/// Stored as `u32` for now so the struct shape is stable; callers
-/// MUST NOT dereference the id outside Phase 5.
+/// `PartialBindingWithMeta` — what `resolveBinding` returns.
+///
+/// **§5.4e shape (locked at this checkpoint):** drops the `'a`
+/// lifetime that the §4.4 placeholder carried (`meta: Metadata<'a>`
+/// can't reference a different file's State than the caller's), and
+/// drops the `path_id: u32` recorder-handle placeholder (no consumer
+/// dereferences it — `compat::path::PathHandle` is the §5.5/§5.6
+/// surface for path-shaped data).
+///
+/// The `node` is the resolved expression cloned out of the source
+/// module, so the caller doesn't need to keep the imported AST
+/// alive. `imported_filename` carries the resolved module's
+/// absolute path so the §5.6 evaluator can include-files-track and
+/// re-construct a `Metadata` pointed at the imported file when it
+/// needs to fold deeper.
+///
+/// `node = None` is a meaningful "binding found but resolved to a
+/// non-expression shape" — function/class/interface decls, etc.
+/// Callers deopt.
 #[derive(Debug)]
-pub struct PartialBindingWithMeta<'a> {
-    pub node: Box<Expr>,
-    /// Phase 5 §5.4 recorder handle. Today: placeholder.
-    pub path_id: u32,
+pub struct PartialBindingWithMeta {
+    /// The resolved expression. `None` when the binding's resolved
+    /// node isn't an `Expr` (declaration shape, namespace import).
+    pub node: Option<Box<Expr>>,
     pub constant: bool,
-    pub meta: Metadata<'a>,
     pub source: BindingSource,
+    /// Absolute path of the imported module, when `source ==
+    /// Import`. `None` for same-file (`source == Module`)
+    /// resolutions and for namespace-import resolutions.
+    pub imported_filename: Option<String>,
 }
+
 
 /// `'import' | 'module'` discriminator on `PartialBindingWithMeta`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

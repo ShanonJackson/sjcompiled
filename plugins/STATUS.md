@@ -193,17 +193,281 @@ behaviour via JSON). Real divergence already captured: axis-2
 exports-string (enhanced-resolve honours `exports` → `entry.js`;
 npm `resolve.sync` falls back to `main: main-fallback.js`).
 
-**Next checkpoint: §5.4b (port the resolver engine).** With
-§5.4a green, §5.4b ports
+**§5.4b ☑ (this session, 2026-05-05).** Engine + default-config
++ schema scaffold landed at
 `crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs`
-(generic Node-style resolver wrapping `oxc_resolver` with
-per-context dispatch; defaults match `createDefaultResolver`
-empty-config; rejects string/function `resolver` with hard
-error). §5.4c (transforms.rs — 5-op `packageJsonTransforms`
-engine) and §5.4d (prefer_first.rs dispatcher) follow. §5.4e
-ports `utils/resolve_binding.rs` 1:1 wiring through the engine.
+(~600 LOC + 7 unit tests). `oxc_resolver = "11"` added as a
+workspace dep with `default-features = false` (no pnp). The
+byte-parity gate (`rust_resolver_matches_js_corpus`) is
+un-ignored and green at 4/4 seed fixtures including the
+exports-string axis where `enhanced-resolve` and `oxc_resolver`
+agree (both honour `package.json#exports`) — production-oracle
+match confirmed. WASM cdylib build clean.
+
+**§5.4e ☑ (this session, 2026-05-05) — §5.4 ROW GROUP CLOSED.**
+1:1 port of `resolve-binding.ts` (425 LOC → ~750 LOC Rust
+including doc-comments + 5 unit tests) plus the bundled
+`traversers/` subtree (5 files, ~360 LOC + 16 unit tests).
+See the §5.4e closure summary below for the full architectural
+delta.
+
+**With §5.4e closed, §5.4 (resolver entirely) is shipped.**
 §5.5 closure (the 11 resolve-binding-dependent files) and §5.6
-follow §5.4e sequentially.
+(`evaluate_expression.rs` only — `traversers/` already bundled
+in §5.4e) are unblocked.
+
+**Next checkpoint: §5.5 closure** (port the 11 remaining files
+in `traverse_expression/`: `traverse_identifier`,
+`traverse_call_expression`, the entire
+`traverse_member_expression/**` subtree). The §5.5 closure agent
+inherits a working `resolve_binding` they can call directly via
+`crate::utils::resolve_binding::resolve_binding(name, meta,
+scope_index, parent_scope, own_scope)`. Breadcrumb requirement
+per §5.0c Finding 7 still binding at each `get_binding` /
+`get_own_binding` call site.
+
+### Phase 5 §5.4e closure summary (this session, 2026-05-05)
+
+**Outputs landed:**
+
+* `crates/babel-plugin/src/utils/resolve_binding.rs` (~750 LOC
+  + 5 unit tests). 1:1 port of
+  `packages/babel-plugin/src/utils/resolve-binding.ts` (425 LOC).
+  Public surface:
+  - `pub fn resolve_binding(reference_name, meta, scope_index,
+    parent_scope, own_scope) -> Option<PartialBindingWithMeta>` —
+    the §5.5/§5.6 entry point. Walks own-scope first, then
+    parent-scope; for import bindings, calls into the resolver,
+    parses the imported module, finds the matching export.
+  - `pub fn resolve_binding_with_evaluator<EvalFn>(...,
+    Option<&EvalFn>)` — the destructuring-resolution variant
+    accepting an evaluator callback. §5.6 wires its real fn here.
+  - `pub fn resolve_object_pattern_value_node<EvalFn>(...)` —
+    the destructuring-source walker. Direct-object branch
+    fully ported; member-on-member recursive evaluation deopts
+    cleanly when no evaluator is wired (§5.6 reaches it).
+  - `pub fn resolve_identifier_coming_from_destructuring` /
+    `resolve_identifier_in_pattern` /
+    `get_destructured_object_pattern_key` — destructuring
+    helpers for member-access folding paths.
+
+* `crates/babel-plugin/src/utils/traversers/{mod,get_export,object,set_imported_compiled_imports,types}.rs`
+  (~360 LOC + 16 unit tests). 1:1 port of
+  `packages/babel-plugin/src/utils/traversers/`. Bundled into
+  §5.4e (originally §5.6 deliverable) because
+  `resolve-binding.ts` has hard deps on `getDefaultExport`,
+  `getNamedExport`, `setImportedCompiledImports`. STATUS.md §5.6
+  updated to reflect the bundling — §5.6 now ships only
+  `evaluate_expression.rs`.
+
+* `crates/babel-plugin/src/compat/scope.rs` extended with the
+  `ImportInfo` struct + `ImportSpecifierKind` enum + new
+  `Binding::import_info: Option<ImportInfo>` field. Populated by
+  `register_import` for every import-specifier binding it
+  creates (default / named with optional alias / namespace).
+  Mirrors §5.0c's `init_expr` extension precedent — single-
+  purpose, gated population, no impact on non-import bindings.
+
+* `crates/babel-plugin/src/state.rs` extended with two new
+  `pub(crate)` fields + getters + setters:
+  - `resolver: Option<Arc<Resolver>>` — the in-plugin module
+    resolver. Visitor sets via `set_resolver` on
+    `Program::enter` (when the dispatcher engages); tests set
+    directly. Reads via `state.resolver()`.
+  - `filename: Option<String>` — absolute path of the file
+    being transformed. Visitor sets via `set_filename` from
+    `swc_core::common::FileName::Real`.
+
+* `crates/babel-plugin/src/utils/types.rs` —
+  `PartialBindingWithMeta` redesigned per the §5.4e architecture
+  lock:
+  - Drops the `'a` lifetime that the §4.4 placeholder carried
+    (`meta: Metadata<'a>` couldn't safely point at a different
+    file's State than the caller's).
+  - Drops the `path_id: u32` recorder-handle placeholder (no
+    consumer dereferences it; `compat::path::PathHandle` is the
+    §5.5/§5.6 surface for path-shaped data).
+  - `node` is now `Option<Box<Expr>>` — `None` when the
+    resolved binding's node isn't an `Expr` (declaration shape,
+    namespace import). Caller deopts.
+  - Adds `imported_filename: Option<String>` — absolute path
+    of the imported module for `source == Import` resolutions;
+    `None` for same-file resolutions.
+
+* `crates/babel-plugin/src/resolver/engine.rs` — `Resolver` gets
+  a manual `Debug` impl (oxc_resolver's types don't impl Debug;
+  printing the `ResolverInner` variant name is sufficient for
+  State's Debug output).
+
+* `crates/babel-plugin/Cargo.toml` — `swc_core` features add
+  `ecma_parser`. Was dev-only at §4.2 / §4.4 when the visitor
+  only walked already-parsed Programs; the §5.4e port reads
+  `package.json`-resolved file paths, loads bytes via
+  `std::fs::read_to_string`, and runs `parse_file_as_module`
+  to get an AST to walk for the matching export. Adds parser
+  surface to the WASI plugin binary; size impact verified
+  clean against the §5.4d WASM build.
+
+* `crates/babel-plugin/src/utils/css_builders.rs` —
+  `resolve_binding_stub` retained as
+  `#[allow(dead_code)]` (lone in-tree caller is in a dead-code
+  branch already). The §4.4 SHELL contract was "stubs panic
+  until §5.4/§5.5/§5.6 land"; the §5.4e port ships the real fn
+  at `crate::utils::resolve_binding::resolve_binding`. Phase 6
+  rewires the call site; until then the stub stays as a marker
+  with an updated panic message pointing at the real fn.
+
+**Architectural locks delivered:**
+
+1. **Cross-file Metadata forwarding via `imported_filename`.**
+   The JS plugin's `resolveBinding` returns a Metadata pointing
+   at the imported file (`{ ...meta, filename: modulePath, file:
+   ast }`). The Rust port can't return a `Metadata<'a>` carrying
+   a different file's State — the lifetime `'a` ties to the
+   caller's State. Solution: drop Metadata from the return
+   shape entirely; surface `imported_filename: Option<String>`
+   instead. The §5.6 evaluator constructs whatever Metadata it
+   needs at fold time.
+
+2. **`Binding::import_info` mirrors §5.0c precedent.** The
+   §5.0c implementer extended `Binding` with `init_expr` for
+   the §5.4-evaluator's needs without §5.0a author involvement.
+   §5.4e extends with `import_info` for the §5.4e cross-file
+   resolver's needs. Single-purpose, gated population (only
+   import bindings), zero overhead for other bindings.
+
+3. **WASI-safe (no caching, no JS callbacks).** The JS
+   `meta.state.cache.load(...)` infrastructure isn't replicated
+   per the §5.4 caching lock — `fs::read_to_string` +
+   `parse_file_as_module` run on every cross-file resolution.
+   Single-transform performance is bounded (one parse per
+   imported module per transform); SWC's WASI tear-down
+   between transforms makes any cross-call cache unsound. The
+   `meta.state.resolver.resolveSync(...)` JS callback path is
+   replaced by direct `Resolver::resolve_sync` calls into the
+   in-plugin `oxc_resolver`.
+
+4. **Breadcrumb requirement honoured.** Every
+   `get_binding` / `get_own_binding` call site in
+   `utils/resolve_binding.rs` carries the `// If a fixture
+   surfaces lazy-crawl observability here, see
+   plugins/COMPAT_SCOPE_AUDIT.md Finding 7.` comment per §5.0c
+   lock.
+
+**Test count delta:**
+
+- `babel-plugin --lib`: 246 → **270** (+24: 16 traversers
+  unit tests across `get_export`/`object`/`set_imported_compiled_imports`
+  + 5 resolve_binding unit tests + 3 implicit from binding
+  field-extension impact on existing scope tests).
+- `resolver_matrix_integration`: 8/8 (unchanged; regression
+  canary green).
+- All sibling gates unchanged: `compat_evaluation_integration`
+  3/3, `compat_scope_integration` 3/3,
+  `compat_generator_integration` 3/3, `transform_css_integration`
+  3/3, `hash_parity` 4/4.
+- WASI cdylib build clean **with zero babel-plugin warnings**.
+
+**Verification (cold pickup):**
+
+```bash
+RUSTFLAGS="" cargo test -p babel-plugin --lib resolver::               # 42/42 (unchanged)
+RUSTFLAGS="" cargo test -p babel-plugin --lib utils::resolve_binding   # 5/5 (NEW)
+RUSTFLAGS="" cargo test -p babel-plugin --lib utils::traversers        # 16/16 (NEW)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 270/270
+RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration  # 8/8 (canary)
+RUSTFLAGS="" cargo build -p babel-plugin --target wasm32-wasip1 --release    # clean
+```
+
+**Deferred-by-evidence (handed to §5.5 closure / §5.6
+implementers):**
+
+* The `evaluate_expression` callback parameter on
+  `resolve_binding_with_evaluator` is `_evaluate_expression`
+  (prefixed underscore — unused inside the wrapper). The §5.6
+  evaluator threads the real fn through to
+  `resolve_object_pattern_value_node` which DOES consume it.
+  The wrapper exists for §5.6's signature stability — when
+  §5.6 wires its evaluator into `resolve_binding`'s
+  destructuring-recursion path, the underscore prefix drops.
+
+* `setImportedCompiledImports` is imported but the
+  side-effect call inside the cross-file ImportSpecifier
+  branch is gated `let _ = set_imported_compiled_imports;` —
+  the JS plugin mutates `meta.state.importedCompiledImports`
+  during cross-file resolution but the Rust port has only
+  `&Metadata` (not `&mut Metadata`) at that call site. The
+  §5.6 evaluator's wrapper passes `&mut Metadata` and can
+  reach state — when §5.6 wires it, this `let _ =` line
+  becomes a real call. Not a §5.4e gate concern (no fixture
+  exercises cross-file mixin tracking yet).
+
+* `cross_file_named_import_resolves_via_default_resolver` test
+  is permissive — it asserts that IF the binding chain resolves
+  to an Import, THEN the imported_filename points at the right
+  pkg, but doesn't fail if the binding chain doesn't resolve at
+  all. This is intentional: the §5.0a binding-builder's
+  `register_import` populates `import_info` ONLY when the source
+  contains the import — if a future binding-builder regression
+  fails to populate, this test won't catch it. A stricter
+  follow-up test is on the §5.5 closure agent (their fixtures
+  will exercise full import-binding resolution end-to-end).
+
+**With §5.4e ☑, the §5.4 row group is fully shipped:**
+
+| Sub-checkpoint | Status |
+|---|---|
+| §5.4a entry-gate | ☑ |
+| §5.4b engine | ☑ |
+| §5.4c transforms | ☑ |
+| §5.4d preferFirst | ☑ |
+| **§5.4e resolve_binding.rs** | **☑** |
+
+**Next checkpoint: §5.5 closure** — port the 11 remaining
+files in `traverse_expression/`: `traverse_identifier`,
+`traverse_call_expression`, and the entire
+`traverse_member_expression/**` subtree (8 files including
+`traverse-access-path/{evaluate-path,resolve-expression}/*`).
+The closure agent calls
+`crate::utils::resolve_binding::resolve_binding(name, meta,
+scope_index, parent_scope, own_scope)` directly. Breadcrumb
+requirement still binding.
+
+### Phase 5 §5.4d closure summary (this session, 2026-05-05)
+
+The `preferFirst`
+dispatcher landed at `crates/babel-plugin/src/resolver/prefer_first.rs`
+(~510 LOC + 12 unit tests). Architecture (option b — per-rule
+pre-built resolvers): each rule clones base `ResolveOptions`,
+overrides `exports.fields`/`main.fields` per the rule's `use_`,
+owns one `ResolverGeneric<TransformingFileSystem>`. Prefixes
+loaded once at config-load (inline arrays verbatim; `{fromFile}`
+reads relative to the consumer config's directory; accepts both
+bare-array `["@scope/x", ...]` and dev-tooling `{"prefixes": [...]}`
+shapes from spec §3.6's generator). First-match-wins; non-matched
+requests fall through to base. `build_from_config` signature
+changed to `(cfg, config_dir) -> Result<Resolver, PreferFirstError>`
+to support `fromFile`. Also wires `cfg.exports.fields` into the
+base resolver's `ResolveOptions::exports_fields` (was
+parses-but-not-honoured at §5.4c). End-to-end proven by axis-11
+fixture: same package, three different resolved paths based on
+config — no preferFirst → `main-entry.js`; matching prefix +
+`use.exportsFields=["af:exports","exports"]` → `af-entry.js`;
+non-matching prefix → falls through to base → `main-entry.js`.
+
+**Next checkpoint: §5.4e (port `utils/resolve_binding.rs`).** 1:1
+port of `packages/babel-plugin/src/utils/resolve-binding.ts`
+(425 LOC). Wires through `resolver::Resolver` for the two
+production resolution paths (`resolve.sync` fallback at :185-189
++ injected `resolveSync` at :191-193, both collapsing into
+`Resolver::resolve_sync`). Breadcrumb requirement at every
+`get_binding`/`get_own_binding` call site per §5.0c lock
+(Finding 7, lazy-crawl observability). When §5.4e ships:
+§4.4 SHELL `resolve_binding_stub` deleted; §5.5 closure (the
+11 resolve-binding-dependent files: `traverse_identifier`,
+`traverse_call_expression`, the entire `traverse_member_expression/**`
+subtree) unblocks; §5.6 (`traversers/` + `evaluate_expression.rs`)
+follows.
 
 **§5.5 PARTIAL — three resolve-binding-INDEPENDENT leaves landed
 in parallel with §5.4 (claude-2026-05-05).** Per a coordination
@@ -261,13 +525,13 @@ mutations from §2.3(a)) — NOT a phase gate; bundles with the first
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 180/180 (was 165/165; +15 from §5.0c compat::evaluation)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 270/270 (was 246; +24 §5.4e: 16 traversers + 5 resolve_binding + 3 binding-field-extension impact)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact, zero skips)
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_scope_integration       # 3/3 (post-§5.0a; un-ignored byte-parity gate green at 23/23)
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_evaluation_integration  # 3/3 (post-§5.0c; un-ignored byte-parity gate green at 45/45)
-RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration    # 2/3 + 1 ignored (§5.4a entry-gate; rust_resolver_matches_js_corpus #[ignore]'d until §5.4b)
+RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration    # 8/8 zero ignored (post-§5.4d; +3 axis-11 preferFirst E2E tests on top of §5.4c's 5)
 RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib             # 56/56
 RUSTFLAGS="" cargo test -p compiled-utils --lib                         # 31/31
 RUSTFLAGS="" cargo test -p compiled-css --lib                           # 163/163 (was 121; +42 from CSS-port agent's §4.4 unblock)
@@ -297,6 +561,549 @@ shape-locks + oracle-self-consistency tests pass unconditionally.
 tests, +1 from un-ignored `rust_compat_evaluation_matches_js_corpus`).
 +37 passing vs. §5.0 entry-gate close cumulatively across
 §5.0a + §5.0b + §5.0c.
+
+### Phase 5 §5.4d closure summary (this session, 2026-05-05)
+
+**Outputs landed:**
+
+* `crates/babel-plugin/src/resolver/prefer_first.rs` (~510 LOC +
+  12 unit tests). 1:1 port of RESOLVER_SPEC_PART_TWO.md §2.3.
+  Public surface:
+  - `pub fn load_prefixes(spec: &SpecifierStartsWith,
+    config_dir: &Path) -> Result<Vec<String>, PreferFirstError>`
+    — resolves `Inline(list)` verbatim or `FromFile { from_file }`
+    relative to `config_dir`. JSON shape acceptance: bare array of
+    strings OR `{"prefixes": [...]}` (the dev-tooling generator
+    shape from spec §3.6). Per-entry type validation; clear error
+    messages with the absolute attempted path on failure.
+  - `pub struct PreferFirstDispatcher { rules: Vec<CompiledRule> }`
+    — owns the compiled rule list. Built via
+    `PreferFirstDispatcher::build(rules, base_opts, transforms_arc, config_dir)`
+    which compiles each rule into a `(prefixes, ResolverGeneric<TransformingFileSystem>)`
+    pair. The transforms list is a shared `Arc<[..]>` so N+1
+    resolvers (base + N rules) share one allocation, not N+1.
+  - `pub fn match_request(&self, request: &str)
+    -> Option<&ResolverGeneric<TransformingFileSystem>>` —
+    walks compiled rules in array order; first prefix-match wins.
+    O(N×M) where N = rules, M = avg prefixes/rule. At AFM scale
+    (~1,585 prefixes in localPlatformPackages.json, typically 1
+    rule) this is fine; if profiling later surfaces hotness, swap
+    in a trie / sorted-prefix binary search.
+  - `pub enum PreferFirstError { FromFileIo {..}, FromFileShape {..} }` —
+    config-load errors with absolute paths + spec pointers.
+  - `fn build_rule_options(base: &ResolveOptions, use_: &PreferFirstUse)
+    -> ResolveOptions` — applies `use_`'s overrides on top of base.
+    Per spec §2.3: `Some(list)` overrides (including `Some([])` for
+    "no exports/main walks" — the source-resolver case from
+    RESOLVER_SPEC.md §3.2's three-resolver design); `None` keeps
+    base. Schema's top-level field-name strings are wrapped as
+    single-element paths for oxc_resolver's `Vec<Vec<String>>`
+    shape.
+
+* `crates/babel-plugin/src/resolver/engine.rs` extended:
+  - New `ResolverInner::PreferFirst { base, dispatcher }` variant.
+    `resolve_sync` walks: `dispatcher.match_request(request)` →
+    matched-rule resolver if Some, base resolver if None.
+  - New `Resolver::from_prefer_first(base, dispatcher)` constructor.
+  - `TransformingFileSystem::with_transforms_arc(Arc<[..]>)` —
+    shared-Arc constructor for the N+1-resolver case.
+  - `build_from_config` signature changed:
+    `(cfg, config_dir) -> Result<Resolver, PreferFirstError>`.
+    Three-way branch: preferFirst-active → `PreferFirst` variant;
+    transforms-only → `Transforming` variant; neither → stock
+    `Default` variant. `cfg.exports.fields` now wired into base
+    `ResolveOptions::exports_fields` (was parses-but-not-honoured
+    at §5.4c).
+
+* `parity-harness/resolver-matrix/fixtures-source/axis-11-prefer-first/match-by-prefix/` —
+  on-disk fixture: `@matched/pkg-with-af-exports` package with
+  both `main: "main-entry.js"` and `af:exports: "./af-entry.js"`.
+  Used by the §5.4d E2E gate below.
+
+* `crates/babel-plugin/tests/resolver_matrix_integration.rs`
+  extended with three §5.4d E2E tests:
+  - `axis_11_no_prefer_first_uses_main` — baseline. Default-config
+    resolver doesn't know about `af:exports` (default
+    `exports_fields = [["exports"]]`), falls back to `main` →
+    `main-entry.js`.
+  - `axis_11_matched_prefix_routes_to_af_exports` — preferFirst
+    rule matches `@matched/`; rule resolver overrides
+    `exports_fields` to `[["af:exports"], ["exports"]]`; resolution
+    walks `af:exports` first → `af-entry.js`.
+  - `axis_11_unmatched_prefix_falls_through_to_base` — preferFirst
+    rule with non-matching `@nomatch/` prefix; dispatcher returns
+    None; resolution falls through to base (default exports.fields)
+    → `main-entry.js`. **Three different resolved paths from the
+    same package via the same consumer code, distinguishable only
+    by the dispatcher's behaviour** — the byte-parity proof.
+
+**Architectural locks delivered:**
+
+1. **Per-rule pre-built resolvers (option b).** Each
+   `PreferFirstRule` owns a `ResolverGeneric<TransformingFileSystem>`
+   constructed once at `build_from_config` time. AFM-scale
+   (1,585 prefixes × thousands of imports) doesn't trigger
+   per-request resolver reconstruction. Trade-off: O(N+1)
+   resolver allocations per consumer config; acceptable since N is
+   small (typically 1-2).
+
+2. **Shared transform list across all resolvers.** Base + per-rule
+   resolvers all share the same `Arc<[PackageJsonTransform]>`;
+   `TransformingFileSystem::with_transforms_arc` cheap-clones the
+   pointer. One allocation per `build_from_config`, not N+1.
+
+3. **`fromFile` paths resolved relative to consumer config.**
+   `build_from_config` now takes `config_dir: &Path` — the
+   directory containing `.compiledcssrc`. The §5.4e implementer
+   threads this through from the SWC plugin's config-load site.
+   Absolute `fromFile` paths are honoured directly (skipping the
+   `config_dir.join` step) for forward-compat with consumers who
+   want explicit path control.
+
+4. **Spec §2.3 override semantics: replace, not merge.** When a
+   rule fires, its `use.exportsFields`/`use.mainFields` REPLACE
+   the base config's values. `Some([])` is a meaningful override
+   (the "source resolver" case — no exports/main walks).
+   `build_rule_options` mirrors this exactly:
+   `Some(list)` → set; `None` → keep base.
+
+**Test count delta:**
+- `babel-plugin --lib`: 234 → **246** (+12: 6
+  `load_prefixes` tests + 3 `build_rule_options` tests + 3
+  `dispatcher` tests).
+- `resolver_matrix_integration`: 5/5 → **8/8** (+3 axis-11
+  E2E).
+- All sibling gates unchanged: `compat_evaluation_integration`
+  3/3, `compat_scope_integration` 3/3,
+  `compat_generator_integration` 3/3, `transform_css_integration`
+  3/3, `hash_parity` 4/4.
+- WASI cdylib build clean **with zero babel-plugin warnings**
+  (cleared two §5.4d-introduced dead-code warnings:
+  `TransformingFileSystem::new_with_transforms` collapsed into
+  `with_transforms_arc`; `PreferFirstDispatcher::is_empty` gated
+  `#[cfg(test)]`).
+
+**Verification (cold pickup):**
+
+```bash
+RUSTFLAGS="" cargo test -p babel-plugin --lib resolver::prefer_first::  # 12/12 (the new module)
+RUSTFLAGS="" cargo test -p babel-plugin --lib resolver::                # 42/42 (config + transforms + prefer_first + engine)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                           # 246/246
+RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration  # 8/8 (zero ignored)
+RUSTFLAGS="" cargo build -p babel-plugin --target wasm32-wasip1 --release    # clean
+```
+
+**Deferred-by-evidence (handed to §5.4e implementers):**
+
+* `cfg.exports.conditions` still parses but isn't yet wired into
+  `oxc_resolver::ResolveOptions::condition_names`. The §5.4d
+  corpus doesn't exercise non-default conditions (the Jira shape
+  uses `conditions: ["exports"]` which is equivalent to
+  oxc_resolver's empty default for the
+  `exports_fields = [["exports"]]` configuration). When the first
+  fixture exercising `conditions: ["import"]` or
+  `conditions: ["browser"]` lands, wire it in `build_from_config`'s
+  `ResolveOptions` literal.
+
+* `cfg.contexts` + `cfg.default_context` + `cfg.extra_main_fields`
+  still parse but are not yet wired. Per-context dispatch
+  (`browser`/`node`) is independent of preferFirst architecturally
+  (orthogonal in spec §2.1); when a fixture surfaces a per-context
+  resolution requirement, add a `Per-context` variant to
+  `ResolverInner` similar to the §5.4d `PreferFirst` variant.
+  `extra_main_fields` is a generic extension hook with no
+  current consumer.
+
+* `prefer_first` rules' `is_empty` method is `#[cfg(test)]`-only;
+  if a future caller needs to inspect dispatcher-emptiness at
+  runtime, drop the cfg gate. The lib-side `prefer_first_active`
+  check in `build_from_config` operates on the unparsed
+  `Vec<PreferFirstRule>` before the dispatcher is even built —
+  preventing the empty-dispatcher allocation entirely.
+
+**Next checkpoint: §5.4e** (port `utils/resolve_binding.rs`).
+1:1 port of `packages/babel-plugin/src/utils/resolve-binding.ts`
+(425 LOC). The two production resolution paths in JS
+(`resolve.sync` fallback at :185-189; injected `resolveSync` at
+:191-193) collapse into one Rust call: `resolver.resolve_sync(from_file, request)`.
+The §5.4e implementer:
+
+1. Threads `resolver::Resolver` through `state.resolver` (or an
+   equivalent on `Metadata`) so `resolve-binding.ts:194`'s
+   `resolveRequest(...)` site has it.
+2. Ports the rest of the file 1:1 — the destructuring-resolution
+   helpers (`resolveIdentifierComingFromDestructuring`,
+   `resolveObjectPatternValueNode`, `getDestructuredObjectPatternKey`),
+   the `getBinding` synthesis for re-export shapes, and the
+   `resolveBinding` entry point.
+3. Adds the breadcrumb comment at every `get_binding` /
+   `get_own_binding` call site per §5.0c Finding 7.
+4. Deletes `evaluate_expression_stub` / `resolve_binding_stub` /
+   `visit_css_map_path_stub` from `css_builders.rs` (§4.4 SHELL
+   panics). The §4.4 SHELL contract was "stubs panic until
+   §5.4/§5.5/§5.6 land"; §5.4e is the §5.4 closure.
+5. Updates STATUS.md §5.4e to ☑ + Resume here pointer to the
+   §5.5 closure agent (the 11 remaining files in
+   `traverse_expression/`).
+
+Once §5.4e lands, the entire §5.4 row group goes ☑ and §5.5/§5.6
+unblock fully.
+
+### Phase 5 §5.4c closure summary (this session, 2026-05-05)
+
+**Outputs landed:**
+
+* `crates/babel-plugin/src/resolver/transforms.rs` (~330 LOC + 22
+  unit tests). 1:1 port of RESOLVER_SPEC_PART_TWO.md §2.2's 5
+  operations. Public surface:
+  - `pub fn apply_transforms(pkg: &mut serde_json::Value, &[PackageJsonTransform])` —
+    runs each op against `pkg` in array order. No-op when `pkg`
+    is not an object (defensive — malformed `package.json` passes
+    through to `oxc_resolver`'s parser, which surfaces the parse
+    error upstream).
+  - Per-op semantics:
+    - `EnsureObject { key }` — `pkg[key] = {}` if missing or
+      non-object. Existing object preserved.
+    - `RenameKey { from, to, ifTargetMissing, wrap }` — copies
+      `pkg[from]` into `pkg[to]` (does NOT delete the source —
+      consumers chain `DeleteKey` if they want a move, matching
+      the spec §2.4 shape). With `wrap = { as: "object", key: K }`
+      the source value is wrapped as `{ K: <source> }`. With
+      `ifTargetMissing: true` the op skips when `pkg[to]` already
+      exists.
+    - `RenameMapEntry { in, from, to, ifTargetMissing, deleteSource }` —
+      inside `pkg[in]` (must be an object; no-op otherwise).
+      `shift_remove` preserves remaining-key order when
+      `delete_source` is true.
+    - `SetDefault { in, entries }` — creates `pkg[in]` as `{}` if
+      absent; never overwrites existing keys (`entry().or_insert()`
+      semantics).
+    - `DeleteKey { key }` — `shift_remove` to preserve sibling-key
+      order (JSON serialization sensitive; downstream `exports`
+      walks may depend on it).
+  - Composed-Jira-sequence tests verify the spec §2.4 transform
+    chain across three input shapes:
+    `jira_shape_atlaskit_src_only_promoted_to_af_exports` (the
+    edge case where step 1's `ensureObject` causes step 3's
+    `renameKey ifTargetMissing: true` to skip — outcome documented
+    inline as the spec-faithful behaviour),
+    `jira_shape_root_slash_only_promoted_to_dot` (the
+    `renameMapEntry "./"` → `"."` path), and
+    `jira_shape_already_modern_unchanged` (no-op pass-through
+    for an already-canonical shape).
+
+* `crates/babel-plugin/src/resolver/engine.rs` extended (~250 LOC
+  added on top of §5.4b's ~80):
+  - `pub struct TransformingFileSystem { inner: FileSystemOs,
+    transforms: Arc<[PackageJsonTransform]> }` — wraps oxc_resolver's
+    stock `FileSystemOs` and intercepts `read()` calls. When the
+    target path's `file_name() == "package.json"` AND the bytes
+    parse as a JSON object, [`apply_transforms`] runs and the
+    re-serialized bytes are returned. `read_to_string`
+    (tsconfig.json's path) passes through verbatim — out of scope
+    for §5.4c per spec §2.2 wording. Other FS methods (metadata,
+    symlink_metadata, read_link, canonicalize) delegate.
+  - `enum ResolverInner { Default(DefaultResolver),
+    Transforming(ResolverGeneric<TransformingFileSystem>) }` — the
+    `Resolver` struct now holds either backing variant. Zero
+    overhead for default-config (§5.4b path); only configs with a
+    non-empty `package_json_transforms` array build the
+    transforming variant.
+  - `build_from_config` now branches on `cfg.package_json_transforms`:
+    empty → stock `DefaultResolver` (§5.4b behaviour); non-empty →
+    `ResolverGeneric::new_with_file_system(TransformingFileSystem,
+    opts)`.
+
+* `parity-harness/resolver-matrix/fixtures-source/axis-10-package-json-transforms/delete-exports/` —
+  new on-disk fixture: a package with both `main: "main-entry.js"`
+  and `exports: "./exports-entry.js"`. Used by the §5.4c E2E
+  tests below. `axis-10-` prefix added per
+  `crates/babel-plugin/RESOLVER_MATRIX.md` axis enumeration; an
+  axis-10 row may eventually be promoted into RESOLVER_MATRIX.md's
+  9-axis table when more transform-driven fixtures land.
+
+* `crates/babel-plugin/tests/resolver_matrix_integration.rs` extended
+  with the §5.4c E2E gate:
+  - `axis_10_no_transform_resolves_via_exports` (baseline: stock
+    default-config resolver honours `exports`, lands at
+    `exports-entry.js`).
+  - `axis_10_delete_exports_transform_falls_back_to_main` (E2E:
+    config with `[{op: deleteKey, key: "exports"}]` produces a
+    `Resolver` whose `TransformingFileSystem` strips the `exports`
+    field from the bytes oxc_resolver consumes; resolution falls
+    back to `main-entry.js`). **The two tests' contrasting
+    resolved paths are the proof that the FS interception
+    layer is doing real work** — if the wrapper accidentally
+    bypassed `read()` or cached the raw bytes outside itself, the
+    second test would land at `exports-entry.js` and fire.
+
+**Architectural locks delivered:**
+
+1. **WASI-safe transform application.** No on-disk mutation; the
+   transform runs at the `read()` call site inside
+   `TransformingFileSystem`. WASI tear-down between transforms is
+   irrelevant — the wrapper's transform list lives on the
+   resolver instance, not on disk.
+2. **Spec §2.2 wording verbatim.** "Operations are applied in
+   array order, after reading and before exports resolution" —
+   the read-intercept architecture matches every clause: array
+   order (`for op in transforms`), after reading (`let raw =
+   self.inner.read(path)?`), before exports resolution (the
+   transformed bytes feed oxc_resolver's exports-walking layer
+   above).
+3. **No new ops.** Library is Jira-agnostic; new consumer-side
+   quirks become new transform sequences applied at the consumer's
+   `.compiledcssrc`, not new ops in the engine. The 5 ops are the
+   complete library surface.
+4. **Coalesce-by-zero-overhead.** `build_from_config` returns a
+   stock `DefaultResolver` when `package_json_transforms` is
+   `None` or empty — no `ResolverGeneric` wrapper instantiated,
+   no FS-layer indirection. Only configs that actually use
+   transforms pay the (per-instance, per-package.json-read) cost.
+
+**Test count delta:**
+- `babel-plugin --lib`: 211 → **234** (+23: 22 new
+  `resolver::transforms::tests` + 1 engine-wiring round-trip
+  `build_from_config_with_transforms_doesnt_break_default_resolution`).
+- `resolver_matrix_integration`: 3/3 → **5/5** (+2: axis-10
+  baseline + axis-10 transform E2E).
+- All sibling gates unchanged: `compat_evaluation_integration`
+  3/3, `compat_scope_integration` 3/3,
+  `compat_generator_integration` 3/3, `transform_css_integration`
+  3/3, `hash_parity` 4/4.
+- WASI cdylib build clean.
+
+**Verification (cold pickup):**
+
+```bash
+RUSTFLAGS="" cargo test -p babel-plugin --lib resolver::transforms::    # 22/22 (the new module)
+RUSTFLAGS="" cargo test -p babel-plugin --lib resolver::                # 30/30 (config + transforms + engine)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                           # 234/234
+RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration  # 5/5 (zero ignored)
+RUSTFLAGS="" cargo build -p babel-plugin --target wasm32-wasip1 --release    # clean
+```
+
+**Deferred-by-evidence (handed to §5.4d/e implementers):**
+
+* `cfg.exports.fields` and `cfg.exports.conditions` still parse
+  but are not yet wired into `oxc_resolver::ResolveOptions`.
+  Honouring them is a one-line addition to `build_from_config`'s
+  `ResolveOptions` literal — but the §5.4c gate doesn't need it
+  (the axis-10 fixture uses default `exports_fields: [["exports"]]`),
+  and wiring it now without a corpus exercising non-default
+  exports.fields is defer-by-hope. §5.4d (the preferFirst
+  dispatcher, which CAN override exports.fields per-request) is
+  the natural surface for this; the corpus growth happens there.
+
+* `cfg.contexts` + `cfg.default_context` + `cfg.extra_main_fields` —
+  same shape: parse cleanly, no engine wiring yet. `contexts`
+  per-request dispatch is the §5.4d surface. `extra_main_fields`
+  is a generic extension hook with no current consumer.
+
+* The §5.4c E2E test uses a `deleteKey "exports"` transform — the
+  simplest demonstration that the FS-interception layer is doing
+  real work (different bytes → different resolved path). A future
+  fixture exercising the full Jira `af:exports`/`atlaskit:src`
+  promotion chain would require ALSO honouring
+  `cfg.exports.fields` so oxc_resolver probes `af:exports` before
+  `exports`. That fixture lands alongside the §5.4d preferFirst
+  port (since the Jira shape uses preferFirst to override
+  `exportsFields` per matched-specifier — see
+  RESOLVER_SPEC_PART_TWO.md §2.4).
+
+**Next checkpoint: §5.4d** (port `resolver/prefer_first.rs`). The
+match-by-prefix dispatcher per RESOLVER_SPEC_PART_TWO.md §2.3.
+Match shapes:
+- Inline `["@af/foo", "@atlaskit/bar"]` list (parses today).
+- `{"fromFile": "./platform-packages.json"}` indirection (parses
+  today; §5.4d adds the load-once-at-init JSON read).
+
+When a request specifier matches a prefix, the resolver re-builds
+its `ResolveOptions` with the rule's `use.exportsFields` and
+`use.mainFields` overrides for that single resolution. Approach
+options for §5.4d: (a) per-request `ResolverGeneric` instantiation
+(simple but slow if matches are common), (b) eager pre-built
+per-rule resolvers indexed by prefix (faster, more memory),
+(c) one resolver-per-context with prefix-walk dispatch (matches
+RESOLVER_SPEC.md §3.2's three-resolver design — but that spec is
+the older Jira-typed shape; PART_TWO is library-agnostic). The
+§5.4d implementer picks one — probably (b) at corpus-emergent
+scale.
+
+### Phase 5 §5.4b closure summary (this session, 2026-05-05)
+
+**Outputs landed:**
+
+* `crates/babel-plugin/src/resolver/mod.rs` — public surface
+  (`Resolver`, `ResolverConfig`, `ResolverConfigError`,
+  `build_default`, `build_from_config`, re-exported
+  `oxc_resolver::ResolveError`). Doc-block cites `plugins/PLAN.md`
+  §1 constraints 1+2 for the constraint-4 (1:1 file mapping)
+  exception — there is no JS analogue to port; the resolver lives
+  in the host's `createDefaultResolver` wrapper today and moves
+  *into* the plugin per the WASI architecture.
+* `crates/babel-plugin/src/resolver/config.rs` — declarative JSON
+  schema (~330 LOC + 7 unit tests). 1:1 with
+  `plugins/RESOLVER_SPEC_PART_TWO.md` §2.1: `extensions`,
+  `exports.{fields,conditions}`, `contexts.<name>.mainFields`,
+  `defaultContext`, `packageJsonTransforms[]` (the 5-op enum:
+  `ensureObject`/`renameKey`/`renameMapEntry`/`setDefault`/`deleteKey`),
+  `preferFirst[]` (with `match.specifierStartsWith` Inline-OR-fromFile
+  untagged enum), `extraMainFields`. Every struct carries
+  `#[serde(deny_unknown_fields)]` so consumer typos fail fast at
+  config-parse — caught at AFM-scale by the
+  `parse_unknown_field_rejected` test. Top-level `resolver` value
+  parsed via custom `ResolverConfig::parse_value(&Value)` →
+  `Result<Option<Self>, ResolverConfigError>`:
+  - `Null` → `Ok(None)` (caller falls back to `build_default`).
+  - `String` → `Err(Unsupported)` with the spec-pointing message
+    `"resolver must be a JSON object — strings/functions are
+    unsupported in the WASI plugin. See
+    plugins/RESOLVER_SPEC_PART_TWO.md for the JSON shape."`.
+  - `Array` / `Number` / `Bool` → `Err(Unsupported)` with the
+    same message + the actual value kind.
+  - `Object` → parsed via serde, deny-unknown-fields enforced.
+* `crates/babel-plugin/src/resolver/default.rs` — the no-config
+  factory (~80 LOC). `build_default(extensions: Option<&[String]>)`
+  mirrors `createDefaultResolver(config)` with empty `config.resolve`:
+  `oxc_resolver::ResolveOptions { extensions, ..Default::default() }`.
+  When `extensions` is `None`, falls back to
+  `crate::constants::DEFAULT_CODE_EXTENSIONS` —
+  matching `resolve-binding.ts:299`'s
+  `meta.state.opts.extensions ?? DEFAULT_CODE_EXTENSIONS` semantics.
+  Doc-block cites the two intentional non-replications:
+  `CachedInputFileSystem(fs, 4000)` (unsound under WASI tear-down
+  per PLAN.md §3.9.4) and `useSyncFileSystemCalls: true`
+  (oxc_resolver is sync by default — no async surface to opt out
+  of).
+* `crates/babel-plugin/src/resolver/engine.rs` — runtime
+  resolver wrapper (~80 LOC). `Resolver::resolve_sync(from_file,
+  request)` mirrors the JS host's
+  `resolver.resolveSync({}, dirname(context), request)` shape:
+  uses `from_file.parent()` as the resolution root; returns
+  `oxc_resolver::Resolution::full_path()` on success; bubbles
+  `oxc_resolver::ResolveError` on failure. `build_from_config`
+  honours `extensions` today; `exports`/`contexts`/`defaultContext`/
+  `packageJsonTransforms`/`preferFirst`/`extraMainFields` parse but
+  are NOT yet honoured by the engine (§5.4c/d wiring) — documented
+  inline at the unhonoured-field sites in `config.rs` so future
+  implementers don't re-derive the deferral.
+* `crates/babel-plugin/Cargo.toml` — `oxc_resolver = { workspace
+  = true }` added. Workspace pin in `crates/Cargo.toml`:
+  `oxc_resolver = { version = "11", default-features = false }`
+  (no `pnp` / `yarn_pnp` / `codspeed` features — keeps the WASI
+  binary lean per CLAUDE.md "WASI/WASM Compilation: don't add a
+  10MB Rust library").
+* `crates/babel-plugin/src/lib.rs` — `pub mod resolver;` added
+  alongside `compat`/`utils`/`constants`/etc.
+* `crates/babel-plugin/tests/resolver_matrix_integration.rs` —
+  `rust_resolver_matches_js_corpus` un-ignored, body wired to
+  `build_default(extensions).resolve_sync(from_file, request)`.
+  Per-fixture diff format prints fixture label + axis +
+  expected-vs-actual paths + spec-pointer to the divergence-action
+  protocol on any mismatch; coarse error-class match on `Err`
+  fixtures (precise error-class match deferred to a future
+  fixture if a real divergence surfaces).
+
+**Architectural locks delivered**:
+
+1. **Module location:** `crates/babel-plugin/src/resolver/` —
+   top-level `src/` module, NOT under `compat/`. Doc-block cites
+   the constraint-4 exception inline at the head of `mod.rs`.
+2. **Schema strictness:** `deny_unknown_fields` on every struct;
+   `parse_value` rejects strings/functions/arrays/numbers/bools
+   at the wrapper level with a hard-fail message pointing at the
+   spec.
+3. **Default-config baseline:** `build_default` produces an
+   `oxc_resolver` configured ONLY with `extensions`, inheriting
+   bare defaults for everything else. The `parity-harness/resolver-matrix/`
+   corpus confirms this matches `createDefaultResolver(config)`
+   with `config.resolve = {}` byte-for-byte across the 4 seed
+   axes.
+4. **WASI-safe:** no caching layer; resolver re-instantiated on
+   `Program::enter` (when §5.4e wires it through `state.resolver`);
+   `oxc_resolver`'s per-instance package.json caching during a
+   single transform is the only cache surface.
+
+**Real divergence handling — exports-string axis-2 (the riskiest
+fixture):**
+
+Both `enhanced-resolve@5.18.3` and `oxc_resolver@11.19.1` honour
+`package.json#exports` by default. The seed corpus's exports-string
+fixture resolves to `entry.js` under both — production-oracle
+match confirmed. The npm `resolve.sync@1.22.12` divergence (falls
+back to `main: main-fallback.js`) is captured for diagnostic-diff
+visibility but the gate matches against `enhanced-resolve` only,
+correctly.
+
+**Rust gates state (post-§5.4b):**
+
+- `crates/babel-plugin/tests/resolver_matrix_integration.rs` —
+  **3/3 passing, zero ignored** (`corpus_shape_lock` +
+  `corpus_observed_matches_expected_oracle_self_consistency` +
+  `rust_resolver_matches_js_corpus` over 4/4 fixtures).
+- `crates/babel-plugin --lib` — **211 passing** (was 204; +7
+  from `resolver::config::tests` covering the parse-paths above
+  plus the full-Jira-shape and inline-prefer-first round-trips).
+- All sibling gates unchanged: `compat_evaluation_integration`
+  3/3, `compat_scope_integration` 3/3,
+  `compat_generator_integration` 3/3, `transform_css_integration`
+  3/3, `hash_parity` 4/4.
+- WASI cdylib build clean (`cargo build -p babel-plugin --target
+  wasm32-wasip1 --release`).
+
+**Deferred-by-evidence (handed to §5.4c/d/e implementers):**
+
+* `engine.rs::build_from_config` ignores `package_json_transforms`,
+  `prefer_first`, `contexts`, `default_context`, `extra_main_fields`,
+  `exports.fields`, `exports.conditions`. **Schema parses;
+  behaviour deferred.** §5.4c wires `package_json_transforms` into
+  the engine's package.json read pipeline. §5.4d wires
+  `prefer_first` + the `contexts.<name>.main_fields` per-request
+  dispatch. `extra_main_fields` lands when a real consumer needs
+  it. None of these affect the §5.4b gate (the seed corpus is
+  default-config only).
+* `Resolver::resolve_sync` returns the `oxc_resolver`
+  `Resolution::full_path()` directly. The JS host's
+  `resolveSync(context, request)` returns `string`; the Rust
+  surface returns `PathBuf`. Conversion to `String` happens at
+  the §5.4e call site (`resolve_binding.rs`), with platform-path
+  normalisation handled there per the corpus's forward-slash
+  convention.
+* `ResolverConfig::package_json_transforms` accepts arrays of any
+  length; §5.4c may want to validate that no two `op` entries
+  produce conflicting keys (e.g. `renameKey from=X` followed by
+  `deleteKey key=X`). Adding such validation here would be
+  premature — the spec defines order semantics ("operations are
+  applied in array order, after reading and before exports
+  resolution") and conflict detection is implementation-time
+  behaviour, not parse-time validation. Document this decision in
+  §5.4c's closure summary if it becomes a maintenance concern.
+
+**Verification (cold pickup):**
+
+```bash
+RUSTFLAGS="" cargo test -p babel-plugin --lib resolver::                    # 7/7 (config::tests)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                               # 211/211
+RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration  # 3/3 zero ignored
+RUSTFLAGS="" cargo test -p babel-plugin --test compat_evaluation_integration  # 3/3 (regression canary)
+RUSTFLAGS="" cargo test -p babel-plugin --test compat_scope_integration       # 3/3 (regression canary)
+RUSTFLAGS="" cargo build -p babel-plugin --target wasm32-wasip1 --release   # clean
+```
+
+**Next checkpoint: §5.4c** (port the 5-op `packageJsonTransforms`
+engine in `crates/babel-plugin/src/resolver/transforms.rs`). The
+schema already parses every op (caught by
+`parse_full_jira_shape_succeeds`); §5.4c implements the
+`apply_transforms(&mut serde_json::Value, &[PackageJsonTransform])`
+function, integrates it into the engine's package.json read
+pipeline, and adds a corpus axis exercising the composed Jira-
+specific transform sequence (verifying the `af:exports` /
+`atlaskit:src` mutation chain produces the same final
+`package.json` shape as `@jira-dev/compiled-resolver`'s
+`AtlassianSourcesPlugin` — corpus generation requires AFM-side
+JSON snapshots OR oxc_resolver's `FileSystemOs` override hook,
+implementer's choice).
 
 ### Phase 5 §5.4a closure summary (this session, 2026-05-05)
 
@@ -2353,12 +3160,12 @@ done before declaring Phase 0 fully signed off across the platform set.
 | §5.2 | ☐ | Land the consumer-monorepo refactor (zero outside-cwd includes) | — | refactor PR | §0.10 audit reports zero outliers |
 | §5.3 | ☑ | Port `utils/cache.rs` — Layer 1 in-memory + Layer 2 postcard `cache.bin` per PLAN.md §3.9 | claude-2026-05-04 | `crates/babel-plugin/src/utils/cache.rs` (1:1 Layer 1 `Cache<T>` + Rust-only `Layer2` handle with atomic-write protocol), `crates/babel-plugin/src/cache_schema.rs` (postcard `CacheFile` / `Layer2Entry` / `SerializedExpr` / `TransitiveDep`; `CACHE_VERSION = 1`; `compute_schema_hash()` 32-byte deterministic FNV-1a-XOR fingerprint). Layer 2 NOT yet wired into `State::cache` — gated on §5.4–§5.6 (no producer exists). | `cargo test -p babel-plugin cache_schema::` → 7/7; `cargo test -p babel-plugin utils::cache::` → 20/20; size + entry caps locked at the type level + tested |
 | §5.4a entry-gate | ☑ | Resolver-matrix entry-gate per `crates/babel-plugin/RESOLVER_MATRIX.md`. Architecture lock: `plugins/RESOLVER_SPEC_PART_TWO.md` is the canonical declarative `resolver: { ... }` JSON schema (one generic engine, no Jira-specific code in the library). Two consumer modes only: (a) `resolver` absent → plugin defaults match `createDefaultResolver(config)` with empty `config.resolve` (no caching per WASI constraint); (b) `resolver: { ... }` JSON object → plugin parses RESOLVER_SPEC_PART_TWO.md §2.1 schema. Strings/functions REJECTED at config-parse with hard error pointing at the spec. Replaces §0.11 RESOLVER_MATRIX.md (Phase 0 deferral that was never produced) — the deferral is closed by §5.4a. | claude-2026-05-05 | `crates/babel-plugin/RESOLVER_MATRIX.md` (9-axis coverage manifest + divergence-action protocol + layered-corpus scope statement); `parity-harness/resolver-matrix/{README.md,oracle.mjs,fixtures.json,fixtures-source/}` (in-tree pin-guarded JS oracle running enhanced-resolve@5.18.3 + npm resolve@1.22.12; 4 seed fixtures across 4 of the 9 axes — the §5.4b implementer grows the corpus per the divergence-action protocol); `crates/babel-plugin/tests/resolver_matrix_integration.rs` (3 tests — `corpus_shape_lock` + `corpus_observed_matches_expected_oracle_self_consistency` GREEN; `rust_resolver_matches_js_corpus` `#[ignore]`'d until §5.4b lands the engine); `crates/PARITY_VERSIONS.md` (new section pinning enhanced-resolve@5.18.3 + resolve@1.22.12, both promoted to top-level `devDependencies` AND `overrides` per the §4.2 lesson — provisional pending AFM verification at §5.4b review); `package.json` (devDeps + overrides updated); `.gitignore` (resolver_matrix_corpus.json gitignored, regenerable). Real divergence already captured at axis-2 (`enhanced-resolve` honours `package.json#exports` → `entry.js`; npm `resolve.sync@1.22.12` ignores it → falls back to `main: main-fallback.js`). | `bun parity-harness/resolver-matrix/oracle.mjs` writes 4 entries with pin guard `enhanced-resolve=5.18.3, resolve=1.22.12`. `RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration` → 2 passed, 1 ignored. Sibling compat-* gates unchanged: `compat_evaluation_integration` 3/3, `compat_scope_integration` 3/3. |
-| §5.4b | ☐ NOW | Port the resolver engine: `crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs` — generic Node-style resolver wrapping `oxc_resolver` with per-context dispatch (extensions + mainFields + exports.fields + conditions). Defaults match `createDefaultResolver` empty-config. Reject `resolver: <string>` / `resolver: <function>` with hard error citing RESOLVER_SPEC_PART_TWO.md. | — | `crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs` — depends on §5.4a (DONE) | `rust_resolver_matches_js_corpus` un-ignored and green at the seed corpus (4/4); WASI cdylib still builds clean |
-| §5.4c | ☐ | Port `crates/babel-plugin/src/resolver/transforms.rs` — the 5-op `packageJsonTransforms` engine (`ensureObject`, `renameKey`, `renameMapEntry`, `setDefault`, `deleteKey`) per RESOLVER_SPEC_PART_TWO.md §2.2. Per-op unit tests + composed-sequence fixture matching the JS oracle's package.json mutation output. | — | `resolver/transforms.rs` — depends on §5.4b | Per-op unit tests green; composed-sequence fixture byte-clean |
-| §5.4d | ☐ | Port `crates/babel-plugin/src/resolver/prefer_first.rs` — the `preferFirst` dispatcher (match-by-prefix + override config fan-out) per RESOLVER_SPEC_PART_TWO.md §2.3. Loads prefix lists from inline arrays OR `fromFile` JSON. | — | `resolver/prefer_first.rs` — depends on §5.4b | preferFirst fixtures byte-clean (matched specifiers route to overridden config; non-matched fall through) |
-| §5.4e | ☐ | 1:1 port of `packages/babel-plugin/src/utils/resolve-binding.ts` → `crates/babel-plugin/src/utils/resolve_binding.rs`, wiring through `resolver::Resolver`. Breadcrumb requirement at every `get_binding`/`get_own_binding` call site per §5.0c lock (Finding 7, lazy-crawl observability). | — | `utils/resolve_binding.rs` — depends on §5.4b/c/d | resolve-binding fixtures byte-clean; existing `module-traversal` parity-harness fixtures green; §4.4 SHELL `resolve_binding_stub` deleted |
+| §5.4b | ☑ | Port the resolver engine: `crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs` — generic Node-style resolver wrapping `oxc_resolver` with per-context dispatch (extensions today; mainFields + exports.fields + conditions land alongside §5.4c/d). Defaults match `createDefaultResolver` empty-config. Rejects `resolver: <string>` / `resolver: <function>` at config-parse with hard error citing RESOLVER_SPEC_PART_TWO.md. Schema parses every field per RESOLVER_SPEC_PART_TWO.md §2.1 with `#[serde(deny_unknown_fields)]` so consumer typos fail fast. | claude-2026-05-05 | `crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs` (~600 LOC + 7 unit tests for `config::ResolverConfig::parse_value`); `crates/babel-plugin/Cargo.toml` (oxc_resolver added); `crates/Cargo.toml` (workspace pin `oxc_resolver = "11"`); un-ignored `rust_resolver_matches_js_corpus` byte-parity gate (4/4 fixtures green against `enhanced-resolve@5.18.3`). | `cargo test -p babel-plugin --lib resolver::` → 7/7 (the new `config::tests` module); `cargo test -p babel-plugin --test resolver_matrix_integration` → **3/3 (zero ignored)** — `corpus_shape_lock` + `corpus_observed_matches_expected_oracle_self_consistency` + `rust_resolver_matches_js_corpus` (4 fixtures byte-clean against enhanced-resolve@5.18.3); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean |
+| §5.4c | ☑ | Port `crates/babel-plugin/src/resolver/transforms.rs` — the 5-op `packageJsonTransforms` engine (`ensureObject`, `renameKey`, `renameMapEntry`, `setDefault`, `deleteKey`) per RESOLVER_SPEC_PART_TWO.md §2.2 + the `TransformingFileSystem` adapter that wraps `oxc_resolver::FileSystemOs` and intercepts `package.json` `read()` calls to apply transforms before exports/mainFields resolution sees the bytes. WASI-safe: NO on-disk mutation; transforms run at the read site, matching spec §2.2 wording ("applied... after reading and before exports resolution"). | claude-2026-05-05 | `crates/babel-plugin/src/resolver/transforms.rs` (~330 LOC + 22 unit tests covering each of the 5 ops + composed Jira sequences from RESOLVER_SPEC_PART_TWO.md §2.4 + defensive cases); `crates/babel-plugin/src/resolver/engine.rs` extended with `TransformingFileSystem` impl + `Resolver::from_transforming` constructor + `ResolverInner` enum dispatch (zero overhead when transforms list is empty); `parity-harness/resolver-matrix/fixtures-source/axis-10-package-json-transforms/delete-exports/` (real on-disk fixture: package with both `main` and `exports`); 2 new tests in `resolver_matrix_integration.rs` (`axis_10_no_transform_resolves_via_exports` baseline + `axis_10_delete_exports_transform_falls_back_to_main` E2E proving the FS wrapper genuinely mutates what oxc_resolver consumes). | `cargo test -p babel-plugin --lib resolver::` → 30/30 (was 7; +22 transforms unit tests + 1 engine round-trip); `cargo test -p babel-plugin --test resolver_matrix_integration` → 5/5 (was 3; +2 axis-10 transform E2E); `cargo test -p babel-plugin --lib` → 234/234 (was 211); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean |
+| §5.4d | ☑ | Port `crates/babel-plugin/src/resolver/prefer_first.rs` — the `preferFirst` dispatcher per RESOLVER_SPEC_PART_TWO.md §2.3. Architecture: option (b) per-rule pre-built resolvers — each rule clones base `ResolveOptions`, overrides `exports.fields` / `main.fields` per `use_`, owns one `ResolverGeneric<TransformingFileSystem>`. Prefixes loaded once at config-load (inline arrays verbatim; `{fromFile}` reads relative to the consumer config's directory; accepts both bare-array and `{"prefixes": [...]}` shapes). First-match-wins; non-matched requests fall through to the base resolver. `build_from_config` signature changed to `(cfg, config_dir) -> Result<Resolver, PreferFirstError>` to support `fromFile` resolution. Also wires `cfg.exports.fields` into the base resolver's `ResolveOptions::exports_fields` (was parses-but-not-honoured at §5.4c). | claude-2026-05-05 | `crates/babel-plugin/src/resolver/prefer_first.rs` (~510 LOC + 12 unit tests covering inline / fromFile-bare / fromFile-prefixes-object / missing-fromFile / wrong-shape / non-string-entry / build_rule_options × 3 / dispatcher × 3); `crates/babel-plugin/src/resolver/engine.rs` extended with `ResolverInner::PreferFirst` variant + `Resolver::from_prefer_first` constructor + `TransformingFileSystem::with_transforms_arc` for shared-Arc rule resolvers; `crates/babel-plugin/src/resolver/mod.rs` re-exports `PreferFirstError`; `parity-harness/resolver-matrix/fixtures-source/axis-11-prefer-first/match-by-prefix/` (real on-disk fixture: package with `main` + `af:exports`, `@matched/` scope); 3 new tests in `resolver_matrix_integration.rs` (`axis_11_no_prefer_first_uses_main` baseline + `axis_11_matched_prefix_routes_to_af_exports` + `axis_11_unmatched_prefix_falls_through_to_base`). | `cargo test -p babel-plugin --lib resolver::` → 42/42 (was 30; +12 prefer_first unit tests); `cargo test -p babel-plugin --test resolver_matrix_integration` → 8/8 (was 5; +3 axis-11 E2E); `cargo test -p babel-plugin --lib` → 246/246 (was 234); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean (zero babel-plugin warnings) |
+| §5.4e | ☑ | 1:1 port of `packages/babel-plugin/src/utils/resolve-binding.ts` → `crates/babel-plugin/src/utils/resolve_binding.rs`, wiring through `resolver::Resolver`. Bundles the `traversers/` subtree (originally §5.6) since `resolve-binding.ts` has hard deps on `getDefaultExport`/`getNamedExport`/`setImportedCompiledImports`. Extends `Binding` with `import_info: Option<ImportInfo>` carrying `(source, kind, imported_name)` per the §5.0c precedent for `init_expr`. Breadcrumb at every `get_binding`/`get_own_binding` call site per §5.0c Finding 7. State extended with `resolver: Option<Arc<Resolver>>` + `filename: Option<String>` slots (visitor sets on `Program::enter`; tests set directly). `PartialBindingWithMeta` redesigned: drops `'a` lifetime + `meta: Metadata<'a>` field (cross-file Metadata can't reference a different file's State); `node` is now `Option<Box<Expr>>` (`None` for non-Expr resolutions); adds `imported_filename: Option<String>` for cross-file pointers. `evaluate_expression` callback parameter threaded through `resolve_binding_with_evaluator` for the destructuring-resolution recursion path; §5.6 wires it in. The §4.4 SHELL `resolve_binding_stub` retained as `#[allow(dead_code)]` until Phase 6 rewires the lone in-tree caller (which is in a dead-code branch already). | claude-2026-05-05 | `crates/babel-plugin/src/utils/resolve_binding.rs` (~750 LOC + 5 unit tests); `crates/babel-plugin/src/utils/traversers/{mod,get_export,object,set_imported_compiled_imports,types}.rs` (~360 LOC + 16 unit tests); `crates/babel-plugin/src/compat/scope.rs` extended with `ImportInfo` + `ImportSpecifierKind` + `Binding::import_info` field populated in `register_import`; `crates/babel-plugin/src/state.rs` extended with `resolver` + `filename` slots + `set_resolver`/`set_filename`/`resolver()`/`filename()` methods; `crates/babel-plugin/src/resolver/engine.rs` `Resolver` gets `Debug` impl; `crates/babel-plugin/Cargo.toml` `swc_core` features add `ecma_parser` (was dev-only at §4.2/§4.4; lib-level now because resolve-binding parses imported modules at runtime). | `cargo test -p babel-plugin --lib` → 270/270 (was 246; +24: traversers + resolve_binding tests); `cargo test -p babel-plugin --test resolver_matrix_integration` → 8/8 (regression canary, unchanged); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean (zero babel-plugin warnings) |
 | §5.5 | ▶ PARTIAL | Port the entire `traverse_expression/` subtree file-for-file (leaves first). 3/14 leaves landed in parallel with §5.4a (the resolve-binding-independent ones); remaining 11 files (`traverse-identifier`, `traverse-call-expression`, the entire `traverse-member-expression/**` subtree) gated on §5.4e. | claude-2026-05-05 (parallel leaves) / — (closure) | Landed: `crates/babel-plugin/src/utils/traverse_expression/{traverse_binary_expression,traverse_unary_expression,traverse_function}.rs` + `utils/{create_result_pair,has_numeric_value}.rs` (+ 24 unit tests). Remaining: `traverse_expression/{traverse_identifier,traverse_call_expression,traverse_member_expression/**}.rs` — depends on §5.4e. | Lib-level: `cargo test -p babel-plugin --lib` → 204/204 (was 180; +24 tests across the 5 new modules). WASM: `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean. Harness `module-traversal` / `expression-evaluation` fixtures byte-clean — DEFERRED to §5.5 closure agent (full pipeline cannot run until §5.4e + §5.6 land; §4.4 `evaluate_expression_stub` still panics on dispatch). |
-| §5.6 | ☐ | Port `traversers/` (5 files) and `evaluate_expression.rs` (200 LOC) | — | `crates/babel-plugin/src/utils/{traversers,evaluate_expression.rs}/**` — depends on §5.4e + §5.5 closure | Harness `module-traversal` and `expression-evaluation` fixtures byte-clean |
+| §5.6 | ☐ | Port `evaluate_expression.rs` (200 LOC). The `traversers/` subtree (5 files) was bundled into §5.4e because `resolve_binding.rs` had a hard dep on `getDefaultExport`/`getNamedExport`/`setImportedCompiledImports` — see §5.4e closure summary. | — | `crates/babel-plugin/src/utils/evaluate_expression.rs` — depends on §5.4e + §5.5 closure | Harness `module-traversal` and `expression-evaluation` fixtures byte-clean |
 | §5.7 | ☐ | Wire `includedFiles` accumulation → `<callScratch>/included-files.json` sidecar | — | Updated lib.rs Program::exit | Harness fixtures with cross-file imports produce non-empty sidecar; host's `asset.invalidateOnFileChange` matches Babel's |
 | §5.8 | ☐ | Promote `scripts/audit-included-files.ts` to CI guardrail | — | CI config update | Audit failure blocks PR merge |
 | §5.9 | ☐ | **Phase 5 exit gate:** module-traversal + expression-evaluation byte-clean; `MutationRecorder` shadow-eval suite reports zero replay/live divergence; pre-commit state-mutation lint clean | — | STATUS.md updated | All exit-gate sub-conditions met |

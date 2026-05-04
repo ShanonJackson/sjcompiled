@@ -94,10 +94,15 @@ fn evaluate_expression_stub(_expr: &Expr, _meta: &mut Metadata<'_>) -> ! {
 }
 
 #[doc(hidden)]
-fn resolve_binding_stub<'a>(_name: &str, _meta: &'a Metadata<'a>) -> Option<PartialBindingWithMeta<'a>> {
+#[allow(dead_code)] // §5.4e ships the real `utils::resolve_binding::resolve_binding`;
+// this stub is retained as a SHELL marker until §4.6 / Phase 6
+// rewires the callers (the lone in-tree caller below is in a
+// dead-code branch already).
+fn resolve_binding_stub(_name: &str, _meta: &Metadata<'_>) -> Option<PartialBindingWithMeta> {
     unimplemented!(
         "resolveBinding is Phase 5 §5.4 (utils/resolve-binding.ts). \
-         The §4.4 css_builders.rs shell stubs every dispatch into it."
+         §5.4e shipped the real port at `utils::resolve_binding::resolve_binding`; \
+         this SHELL stub is retained until Phase 6 rewires call sites."
     )
 }
 
@@ -412,7 +417,7 @@ fn callback_if_file_included(_meta_state: &State, _next_state: &State) {
 #[allow(dead_code)]
 fn assert_no_imported_css_variables(
     reference_node_span: Option<swc_core::common::Span>,
-    resolved_binding: &PartialBindingWithMeta<'_>,
+    resolved_binding: &PartialBindingWithMeta,
     build_css_result: &CSSOutput,
 ) -> Result<(), CssBuildError> {
     if matches!(resolved_binding.source, BindingSource::Import)

@@ -28,6 +28,7 @@ pub mod cache_schema;
 pub mod compat;
 pub mod constants;
 pub mod mutation_recorder;
+pub mod resolver;
 pub mod state;
 pub mod types;
 pub mod utils;

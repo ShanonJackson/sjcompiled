@@ -39,9 +39,12 @@
 //! Mutating methods on `State` (e.g. `set_pragma_jsx`,
 //! `ensure_compiled_imports`) provide the controlled write paths.
 
+use std::sync::Arc;
+
 use indexmap::IndexMap;
 
 use crate::mutation_recorder::{ApiKind, MutationRecorder, StateDiff};
+use crate::resolver::Resolver;
 use crate::types::PluginOptions;
 
 /// Per-file traversal state. Mirrors upstream `State` in
@@ -118,11 +121,28 @@ pub struct State {
     /// Per-pass scope; SWC tears down the WASI instance between
     /// transforms so a fresh visitor starts at 0 every time.
     pub(crate) uid_counter: u32,
-    // `resolver` is omitted: object form isn't reachable, string
-    // form is in `opts`. `transformCache` (Babel WeakMap on
-    // NodePath) is a Babel-only construct — the Rust visitor's
-    // single-pass design (PLAN.md §3.5) eliminates the re-visit
-    // problem the WeakMap was guarding against.
+
+    /// In-plugin module resolver. Built once at `Program::enter` from
+    /// `state.opts.resolver` (Phase 5 §5.4b/c/d shipped the engine;
+    /// the visitor-dispatch wiring lands when the dispatcher
+    /// engages). `None` until `set_resolver` is called — see
+    /// `resolve_binding.rs` for the consumer surface and §5.4
+    /// closure summaries in `plugins/STATUS.md` for the architecture.
+    /// Stored as `Arc` so the resolver can be cheaply cloned into
+    /// per-rule preferFirst dispatchers without duplicating
+    /// `oxc_resolver`'s package.json caches.
+    pub(crate) resolver: Option<Arc<Resolver>>,
+
+    /// Absolute path of the file being transformed. Mirrors Babel's
+    /// `state.filename`. Used by `resolve_binding.rs` to resolve
+    /// relative import specifiers and to skip module-traversal when
+    /// the visitor was invoked without a filename (e.g. anonymous
+    /// in-memory transforms in some test harnesses). `None` until
+    /// `set_filename` is called by the visitor on `Program::enter`.
+    pub(crate) filename: Option<String>,
+    // `transformCache` (Babel WeakMap on NodePath) is a Babel-only
+    // construct — the Rust visitor's single-pass design (PLAN.md §3.5)
+    // eliminates the re-visit problem the WeakMap was guarding against.
 }
 
 // ───────── Read-only getters (public API) ─────────
@@ -177,6 +197,21 @@ impl State {
     pub fn ignore_member_expressions(&self) -> &IndexMap<String, bool> {
         &self.ignore_member_expressions
     }
+
+    /// `&Resolver` if the visitor has wired one in via [`Self::set_resolver`].
+    /// `resolve_binding` consumers must check `is_some` — non-set
+    /// resolvers produce an `unimplemented!` upstream rather than a
+    /// silent no-op (per the §5.4e closure contract; the visitor
+    /// dispatcher MUST set the resolver on `Program::enter`).
+    pub fn resolver(&self) -> Option<&Resolver> {
+        self.resolver.as_deref()
+    }
+
+    /// `&str` of the file being transformed. `None` if
+    /// `set_filename` hasn't been called.
+    pub fn filename(&self) -> Option<&str> {
+        self.filename.as_deref()
+    }
 }
 
 // ───────── Init-time / non-captured mutators ─────────
@@ -194,6 +229,23 @@ impl State {
 impl State {
     pub(crate) fn set_opts(&mut self, opts: PluginOptions) {
         self.opts = opts;
+    }
+
+    /// Wire an `Arc<Resolver>` into the state. The visitor calls
+    /// this once on `Program::enter` after building the resolver
+    /// from `self.opts.resolver` per RESOLVER_SPEC_PART_TWO.md.
+    /// Tests / integration callers in `resolve_binding.rs::tests`
+    /// also use this directly with a hand-built resolver.
+    pub fn set_resolver(&mut self, resolver: Arc<Resolver>) {
+        self.resolver = Some(resolver);
+    }
+
+    /// Wire the absolute filename of the current source. The
+    /// visitor calls this once on `Program::enter` from
+    /// `swc_core::common::FileName::Real(...)`. Tests construct it
+    /// directly. `resolve_binding.rs` reads via `Self::filename`.
+    pub fn set_filename(&mut self, filename: String) {
+        self.filename = Some(filename);
     }
 
     pub(crate) fn set_import_sources(&mut self, sources: Vec<String>) {
