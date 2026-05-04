@@ -13,10 +13,19 @@
 //! `transform_css_items` depends on. Each module MUST be a 1:1 port
 //! of its `.ts` sibling — see `plugins/PLAN.md` constraint 4.
 //!
+//! Phase 5 §5.5 PARTIAL (this checkpoint, parallel to §5.4): adds the
+//! three §5.5 leaf traversers that DO NOT call into the resolver/scope
+//! index — `traverse_binary_expression`, `traverse_unary_expression`,
+//! `traverse_function` — plus their pure-data dependencies
+//! `create_result_pair` and `has_numeric_value`. The remaining 11 files
+//! in `traverse-expression/` (the resolve-binding-dependent half) wait
+//! on §5.4. See `traverse_expression/mod.rs` module docs.
+//!
 //! Still pending (Phase 5/6):
-//! * `cache.rs` (§5.3)
-//! * `resolve_binding.rs` (§5.4)
-//! * `traverse_expression/` subtree (§5.5)
+//! * `resolve_binding.rs` (§5.4) — in progress, sequential
+//! * `traverse_expression/` subtree (§5.5) — partial here; remaining
+//!   leaves (`traverse-identifier`, `traverse-call-expression`,
+//!   `traverse-member-expression/**`) gated on §5.4
 //! * `traversers/` subtree (§5.6)
 //! * `evaluate_expression.rs` (§5.6)
 
@@ -26,13 +35,16 @@ pub mod build_css_variables;
 pub mod cache;
 pub mod compress_class_names_for_runtime;
 pub mod constants;
+pub mod create_result_pair;
 pub mod css_builders;
 pub mod get_jsx_attribute;
 pub mod get_runtime_class_name_library;
+pub mod has_numeric_value;
 pub mod hoist_sheet;
 pub mod is_compiled;
 pub mod is_empty;
 pub mod manipulate_template_literal;
 pub mod object_property_to_string;
 pub mod transform_css_items;
+pub mod traverse_expression;
 pub mod types;

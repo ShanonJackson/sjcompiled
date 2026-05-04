@@ -176,12 +176,54 @@ complete; §5.4 is unblocked. §4.6 visitor-dispatch wiring,
 wrapper — single `transformSync` call, sidecar drains). Does not
 depend on the evaluator.
 
-**Next checkpoint: §5.4 (port `utils/resolve_binding.rs`).** With
-§5.0a/b/c all green, the compat layer is complete. §5.4 is also
-nominally gated on §0.11 RESOLVER_MATRIX.md (Phase 0 deferral
-that was never produced); the §5.4 owner should either (a)
-produce the matrix as part of §5.4's entry-gate, or (b) escalate
-the deferral. §5.5 / §5.6 follow §5.4 sequentially.
+**§5.4 entry-gate ☑ (this session, 2026-05-05).** The §0.11
+RESOLVER_MATRIX.md Phase 0 deferral is closed by §5.4a:
+`crates/babel-plugin/RESOLVER_MATRIX.md` (9-axis Layer-1
+default-config coverage manifest + divergence-action protocol),
+the JS oracle at `parity-harness/resolver-matrix/` (pin-guarded
+against `enhanced-resolve@5.18.3` + `resolve@1.22.12`, 4 seed
+fixtures across 4 of the 9 axes — grow-as-divergence-surfaces
+per the §4.3 / §5.0c precedent), and the `#[ignore]`'d Rust gate
+at `crates/babel-plugin/tests/resolver_matrix_integration.rs`
+(2/3 green; byte-parity body un-ignored by §5.4b). Architecture
+lock: `plugins/RESOLVER_SPEC_PART_TWO.md` is the canonical
+declarative `resolver: { ... }` JSON schema (one generic engine
+in the library, no Jira-specific code; consumers describe
+behaviour via JSON). Real divergence already captured: axis-2
+exports-string (enhanced-resolve honours `exports` → `entry.js`;
+npm `resolve.sync` falls back to `main: main-fallback.js`).
+
+**Next checkpoint: §5.4b (port the resolver engine).** With
+§5.4a green, §5.4b ports
+`crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs`
+(generic Node-style resolver wrapping `oxc_resolver` with
+per-context dispatch; defaults match `createDefaultResolver`
+empty-config; rejects string/function `resolver` with hard
+error). §5.4c (transforms.rs — 5-op `packageJsonTransforms`
+engine) and §5.4d (prefer_first.rs dispatcher) follow. §5.4e
+ports `utils/resolve_binding.rs` 1:1 wiring through the engine.
+§5.5 closure (the 11 resolve-binding-dependent files) and §5.6
+follow §5.4e sequentially.
+
+**§5.5 PARTIAL — three resolve-binding-INDEPENDENT leaves landed
+in parallel with §5.4 (claude-2026-05-05).** Per a coordination
+contract from the §5.4 owner: `traverse_binary_expression`,
+`traverse_unary_expression`, and `traverse_function` (verified by
+grep to NOT reach `resolveBinding` / `meta.state.cache` /
+`resolveRequest`) ported 1:1 with their helper deps
+(`create_result_pair`, `has_numeric_value`). Lib-test count:
+180 → 204 (+24 across the 5 new modules). WASM build clean.
+Remaining 11 §5.5 files (`traverse-identifier`,
+`traverse-call-expression`, `traverse-member-expression/**`
+including `resolve-expression/` and `evaluate-path/`) sit behind
+§5.4 — the §5.5 closure agent picks them up after
+`resolve_binding.rs` lands. Drift discipline preserved: no stubs
+for `resolve_binding`; no patching of pre-existing breadcrumbs;
+the JS-undefined fall-through path in `traverse-function.ts` was
+modelled with `Option<Box<Expr>>` in `ResultPair::value` rather
+than substituting an `Expr::Ident("undefined")` sentinel (which
+would have flipped `is_empty_value` semantics relative to JS —
+documented in `create_result_pair.rs` module docs).
 
 The §5.4 owner inherits two §5.0c-bundled scope-shape extensions
 they should NOT re-derive:
@@ -225,6 +267,7 @@ RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact, zero skips)
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_scope_integration       # 3/3 (post-§5.0a; un-ignored byte-parity gate green at 23/23)
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_evaluation_integration  # 3/3 (post-§5.0c; un-ignored byte-parity gate green at 45/45)
+RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration    # 2/3 + 1 ignored (§5.4a entry-gate; rust_resolver_matches_js_corpus #[ignore]'d until §5.4b)
 RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib             # 56/56
 RUSTFLAGS="" cargo test -p compiled-utils --lib                         # 31/31
 RUSTFLAGS="" cargo test -p compiled-css --lib                           # 163/163 (was 121; +42 from CSS-port agent's §4.4 unblock)
@@ -243,6 +286,7 @@ bun parity-harness/transform-css/oracle.mjs
 bun parity-harness/compat-generator/oracle.mjs                          # 55 entries
 bun parity-harness/compat-scope/oracle.mjs                              # 20 entries (§5.0)
 bun parity-harness/compat-evaluation/oracle.mjs                         # 45 entries (§5.0)
+bun parity-harness/resolver-matrix/oracle.mjs                           # 4 entries (§5.4a entry-gate seed; §5.4b grows)
 ```
 
 Total: **2747 tests, zero failures, zero ignored** post-§5.0c.
@@ -253,6 +297,134 @@ shape-locks + oracle-self-consistency tests pass unconditionally.
 tests, +1 from un-ignored `rust_compat_evaluation_matches_js_corpus`).
 +37 passing vs. §5.0 entry-gate close cumulatively across
 §5.0a + §5.0b + §5.0c.
+
+### Phase 5 §5.4a closure summary (this session, 2026-05-05)
+
+**Outputs landed:**
+
+* `crates/babel-plugin/RESOLVER_MATRIX.md` — 9-axis Layer-1
+  default-config coverage manifest (`package.json#main`,
+  `package.json#exports` + conditions, `tsconfig` paths,
+  symlink realpath, browser-field, extension order, directory
+  index, scoped packages, deep imports + `node_modules` walk)
+  + divergence-action protocol (match | shim | escalate, same
+  three-option shape COMPAT_EVALUATION_COVERAGE.md uses)
+  + layered-corpus scope statement (Layer-1 here; transforms
+  / preferFirst / `resolve_binding.rs` are §5.4c/d/e corpora).
+  Cites `plugins/RESOLVER_SPEC_PART_TWO.md` as the canonical
+  declarative `resolver: { ... }` JSON schema for §5.4b+.
+* `parity-harness/resolver-matrix/` — pin-guarded JS oracle
+  workspace mirroring the `compat-scope` / `compat-evaluation`
+  layouts:
+  - `README.md` — run instructions + add-a-fixture protocol.
+  - `oracle.mjs` — runs each fixture through both
+    `enhanced-resolve@5.18.3` (production oracle) AND npm
+    `resolve@1.22.12` (the `resolve-binding.ts:185-189`
+    fallback path), captures resolved-path-or-error per fixture,
+    self-consistency-checks against `expected`, emits a
+    sorted-by-axis corpus to
+    `crates/babel-plugin/tests/resolver_matrix_corpus.json`
+    (gitignored, regenerable). Pin guards at top of file fail
+    fast on version drift.
+  - `fixtures.json` — checked-in declarative manifest. 4 seed
+    fixtures spanning 4 axes (package.json-main,
+    package.json-exports-conditions, extension-order,
+    directory-index). The §5.4b implementer grows the corpus
+    per the divergence-action protocol; entry-gate-floor of 4
+    locked in `corpus_shape_lock`.
+  - `fixtures-source/` — checked-in real npm-package skeletons
+    (small `package.json` + source files + `node_modules/<dep>`
+    layouts) backing each fixture. Necessary because resolver
+    parity depends on filesystem reality, not just AST shape.
+* `crates/babel-plugin/tests/resolver_matrix_integration.rs` —
+  3 tests mirroring the `compat_evaluation_integration` /
+  `compat_scope_integration` shape:
+  - `corpus_shape_lock` — runs unconditionally; asserts schema
+    version + pin freshness + entry-count floor + per-axis
+    coverage. **GREEN.**
+  - `corpus_observed_matches_expected_oracle_self_consistency` —
+    runs unconditionally; catches stale corpora. **GREEN.**
+  - `rust_resolver_matches_js_corpus` — `#[ignore]`'d at
+    §5.4a entry-gate. The §5.4b implementer un-ignores once
+    `crates/babel-plugin/src/resolver/` exists.
+* `crates/PARITY_VERSIONS.md` — new "enhanced-resolve + resolve"
+  section pinning `enhanced-resolve@5.18.3` (provisional pending
+  AFM verification at §5.4b review) and `resolve@1.22.12`. Both
+  promoted to top-level `devDependencies` AND `overrides` per
+  the §4.2 lesson.
+* `package.json` — devDeps + overrides updated; `bun install`
+  resolves cleanly (1 new top-level dep: enhanced-resolve@5.18.3).
+* `.gitignore` — `crates/babel-plugin/tests/resolver_matrix_corpus.json`
+  added per the convention used for compat_{scope,evaluation,generator}_corpus.json.
+
+**Architectural locks** (recorded in this session, mirror the
+§5.0c Q1/Q2/Q3 shape):
+
+1. **Module location** — `crates/babel-plugin/src/resolver/`
+   (top-level `src/` module, NOT under `compat/`). The resolver
+   isn't a Babel-API shim — it's the in-plugin replacement for
+   the host's `createDefaultResolver` per `plugins/PLAN.md` §1
+   constraint 2. PLAN.md constraint 4 (1:1 file mapping) is
+   explicitly excepted at this site, with the citation inline
+   in the new module's doc-comment.
+
+2. **JSON schema strictness** — `resolver: { ... }` rejects
+   unknown fields at config-parse time with a hard error
+   pointing at `plugins/RESOLVER_SPEC_PART_TWO.md`. Catches
+   typos before they become byte divergence at AFM scale.
+
+3. **Default-config baseline** — when `.compiledcssrc` has no
+   `resolver` key, the plugin matches `createDefaultResolver(config)`
+   with `config.resolve = {}`. That means: extensions from
+   `config.extensions` (else `DEFAULT_CODE_EXTENSIONS`),
+   enhanced-resolve's bare defaults for everything else, **no
+   caching** (the `CachedInputFileSystem(fs, 4000)` wrapper is
+   intentionally NOT replicated — WASI tears down the instance
+   between `transformSync` calls per PLAN.md §3.9.4, so any
+   cross-call cache is unsound; oxc_resolver's per-instance
+   in-memory caching during a single transform is sufficient).
+
+4. **String/function `resolver` REJECTED** — PLAN.md §1
+   constraint 1 already disallows them (no JS callbacks from
+   the WASI plugin). Hard-fail at config-parse with the message
+   `"resolver must be a JSON object — strings/functions are
+   unsupported in the WASI plugin. See plugins/RESOLVER_SPEC_PART_TWO.md
+   for the JSON shape."` Not silent-fallback to defaults.
+
+**Rust gates state (post-§5.4a):**
+
+- `crates/babel-plugin/tests/resolver_matrix_integration.rs` —
+  **2/3 + 1 ignored** (`corpus_shape_lock`,
+  `corpus_observed_matches_expected_oracle_self_consistency`
+  green; `rust_resolver_matches_js_corpus` ignored per spec).
+- All sibling gates unchanged: `compat_evaluation_integration` 3/3,
+  `compat_scope_integration` 3/3, `compat_generator_integration`
+  3/3, `transform_css_integration` 3/3, `hash_parity` 4/4.
+
+**Real divergence captured at entry-gate**: axis-2 exports-string.
+`enhanced-resolve` honours `package.json#exports` and resolves to
+`entry.js`; npm `resolve.sync@1.22.12` ignores the `exports`
+field and falls back to `main: main-fallback.js`. The §5.4b
+Rust port MUST match `enhancedResolve` (the production oracle),
+NOT `npmResolve` — the `npmResolve` column is captured for
+diagnostic-diff visibility only.
+
+**Verification (cold pickup):**
+
+```bash
+bun install                                                                  # idempotent; resolves enhanced-resolve@5.18.3
+bun parity-harness/resolver-matrix/oracle.mjs                                # 4 entries; pin guard green
+RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration   # 2 passed, 1 ignored
+RUSTFLAGS="" cargo test -p babel-plugin --test compat_evaluation_integration # 3/3 (regression canary)
+RUSTFLAGS="" cargo test -p babel-plugin --test compat_scope_integration      # 3/3 (regression canary)
+```
+
+**Next checkpoint: §5.4b** (port the resolver engine —
+`crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs`
+mirroring `createDefaultResolver` empty-config defaults, parsing
+the RESOLVER_SPEC_PART_TWO.md §2.1 schema, dispatching through
+`oxc_resolver`). The §5.4b implementer un-ignores
+`rust_resolver_matches_js_corpus` once the engine is wired.
 
 ### Phase 5 §5.0c closure summary (this session)
 
@@ -2180,9 +2352,13 @@ done before declaring Phase 0 fully signed off across the platform set.
 | §5.1 | ☑ | Re-confirm `STATE_MUTATIONS.md` is current vs upstream Babel; reconcile any new mutation sites | claude-2026-05-04 | Updated STATE_MUTATIONS.md (line-number drift on sites #6/#7); zero new variants needed; reach of §5.5/§5.6 subtree into state writes is exactly one site (`set-imported-compiled-imports.ts:23`, already in OUT-of-capture list). | `grep -rEn 'state\.(includedFiles\|compiledImports\|sheets\|cssMap\|ignoreMemberExpressions)\b'` over `packages/babel-plugin/src/` returns 8 matches matching the doc's site list |
 | §5.2 | ☐ | Land the consumer-monorepo refactor (zero outside-cwd includes) | — | refactor PR | §0.10 audit reports zero outliers |
 | §5.3 | ☑ | Port `utils/cache.rs` — Layer 1 in-memory + Layer 2 postcard `cache.bin` per PLAN.md §3.9 | claude-2026-05-04 | `crates/babel-plugin/src/utils/cache.rs` (1:1 Layer 1 `Cache<T>` + Rust-only `Layer2` handle with atomic-write protocol), `crates/babel-plugin/src/cache_schema.rs` (postcard `CacheFile` / `Layer2Entry` / `SerializedExpr` / `TransitiveDep`; `CACHE_VERSION = 1`; `compute_schema_hash()` 32-byte deterministic FNV-1a-XOR fingerprint). Layer 2 NOT yet wired into `State::cache` — gated on §5.4–§5.6 (no producer exists). | `cargo test -p babel-plugin cache_schema::` → 7/7; `cargo test -p babel-plugin utils::cache::` → 20/20; size + entry caps locked at the type level + tested |
-| §5.4 | ⚠ BLOCKED | Port `utils/resolve_binding.rs` using `oxc_resolver` configured per §0.11 matrix | — | (blocked) `crates/babel-plugin/src/utils/resolve_binding.rs` — depends on §5.0b + §5.0c | Resolver-matrix corpus byte-clean against this plugin's resolver wrapper. Also blocked on §0.11 RESOLVER_MATRIX.md, which doesn't exist (Phase 0 deferral, never produced). |
-| §5.5 | ⚠ BLOCKED | Port the entire `traverse_expression/` subtree file-for-file (leaves first) | — | (blocked) `crates/babel-plugin/src/utils/traverse_expression/**` — depends on §5.0b + §5.0c | Harness `module-traversal` and `expression-evaluation` fixtures byte-clean |
-| §5.6 | ⚠ BLOCKED | Port `traversers/` and `evaluate_expression.rs` | — | (blocked) `crates/babel-plugin/src/utils/{traversers,evaluate_expression.rs}/**` — depends on §5.0b + §5.0c | Same as above |
+| §5.4a entry-gate | ☑ | Resolver-matrix entry-gate per `crates/babel-plugin/RESOLVER_MATRIX.md`. Architecture lock: `plugins/RESOLVER_SPEC_PART_TWO.md` is the canonical declarative `resolver: { ... }` JSON schema (one generic engine, no Jira-specific code in the library). Two consumer modes only: (a) `resolver` absent → plugin defaults match `createDefaultResolver(config)` with empty `config.resolve` (no caching per WASI constraint); (b) `resolver: { ... }` JSON object → plugin parses RESOLVER_SPEC_PART_TWO.md §2.1 schema. Strings/functions REJECTED at config-parse with hard error pointing at the spec. Replaces §0.11 RESOLVER_MATRIX.md (Phase 0 deferral that was never produced) — the deferral is closed by §5.4a. | claude-2026-05-05 | `crates/babel-plugin/RESOLVER_MATRIX.md` (9-axis coverage manifest + divergence-action protocol + layered-corpus scope statement); `parity-harness/resolver-matrix/{README.md,oracle.mjs,fixtures.json,fixtures-source/}` (in-tree pin-guarded JS oracle running enhanced-resolve@5.18.3 + npm resolve@1.22.12; 4 seed fixtures across 4 of the 9 axes — the §5.4b implementer grows the corpus per the divergence-action protocol); `crates/babel-plugin/tests/resolver_matrix_integration.rs` (3 tests — `corpus_shape_lock` + `corpus_observed_matches_expected_oracle_self_consistency` GREEN; `rust_resolver_matches_js_corpus` `#[ignore]`'d until §5.4b lands the engine); `crates/PARITY_VERSIONS.md` (new section pinning enhanced-resolve@5.18.3 + resolve@1.22.12, both promoted to top-level `devDependencies` AND `overrides` per the §4.2 lesson — provisional pending AFM verification at §5.4b review); `package.json` (devDeps + overrides updated); `.gitignore` (resolver_matrix_corpus.json gitignored, regenerable). Real divergence already captured at axis-2 (`enhanced-resolve` honours `package.json#exports` → `entry.js`; npm `resolve.sync@1.22.12` ignores it → falls back to `main: main-fallback.js`). | `bun parity-harness/resolver-matrix/oracle.mjs` writes 4 entries with pin guard `enhanced-resolve=5.18.3, resolve=1.22.12`. `RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration` → 2 passed, 1 ignored. Sibling compat-* gates unchanged: `compat_evaluation_integration` 3/3, `compat_scope_integration` 3/3. |
+| §5.4b | ☐ NOW | Port the resolver engine: `crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs` — generic Node-style resolver wrapping `oxc_resolver` with per-context dispatch (extensions + mainFields + exports.fields + conditions). Defaults match `createDefaultResolver` empty-config. Reject `resolver: <string>` / `resolver: <function>` with hard error citing RESOLVER_SPEC_PART_TWO.md. | — | `crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs` — depends on §5.4a (DONE) | `rust_resolver_matches_js_corpus` un-ignored and green at the seed corpus (4/4); WASI cdylib still builds clean |
+| §5.4c | ☐ | Port `crates/babel-plugin/src/resolver/transforms.rs` — the 5-op `packageJsonTransforms` engine (`ensureObject`, `renameKey`, `renameMapEntry`, `setDefault`, `deleteKey`) per RESOLVER_SPEC_PART_TWO.md §2.2. Per-op unit tests + composed-sequence fixture matching the JS oracle's package.json mutation output. | — | `resolver/transforms.rs` — depends on §5.4b | Per-op unit tests green; composed-sequence fixture byte-clean |
+| §5.4d | ☐ | Port `crates/babel-plugin/src/resolver/prefer_first.rs` — the `preferFirst` dispatcher (match-by-prefix + override config fan-out) per RESOLVER_SPEC_PART_TWO.md §2.3. Loads prefix lists from inline arrays OR `fromFile` JSON. | — | `resolver/prefer_first.rs` — depends on §5.4b | preferFirst fixtures byte-clean (matched specifiers route to overridden config; non-matched fall through) |
+| §5.4e | ☐ | 1:1 port of `packages/babel-plugin/src/utils/resolve-binding.ts` → `crates/babel-plugin/src/utils/resolve_binding.rs`, wiring through `resolver::Resolver`. Breadcrumb requirement at every `get_binding`/`get_own_binding` call site per §5.0c lock (Finding 7, lazy-crawl observability). | — | `utils/resolve_binding.rs` — depends on §5.4b/c/d | resolve-binding fixtures byte-clean; existing `module-traversal` parity-harness fixtures green; §4.4 SHELL `resolve_binding_stub` deleted |
+| §5.5 | ▶ PARTIAL | Port the entire `traverse_expression/` subtree file-for-file (leaves first). 3/14 leaves landed in parallel with §5.4a (the resolve-binding-independent ones); remaining 11 files (`traverse-identifier`, `traverse-call-expression`, the entire `traverse-member-expression/**` subtree) gated on §5.4e. | claude-2026-05-05 (parallel leaves) / — (closure) | Landed: `crates/babel-plugin/src/utils/traverse_expression/{traverse_binary_expression,traverse_unary_expression,traverse_function}.rs` + `utils/{create_result_pair,has_numeric_value}.rs` (+ 24 unit tests). Remaining: `traverse_expression/{traverse_identifier,traverse_call_expression,traverse_member_expression/**}.rs` — depends on §5.4e. | Lib-level: `cargo test -p babel-plugin --lib` → 204/204 (was 180; +24 tests across the 5 new modules). WASM: `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean. Harness `module-traversal` / `expression-evaluation` fixtures byte-clean — DEFERRED to §5.5 closure agent (full pipeline cannot run until §5.4e + §5.6 land; §4.4 `evaluate_expression_stub` still panics on dispatch). |
+| §5.6 | ☐ | Port `traversers/` (5 files) and `evaluate_expression.rs` (200 LOC) | — | `crates/babel-plugin/src/utils/{traversers,evaluate_expression.rs}/**` — depends on §5.4e + §5.5 closure | Harness `module-traversal` and `expression-evaluation` fixtures byte-clean |
 | §5.7 | ☐ | Wire `includedFiles` accumulation → `<callScratch>/included-files.json` sidecar | — | Updated lib.rs Program::exit | Harness fixtures with cross-file imports produce non-empty sidecar; host's `asset.invalidateOnFileChange` matches Babel's |
 | §5.8 | ☐ | Promote `scripts/audit-included-files.ts` to CI guardrail | — | CI config update | Audit failure blocks PR merge |
 | §5.9 | ☐ | **Phase 5 exit gate:** module-traversal + expression-evaluation byte-clean; `MutationRecorder` shadow-eval suite reports zero replay/live divergence; pre-commit state-mutation lint clean | — | STATUS.md updated | All exit-gate sub-conditions met |

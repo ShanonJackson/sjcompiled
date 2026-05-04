@@ -5,11 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="46baedc5-8956-4da5-8e73-63c433c62642" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/plugins/RESOLVER_SPEC.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/plugins/RESOLVER_SPEC_PART_TWO.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/tests/compat_evaluation_integration.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/tests/compat_evaluation_integration.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/tests/compat_scope_integration.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/tests/compat_scope_integration.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plugins/COMPAT_SCOPE_AUDIT.md" beforeDir="false" afterPath="$PROJECT_DIR$/plugins/COMPAT_SCOPE_AUDIT.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/PARITY_VERSIONS.md" beforeDir="false" afterPath="$PROJECT_DIR$/crates/PARITY_VERSIONS.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plugins/STATUS.md" beforeDir="false" afterPath="$PROJECT_DIR$/plugins/STATUS.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -20,32 +21,37 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 5
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
   <component name="ProjectId" id="3DEMWukNUbQfr5y93m2fWoNhSMJ" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
     <option name="sortKey" value="BY_TIME_DESCENDING" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "C:/Users/shanon/Documents/projects/sjcompiled",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "bun",
-    "prettierjs.PrettierConfiguration.Package": "C:\\Users\\shanon\\Documents\\projects\\sjcompiled\\node_modules\\prettier",
-    "ts.external.directory.path": "C:\\Users\\shanon\\Documents\\projects\\sjcompiled\\node_modules\\typescript\\lib",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/shanon/Documents/projects/sjcompiled&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;bun&quot;,
+    &quot;prettierjs.PrettierConfiguration.Package&quot;: &quot;C:\\Users\\shanon\\Documents\\projects\\sjcompiled\\node_modules\\prettier&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;C:\\Users\\shanon\\Documents\\projects\\sjcompiled\\node_modules\\typescript\\lib&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\shanon\Documents\projects\sjcompiled\plugins" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>

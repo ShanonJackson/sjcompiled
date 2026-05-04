@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "//": "Phase 5 §5.4a entry-gate seed corpus. Locks the schema and exercises the JS oracle pipeline end-to-end. The §5.4b implementer grows this corpus axis-by-axis as they hit divergence between oxc_resolver and enhanced-resolve. The 9 axes are enumerated in `crates/babel-plugin/RESOLVER_MATRIX.md`. fromFile paths are repo-root-relative; the oracle resolves them to absolute at run time.",
+  "fixtures": [
+    {
+      "label": "axis-1-pkg-main-only",
+      "axis": "package.json-main",
+      "fromFile": "parity-harness/resolver-matrix/fixtures-source/axis-1-pkg-main/main-only/consumer.js",
+      "request": "parity-pkg-main-only",
+      "extensions": [".js", ".jsx", ".ts", ".tsx"],
+      "expected": {
+        "enhancedResolve": {
+          "kind": "ok",
+          "path": "parity-harness/resolver-matrix/fixtures-source/axis-1-pkg-main/main-only/node_modules/parity-pkg-main-only/lib/entry.js"
+        },
+        "npmResolve": {
+          "kind": "ok",
+          "path": "parity-harness/resolver-matrix/fixtures-source/axis-1-pkg-main/main-only/node_modules/parity-pkg-main-only/lib/entry.js"
+        }
+      }
+    },
+    {
+      "label": "axis-2-exports-string",
+      "axis": "package.json-exports-conditions",
+      "fromFile": "parity-harness/resolver-matrix/fixtures-source/axis-2-pkg-exports/exports-string/consumer.js",
+      "request": "parity-pkg-exports-string",
+      "extensions": [".js", ".jsx", ".ts", ".tsx"],
+      "//": "Real divergence captured at §5.4a entry-gate: enhanced-resolve honours `exports` and resolves to `entry.js`. npm resolve.sync@1.22.12 ignores the `exports` field and falls back to `main: main-fallback.js`. The Rust oxc_resolver port (§5.4b) MUST match `enhancedResolve` — that is the production oracle. `npmResolve` is captured for diagnostic-diff only.",
+      "expected": {
+        "enhancedResolve": {
+          "kind": "ok",
+          "path": "parity-harness/resolver-matrix/fixtures-source/axis-2-pkg-exports/exports-string/node_modules/parity-pkg-exports-string/entry.js"
+        },
+        "npmResolve": {
+          "kind": "ok",
+          "path": "parity-harness/resolver-matrix/fixtures-source/axis-2-pkg-exports/exports-string/node_modules/parity-pkg-exports-string/main-fallback.js"
+        }
+      }
+    },
+    {
+      "label": "axis-6-extension-order-js-wins",
+      "axis": "extension-order",
+      "fromFile": "parity-harness/resolver-matrix/fixtures-source/axis-6-extension-order/js-wins-over-ts/consumer.js",
+      "request": "./shared/util",
+      "extensions": [".js", ".jsx", ".ts", ".tsx"],
+      "expected": {
+        "enhancedResolve": {
+          "kind": "ok",
+          "path": "parity-harness/resolver-matrix/fixtures-source/axis-6-extension-order/js-wins-over-ts/shared/util.js"
+        },
+        "npmResolve": {
+          "kind": "ok",
+          "path": "parity-harness/resolver-matrix/fixtures-source/axis-6-extension-order/js-wins-over-ts/shared/util.js"
+        }
+      }
+    },
+    {
+      "label": "axis-7-directory-index-js",
+      "axis": "directory-index",
+      "fromFile": "parity-harness/resolver-matrix/fixtures-source/axis-7-directory-index/index-js/consumer.js",
+      "request": "./components",
+      "extensions": [".js", ".jsx", ".ts", ".tsx"],
+      "expected": {
+        "enhancedResolve": {
+          "kind": "ok",
+          "path": "parity-harness/resolver-matrix/fixtures-source/axis-7-directory-index/index-js/components/index.js"
+        },
+        "npmResolve": {
+          "kind": "ok",
+          "path": "parity-harness/resolver-matrix/fixtures-source/axis-7-directory-index/index-js/components/index.js"
+        }
+      }
+    }
+  ]
+}

@@ -41,3 +41,9 @@ crates/babel-plugin/tests/compat_scope_corpus.json
 # `bun parity-harness/compat-evaluation/oracle.mjs` to rehydrate before
 # `cargo test -p babel-plugin --test compat_evaluation_integration`.
 crates/babel-plugin/tests/compat_evaluation_corpus.json
+# Phase 5 §5.4a resolver-matrix corpus — regenerable from the JS oracle
+# walking parity-harness/resolver-matrix/fixtures.json + fixtures-source/
+# against pinned enhanced-resolve@5.18.3 and resolve@1.22.12. Run
+# `bun parity-harness/resolver-matrix/oracle.mjs` to rehydrate before
+# `cargo test -p babel-plugin --test resolver_matrix_integration`.
+crates/babel-plugin/tests/resolver_matrix_corpus.json

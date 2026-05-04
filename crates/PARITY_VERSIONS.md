@@ -171,6 +171,44 @@ helper-globals version with different builtin lists, the
 fires immediately (entry count + sample-name fingerprint mismatch).
 At that point promote to a top-level pin and re-vendor the JSONs.
 
+### `enhanced-resolve` + `resolve` (used by Phase 5 §5.4 resolver-matrix parity oracle)
+
+Phase 5 §5.4a's resolver-matrix oracle
+(`parity-harness/resolver-matrix/oracle.mjs`) runs every fixture
+through enhanced-resolve@5.x AND `npm resolve.sync` to produce the
+byte-parity contract that `crates/babel-plugin/src/resolver/` (the
+in-plugin replacement for `createDefaultResolver` per
+`plugins/PLAN.md` §1 constraint 2) must match using `oxc_resolver`.
+
+The two corresponding production code paths are:
+
+- **`enhanced-resolve@5.x`** — wrapped by `createDefaultResolver` in
+  the host's parcel-transformer (see `plugins/PARCEL_USAGE_EXAMPLE.md`).
+  The matrix exercises the no-config path:
+  `ResolverFactory.createResolver({ fileSystem, extensions, useSyncFileSystemCalls: true })`
+  with `extensions = config.extensions ?? DEFAULT_CODE_EXTENSIONS`.
+  This is the production oracle; `oxc_resolver` MUST byte-match its
+  resolved-path output for every Layer-1 fixture.
+- **`resolve@1.x`** — the npm `resolve` package, used as the fallback
+  at `packages/babel-plugin/src/utils/resolve-binding.ts:185-189`
+  when no `state.resolver` is injected. Configured as
+  `resolve.sync(id, { extensions })`.
+
+| npm package | Pinned version | Notes |
+|---|---|---|
+| `enhanced-resolve` | **5.18.3** | Provisional — matches the latest 5.x stable as of 2026-05-05; pending AFM verification at §5.4b review. The matrix gate is meaningful as long as the Rust port matches the same pin's behaviour. If AFM uses a different 5.x, bump this pin and re-snapshot the corpus per the divergence-action protocol in `crates/babel-plugin/RESOLVER_MATRIX.md`. Pinned in root `package.json#overrides` AND promoted to top-level `devDependencies` per the §4.2 lesson. |
+| `resolve` | **1.22.12** | Already in tree at `node_modules/.bun/resolve@1.22.12`. The npm `resolve` package's API surface is stable across 1.x; pin documented for completeness. Pinned in root `package.json#overrides` AND promoted to top-level `devDependencies`. |
+
+The `oracle.mjs` pin guards (top of file) read each package's
+`package.json#version` and throw on drift, mirroring the
+`@babel/traverse@7.29.0` / `@babel/parser@7.29.2` guards in the
+compat-evaluation oracle.
+
+The Rust crate that replaces both call paths is `oxc_resolver` —
+its pinned version is recorded by §5.4b once the implementer
+selects a version (separate decision from the JS-oracle pins
+above; the matrix corpus is the contract between them).
+
 ### Direct dependencies of `@compiled/css`
 
 | npm package | Range in `packages/css/package.json` | Resolved version | Rust crate | Used in |
