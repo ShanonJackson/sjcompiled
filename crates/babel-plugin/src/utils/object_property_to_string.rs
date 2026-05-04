@@ -47,8 +47,8 @@ pub struct EvaluatedExpression {
 
 fn template_literal_to_string(
     template: &Tpl,
-    _meta: &Metadata<'_>,
-    _expression_to_string: impl Fn(&Expr, &Metadata<'_>) -> Result<String, CssBuildError>,
+    _meta: &mut Metadata<'_>,
+    _expression_to_string: impl Fn(&Expr, &mut Metadata<'_>) -> Result<String, CssBuildError>,
 ) -> Result<String, CssBuildError> {
     // Mirrors upstream lines 9–32. Walks `quasis[i].value.raw`
     // interleaved with `expressionToString(expressions[i])`. The
@@ -71,8 +71,8 @@ fn template_literal_to_string(
 
 fn binary_expression_to_string(
     expression: &BinExpr,
-    meta: &Metadata<'_>,
-    expression_to_string: impl Fn(&Expr, &Metadata<'_>) -> Result<String, CssBuildError>,
+    meta: &mut Metadata<'_>,
+    expression_to_string: impl Fn(&Expr, &mut Metadata<'_>) -> Result<String, CssBuildError>,
 ) -> Result<String, CssBuildError> {
     // Mirrors upstream lines 34–49. Only `+` is allowed; anything
     // else throws the upstream error message verbatim.
@@ -122,11 +122,11 @@ fn op_str(op: BinaryOp) -> &'static str {
 
 /// `expressionToString` upstream lines 51–79. Recursive dispatch
 /// over expression kinds.
-pub fn expression_to_string(expression: &Expr, meta: &Metadata<'_>) -> Result<String, CssBuildError> {
+pub fn expression_to_string(expression: &Expr, meta: &mut Metadata<'_>) -> Result<String, CssBuildError> {
     // {'key-name': 'value'} or {1: 'value'}
     if let Expr::Lit(lit) = expression {
         match lit {
-            Lit::Str(s) => return Ok(s.value.to_string()),
+            Lit::Str(s) => return Ok(s.value.to_atom_lossy().as_str().to_string()),
             Lit::Num(n) => {
                 // JS `String(numericLiteral.value)` — `String(12)` →
                 // `"12"`, `String(1.5)` → `"1.5"`. Rust's Display
@@ -226,7 +226,7 @@ fn babel_type_name(expression: &Expr) -> &'static str {
 /// `expressionToString`). `PropName::Computed` dispatches to
 /// `expression_to_string` over the inner expression (matches Babel's
 /// `expressionToString(key, meta)` dispatch).
-pub fn object_property_to_string(prop_name: &PropName, meta: &Metadata<'_>) -> Result<String, CssBuildError> {
+pub fn object_property_to_string(prop_name: &PropName, meta: &mut Metadata<'_>) -> Result<String, CssBuildError> {
     match prop_name {
         // {key: 'value'} — Babel's Identifier&&!computed branch.
         PropName::Ident(ident_name) => Ok(ident_name.sym.to_string()),
@@ -235,7 +235,7 @@ pub fn object_property_to_string(prop_name: &PropName, meta: &Metadata<'_>) -> R
         // computed-key wrap). Babel routes them through
         // expressionToString's StringLiteral/NumericLiteral arms;
         // bytes match.
-        PropName::Str(s) => Ok(s.value.to_string()),
+        PropName::Str(s) => Ok(s.value.to_atom_lossy().as_str().to_string()),
         PropName::Num(n) => {
             if n.value.fract() == 0.0 && n.value.abs() < 1e16 {
                 Ok((n.value as i64).to_string())
@@ -268,22 +268,22 @@ mod tests {
     #[test]
     fn ident_key_returns_name() {
         let mut state = State::default();
-        let meta = dummy_meta(&mut state);
+        let mut meta = dummy_meta(&mut state);
         let key = PropName::Ident(IdentName::new("color".into(), DUMMY_SP));
-        assert_eq!(object_property_to_string(&key, &meta).unwrap(), "color");
+        assert_eq!(object_property_to_string(&key, &mut meta).unwrap(), "color");
     }
 
     #[test]
     fn string_key_returns_value() {
         let mut state = State::default();
-        let meta = dummy_meta(&mut state);
+        let mut meta = dummy_meta(&mut state);
         let key = PropName::Str(Str {
             span: DUMMY_SP,
             value: "background-color".into(),
             raw: None,
         });
         assert_eq!(
-            object_property_to_string(&key, &meta).unwrap(),
+            object_property_to_string(&key, &mut meta).unwrap(),
             "background-color"
         );
     }
@@ -291,12 +291,12 @@ mod tests {
     #[test]
     fn integer_numeric_key_stringifies_without_dot() {
         let mut state = State::default();
-        let meta = dummy_meta(&mut state);
+        let mut meta = dummy_meta(&mut state);
         let key = PropName::Num(Number {
             span: DUMMY_SP,
             value: 1.0,
             raw: None,
         });
-        assert_eq!(object_property_to_string(&key, &meta).unwrap(), "1");
+        assert_eq!(object_property_to_string(&key, &mut meta).unwrap(), "1");
     }
 }

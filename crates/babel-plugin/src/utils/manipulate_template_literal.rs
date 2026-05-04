@@ -22,7 +22,7 @@ use crate::types::Metadata;
 /// the parent-traversal index from Phase 5 §5.6.
 pub fn has_nested_template_literals_with_conditional_rules(
     _node: &Tpl,
-    _meta: &Metadata<'_>,
+    _meta: &mut Metadata<'_>,
 ) -> bool {
     unimplemented!(
         "hasNestedTemplateLiteralsWithConditionalRules requires parent-traversal — \
@@ -53,21 +53,21 @@ pub fn recompose_template_literal(template: &mut Tpl, prefix: &str, suffix: &str
         // even when n == 1 (in that case lead == tail and the
         // mutations stack). Mirror with a borrowed scope.
         let lead = &mut template.quasis[0];
-        let new_raw = format!("{}{}", prefix, lead.raw);
+        let new_raw = format!("{}{}", prefix, lead.raw.as_str());
         let new_cooked = lead
             .cooked
             .as_ref()
-            .map(|c| format!("{}{}", prefix, c));
+            .map(|c| format!("{}{}", prefix, c.to_atom_lossy().as_str()));
         lead.raw = new_raw.into();
         lead.cooked = new_cooked.map(|c| c.into());
     }
     {
         let tail = &mut template.quasis[n - 1];
-        let new_raw = format!("{}{}", tail.raw, suffix);
+        let new_raw = format!("{}{}", tail.raw.as_str(), suffix);
         let new_cooked = tail
             .cooked
             .as_ref()
-            .map(|c| format!("{}{}", c, suffix));
+            .map(|c| format!("{}{}", c.to_atom_lossy().as_str(), suffix));
         tail.raw = new_raw.into();
         tail.cooked = new_cooked.map(|c| c.into());
     }
@@ -110,7 +110,7 @@ pub fn optimize_conditional_expression(
             })),
             Expr::Lit(Lit::Str(Str { value, .. })) => Expr::Lit(Lit::Str(Str {
                 span: DUMMY_SP,
-                value: format!("{}{}{}", prefix, value, suffix).into(),
+                value: format!("{}{}{}", prefix, value.to_atom_lossy().as_str(), suffix).into(),
                 raw: None,
             })),
             Expr::Tpl(tpl) => {
@@ -333,7 +333,10 @@ mod tests {
         recompose_template_literal(&mut tpl, "color: ", ";");
         assert_eq!(&*tpl.quasis[0].raw, "color: body;");
         assert_eq!(
-            tpl.quasis[0].cooked.as_ref().map(|c| c.to_string()),
+            tpl.quasis[0]
+                .cooked
+                .as_ref()
+                .map(|c| c.to_atom_lossy().as_str().to_string()),
             Some("color: body;".to_string())
         );
     }

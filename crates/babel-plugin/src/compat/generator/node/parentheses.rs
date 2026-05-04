@@ -15,8 +15,8 @@
 //! `isFirstInContext` (object as bare statement, etc.), extend then.
 
 use swc_core::ecma::ast::{
-    BinExpr, BinaryOp, CallExpr, Callee, CondExpr, Expr, MemberExpr, MemberProp, NewExpr,
-    OptCall, OptChainBase, OptChainExpr,
+    BinExpr, BinaryOp, CallExpr, Callee, Expr, MemberExpr, MemberProp, NewExpr, OptCall,
+    OptChainBase, OptChainExpr,
 };
 
 /// Operator precedence per upstream's `PRECEDENCE` table. Used by

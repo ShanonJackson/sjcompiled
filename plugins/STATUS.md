@@ -28,13 +28,16 @@
 **Closed:** Phase 0 ☑ (modulo deferred §0.10–§0.12 hardening
 tasks — Phase 5 gates, NOT Phase 4 blockers). Phase 1 ☑. Phase 2 ☑.
 Phase 3 ☑ (§3.1–§3.4). Phase 4 §4.1 ☑. Phase 4 §4.2 ☑. Phase 4 §4.3 ☑.
+Phase 4 §4.4 ☑ (SHELL port — see closure summary below).
 
-**Next checkpoint: §4.4** — port `utils/css_builders.rs` line-for-line.
-This is the first checkpoint that consumes both `compat::generator`
-(this session's §4.3 close-out) AND `css::transform_css` (§4.1's
-integration parity gate) end-to-end. After §4.4 the visitor finally
-has the pieces to handle `keyframes` / `css` / `cssMap` source-side
-transforms; §4.5 + §4.6 wire it into the dispatcher single-pass.
+**Next checkpoint: §4.5** — port `utils/transform_css_items.rs` and
+`utils/build_css_variables.rs`. Both are pure-data adapters that
+consume the §4.4 shell's `CSSOutput` shape and the §4.1 integration's
+`css::transform_css`. After §4.5, §4.6 wires `transform_css` into the
+visitor single-pass, then §4.7 updates the Parcel wrapper, then §4.8
+is the Phase 4 exit gate (full byte-clean for keyframes / css /
+cssMap fixtures — the gate that actually requires Phases 5/6's
+evaluate/resolve/visitCssMap to be real, not stubbed).
 
 Phase 4 §4.3 closure: 55/55 fixtures byte-exact, JSX printer landed
 1:1 from `@babel/generator@7.23.0/lib/generators/jsx.js` (122 LOC →
@@ -55,12 +58,13 @@ mutations from §2.3(a)) — NOT a phase gate; bundles with the first
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 43/43
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 75/75 (was 43/43; +32 from §4.4 utils ports)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact, zero skips)
 RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib             # 56/56
 RUSTFLAGS="" cargo test -p compiled-utils --lib                         # 31/31
+RUSTFLAGS="" cargo test -p compiled-css --lib                           # 163/163 (was 121; +42 from CSS-port agent's §4.4 unblock)
 
 # Bun parity harnesses.
 bun test parity-harness/strip-runtime/harness.test.ts                   # 1132/1132
@@ -76,7 +80,105 @@ bun parity-harness/transform-css/oracle.mjs
 bun parity-harness/compat-generator/oracle.mjs                          # 55 entries
 ```
 
-Total: **2562 tests, zero failures, zero ignored.**
+Total: **2636 tests, zero failures, zero ignored** (+74 vs. §4.3 close).
+
+### Phase 4 §4.4 closure summary (SHELL port; 4 hash-call-shape sites end-to-end)
+
+`crates/babel-plugin/src/utils/css_builders.rs` (~1100 LOC mirroring
+upstream `packages/babel-plugin/src/utils/css-builders.ts` 1:1) plus
+the small tractable transitive deps (`types`, `is_empty`,
+`is_compiled`, `ast`, `object_property_to_string`,
+`manipulate_template_literal`) ship as a SHELL — the file structure
+mirrors upstream 1:1, the four §3 hash-call-shape sites are wired
+end-to-end through `compat::generator::generate` →
+`compiled_utils::hash`, and every `evaluate_expression` /
+`resolve_binding` / `visit_css_map_path` dispatch site is gated on a
+phase-citing `unimplemented!()` panic. The §4.8 phase exit gate
+(harness fixtures byte-clean for keyframes / css / cssMap) is what
+will eventually require those stubs to be real; §4.4 is the
+structural milestone that makes the Phase 6 handler ports possible.
+
+**Hash-call-shape sites wired (§3 corpus already covers the inputs):**
+
+| Site | Upstream LOC | Wiring |
+|---|---|---|
+| #1 keyframes name | css-builders.ts:464 | `format!("k{}", hash(&generate(call_or_tagged_tpl)))` in `extract_keyframes` |
+| #2 object-expression catch-all | css-builders.ts:639 | `format!("--_{}", hash(&variable_name))` in `extract_object_expression` |
+| #3 template-literal catch-all | css-builders.ts:869 | `format!("--_{}{}", hash(&variable_name), prefix_marker)` in `extract_template_literal` |
+
+(The fourth hash-call-shape site at `atomicify-rules.ts:41/:44` lives
+in `crates/css` / `crates/compiled-css`, not in babel-plugin — owned
+by the CSS-port agent. Already exercised by the §3 hash parity corpus
+through the §4.1 transform_css integration test.)
+
+Each site has a unit test in `utils::css_builders::tests` that
+constructs the AST shape the JS path would build and asserts the
+emitted hash-keyed name matches the JS oracle. Tests reach the real
+Rust dispatch (no mocking); the §3 corpus's 10037-entry parity
+contract guarantees byte-equality at the hash-input boundary.
+
+**Stubs (Phase 5 / 6 gates):**
+
+* `evaluate_expression_stub(...)` → Phase 5 §5.6
+  (utils/evaluate-expression.ts) — every dispatch into the evaluator.
+* `resolve_binding_stub(...)` → Phase 5 §5.4
+  (utils/resolve-binding.ts) — every dispatch into the resolver.
+* `visit_css_map_path_stub()` → Phase 6 §6.3 (css-map handler).
+* `has_nested_template_literals_with_conditional_rules` → Phase 5
+  §5.6's NodePath-parent-traversal analog
+  (`getPathOfNode + traverse(parent, ...)`).
+
+**CSS-port agent's parallel work** (CSS_BUILDERS_DEPS.md, RESOLVED
+2026-05-04). `addUnitIfNeeded` (45-property unitless lookup +
+`AddUnitValue` enum) and `cssAffixInterpolation` (with
+`BeforeInterpolation` / `AfterInterpolation` types) landed at
+`crates/compiled-css/src/utils/{css_property,css_affix_interpolation}.rs`
+as 1:1 ports of the JS source (35 affix-test-cases ported verbatim;
+9 add_unit cases). Re-exported from `crates/css/src/lib.rs` so
+`crates/babel-plugin/src/utils/css_builders.rs` imports from `css::`
+the same shape JS imports from `@compiled/css`. `compiled-css` test
+count: 121 → 163. The §4.4 SHELL uses both helpers directly at the
+numeric-literal-property and template-literal catch-all sites — no
+stubs at the hash-call-shape paths.
+
+**Architectural change: `Metadata` reborrow shape.** Babel's
+`{ ...meta, context: 'keyframes', keyframe: name }` object spread
+shares the `state` reference and overrides fields. Rust requires an
+explicit reborrow because `State` is `&mut`-held —
+`Metadata::reborrow_with_context(&mut self, ctx) -> Metadata<'_>`
+(landed in `types.rs`) is the analog. Every `extract_*` function in
+`css_builders.rs` takes `&mut Metadata<'_>` (not `&Metadata<'_>`) so
+child calls can reborrow properly. This rippled to
+`object_property_to_string.rs` and
+`manipulate_template_literal.rs` signatures; tests updated to pass
+`&mut meta`.
+
+**Cargo.toml move:** `css = { workspace = true }` promoted from
+`[dev-dependencies]` to `[dependencies]` per the §4.6 hand-off note
+in §4.3's closure (now landed at §4.4 because the helpers it
+re-exports are reachable from the SHELL hash-call sites). Also added
+`regex` and `once_cell` workspace deps for the upstream regex ports
+in `manipulate_template_literal.rs` and `css_builders.rs`.
+
+**Bug-parity preserved:** `manipulate_template_literal.rs`
+intentionally mirrors upstream's `[;|{|}]` split-statement regex
+verbatim (the `|` between bracket entries is literal in a char
+class — looks like a typo but ships in production). Per CLAUDE.md
+"BUGS in OLD! Need to be BUGS In NEW" (added 2026-05-04), this is
+documented inline at the regex declaration so future readers don't
+"fix" it.
+
+**Deliberately deferred (NOT urgent):**
+
+* `arrow.body = firstExpression` mutation in
+  `extract_object_expression` (Babel's optimised template-literal
+  wrapping for arrow-function-with-body-as-Tpl-with-cond-arg). The
+  §4.4 corpus does not exercise this path; Phase 5 §5.6's
+  mutable-walker shape lands the proper model.
+* `nextQuasis.value.raw = after.css` mutation in
+  `extract_template_literal`. Same reason — Phase 5 §5.6 mutable
+  walker.
+* `extract_member_expression`'s map-cache miss path (Phase 6 §6.3).
 
 ### Phase 4 §4.3 closure summary (55/55 byte-exact, zero skips)
 
@@ -577,34 +679,39 @@ sign-off (this session):
 
 ### Hand-off — what the next session should do
 
-**Active checkpoint:** Phase 4 §4.4 — port `utils/css_builders.rs`
-line-for-line from `packages/babel-plugin/src/utils/css-builders.ts`
-into `crates/babel-plugin/src/utils/css_builders.rs`. This is the
-first file that consumes BOTH `compat::generator::generate*` (this
-session's §4.3 close-out) AND `css::transform_css` (§4.1's parity
-gate). The artefact rows on the Phase 4 table list the entry points
-to mirror; the COMPAT_GENERATOR_COVERAGE.md manifest pins which
-generate() call sites the new module hits.
+**Active checkpoint:** Phase 4 §4.5 — port
+`utils/transform_css_items.rs` and `utils/build_css_variables.rs`.
+Both are pure-data adapters consuming the §4.4 SHELL's `CSSOutput`
+shape. No new transitive-dep ports expected.
 
-Order to land §4.4 → §4.6 cleanly:
-1. **§4.4** — port the file. The hash-relevant call sites
-   (`hash(generate(expression).code)` at `:464`,
-   `hash(variableName)` at `:639` / `:869`, atomicify-key at
-   `atomicify-rules.ts:41`, atomicify-value at `:44`) are all
-   covered by the §3 hash parity corpus already. Adding a unit
-   test that runs each of those 4 call shapes through the Rust
-   path and compares to the JS oracle is the §4.4 close-out
-   signal.
-2. **§4.5** — port `utils/transform_css_items.rs` and
-   `utils/build_css_variables.rs`. Both are pure-data adapters;
-   wire them through the same harness as §4.4.
-3. **§4.6** — wire `transform_css` into the visitor (single pass,
-   no scan/apply). Promote the `[dev-dependencies]` entry on
-   `crates/css` in `babel-plugin`'s `Cargo.toml` to
-   `[dependencies]` per §4.1's note.
-4. **§4.7** — update `packages/parcel-transformer/src/index.ts` to
+Order to land §4.5 → §4.8 cleanly:
+1. **§4.5** — port the two adapter files. They consume §4.4's
+   `CSSOutput` (which holds `Vec<CssItem>` + `Vec<Variable>`) and
+   `css::transform_css` (already wired via §4.1's `[dependencies]`
+   promotion landed at §4.4). Add unit tests that round-trip each
+   adapter against the §4.1 transform_css corpus.
+2. **§4.6** — wire `transform_css` into the visitor (single pass,
+   no scan/apply). The `[dev-dependencies]` → `[dependencies]`
+   promotion happened at §4.4; this checkpoint uses the dep at
+   the visitor layer.
+3. **§4.7** — update `packages/parcel-transformer/src/index.ts` to
    make a single `transformSync` call per PLAN.md §8 (Parcel
    wrapper drains sidecars).
+4. **§4.8** — Phase 4 exit gate: keyframes / css / cssMap fixtures
+   byte-clean. THIS is the gate that requires the §4.4 SHELL's
+   evaluate / resolve / visitCssMap stubs to be real (Phases 5/6).
+   Don't try to land §4.8 ahead of those phases.
+
+Phase 4 §4.4 deliberately deferred (NOT urgent, NOT §4.5 blockers):
+- `arrow.body = firstExpression` mutation in
+  `extract_object_expression` — Phase 5 §5.6 mutable-walker.
+- `nextQuasis.value.raw = after.css` mutation in
+  `extract_template_literal` — same Phase 5 §5.6 reason.
+- `extract_member_expression`'s map-cache miss path — Phase 6 §6.3
+  visitCssMapPath wiring.
+
+See `crates/babel-plugin/CSS_BUILDERS_DEPS.md` for the
+CSS-port-agent collaboration record (RESOLVED 2026-05-04).
 
 Phase 4 §4.3 deliberately deferred (NOT urgent, NOT blockers):
 - `Expr::Paren` transparency edge cases — only one corpus fixture
@@ -899,7 +1006,7 @@ done before declaring Phase 0 fully signed off across the platform set.
 | §4.1 | ☑ | `transform_css` integration parity test — every JS-corpus input produces byte-identical Rust output from this plugin's perspective | claude-2026-05-04 | `parity-harness/transform-css/oracle.mjs` (imports `@compiled/css.transformCss` directly; pins `BROWSERSLIST_CONFIG` to `crates/browserslist-shim/tests/fixtures/afm/.browserslistrc` — the EXACT production AFM pin per `BROWSER_LIST_FROM_AFM.md`, resolves to the 14-entry list `and_chr 144 / chrome 144..140 / edge 144..143 / firefox 147..146 / ios_saf 26.2..26.1 / safari 26.2..26.1` under workspace-pinned `caniuse-lite@1.0.30001766` + `browserslist@4.24.2`. Unsets `BROWSERSLIST`, `AUTOPREFIXER`, and `COMPILED_CSS_ENGINE`) → emits `crates/babel-plugin/tests/transform_css_corpus.json` (gitignored — regenerable). 30 hand-curated CSS fixtures from `crates/parity-runner/corpus/transform-css/` × 4 opts permutations spanning the babel-plugin's real call shape from `packages/babel-plugin/src/utils/{transform-css-items,build-styled-component}.ts` (`{}`, `{optimizeCss:false}`, `{increaseSpecificity:true}`, `{classHashPrefix:'x'}`). **120/120 entries byte-equal** with `css::transform_css`. New `[dev-dependencies]` entry on `crates/css` in `crates/babel-plugin/Cargo.toml` (will promote to `[dependencies]` when §4.6 wires `transform_css` into the visitor). | `RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration` → 3/3 (120/120 parity, no expected-to-fail). 5 consecutive runs all green confirms the env-race fix is stable. Sibling suites unchanged. |
 | §4.2 | ☑ | Build `crates/babel-plugin/COMPAT_GENERATOR_COVERAGE.md` enumerating every AST node kind reachable from `keyframes(...)` (and any other `generate(...)` call site) in the consuming monorepo | claude-2026-05-04 | `crates/babel-plugin/COMPAT_GENERATOR_COVERAGE.md` (per-call-site coverage manifest + comment-axis fixtures + real-divergence table); `parity-harness/compat-generator/{fixtures.json,oracle.mjs}` (in-tree input manifest + JS oracle that emits `crates/babel-plugin/tests/compat_generator_corpus.json`, gitignored, regenerable; pin guard fail-fasts on `@babel/generator` / `@babel/parser` drift); `crates/babel-plugin/src/compat/{mod.rs,generator.rs}` (stub `generate(&Expr) -> String` that `unimplemented!()`s — by design, callers know §4.3 is a hard prereq); `crates/babel-plugin/tests/compat_generator_integration.rs` (3 tests: corpus shape lock + SWC parse coverage GREEN at §4.2 ship; byte-parity assertion `#[ignore]`d until §4.3 ports the line-for-line generator). Pinned `@babel/generator@7.23.0` + `@babel/parser@7.29.2` (AFM-resolved) in root `package.json#overrides` AND promoted both to top-level devDependencies (workspace's bun-isolated dep layout doesn't symlink `node_modules/@babel/generator`, so without the devDep promotion `require('@babel/generator')` walked PAST the workspace and grabbed `Documents\projects\node_modules\@babel\generator@7.28.5` — a sibling tree's copy. Caught by the oracle's pin guard). Both pins recorded in `crates/PARITY_VERSIONS.md` with the rationale for pinning the parser alongside the generator. 55 fixtures across 5 call_site axes (conditional-classname-item: 8, generic-expression: 25, jsx-key-attribute: 5, keyframes-expression: 11, variable-init: 6) — every call_site has ≥1 fixture; comment-axis fixtures (eslint-disable, ternary-inner, PURE annotations, leading/trailing block comments) seeded explicitly per the user's flag. Real divergences captured in the corpus that §4.3 must reproduce: `cond ? /* yes */'a-class' : 'b-class'` (no space after block comment), `(a && b) \|\| c → a && b \|\| c` (paren drop at precedence boundary), single-quote preservation. | `bun parity-harness/compat-generator/oracle.mjs` writes 55 entries with pin guard `@babel/generator=7.23.0, @babel/parser=7.29.2`. `RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration` → 2 passed (`corpus_shape_lock`, `corpus_input_sources_parse_under_swc`), 1 ignored (`rust_compat_generator_matches_js_corpus` waiting on §4.3). Sibling suites unchanged: 43 babel-plugin lib + 4 hash_parity + 3 transform_css_integration + 56 strip-runtime lib + 31 compiled-utils lib + 1132 strip-runtime harness + 954 babel-plugin full harness + 336 equality-harness. **Verified against current `crates/css` HEAD — §4.1 still 120/120 under both new pins** (defense-in-depth crosscheck per the parallel autoprefixer-agent collision risk note in §4.2 plan). |
 | §4.3 | ☑ | Port `compat/generator.rs` covering every node kind in the manifest | claude-2026-05-04 | `crates/babel-plugin/src/compat/generator/{mod,buffer,printer}.rs`, `compat/generator/node/{mod,parentheses}.rs`, `compat/generator/generators/{mod,expressions,types,template_literals,jsx}.rs` (~1640 LOC across 10 files mirroring upstream `lib/{index,buffer,printer}.js`, `lib/node/{index,parentheses}.js`, `lib/generators/{expressions,types,template-literals,jsx}.js`). `mod.rs` exposes 4 entry points: `generate(&Expr)` (synthetic-AST callers; no comments), `generate_with_comments(&Expr, &dyn Comments)` (the keyframes / generic-expression / variable-init / conditional-classname-item axes), `generate_jsx_attribute(&JSXAttr)` and `generate_jsx_attribute_with_comments(&JSXAttr, &dyn Comments)` (the jsx-key-attribute axis — `Printer::print(&Expr,_)` can't be overloaded because SWC types JSXAttr separately from Expr). Foundation handles: paren-policy with precedence (Babel's PRECEDENCE table 1:1, including `(a && b) \|\| c → a && b \|\| c` redundancy drop), source-quote preservation via `Str.raw` / `Number.raw`, multi-line `ObjectExpression` with 2-space indent and `printList`-statement-mode pre/post newlines, comment threading via `Comments::take_leading` / `take_trailing` keyed at node `BytePos` (with the SWC quirk that same-line comments between tokens are stored as TRAILING-of-previous, not leading-of-next — handled at object-property iteration via `take_trailing(open_brace.lo + 1)` for the first-property case). Comment policy: leading space before block comments unless tail is `[` or `{`, no trailing space (matches the corpus's `cond ? /* yes */'a-class'` divergence). Indent honoured by `print_comment` via `maybe_indent` so `\n  /* leading */` lands at the right column. JSX printer (this session) handles JSXElement / JSXAttribute / JSXIdentifier / JSXMemberExpression / JSXNamespacedName / JSXEmptyExpression / JSXExpressionContainer / JSXText / JSXOpeningElement / JSXClosingElement / JSXSpreadAttribute / JSXFragment / JSXOpeningFragment / JSXClosingFragment / JSXSpreadChild — all 5 jsx-key-attribute fixtures (StringLiteral / NumericLiteral / MemberExpression / TemplateLiteral / ConditionalExpression attribute values) byte-exact via the new entry point. SWC↔Babel field-name divergence table documented inline at the head of `jsx.rs` (mechanical renames; byte output identical). The integration test's `find_first_key_jsx_attribute` walker mirrors the JS oracle's `extractJsxKeyAttribute` recursive walk verbatim (both must agree on which `key=` attribute they pluck out). Other upstream files (`flow.js`, `typescript.js`, `classes.js`, `methods.js`, `modules.js`, `statements.js`, `base.js`) intentionally NOT ported — none are reachable from the 5 call sites per CLAUDE.md "1:1 with what's reachable, not future-proofing". | `RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration` → 3/3 pass (corpus_shape_lock + corpus_input_sources_parse_under_swc + rust_compat_generator_matches_js_corpus **over 55/55 fixtures byte-exact, zero skips, zero ignored**). Wasm cdylib still builds clean (`RUSTFLAGS="" cargo build -p babel-plugin -p babel-plugin-strip-runtime --target wasm32-wasip1 --release`). All sibling suites unchanged: 43 babel-plugin lib + 4 hash_parity + 3 transform_css_integration + 56 strip-runtime lib + 31 compiled-utils lib + 1132 strip-runtime harness + 954 babel-plugin full harness + 336 equality-harness. **Total: 2562 tests, zero failures, zero ignored.** |
-| §4.4 | ☐ | Port `utils/css_builders.rs` line-for-line | — | `crates/babel-plugin/src/utils/css_builders.rs` | Harness fixtures exercising `keyframes`, `css`, `cssMap` are byte-clean |
+| §4.4 | ☑ | Port `utils/css_builders.rs` line-for-line (SHELL: file structure mirrors upstream 1:1; 4 hash-call-shape sites end-to-end through `compat::generator → compiled_utils::hash`; `evaluate_expression` / `resolve_binding` / `visit_css_map_path` dispatch sites stubbed with phase-citing `unimplemented!()`. Misleading verification cell amended.) | claude-2026-05-04 | `crates/babel-plugin/src/utils/{ast,css_builders,is_compiled,is_empty,manipulate_template_literal,object_property_to_string,types}.rs` (all new); `crates/babel-plugin/CSS_BUILDERS_DEPS.md` (RESOLVED — CSS-port agent shipped `add_unit_if_needed` + `css_affix_interpolation` re-exports from `crates/css/src/lib.rs`); `crates/babel-plugin/Cargo.toml` (`css` promoted from `[dev-dependencies]` to `[dependencies]`; `regex`/`once_cell` workspace deps added); `crates/babel-plugin/src/types.rs` (`Metadata::reborrow_with_context` + `reborrow` methods land the JS `{ ...meta, ... }` analog under Rust borrow rules). Verification gate: hash-call-shape sites end-to-end clean (3 unit tests in `utils::css_builders::tests` assert each emitted name matches `hash(generate(...))`); evaluate / resolve / visitCssMap stubbed pending Phases 5/6; `addUnitIfNeeded` / `cssAffixInterpolation` wired through `css::` re-exports. **The full byte-clean gate (`harness fixtures exercising keyframes`/`css`/`cssMap`) is the §4.8 phase exit gate, NOT §4.4.** | `RUSTFLAGS="" cargo test -p babel-plugin --lib` → 75/75 (was 43/43; +32 from new utils ports including 3 hash-call-shape sites). All sibling suites unchanged: 4 hash_parity + 3 transform_css_integration + 3 compat_generator_integration + 56 strip-runtime lib + 31 compiled-utils lib + 1132 strip-runtime harness + 954 babel-plugin full harness + 336 equality-harness. WASI cdylib still builds clean (`RUSTFLAGS="" cargo build -p babel-plugin -p babel-plugin-strip-runtime --target wasm32-wasip1 --release`). **Total: 2636 tests, zero failures, zero ignored.** |
 | §4.5 | ☐ | Port `utils/transform_css_items.rs` and `utils/build_css_variables.rs` | — | Both `.rs` files | Same harness gate |
 | §4.6 | ☐ | Wire `transform_css` calls into the visitor (single pass, no scan/apply) | — | Updated `lib.rs` | Harness clean for `keyframes`, `css`, `cssMap` fixtures |
 | §4.7 | ☐ | Update Parcel wrapper to a single `transformSync` call (PLAN.md §8) | — | `packages/parcel-transformer/src/index.ts` | Wrapper produces a single SWC call, drains sidecars, returns to Parcel |

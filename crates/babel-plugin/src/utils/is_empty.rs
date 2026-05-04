@@ -17,11 +17,8 @@ use swc_core::ecma::ast::Expr;
 pub fn is_empty_value(expression: &Expr) -> bool {
     match expression {
         Expr::Ident(ident) => &*ident.sym == "undefined",
-        Expr::Lit(lit) => matches!(
-            lit,
-            swc_core::ecma::ast::Lit::Null(_)
-                | swc_core::ecma::ast::Lit::Str(s) if s.value.is_empty()
-        ),
+        Expr::Lit(swc_core::ecma::ast::Lit::Null(_)) => true,
+        Expr::Lit(swc_core::ecma::ast::Lit::Str(s)) => s.value.is_empty(),
         _ => false,
     }
 }

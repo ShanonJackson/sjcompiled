@@ -208,6 +208,41 @@ pub struct Metadata<'a> {
     pub context: MetadataContext,
 }
 
+impl<'a> Metadata<'a> {
+    /// Babel's `{ ...meta, context: ..., keyframe: ... }` reborrow.
+    ///
+    /// JS object spread shares the State reference and overrides
+    /// fields. Rust requires an explicit reborrow because `State` is
+    /// `&mut`-held — `&mut self` here lets us produce a fresh
+    /// `Metadata` carrying a re-borrowed `&mut State` without
+    /// running afoul of aliasing rules.
+    ///
+    /// Used by `utils::css_builders::extract_keyframes` to build the
+    /// `MetadataContext::Keyframes { keyframe }` child meta the inner
+    /// `build_css` walk needs.
+    pub fn reborrow_with_context<'b>(&'b mut self, context: MetadataContext) -> Metadata<'b> {
+        Metadata {
+            state: &mut *self.state,
+            parent_id: self.parent_id,
+            own_id: self.own_id,
+            context,
+        }
+    }
+
+    /// Same shape, but keeps the existing context. Used at every call
+    /// site where the JS spread is `{ ...meta }` (no overrides) and
+    /// the Rust port needs to descend through a non-borrow-compatible
+    /// signature.
+    pub fn reborrow<'b>(&'b mut self) -> Metadata<'b> {
+        Metadata {
+            state: &mut *self.state,
+            parent_id: self.parent_id,
+            own_id: self.own_id,
+            context: self.context.clone(),
+        }
+    }
+}
+
 /// `Tag` from upstream lines 248–259 — `(name, type)` describing a
 /// JSX/styled host (`'div'` / `'MyComponent'`).
 #[derive(Debug, Clone, PartialEq, Eq)]
