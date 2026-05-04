@@ -51,8 +51,7 @@
 /// In other words: insert `prefix` between the leading boundary and
 /// NAME, leaving everything else unchanged. [`WordMatcher::replace_all_with_prefix`]
 /// implements that.
-#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct WordMatcher {
     /// The ASCII name (already lowercased so we can compare with
     /// `eq_ignore_ascii_case` on a per-byte basis).
@@ -149,8 +148,7 @@ struct Match {
 ///     `replace_all(selector, |caps| format!("{}{prefixed}", caps[1]))`
 ///   - `OldSelector.regexp` / `name_regexp` / `prefixeds[*].1` —
 ///     `is_match` only
-#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct SelectorMatcher {
     name_lower: Vec<u8>,
 }
@@ -232,8 +230,7 @@ impl SelectorMatcher {
 /// `tests/intrinsic_regexp_parity.rs::fit_content_open_paren_must_not_match`
 /// pins this single-byte asymmetry as a named test so any drift here
 /// surfaces immediately.
-#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct IntrinsicMatcher {
     name_lower: Vec<u8>,
 }
@@ -770,192 +767,92 @@ fn ascii_eq_ignore_case(a: &[u8], b_lowered: &[u8]) -> bool {
 }
 
 // --------------------------------------------------------------------------
-// Public wrapper types — feature-gated swap-out for `regex::Regex`
+// Public wrapper types
 // --------------------------------------------------------------------------
 //
-// `WordRegexp` and `SelectorRegexp` are the feature-flag swap layer.
-// With `--features fast-match`, the wrappers carry our hand-rolled
-// matchers and avoid regex compilation entirely. Without the feature,
-// they wrap a `regex::Regex` compiled with the same pattern the
-// original code paths used — preserving the slow path verbatim for
-// instant revert if drift is ever found in production.
+// `WordRegexp` / `SelectorRegexp` / `IntrinsicRegexp` wrap the hand-
+// rolled matchers above. The historic `regex::Regex` fallback was
+// removed on 2026-05-04 once the matchers had locked the byte-equality
+// contract via:
+//   - `tests/fast_match_parity.rs` (20k fuzz iters per name + corner
+//     cases, comparing against `regex::Regex` directly)
+//   - `tests/intrinsic_regexp_parity.rs` (parallel suite for
+//     IntrinsicMatcher)
+//   - parity-runner 65/65 autoprefixer + 30/30 transform-css byte-clean
 //
-// **Drift contract:** the WITH-feature path's bytes-out MUST equal the
-// WITHOUT-feature path's bytes-out for every input. Property tests in
-// `tests/fast_match_parity.rs` lock the matchers down; the
-// parity-runner 337-fixture corpus is the integration gate.
+// Drift contract: every wrapper produces bytes byte-equal to the
+// `regex::Regex` it replaced. If a divergence is ever found, REVERT —
+// don't patch. See CLAUDE.md drift policy + `fast_match.rs` head.
 
-/// Word-pattern wrapper — equivalent to `regex::Regex` compiled from
+/// Word-pattern wrapper — byte-equal to the regex
 /// `(?i)(^|[\s,(])({}($|[\s(,]))` where `{}` is the regex-escaped name.
 ///
 /// Hot-path used by `OldValue.regexp` and `ValueBase`'s lazy regexp
-/// cache. Construction cost is what we're attacking: with `fast-match`
-/// the wrapper is a `WordMatcher` (no regex compile); without it, we
-/// fall back to the original regex compile path (slow but parity-safe).
-#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone)]
+/// cache.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WordRegexp {
-    #[cfg(feature = "fast-match")]
     inner: WordMatcher,
-    #[cfg(not(feature = "fast-match"))]
-    inner: regex::Regex,
 }
 
 impl WordRegexp {
-    /// `name` is the unescaped identifier (e.g. `"flex"`,
-    /// `"-webkit-flex"`, `"linear-gradient"`). The regex-side branch
-    /// performs the same `escape_regexp + format` the original
-    /// `utils::regexp` did, routed through the profiling counter.
     pub fn new(name: &str) -> Self {
-        #[cfg(feature = "fast-match")]
-        {
-            Self { inner: WordMatcher::new(name) }
-        }
-        #[cfg(not(feature = "fast-match"))]
-        {
-            let escaped = crate::utils::escape_regexp(name);
-            let pat = format!(r"(?i)(^|[\s,(])({}($|[\s(,]))", escaped);
-            let re = crate::profile::time_regex_compile(|| {
-                regex::Regex::new(&pat).expect("valid word regex")
-            });
-            Self { inner: re }
-        }
+        Self { inner: WordMatcher::new(name) }
     }
 
     pub fn is_match(&self, haystack: &str) -> bool {
         self.inner.is_match(haystack)
     }
 
-    /// Mirrors `re.replace_all(s, |caps| caps[1] + prefix + caps[2])`
-    /// from `value.rs` and the JS oracle. Returns owned String (the
-    /// regex path's `Cow` is only borrowed when no match occurred —
-    /// flattening to String costs nothing in the no-match case
-    /// because postcard parity tests confirm byte equality).
+    /// Mirrors `re.replace_all(s, |caps| caps[1] + prefix + caps[2])`.
     pub fn replace_all_with_prefix(&self, haystack: &str, prefix: &str) -> String {
-        #[cfg(feature = "fast-match")]
-        {
-            self.inner.replace_all_with_prefix(haystack, prefix)
-        }
-        #[cfg(not(feature = "fast-match"))]
-        {
-            self.inner
-                .replace_all(haystack, |caps: &regex::Captures| {
-                    format!(
-                        "{}{}{}",
-                        caps.get(1).map(|m| m.as_str()).unwrap_or(""),
-                        prefix,
-                        caps.get(2).map(|m| m.as_str()).unwrap_or(""),
-                    )
-                })
-                .into_owned()
-        }
+        self.inner.replace_all_with_prefix(haystack, prefix)
     }
 }
 
-/// Selector-pattern wrapper — equivalent to `regex::Regex` compiled
-/// from `(?i)(^|[^:"'=]){}` where `{}` is the regex-escaped selector
-/// name (or its prefixed form).
+/// Selector-pattern wrapper — byte-equal to the regex
+/// `(?i)(^|[^:"'=]){}` where `{}` is the regex-escaped selector name
+/// (or its prefixed form).
 ///
 /// Hot-path used by `SelectorBase`'s regexp cache, `OldSelector` /
 /// `SelectorView` fields, and the prefixed-form check loop in
 /// `OldSelector::is_hack`.
-#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SelectorRegexp {
-    #[cfg(feature = "fast-match")]
     inner: SelectorMatcher,
-    #[cfg(not(feature = "fast-match"))]
-    inner: regex::Regex,
 }
 
 impl SelectorRegexp {
     pub fn new(name: &str) -> Self {
-        #[cfg(feature = "fast-match")]
-        {
-            Self { inner: SelectorMatcher::new(name) }
-        }
-        #[cfg(not(feature = "fast-match"))]
-        {
-            let escaped = crate::utils::escape_regexp(name);
-            let pat = format!(r#"(?i)(^|[^:"'=]){}"#, escaped);
-            let re = crate::profile::time_regex_compile(|| {
-                regex::Regex::new(&pat).expect("valid selector regex")
-            });
-            Self { inner: re }
-        }
+        Self { inner: SelectorMatcher::new(name) }
     }
 
     pub fn is_match(&self, haystack: &str) -> bool {
         self.inner.is_match(haystack)
     }
 
-    /// Mirrors `re.replace_all(s, |caps| format!("{}{}", caps[1], replacement))`
-    /// from `selector.rs::replace`.
+    /// Mirrors `re.replace_all(s, |caps| format!("{}{}", caps[1], replacement))`.
     pub fn replace_all_with(&self, haystack: &str, replacement: &str) -> String {
-        #[cfg(feature = "fast-match")]
-        {
-            self.inner.replace_all_with(haystack, replacement)
-        }
-        #[cfg(not(feature = "fast-match"))]
-        {
-            self.inner
-                .replace_all(haystack, |caps: &regex::Captures| {
-                    format!(
-                        "{}{}",
-                        caps.get(1).map(|m| m.as_str()).unwrap_or(""),
-                        replacement,
-                    )
-                })
-                .into_owned()
-        }
+        self.inner.replace_all_with(haystack, replacement)
     }
 }
 
-/// Intrinsic-pattern wrapper — equivalent to `regex::Regex` compiled
-/// from `(?i)(^|[\s,(])({}($|[\s),]))` where `{}` is the regex-escaped
-/// name.
+/// Intrinsic-pattern wrapper — byte-equal to the regex
+/// `(?i)(^|[\s,(])({}($|[\s),]))` where `{}` is the regex-escaped name.
 ///
 /// Hot-path used by the `OldValueRegexp::Intrinsic` variant (consumed
 /// by `OldValue::check`) and by the `Intrinsic` hack's lazy regexp
-/// cache (consumed by `ValuePrefixer::check` and the hack's `replace`
-/// implementation).
+/// cache.
 ///
-/// **Drift contract:** byte-equal to the equivalent `regex::Regex` for
-/// every input. The single-byte trailing-class asymmetry vs WORD is
-/// load-bearing — see `IntrinsicMatcher` doc + `tests/intrinsic_regexp_parity.rs`.
-#[cfg(feature = "fast-match")]
+/// The single-byte trailing-class asymmetry vs WORD is load-bearing —
+/// see `IntrinsicMatcher` doc + `tests/intrinsic_regexp_parity.rs`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IntrinsicRegexp {
     inner: IntrinsicMatcher,
 }
 
-#[cfg(not(feature = "fast-match"))]
-#[derive(Debug, Clone)]
-pub struct IntrinsicRegexp {
-    inner: regex::Regex,
-    /// Original name — preserved so `replace_all_with_prefix` and
-    /// `replace_all_with_vendor_alias` can rebuild the same capture
-    /// access pattern the JS oracle uses.
-    #[allow(dead_code)]
-    name: String,
-}
-
 impl IntrinsicRegexp {
     pub fn new(name: &str) -> Self {
-        #[cfg(feature = "fast-match")]
-        {
-            Self { inner: IntrinsicMatcher::new(name) }
-        }
-        #[cfg(not(feature = "fast-match"))]
-        {
-            let escaped = crate::utils::escape_regexp(name);
-            let pat =
-                format!(r"(?i)(^|[\s,(])({}($|[\s),]))", escaped);
-            let re = crate::profile::time_regex_compile(|| {
-                regex::Regex::new(&pat).expect("valid intrinsic regex")
-            });
-            Self { inner: re, name: name.to_string() }
-        }
+        Self { inner: IntrinsicMatcher::new(name) }
     }
 
     pub fn is_match(&self, haystack: &str) -> bool {
@@ -964,23 +861,7 @@ impl IntrinsicRegexp {
 
     /// `caps[1] + prefix + caps[2]` — JS Intrinsic.replace non-stretch.
     pub fn replace_all_with_prefix(&self, haystack: &str, prefix: &str) -> String {
-        #[cfg(feature = "fast-match")]
-        {
-            self.inner.replace_all_with_prefix(haystack, prefix)
-        }
-        #[cfg(not(feature = "fast-match"))]
-        {
-            self.inner
-                .replace_all(haystack, |caps: &regex::Captures| {
-                    format!(
-                        "{}{}{}",
-                        caps.get(1).map(|m| m.as_str()).unwrap_or(""),
-                        prefix,
-                        caps.get(2).map(|m| m.as_str()).unwrap_or(""),
-                    )
-                })
-                .into_owned()
-        }
+        self.inner.replace_all_with_prefix(haystack, prefix)
     }
 
     /// `caps[1] + alias + caps[3]` — JS Intrinsic.replace stretch-family
@@ -991,23 +872,7 @@ impl IntrinsicRegexp {
         haystack: &str,
         alias: &str,
     ) -> String {
-        #[cfg(feature = "fast-match")]
-        {
-            self.inner.replace_all_with_vendor_alias(haystack, alias)
-        }
-        #[cfg(not(feature = "fast-match"))]
-        {
-            self.inner
-                .replace_all(haystack, |caps: &regex::Captures| {
-                    format!(
-                        "{}{}{}",
-                        caps.get(1).map(|m| m.as_str()).unwrap_or(""),
-                        alias,
-                        caps.get(3).map(|m| m.as_str()).unwrap_or(""),
-                    )
-                })
-                .into_owned()
-        }
+        self.inner.replace_all_with_vendor_alias(haystack, alias)
     }
 }
 

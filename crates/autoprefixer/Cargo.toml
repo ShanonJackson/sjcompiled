@@ -34,12 +34,14 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # raw oracle JSON is parsed for the diff.
 serde_json = { version = "1", features = ["preserve_order"] }
 
-[features]
-# Hand-rolled byte-equal substitutes for the WORD/SELECTOR regex shapes
-# in `prefixer.rs::preprocess` (~93% of preprocess time per profile).
-# Default OFF — flip to default ON only after parity-runner 337/337
-# confirms byte-equality with the feature enabled.
-#
-# Enable from the workspace via `--features autoprefixer/fast-match` or
-# from a downstream crate via its own forwarding feature.
-fast-match = []
+# NOTE: `fast-match` was a feature flag during the byte-equality
+# bring-up phase. It became the standard path on 2026-05-04 after
+# parity-runner 65/65 (autoprefixer) + 30/30 (transform-css) byte-clean
+# results plus the 20k-iter property-test suite (`tests/{fast,intrinsic}_match_parity.rs`)
+# locked the matchers down. The regex::Regex fallback was removed
+# along with the V1 precomputed snapshot — V2 is the only snapshot
+# format and the hand-rolled matchers (`fast_match.rs::WordMatcher`,
+# `SelectorMatcher`, `IntrinsicMatcher`) are the only matcher path.
+# `regex` is still depended on by `resolution.rs` / `selector.rs`
+# / `prefixer.rs` for non-hot-path matchers (e.g., the `:(-\w+-)`
+# pseudo-prefix detector).

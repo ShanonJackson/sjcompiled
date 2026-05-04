@@ -14,12 +14,7 @@ use crate::fast_match::{IntrinsicRegexp, WordRegexp};
 /// for every input on the Intrinsic name corpus (see
 /// `tests/intrinsic_regexp_parity.rs`).
 ///
-/// Serde derives are feature-gated on `fast-match`. Without that
-/// feature `WordRegexp` / `IntrinsicRegexp` wrap `regex::Regex` which
-/// is not serde-able; the V2 snapshot path is correspondingly only
-/// available with `fast-match` on.
-#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum OldValueRegexp {
     Word(WordRegexp),
     Intrinsic(IntrinsicRegexp),
@@ -34,8 +29,7 @@ impl OldValueRegexp {
     }
 }
 
-#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OldValue {
     pub unprefixed: String,
     pub prefixed: String,

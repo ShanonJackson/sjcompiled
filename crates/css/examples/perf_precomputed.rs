@@ -13,10 +13,7 @@
 use std::time::{Duration, Instant};
 
 use autoprefixer::autoprefixer::AutoprefixerOptions;
-use autoprefixer::precomputed::{
-    encode_precomputed, encode_precomputed_v2, precompute_prefixes,
-    precompute_prefixes_v2,
-};
+use autoprefixer::precomputed::{encode_precomputed, precompute_prefixes};
 use css::{transform_css, TransformOpts};
 
 const SAMPLE_CSS: &str = r#"
@@ -122,38 +119,24 @@ fn main() {
         .join("afm");
     let from = afm_dir.to_string_lossy().into_owned();
 
-    println!("Building V1 precomputed snapshot (one-time, outside timing)...");
-    let v1_build_start = Instant::now();
-    let v1_snapshot = precompute_prefixes(AutoprefixerOptions {
+    println!("Building precomputed snapshot (one-time, outside timing)...");
+    let snapshot_build_start = Instant::now();
+    let snapshot = precompute_prefixes(AutoprefixerOptions {
         from: Some(from.clone()),
         ..Default::default()
     });
-    let v1_bytes = encode_precomputed(&v1_snapshot);
-    let v1_build = v1_build_start.elapsed();
+    let bytes = encode_precomputed(&snapshot);
+    let snapshot_build = snapshot_build_start.elapsed();
     println!(
-        "  V1 snapshot built in {:.2} ms, encoded to {} bytes",
-        v1_build.as_secs_f64() * 1000.0,
-        v1_bytes.len()
+        "  snapshot built in {:.2} ms, encoded to {} bytes\n",
+        snapshot_build.as_secs_f64() * 1000.0,
+        bytes.len()
     );
 
-    println!("Building V2 precomputed snapshot (one-time, outside timing)...");
-    let v2_build_start = Instant::now();
-    let v2_snapshot = precompute_prefixes_v2(AutoprefixerOptions {
-        from: Some(from.clone()),
-        ..Default::default()
-    });
-    let v2_bytes = encode_precomputed_v2(&v2_snapshot);
-    let v2_build = v2_build_start.elapsed();
-    println!(
-        "  V2 snapshot built in {:.2} ms, encoded to {} bytes\n",
-        v2_build.as_secs_f64() * 1000.0,
-        v2_bytes.len()
-    );
-
-    // Write V2 bytes to a temp file for path-delivery bench.
-    let v2_path = std::env::temp_dir().join("compiled-css-v2-snapshot.bin");
-    std::fs::write(&v2_path, &v2_bytes).expect("write V2 snapshot to temp");
-    println!("  V2 snapshot also written to {} for path-delivery bench\n", v2_path.display());
+    // Write bytes to a temp file for path-delivery bench.
+    let snapshot_path = std::env::temp_dir().join("compiled-css-snapshot.bin");
+    std::fs::write(&snapshot_path, &bytes).expect("write snapshot to temp");
+    println!("  snapshot also written to {} for path-delivery bench\n", snapshot_path.display());
 
     // Make the slow path resolve against AFM's `.browserslistrc` too,
     // so all paths are doing identical pipeline work — the only
@@ -161,14 +144,12 @@ fn main() {
     std::env::set_current_dir(&afm_dir).expect("set cwd to AFM fixture dir");
 
     let slow_opts = make_opts(None);
-    let v1_opts = make_opts(Some(v1_bytes));
-    let v2_opts = make_opts(Some(v2_bytes));
-    let v2_path_opts = make_opts_with_path(v2_path.clone());
+    let inline_opts = make_opts(Some(bytes));
+    let path_opts = make_opts_with_path(snapshot_path.clone());
 
     bench("slow path (default)",      &slow_opts);
-    bench("V1 (preprocess on load)",  &v1_opts);
-    bench("V2 (no preprocess, inline)", &v2_opts);
-    bench("V2 (no preprocess, path)",   &v2_path_opts);
+    bench("snapshot (inline bytes)",  &inline_opts);
+    bench("snapshot (path delivery)", &path_opts);
 
     // Phase breakdown — answers "where does the autoprefixer cost go?"
     // by measuring just the autoprefixer construction cost in isolation.
@@ -177,32 +158,23 @@ fn main() {
     {
         use autoprefixer::autoprefixer::build_prefixes_default;
         use autoprefixer::precomputed::{
-            build_prefixes_from_precomputed, build_prefixes_from_snapshot_v2,
-            decode_precomputed_v2,
+            build_prefixes_from_precomputed, build_prefixes_from_snapshot,
+            decode_precomputed,
         };
 
-        let v1_snap = autoprefixer::precomputed::precompute_prefixes(
+        let snap = autoprefixer::precomputed::precompute_prefixes(
             autoprefixer::autoprefixer::AutoprefixerOptions {
                 from: Some(afm_dir.to_string_lossy().into_owned()),
                 ..Default::default()
             },
         );
-        let v1_bytes_local = autoprefixer::precomputed::encode_precomputed(&v1_snap);
-
-        let v2_snap = autoprefixer::precomputed::precompute_prefixes_v2(
-            autoprefixer::autoprefixer::AutoprefixerOptions {
-                from: Some(afm_dir.to_string_lossy().into_owned()),
-                ..Default::default()
-            },
-        );
-        let v2_bytes_local = autoprefixer::precomputed::encode_precomputed_v2(&v2_snap);
+        let bytes_local = autoprefixer::precomputed::encode_precomputed(&snap);
 
         // Warmup
         for _ in 0..50 {
             let _ = build_prefixes_default(None).unwrap();
-            let _ = build_prefixes_from_precomputed(&v1_bytes_local).unwrap();
-            let decoded = decode_precomputed_v2(&v2_bytes_local).unwrap();
-            let _ = build_prefixes_from_snapshot_v2(decoded);
+            let decoded = decode_precomputed(&bytes_local).unwrap();
+            let _ = build_prefixes_from_snapshot(decoded);
         }
 
         let n = 200;
@@ -214,39 +186,27 @@ fn main() {
 
         let t = Instant::now();
         for _ in 0..n {
-            let _ = build_prefixes_from_precomputed(&v1_bytes_local).unwrap();
+            let _ = decode_precomputed(&bytes_local).unwrap();
         }
-        let v1_build = t.elapsed();
-
-        // V2 — split decode and reconstruct so we can attribute the cost.
-        let t = Instant::now();
-        for _ in 0..n {
-            let _ = decode_precomputed_v2(&v2_bytes_local).unwrap();
-        }
-        let v2_decode = t.elapsed();
+        let decode_only = t.elapsed();
 
         let t = Instant::now();
         for _ in 0..n {
-            let decoded = decode_precomputed_v2(&v2_bytes_local).unwrap();
-            let _ = build_prefixes_from_snapshot_v2(decoded);
+            let _ = build_prefixes_from_precomputed(&bytes_local).unwrap();
         }
-        let v2_total = t.elapsed();
+        let total_load = t.elapsed();
 
         println!(
             "  build_prefixes_default          {:>8.2} µs/call",
             slow_build.as_secs_f64() * 1e6 / n as f64
         );
         println!(
-            "  V1 build_from_precomputed       {:>8.2} µs/call (decode + preprocess)",
-            v1_build.as_secs_f64() * 1e6 / n as f64
+            "  decode only                     {:>8.2} µs/call",
+            decode_only.as_secs_f64() * 1e6 / n as f64
         );
         println!(
-            "  V2 decode only                  {:>8.2} µs/call",
-            v2_decode.as_secs_f64() * 1e6 / n as f64
-        );
-        println!(
-            "  V2 decode + reconstruct         {:>8.2} µs/call (no preprocess)",
-            v2_total.as_secs_f64() * 1e6 / n as f64
+            "  decode + reconstruct            {:>8.2} µs/call (no preprocess)",
+            total_load.as_secs_f64() * 1e6 / n as f64
         );
     }
 

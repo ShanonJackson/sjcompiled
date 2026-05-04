@@ -42,7 +42,7 @@
 use crate::declaration::DeclarationBase;
 use postcss_core::{Node, NodeKind};
 
-#[cfg_attr(feature = "fast-match", derive(serde::Serialize, serde::Deserialize))]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct UserSelect {
     pub base: DeclarationBase,
 }
