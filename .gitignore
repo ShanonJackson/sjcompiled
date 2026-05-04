@@ -29,3 +29,15 @@ crates/babel-plugin/tests/transform_css_corpus.json
 # `bun parity-harness/compat-generator/oracle.mjs` to rehydrate before
 # `cargo test -p babel-plugin --test compat_generator_integration`.
 crates/babel-plugin/tests/compat_generator_corpus.json
+# Phase 5 §5.0a/b compat-scope corpus — regenerable from the JS oracle
+# walking parity-harness/compat-scope/fixtures.json against pinned
+# @babel/traverse@7.29.0. Run
+# `bun parity-harness/compat-scope/oracle.mjs` to rehydrate before
+# `cargo test -p babel-plugin --test compat_scope_integration`.
+crates/babel-plugin/tests/compat_scope_corpus.json
+# Phase 5 §5.0c compat-evaluation corpus — regenerable from the JS oracle
+# walking parity-harness/compat-evaluation/fixtures.json against pinned
+# @babel/traverse@7.29.0. Run
+# `bun parity-harness/compat-evaluation/oracle.mjs` to rehydrate before
+# `cargo test -p babel-plugin --test compat_evaluation_integration`.
+crates/babel-plugin/tests/compat_evaluation_corpus.json

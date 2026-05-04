@@ -15,6 +15,7 @@
     "@babel/core": "^7.26.10",
     "@babel/generator": "7.23.0",
     "@babel/parser": "7.29.2",
+    "@babel/traverse": "7.29.0",
     "@babel/plugin-syntax-jsx": "^7.25.9",
     "@babel/preset-react": "^7.28.5",
     "@atlaskit/tokens": "*",
@@ -73,6 +74,7 @@
     "prettier": "2.8.8",
     "@babel/generator": "7.23.0",
     "@babel/parser": "7.29.2",
+    "@babel/traverse": "7.29.0",
     "cssnano-preset-default": {
       ".": "5.2.14",
       "postcss-discard-duplicates": "5.1.0"

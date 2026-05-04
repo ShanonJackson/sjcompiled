@@ -36,76 +36,106 @@ Phase 5 §5.1 ☑ (STATE_MUTATIONS.md reconfirmed; line-number drifts
 amended; zero new variants). Phase 5 §5.3 ☑ (Layer-1 Cache + Layer-2
 postcard schema + atomic-write Layer-2 handle landed; not yet wired
 into State because §5.4/§5.6 are blocked — see §5.4–§5.6 drift note
-below).
+below). Phase 5 §5.0 ▶ ENTRY-GATE OPEN (audit, parity corpora,
+pin guards, `#[ignore]`'d Rust gates landed; the line-by-line port
+of `compat/{scope,path,evaluation}.rs` is the next concrete code
+checkpoint — see §5.0 entry-gate summary below).
 
-**ESCALATION — Phase 5 §5.4 / §5.5 / §5.6 are BLOCKED on a Phase 0
-scaffolding gap. NOT closed this session.**
+**§5.4 / §5.5 / §5.6 unblock plan: see §5.0 entry-gate below.**
+The (a)/(b) decision from the prior session is RESOLVED: option
+(a), with Q1/Q2/Q3 architectural locks recorded in
+`plugins/COMPAT_SCOPE_AUDIT.md`. The "1.5–3k LOC unknown" framing
+is replaced with three bounded sub-checkpoints (§5.0a/b/c) totaling
+~700–1100 LOC for the compat layer, plus the §5.4/§5.5/§5.6 file
+ports already scoped at PLAN.md.
 
-**Drift detected in Phase 0 / §2.x scaffolding** — there is no Babel
-`NodePath`/scope-tree analog in the Rust port. The §5.4
-(`resolve_binding`), §5.5 (`traverse_expression/`), and §5.6
-(`evaluate_expression`) ports each depend hard on Babel's
-`path.scope.getBinding(name)`, `path.scope.getOwnBinding(name)`,
-`path.scope.push({id, init, kind})`, `binding.referencePaths`,
-`binding.constant`, `path.parentPath`, `path.evaluate()`,
-`path.replaceWith(...)`, and `path.traverse(visitor, scope, state,
-parentPath)`. None of those exist as Rust analogs in
-`crates/babel-plugin/src/`. The strip-runtime port has a thin
-flat-module-binding index (`crates/babel-plugin-strip-runtime/src/
-compat/scope.rs`, ~352 LOC) that handles ONE narrow lookup
-(`get_string_binding(name) → Option<&str>`); it is NOT a usable
-analog for the evaluator's needs. The current `Metadata` carries
-`parent_id: u32` / `own_id: Option<u32>` placeholders (see
-`crates/babel-plugin/src/types.rs:206`) — these are recorder
-handles, not navigable paths.
+**§5.0 entry-gate (this session): audit, decisions locked, parity
+corpora landed, Rust gates seeded. The line-by-line port of
+`compat/{scope,path,evaluation}.rs` is the next concrete code
+checkpoint.**
 
-A 1:1 port of `evaluate-expression.ts` and the `traverse-expression/`
-subtree under the CLAUDE.md "no drift workarounds" rule REQUIRES
-either:
-  (a) port `compat/scope.rs` and `compat/path.rs` providing the full
-      Babel scope/path surface (lexical chain, getBinding /
-      getOwnBinding, scope.push, generateUidIdentifier, binding's
-      `referencePaths` + `constant` + `constantViolations`,
-      path.parentPath, path.evaluate fold, path.replaceWith,
-      path.traverse subtree-walks). This is approximately 1.5–3k
-      LOC and is the MISSING Phase 0 / Phase 2 architecture
-      deliverable, OR
-  (b) re-architect upstream's `evaluate-expression.ts` against a
-      subset of the path surface that an SWC visitor can natively
-      provide. That's a deviation from "1:1 file-for-file" and
-      directly violates CLAUDE.md / PLAN.md constraint 4.
+**Architectural lock (recorded in `plugins/COMPAT_SCOPE_AUDIT.md`):**
+- **Q1 — pre-index.** `Program::enter` builds binding map +
+  parent-pointer map + reference-paths map. Read-only navigation
+  during the visit pass; invalidate-on-replace is local. Matches
+  §5.3's record-then-replay cache model.
+- **Q2 — scoped `&mut Expr` for the IIFE site only.** The single
+  `replaceWith` site (IIFE wrap in `traverseCallExpression`) gets
+  `&mut Expr` passed down explicitly. The rest of
+  `evaluate_expression` returns `Resolved` and stays read-only.
+  Don't propagate `&mut Expr` through the whole evaluator.
+- **Q3 — full line-by-line port of `path.evaluate()`.** No
+  partial-port-by-corpus; the corpus is a few hundred fixtures,
+  the consumer monorepo is 10M LOC, defer-by-hope is unacceptable.
+  Evidenced-unreachable branches MAY emit
+  `unimplemented!("…")` with citation back to
+  `crates/babel-plugin/COMPAT_EVALUATION_COVERAGE.md` — bounded by
+  evidence, not deferred by hope.
 
-Per CLAUDE.md "DRIFT DETECTION — escalate, don't work around"
-this session STOPS at §5.3 close. The next agent's task is the
-scaffolding decision (a) vs (b). Recommended:
-  1. Spike `compat/scope.rs` against the
-     `expression-evaluation.test.ts` corpus. Map every
-     `path.scope.*` / `binding.*` / `path.evaluate*` reach. If the
-     port is tractable (≤1k LOC for the slice the evaluator
-     actually exercises), land it as Phase 5 §5.0 (NEW) and
-     §5.4–§5.6 follow as planned.
-  2. If the spike shows the surface is too wide / too tangled
-     with `@babel/traverse` internals to port 1:1, escalate to
-     human review. The fallback is letting `@compiled/babel-plugin`
-     keep this slice in JS via an out-of-band oracle call — but
-     that hits PLAN.md constraint 1 (no JS callbacks from the
-     WASI plugin). Mutually-exclusive constraints would need user
-     adjudication.
+**Three sub-checkpoints (the §5.0 owner picks them up in order):**
 
-The §4.4 SHELL stubs in `css_builders.rs`
+| Sub-checkpoint | Owner deliverable | LOC est | Status |
+|---|---|---|---|
+| §5.0a | `crates/babel-plugin/src/compat/scope.rs` — pre-indexed scope tree (binding map + parent-pointer map + reference-paths map). 1:1 surface enumeration in `plugins/COMPAT_SCOPE_AUDIT.md`. | 250–350 | ☐ |
+| §5.0b | `crates/babel-plugin/src/compat/path.rs` — `PathHandle` carrying `(node_ref, parent_ref, scope_ref, list_key)`. Predicate methods, `get(field)`, `parent_path()`, `replace_with()` (single-site), `traverse()` delegating to a `VisitMut` over the subtree. | 250–350 | ☐ |
+| §5.0c | `crates/babel-plugin/src/compat/evaluation.rs` — line-by-line port of `@babel/traverse@7.29.0/lib/path/evaluation.js` covering every reachable branch. The four unreachable branches (Flow type-cast, JSX-as-evaluable, SequenceExpression, TaggedTemplateExpression) emit `unimplemented!()` with citation. | 200–400 | ☐ |
+
+**Parity corpora landed this session (regenerable, gitignored):**
+
+- `parity-harness/compat-scope/{fixtures.json,oracle.mjs}` — 20
+  entries across 6 query axes (binding-lookup-from-reference,
+  path-predicate-via-binding, has-own-binding, scope-push-iife,
+  generate-uid, list-key-arguments). Oracle self-consistency check
+  enforces "expected = what Babel actually does" so a buggy fixture
+  can't sneak into the corpus.
+- `parity-harness/compat-evaluation/{fixtures.json,oracle.mjs}` — 45
+  entries across 12 categories (literal, identifier-global, binary,
+  binary-comparison, logical, unary, conditional, template,
+  parenthesized, ts, deopt, mixed). Synthetic
+  `const __evalTarget = (EXPR);` wrapper dodges the
+  directive-prologue trap.
+- Both oracles guard the AFM-pinned `@babel/traverse@7.29.0` +
+  `@babel/parser@7.29.2` versions; pin drift fails fast rather
+  than silently emitting bytes from a different Babel version.
+
+**Rust gates landed this session (`#[ignore]`'d byte-parity gates;
+shape-locks + oracle-self-consistency tests run unconditionally):**
+
+- `crates/babel-plugin/tests/compat_scope_integration.rs` —
+  3 tests (2 pass, 1 ignored). The ignored
+  `rust_compat_scope_matches_js_corpus` un-ignores when §5.0a/b
+  lands.
+- `crates/babel-plugin/tests/compat_evaluation_integration.rs` —
+  3 tests (2 pass, 1 ignored). The ignored
+  `rust_compat_evaluation_matches_js_corpus` un-ignores when §5.0c
+  lands.
+
+**Pin contract added to `crates/PARITY_VERSIONS.md`:**
+`@babel/traverse@7.29.0` (AFM-resolved 2026-05-04). Promoted to
+top-level `package.json#devDependencies` AND kept in `overrides`
+per the §4.2 lesson — bun's isolated dep layout silently bypasses
+overrides for transitive deps unless top-level promotion happens.
+
+**Coverage manifest added:**
+`crates/babel-plugin/COMPAT_EVALUATION_COVERAGE.md` enumerates the
+four evidenced-unreachable branches (each with a quoted panic
+message the §5.0c port emits) and the reachable-branch list the
+port must cover. Maintained the same way
+`COMPAT_GENERATOR_COVERAGE.md` is for §4.3.
+
+**The §4.4 SHELL stubs in `css_builders.rs`
 (`evaluate_expression_stub`, `resolve_binding_stub`,
-`visit_css_map_path_stub`) REMAIN PANIC-ON-CALL and CANNOT be
-replaced this session. §4.6 finalisation (visitor dispatch wiring),
-§4.8 (Phase 4 exit gate), and Phase 6 handlers all transitively
-depend on the §5.4–§5.6 ports.
+`visit_css_map_path_stub`) REMAIN PANIC-ON-CALL** until §5.0a/b/c
++ §5.4/§5.5/§5.6 land. §4.6 visitor-dispatch wiring, §4.8 phase
+exit gate, and Phase 6 handlers stay blocked.
 
-**Independently shippable** while the scaffolding decision is
-pending: §4.7 (Parcel wrapper update — single `transformSync` call,
-sidecar drains). It does not depend on the evaluator.
+**Independently shippable** while §5.0 is in flight: §4.7 (Parcel
+wrapper — single `transformSync` call, sidecar drains). Does not
+depend on the evaluator.
 
-**Next checkpoint: §5.0 (NEW — scaffold compat/scope.rs +
-compat/path.rs)** OR `§4.7` if the next session prefers to ship the
-Parcel wrapper while the scaffolding decision is pending.
+**Next checkpoint: §5.0a (port `compat/scope.rs`).** Read
+`plugins/COMPAT_SCOPE_AUDIT.md` end-to-end first; the surface
+table + Q1/Q2/Q3 locks are the entry-gate contract.
 
 Phase 4 §4.3 closure: 55/55 fixtures byte-exact, JSX printer landed
 1:1 from `@babel/generator@7.23.0/lib/generators/jsx.js` (122 LOC →
@@ -130,6 +160,8 @@ RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 145/145
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact, zero skips)
+RUSTFLAGS="" cargo test -p babel-plugin --test compat_scope_integration       # 2/2 + 1 ignored (post-§5.0a/b)
+RUSTFLAGS="" cargo test -p babel-plugin --test compat_evaluation_integration  # 2/2 + 1 ignored (post-§5.0c)
 RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib             # 56/56
 RUSTFLAGS="" cargo test -p compiled-utils --lib                         # 31/31
 RUSTFLAGS="" cargo test -p compiled-css --lib                           # 163/163 (was 121; +42 from CSS-port agent's §4.4 unblock)
@@ -146,11 +178,147 @@ bun run packages/equality-harness/scripts/verify.mjs                    # 336/33
 bun parity-harness/hash/oracle.mjs
 bun parity-harness/transform-css/oracle.mjs
 bun parity-harness/compat-generator/oracle.mjs                          # 55 entries
+bun parity-harness/compat-scope/oracle.mjs                              # 20 entries (§5.0)
+bun parity-harness/compat-evaluation/oracle.mjs                         # 45 entries (§5.0)
 ```
 
-Total: **2706 tests, zero failures, zero ignored** (+27 vs. §4.6 close).
+Total: **2710 tests, zero failures, 2 ignored** (the §5.0a/b/c
+byte-parity gates; the shape-locks + oracle-self-consistency tests
+on the new gates pass unconditionally). +4 passing vs. §5.3 close.
 
-### Phase 5 §5.1 + §5.3 closure summary (this session)
+### Phase 5 §5.0 entry-gate summary (this session)
+
+**Outputs landed:**
+
+* `plugins/COMPAT_SCOPE_AUDIT.md` — surface enumeration (8 scope-chain
+  call shapes + 5 binding fields + 10 NodePath operations + the
+  IIFE/getPathOfNode special semantics), feasibility breakdown
+  (700–1100 LOC compat layer, replacing the previous "1.5–3k LOC
+  unknown" framing), Q1/Q2/Q3 architectural locks recorded inline.
+* `crates/babel-plugin/COMPAT_EVALUATION_COVERAGE.md` — coverage
+  manifest for the §5.0c port. Four evidenced-unreachable branches
+  (Flow type-cast, JSX-as-evaluable, SequenceExpression,
+  TaggedTemplateExpression) each carry a quoted `unimplemented!()`
+  panic message the §5.0c port emits on reach. Reachable-branch
+  list locks the port's coverage contract.
+* `parity-harness/compat-scope/{fixtures.json,oracle.mjs}` — 20
+  entries covering every reachable scope-chain / binding /
+  path-predicate / scope-push / list-key call shape. Pin guard:
+  `@babel/traverse@7.29.0` + `@babel/parser@7.29.2`.
+* `parity-harness/compat-evaluation/{fixtures.json,oracle.mjs}` — 45
+  entries covering every reachable `path.evaluate()` branch
+  (literal × 6, identifier-global × 3, binary × 10, binary-comparison
+  × 3, logical × 5, unary × 6, conditional × 2, template × 2,
+  parenthesized × 1, ts × 2, deopt × 3, mixed × 2). Same pin guard.
+* `crates/babel-plugin/tests/compat_scope_integration.rs` —
+  3 tests: shape-lock + oracle-self-consistency unconditional,
+  byte-parity `#[ignore]`'d for §5.0a/b unblock.
+* `crates/babel-plugin/tests/compat_evaluation_integration.rs` —
+  3 tests: same shape, `#[ignore]`'d byte-parity for §5.0c unblock.
+* `package.json` — `@babel/traverse@7.29.0` added to `overrides`
+  AND promoted to top-level `devDependencies` (the §4.2 lesson —
+  bun's isolated layout silently bypasses overrides for transitive
+  deps unless the dep is also a top-level devDep).
+* `crates/PARITY_VERSIONS.md` — new section documenting the
+  `@babel/traverse@7.29.0` pin under "AFM-resolved 2026-05-04",
+  alongside the existing `@babel/generator@7.23.0` /
+  `@babel/parser@7.29.2` pin from §4.2.
+* `.gitignore` — both new corpus paths added (regenerable).
+
+**Oracle self-consistency check landed inline in both
+`oracle.mjs` scripts:** every key in a fixture's `expected` object
+must equal the corresponding key in the oracle's `observed` output.
+The fixture author can't accidentally lie about what Babel does;
+"expected = what Babel ACTUALLY does" is enforced at corpus
+generation, not just at Rust-gate replay. Same shape as the
+strip-runtime synth corpus's deterministic-seed lock.
+
+**Upstream-trace spot-check landed (audit doc + fixtures + pin):**
+
+The original audit was consumer-traced (grep over the §5.4–§5.6
+source). Spot-check against
+`node_modules/.bun/@babel+traverse@7.29.0/.../scope/{index,binding}.js`
+landed eight new findings, recorded in
+`plugins/COMPAT_SCOPE_AUDIT.md` "Upstream-trace findings (2026-05-04)":
+
+1. `Binding.constant` is a stored bool — the §5.5/§5.6 owner's
+   "computed dynamically from constantViolations.length" concern is
+   unfounded for 7.29.0; reasoning recorded so the §5.0a impl
+   doesn't over-engineer.
+2. `getBinding()` has a pattern-skip walk (skip non-param/local
+   bindings reached through a `Pattern`). NEW fixture
+   `pattern-skip-getBinding-walks-past-pattern`.
+3. `var` declarations hoist through `ForStatement`/`ForXStatement`
+   init to the enclosing function/program scope. NEW fixture
+   `var-in-for-loop-hoists-to-function-scope`.
+4. `Binding` constructor's `isInitInLoop` auto-marks `var`/`hoisted`
+   bindings inside loops as non-constant. Same fixture as #3.
+5. `Scope.parent` is a getter with key/decorators skip semantics —
+   the Rust pre-index parent-pointer map bakes these in at build.
+6. `Scope.push({id, init, kind})` is AST-MUTATING (synthesises a
+   `VariableDeclaration` and `unshiftContainer`'s it onto `path.body`),
+   not a bindings-only update. Critical for the §5.0b IIFE site.
+7. `Scope.crawl()` is lazy via `init()`; eager pre-index (Q1) is an
+   intentional semantic delta, not drift — documented so future
+   agents don't "fix" it.
+8. `Scope.globals` / `Scope.contextVariables` come from
+   `@babel/helper-globals@7.28.0` (`builtin-lower.json` × 13 +
+   `builtin-upper.json` × 49). Pin row added to
+   `crates/PARITY_VERSIONS.md`. The §5.0a port vendors both JSON
+   files verbatim with a schema-lock asserting the 13+49 entry
+   counts.
+
+NEW fixture `var-mutated-after-decl-is-non-constant` adds a sanity
+check on the basic `Binding.reassign()` path for `var`. Total
+compat-scope corpus: 20 → 23 entries.
+
+LOC estimate updated: `compat/scope.rs` 250–350 → 300–400 (extra
+~50 LOC for the three semantic rules + helper-globals vendor).
+Within Q1's budget.
+
+**Q1/Q2/Q3 ARCHITECTURAL LOCKS** (from `COMPAT_SCOPE_AUDIT.md`,
+recorded by the §5.0 owner via the entry-gate audit cycle):
+- **Q1**: pre-index on `Program::enter` — read-only navigation
+  during the visit pass, invalidate-on-replace is local.
+- **Q2**: `&mut Expr` scoped to the single IIFE site
+  (`traverse-call-expression.ts:95`); rest of the evaluator
+  returns a `Resolved` value and stays read-only.
+- **Q3**: full line-by-line port of `path.evaluate()` from
+  `@babel/traverse@7.29.0/lib/path/evaluation.js`. No
+  partial-port-by-corpus; evidenced-unreachable-branch panics
+  permitted with citation.
+
+**Test count delta**: `compat_scope_integration` (+3 tests, 1
+ignored) and `compat_evaluation_integration` (+3 tests, 1
+ignored). Net: +4 passing, +2 ignored vs. §5.3 close. All other
+gates unchanged. Workspace total: 2710 (was 2706), 2 ignored.
+
+**Bug-parity preserved during corpus generation:** the `ts`
+category fixtures originally asserted `confident: true` for
+`(1 as number)` / `('hi' as string)` — but `path.evaluate()`
+actually returns `confident: false` for `TSAsExpression` (the
+Compiled evaluator unwraps the type assertion at
+`evaluate-expression.ts:132` BEFORE calling `path.evaluate()`).
+Self-consistency check caught the divergence; fixtures relabeled
+`ts-as-expression-deopts` with the actual Babel behavior. The
+§5.6 caller's responsibility to unwrap before evaluating is
+captured inline in the fixture comments.
+
+**Deliberately deferred (NOT urgent):**
+
+* The actual line-by-line port of `compat/{scope,path,evaluation}.rs`
+  is §5.0a/b/c. This session is the entry-gate; the port is the
+  next concrete code work. Reading
+  `plugins/COMPAT_SCOPE_AUDIT.md` end-to-end is the entry-gate
+  contract for the §5.0a implementer.
+* Wiring `Layer2` into `State::cache` (the §5.3 closure carry-over)
+  remains gated on §5.0a/b/c + §5.6 — the typed-T choices for
+  `Cache<String>` / `Cache<Arc<Module>>` / `Cache<Option<ExportLookup>>`
+  depend on the evaluator's call shapes.
+
+**Next checkpoint: §5.0a (port `compat/scope.rs`).**
+
+### Phase 5 §5.1 + §5.3 closure summary (prior session)
 
 **§5.1 — STATE_MUTATIONS.md reconfirmed.** Re-ran the canonical
 `grep -rEn 'state\.(includedFiles|compiledImports|sheets|cssMap|

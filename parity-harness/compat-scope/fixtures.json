@@ -1,0 +1,326 @@
+{
+  "version": 1,
+  "//": "Phase 5 §5.0a/b parity corpus — exercises every Babel scope/binding/NodePath call shape reachable from utils/evaluate-expression.ts + utils/resolve-binding.ts + utils/traverse-expression/*. See plugins/COMPAT_SCOPE_AUDIT.md surface table. Each fixture pairs an `input_source` (top-level Module string) with a `query` describing the lookup the oracle runs against @babel/traverse and the Rust pre-indexed scope must match.",
+  "//pin_lock": "@babel/traverse@7.29.0 — see crates/PARITY_VERSIONS.md.",
+  "fixtures": [
+    {
+      "label": "module-const-string-binding-1ref",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "const color = 'blue'; const x = color;",
+      "lookup_name": "color",
+      "lookup_from": "first-ident-named-color-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "VariableDeclarator",
+        "binding_kind": "const",
+        "constant": true,
+        "reference_paths_count": 1,
+        "parent_path_type": "VariableDeclaration"
+      }
+    },
+    {
+      "label": "module-let-mutation-not-constant",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "let counter = 1; counter = 2; const x = counter;",
+      "lookup_name": "counter",
+      "lookup_from": "first-ident-named-counter-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "VariableDeclarator",
+        "binding_kind": "let",
+        "constant": false,
+        "reference_paths_count": 1,
+        "parent_path_type": "VariableDeclaration"
+      }
+    },
+    {
+      "label": "module-var-three-refs-constant",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "var x = 1; const a = x; const b = x; const c = x;",
+      "lookup_name": "x",
+      "lookup_from": "first-ident-named-x-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "VariableDeclarator",
+        "binding_kind": "var",
+        "constant": true,
+        "reference_paths_count": 3,
+        "parent_path_type": "VariableDeclaration"
+      }
+    },
+    {
+      "label": "missing-binding-returns-undefined",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "const x = unknownGlobal;",
+      "lookup_name": "unknownGlobal",
+      "lookup_from": "first-ident-named-unknownGlobal-on-rhs",
+      "expected": {
+        "found": false
+      }
+    },
+    {
+      "label": "import-default-specifier",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "import React from 'react'; const x = React;",
+      "lookup_name": "React",
+      "lookup_from": "first-ident-named-React-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "ImportDefaultSpecifier",
+        "binding_kind": "module",
+        "constant": true,
+        "reference_paths_count": 1,
+        "parent_path_type": "ImportDeclaration"
+      }
+    },
+    {
+      "label": "import-named-specifier",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "import { useState } from 'react'; const x = useState;",
+      "lookup_name": "useState",
+      "lookup_from": "first-ident-named-useState-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "ImportSpecifier",
+        "binding_kind": "module",
+        "constant": true,
+        "reference_paths_count": 1,
+        "parent_path_type": "ImportDeclaration"
+      }
+    },
+    {
+      "label": "import-namespace-specifier",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "import * as theme from 'theme'; const x = theme;",
+      "lookup_name": "theme",
+      "lookup_from": "first-ident-named-theme-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "ImportNamespaceSpecifier",
+        "binding_kind": "module",
+        "constant": true,
+        "reference_paths_count": 1,
+        "parent_path_type": "ImportDeclaration"
+      }
+    },
+    {
+      "label": "import-named-aliased",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "import { foo as bar } from 'mod'; const x = bar;",
+      "lookup_name": "bar",
+      "lookup_from": "first-ident-named-bar-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "ImportSpecifier",
+        "binding_kind": "module",
+        "constant": true,
+        "reference_paths_count": 1,
+        "parent_path_type": "ImportDeclaration"
+      }
+    },
+    {
+      "label": "function-param-binding",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "function f(color) { const x = color; }",
+      "lookup_name": "color",
+      "lookup_from": "first-ident-named-color-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "Identifier",
+        "binding_kind": "param",
+        "constant": true,
+        "reference_paths_count": 1,
+        "parent_path_type": "FunctionDeclaration"
+      }
+    },
+    {
+      "label": "arrow-param-binding",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "const f = (size) => size;",
+      "lookup_name": "size",
+      "lookup_from": "first-ident-named-size-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "Identifier",
+        "binding_kind": "param",
+        "constant": true,
+        "reference_paths_count": 1,
+        "parent_path_type": "ArrowFunctionExpression"
+      }
+    },
+    {
+      "label": "block-scoped-shadowing-inner-wins",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "const color = 'blue'; { const color = 'red'; const x = color; }",
+      "lookup_name": "color",
+      "lookup_from": "first-ident-named-color-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "VariableDeclarator",
+        "binding_kind": "const",
+        "constant": true,
+        "reference_paths_count": 1,
+        "parent_path_type": "VariableDeclaration",
+        "binding_init_string": "red"
+      }
+    },
+    {
+      "label": "object-pattern-destructure",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "const { foo } = obj; const x = foo;",
+      "lookup_name": "foo",
+      "lookup_from": "first-ident-named-foo-on-rhs",
+      "expected": {
+        "found": true,
+        "binding_node_type": "VariableDeclarator",
+        "binding_kind": "const",
+        "constant": true,
+        "reference_paths_count": 1,
+        "parent_path_type": "VariableDeclaration",
+        "binding_id_type": "ObjectPattern"
+      }
+    },
+    {
+      "label": "is-import-declaration-predicate-positive",
+      "call_site": "path-predicate-via-binding",
+      "input_source": "import { x } from 'mod'; const a = x;",
+      "lookup_name": "x",
+      "lookup_from": "first-ident-named-x-on-rhs",
+      "expected": {
+        "found": true,
+        "is_import_declaration_parent": true,
+        "is_export_named_declaration": false,
+        "is_object_pattern": false,
+        "is_variable_declarator": false
+      }
+    },
+    {
+      "label": "is-variable-declarator-predicate-positive",
+      "call_site": "path-predicate-via-binding",
+      "input_source": "const x = 'hi'; const a = x;",
+      "lookup_name": "x",
+      "lookup_from": "first-ident-named-x-on-rhs",
+      "expected": {
+        "found": true,
+        "is_import_declaration_parent": false,
+        "is_export_named_declaration": false,
+        "is_object_pattern": false,
+        "is_variable_declarator": true
+      }
+    },
+    {
+      "label": "has-own-binding-positive",
+      "call_site": "has-own-binding",
+      "input_source": "function f(style) { return style; }",
+      "lookup_name": "style",
+      "lookup_from": "function-body-block",
+      "expected": {
+        "has_own_binding": true,
+        "has_binding": true
+      }
+    },
+    {
+      "label": "has-own-binding-negative-but-has-binding",
+      "call_site": "has-own-binding",
+      "input_source": "const style = 'x'; function f() { return style; }",
+      "lookup_name": "style",
+      "lookup_from": "function-body-block",
+      "expected": {
+        "has_own_binding": false,
+        "has_binding": true
+      }
+    },
+    {
+      "label": "has-own-binding-negative-and-no-binding",
+      "call_site": "has-own-binding",
+      "input_source": "function f() { return style; }",
+      "lookup_name": "style",
+      "lookup_from": "function-body-block",
+      "expected": {
+        "has_own_binding": false,
+        "has_binding": false
+      }
+    },
+    {
+      "label": "scope-push-iife-injects-const-binding",
+      "call_site": "scope-push-iife",
+      "input_source": "(() => null)();",
+      "//": "Oracle wraps the arrow's body scope with scope.push({id: 'param', init: stringLiteral('val'), kind: 'const'}). Rust analog: synthetic ScopeId in compat/scope.rs; getOwnBinding('param') returns the injected binding, getBinding from enclosing module scope does NOT see it.",
+      "lookup_name": "param",
+      "expected": {
+        "after_push_has_own_binding_in_arrow_scope": true,
+        "after_push_has_binding_in_module_scope": false,
+        "binding_node_type_after_push": "VariableDeclarator",
+        "binding_kind_after_push": "const"
+      }
+    },
+    {
+      "label": "generate-uid-identifier-zero-counter",
+      "call_site": "generate-uid",
+      "input_source": "const x = 1;",
+      "//": "Babel's generateUidIdentifier(name) returns Identifier whose name is `_<bareName>` for the first call, `_<bareName>2` for second, etc., AND avoids collisions with existing scope bindings. Empty input ⇒ `_temp`-family. Test locks that two consecutive calls produce distinct names.",
+      "expected": {
+        "first_uid_name_starts_with_underscore": true,
+        "second_uid_name_differs_from_first": true,
+        "neither_collides_with_existing_x": true
+      }
+    },
+    {
+      "label": "list-key-call-arguments",
+      "call_site": "list-key-arguments",
+      "input_source": "foo(bar.baz)",
+      "//": "Mirrors traverse-member-expression/index.ts:37: when a MemberExpression is reached during a sub-traversal, listKey === 'arguments' tells us we're inside a CallExpression's args list.",
+      "expected": {
+        "member_expr_list_key": "arguments"
+      }
+    },
+    {
+      "label": "pattern-skip-getBinding-walks-past-pattern",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "const foo = 'outer'; function f({ foo }) { return foo; }",
+      "lookup_name": "foo",
+      "lookup_from": "first-ident-named-foo-on-rhs",
+      "//": "Upstream-trace finding 2: getBinding walks past Pattern scopes when the encountered binding is NOT param/local. Inner reference-from-`return foo` resolves to the destructured `{ foo }` PARAM, NOT the outer `const foo`. This is the pattern-skip rule at scope/index.js:816. The §5.0a port must implement this walk. NB: when a param is a destructure, binding.path.node.type === 'ObjectPattern' (the whole pattern), NOT 'Identifier' — the Identifier inside the pattern is registered through getOuterBindingIdentifiers but the binding.path points at the pattern itself.",
+      "expected": {
+        "found": true,
+        "binding_node_type": "ObjectPattern",
+        "binding_kind": "param",
+        "constant": true,
+        "reference_paths_count": 1,
+        "parent_path_type": "FunctionDeclaration"
+      }
+    },
+    {
+      "label": "var-in-for-loop-hoists-to-function-scope",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "function f() { for (var x = 1; x < 10; x++) {} const y = x; }",
+      "lookup_name": "x",
+      "lookup_from": "first-ident-named-x-on-rhs",
+      "//": "Upstream-trace finding 3: `var` in ForStatement init hoists to the enclosing function scope. The reference `const y = x;` AFTER the loop must resolve to the hoisted `var x`. ALSO triggers finding 4: `var` in loop body is auto-marked non-constant via Binding.isInitInLoop → reassign(). Reference count is 3 per Babel: x in test position (`x < 10`), x in `x++`, and x in `const y = x`. The `var x = 1` init position itself is the binding declaration, not a reference.",
+      "expected": {
+        "found": true,
+        "binding_node_type": "VariableDeclarator",
+        "binding_kind": "var",
+        "constant": false,
+        "reference_paths_count": 3,
+        "parent_path_type": "VariableDeclaration"
+      }
+    },
+    {
+      "label": "var-mutated-after-decl-is-non-constant",
+      "call_site": "binding-lookup-from-reference",
+      "input_source": "var x = 1; x = 2; const y = x;",
+      "lookup_name": "x",
+      "lookup_from": "first-ident-named-x-on-rhs",
+      "//": "Confirms Binding.constant is FALSE when reassign() fires from an AssignmentExpression. Same shape as `module-let-mutation-not-constant` but with `var` to verify the var-kind path is wired.",
+      "expected": {
+        "found": true,
+        "binding_node_type": "VariableDeclarator",
+        "binding_kind": "var",
+        "constant": false,
+        "reference_paths_count": 1,
+        "parent_path_type": "VariableDeclaration"
+      }
+    }
+  ]
+}

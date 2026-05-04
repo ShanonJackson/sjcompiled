@@ -134,6 +134,43 @@ no perturbation to the existing 2559-test verification block
 31 compiled-utils lib + 1132 strip-runtime harness +
 954 babel-plugin harness + 336 equality-harness verify).
 
+### `@babel/traverse` (used by Phase 5 §5.0 compat-scope + compat-evaluation parity oracles)
+
+`packages/babel-plugin@0.36.1`'s `evaluate-expression.ts:23/:34/:88/:93` and
+`resolve-binding.ts:201/:208/:226/:281/:369` use `@babel/traverse`'s
+`NodePath.scope.getBinding(...)`, `path.evaluate()`, `path.replaceWith(...)`,
+and `path.traverse(...)` to drive static evaluation across the import graph.
+The `crates/babel-plugin/src/compat/{scope,path,evaluation}.rs` ports
+(Phase 5 §5.0a/b/c) target this version verbatim.
+
+The Phase 5 §5.0 oracles (`parity-harness/compat-scope/oracle.mjs` and
+`parity-harness/compat-evaluation/oracle.mjs`) call `@babel/traverse`
+directly to capture expected `binding.path.node` / `binding.constant` /
+`binding.referencePaths.length` shape AND `path.evaluate()` output as
+parity-corpus JSON. The Rust gates assert byte/shape equality against
+those corpora.
+
+| npm package | Pinned version | Notes |
+|---|---|---|
+| `@babel/traverse` | **7.29.0** | AFM-resolved under `@compiled/babel-plugin@0.36.1` (commit `16a62b8`). Source of truth: AFM dependency engineer (2026-05-04). |
+| `@babel/helper-globals` | **7.28.0** | Transitively pulled by `@babel/traverse@7.29.0`. Surface: `data/builtin-lower.json` (13 entries) + `data/builtin-upper.json` (49 entries) define `Scope.globals`, used by `hasBinding`'s `noGlobals` path and by `path.evaluate()`'s identifier resolution for `undefined`/`NaN`/`Infinity`. The Rust port (`crates/babel-plugin/src/compat/scope.rs` §5.0a) vendors both JSON files VERBATIM as `const` slices; a schema-lock test asserts entry counts (13 + 49) so a future `@babel/traverse` bump that changes the globals list fails fast. Currently-resolved version verified via `bun -e "console.log(require('@babel/helper-globals/package.json').version)"`. |
+
+Pinned in root `package.json#overrides` AND promoted to top-level
+`devDependencies` (2026-05-04). Promotion follows the §4.2 lesson —
+bun's isolated dep layout silently bypasses `package.json#overrides`
+for transitive deps unless the dep is also a top-level devDep, and
+`require('@babel/traverse')` from the oracle would otherwise resolve
+through ancestor `node_modules/` walks to whatever sibling-project
+version happens to be there.
+
+`@babel/helper-globals` is currently a transitive dep of
+`@babel/traverse@7.29.0` and resolves cleanly without explicit
+override. If a future `@babel/traverse` bump pulls a different
+helper-globals version with different builtin lists, the
+`compat::scope::globals_lock` test in `crates/babel-plugin/src/`
+fires immediately (entry count + sample-name fingerprint mismatch).
+At that point promote to a top-level pin and re-vendor the JSONs.
+
 ### Direct dependencies of `@compiled/css`
 
 | npm package | Range in `packages/css/package.json` | Resolved version | Rust crate | Used in |

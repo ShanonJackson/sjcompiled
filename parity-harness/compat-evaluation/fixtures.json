@@ -1,0 +1,280 @@
+{
+  "version": 1,
+  "//": "Phase 5 §5.0c parity corpus — exercises every reachable @babel/traverse path.evaluate() branch per crates/babel-plugin/COMPAT_EVALUATION_COVERAGE.md. The four unreachable branches (Flow type-cast, JSX-as-evaluable, SequenceExpression, TaggedTemplateExpression — see COVERAGE.md §Confirmed-unreachable) are NOT exercised here; the Rust port emits unimplemented! with a citation rather than fall through.",
+  "//pin_lock": "@babel/traverse@7.29.0 — see crates/PARITY_VERSIONS.md.",
+  "//shape": "Each fixture's input_source is parsed as an Expression; the oracle calls path.evaluate() on the parsed node and captures {confident, value_kind, value_string} where value_string is JSON.stringify(value) when confident. The Rust port mirrors via compat::evaluation::evaluate(&expr, &scope) returning Option<EvaluatedValue>.",
+  "fixtures": [
+    {
+      "label": "string-literal",
+      "category": "literal",
+      "input_source": "'hello'",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"hello\"" }
+    },
+    {
+      "label": "numeric-literal-int",
+      "category": "literal",
+      "input_source": "42",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "42" }
+    },
+    {
+      "label": "numeric-literal-decimal",
+      "category": "literal",
+      "input_source": "3.14",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "3.14" }
+    },
+    {
+      "label": "boolean-true",
+      "category": "literal",
+      "input_source": "true",
+      "expected": { "confident": true, "value_kind": "boolean", "value_string": "true" }
+    },
+    {
+      "label": "boolean-false",
+      "category": "literal",
+      "input_source": "false",
+      "expected": { "confident": true, "value_kind": "boolean", "value_string": "false" }
+    },
+    {
+      "label": "null-literal",
+      "category": "literal",
+      "input_source": "null",
+      "expected": { "confident": true, "value_kind": "object", "value_string": "null" }
+    },
+    {
+      "label": "identifier-undefined-global",
+      "category": "identifier-global",
+      "input_source": "undefined",
+      "expected": { "confident": true, "value_kind": "undefined", "value_string": "undefined" }
+    },
+    {
+      "label": "identifier-NaN-global",
+      "category": "identifier-global",
+      "input_source": "NaN",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "null" }
+    },
+    {
+      "label": "identifier-Infinity-global",
+      "category": "identifier-global",
+      "input_source": "Infinity",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "null" }
+    },
+    {
+      "label": "binary-addition-numbers",
+      "category": "binary",
+      "input_source": "1 + 2",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "3" }
+    },
+    {
+      "label": "binary-string-concat",
+      "category": "binary",
+      "input_source": "'a' + 'b'",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"ab\"" }
+    },
+    {
+      "label": "binary-string-number-concat",
+      "category": "binary",
+      "input_source": "'_' + 3",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"_3\"" }
+    },
+    {
+      "label": "binary-multiplication",
+      "category": "binary",
+      "input_source": "5 * 3",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "15" }
+    },
+    {
+      "label": "binary-division",
+      "category": "binary",
+      "input_source": "10 / 2",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "5" }
+    },
+    {
+      "label": "binary-subtraction",
+      "category": "binary",
+      "input_source": "10 - 3",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "7" }
+    },
+    {
+      "label": "binary-modulo",
+      "category": "binary",
+      "input_source": "10 % 3",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "1" }
+    },
+    {
+      "label": "binary-strict-eq-true",
+      "category": "binary-comparison",
+      "input_source": "1 === 1",
+      "expected": { "confident": true, "value_kind": "boolean", "value_string": "true" }
+    },
+    {
+      "label": "binary-strict-eq-false",
+      "category": "binary-comparison",
+      "input_source": "1 === 2",
+      "expected": { "confident": true, "value_kind": "boolean", "value_string": "false" }
+    },
+    {
+      "label": "binary-less-than",
+      "category": "binary-comparison",
+      "input_source": "1 < 2",
+      "expected": { "confident": true, "value_kind": "boolean", "value_string": "true" }
+    },
+    {
+      "label": "binary-bitwise-or",
+      "category": "binary",
+      "input_source": "5 | 3",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "7" }
+    },
+    {
+      "label": "binary-bitwise-and",
+      "category": "binary",
+      "input_source": "5 & 3",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "1" }
+    },
+    {
+      "label": "binary-shift-left",
+      "category": "binary",
+      "input_source": "1 << 3",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "8" }
+    },
+    {
+      "label": "logical-and-truthy",
+      "category": "logical",
+      "input_source": "true && 'x'",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"x\"" }
+    },
+    {
+      "label": "logical-and-falsy",
+      "category": "logical",
+      "input_source": "false && 'x'",
+      "expected": { "confident": true, "value_kind": "boolean", "value_string": "false" }
+    },
+    {
+      "label": "logical-or-falsy-fallback",
+      "category": "logical",
+      "input_source": "false || 'y'",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"y\"" }
+    },
+    {
+      "label": "logical-nullish-coalesce-null",
+      "category": "logical",
+      "input_source": "null ?? 'z'",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"z\"" }
+    },
+    {
+      "label": "logical-nullish-coalesce-zero",
+      "category": "logical",
+      "input_source": "0 ?? 'z'",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "0" }
+    },
+    {
+      "label": "unary-negate-number",
+      "category": "unary",
+      "input_source": "-5",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "-5" }
+    },
+    {
+      "label": "unary-plus-string",
+      "category": "unary",
+      "input_source": "+'42'",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "42" }
+    },
+    {
+      "label": "unary-not-true",
+      "category": "unary",
+      "input_source": "!true",
+      "expected": { "confident": true, "value_kind": "boolean", "value_string": "false" }
+    },
+    {
+      "label": "unary-typeof-string",
+      "category": "unary",
+      "input_source": "typeof 'hi'",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"string\"" }
+    },
+    {
+      "label": "unary-void-zero",
+      "category": "unary",
+      "input_source": "void 0",
+      "expected": { "confident": true, "value_kind": "undefined", "value_string": "undefined" }
+    },
+    {
+      "label": "unary-bitwise-not",
+      "category": "unary",
+      "input_source": "~3",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "-4" }
+    },
+    {
+      "label": "conditional-true-branch",
+      "category": "conditional",
+      "input_source": "true ? 'yes' : 'no'",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"yes\"" }
+    },
+    {
+      "label": "conditional-false-branch",
+      "category": "conditional",
+      "input_source": "false ? 'yes' : 'no'",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"no\"" }
+    },
+    {
+      "label": "template-literal-static",
+      "category": "template",
+      "input_source": "`hello world`",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"hello world\"" }
+    },
+    {
+      "label": "template-literal-with-expression",
+      "category": "template",
+      "input_source": "`hello ${'wo' + 'rld'}`",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"hello world\"" }
+    },
+    {
+      "label": "parenthesized-binary",
+      "category": "parenthesized",
+      "input_source": "(1 + 2) * 3",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "9" }
+    },
+    {
+      "label": "ts-as-expression-deopts",
+      "category": "ts",
+      "input_source": "(1 as number)",
+      "//": "Babel's path.evaluate() does NOT fold TSAsExpression — returns confident=false. The Compiled evaluator handles this OUTSIDE path.evaluate() at evaluate-expression.ts:132 (t.isTSAsExpression(expression) ? expression.expression : expression). So at the compat::evaluation layer, TSAsExpression is a deopt; the wrapping unwrap is the §5.6 utils/evaluate_expression.rs caller's job.",
+      "expected": { "confident": false, "value_kind": "undefined", "value_string": "undefined" }
+    },
+    {
+      "label": "ts-as-expression-string-deopts",
+      "category": "ts",
+      "input_source": "('hi' as string)",
+      "//": "Same as above — TSAsExpression is unwrapped by the §5.6 caller, not by compat::evaluation.",
+      "expected": { "confident": false, "value_kind": "undefined", "value_string": "undefined" }
+    },
+    {
+      "label": "deopt-call-expression",
+      "category": "deopt",
+      "input_source": "someFn()",
+      "expected": { "confident": false, "value_kind": "undefined", "value_string": "undefined" }
+    },
+    {
+      "label": "deopt-unbound-identifier",
+      "category": "deopt",
+      "input_source": "someUnboundIdent",
+      "expected": { "confident": false, "value_kind": "undefined", "value_string": "undefined" }
+    },
+    {
+      "label": "deopt-member-on-call",
+      "category": "deopt",
+      "input_source": "someFn().x",
+      "expected": { "confident": false, "value_kind": "undefined", "value_string": "undefined" }
+    },
+    {
+      "label": "mixed-string-arithmetic",
+      "category": "mixed",
+      "input_source": "'_' + (1 + 2)",
+      "expected": { "confident": true, "value_kind": "string", "value_string": "\"_3\"" }
+    },
+    {
+      "label": "mixed-conditional-arithmetic",
+      "category": "mixed",
+      "input_source": "(1 < 2) ? (3 + 4) : (5 - 6)",
+      "expected": { "confident": true, "value_kind": "number", "value_string": "7" }
+    }
+  ]
+}
