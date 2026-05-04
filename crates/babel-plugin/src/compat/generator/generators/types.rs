@@ -31,7 +31,7 @@ pub fn literal(p: &mut Printer, lit: &Lit) {
     }
 }
 
-fn string_literal(p: &mut Printer, s: &swc_core::ecma::ast::Str) {
+pub(super) fn string_literal(p: &mut Printer, s: &swc_core::ecma::ast::Str) {
     // Babel's `getPossibleRaw(node)` returns `node.extra.raw` (the
     // EXACT source-quoted form) when available. SWC stores the same
     // on `Str.raw: Option<Atom>`. Using `raw` preserves single-vs-double

@@ -1,6 +1,7 @@
 //! 1:1 port of `@babel/generator@7.23.0/lib/generators/`.
 //!
 //! Each upstream `generators/<file>.js` maps to a Rust module here.
+//! Ported: `expressions.js`, `jsx.js`, `template-literals.js`, `types.js`.
 //! We omit the upstream files that are NOT reachable from our 5
 //! call-site corpus:
 //! - `flow.js` — Flow types; not used by Compiled consumers.
@@ -16,5 +17,6 @@
 //! files, port that file 1:1 alongside the fixture.
 
 pub mod expressions;
+pub mod jsx;
 pub mod template_literals;
 pub mod types;

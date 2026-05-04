@@ -263,21 +263,11 @@ impl<'c> Printer<'c> {
             Expr::Tpl(t) => generators::template_literals::tpl(self, t, node),
             Expr::TaggedTpl(t) => generators::template_literals::tagged_tpl(self, t, node),
             Expr::Paren(_) => unreachable!("handled above"),
-            Expr::JSXElement(_)
-            | Expr::JSXFragment(_)
-            | Expr::JSXEmpty(_)
-            | Expr::JSXMember(_)
-            | Expr::JSXNamespacedName(_) => {
-                // §4.3 follow-up — JSX Element / Fragment / Empty
-                // are reachable only from the jsx-key-attribute
-                // call_site, which the corpus's gate handles by
-                // walking from a parsed Module to the JSXAttribute,
-                // NOT by handing `print()` a JSXElement directly.
-                // Until JSX is fully ported (next sub-step), this
-                // branch emits a marker so the byte-parity gate
-                // fails with a clear pointer.
-                self.buf.append("/*JSX-NOT-PORTED*/");
-            }
+            Expr::JSXElement(e) => generators::jsx::jsx_element(self, e),
+            Expr::JSXFragment(f) => generators::jsx::jsx_fragment(self, f),
+            Expr::JSXEmpty(e) => generators::jsx::jsx_empty_expression(self, e),
+            Expr::JSXMember(m) => generators::jsx::jsx_member_expression(self, m),
+            Expr::JSXNamespacedName(n) => generators::jsx::jsx_namespaced_name(self, n),
             other => {
                 let _ = other;
                 self.buf.append("/*UNHANDLED-EXPR*/");

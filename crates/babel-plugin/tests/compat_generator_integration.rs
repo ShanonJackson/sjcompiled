@@ -58,12 +58,18 @@ use serde::Deserialize;
 use swc_core::common::comments::SingleThreadedComments;
 use swc_core::common::sync::Lrc;
 use swc_core::common::{FileName, SourceMap};
-use swc_core::ecma::ast::{EsVersion, Expr, Module};
+use swc_core::ecma::ast::{
+    EsVersion, Expr, JSXAttr, JSXAttrName, JSXAttrOrSpread, JSXElement, JSXElementChild, Module,
+    ModuleItem, Stmt,
+};
 use swc_core::ecma::parser::{
     parse_file_as_expr, parse_file_as_module, EsSyntax, Syntax, TsSyntax,
 };
 
-use babel_plugin::compat::generator::{generate, generate_with_comments};
+#[allow(unused_imports)]
+use babel_plugin::compat::generator::{
+    generate, generate_jsx_attribute_with_comments, generate_with_comments,
+};
 
 // AFM-pinned versions; mirror the constants in
 // `parity-harness/compat-generator/oracle.mjs` and the row in
@@ -323,14 +329,25 @@ fn rust_compat_generator_matches_js_corpus() {
             }
         };
 
-        // §4.3-in-progress: JSX-key-attribute path needs a generate
-        // entry point that takes a JSXAttribute (or extends `generate`
-        // to dispatch on more node kinds). For now we only exercise
-        // the Expr cases; JSX-key fixtures will be brought online
-        // when JSX printers land (next sub-step).
+        // §4.3 closed: the JSX-key-attribute axis walks the parsed
+        // Module to find the first `key=` attribute and dispatches
+        // through `generate_jsx_attribute_with_comments`, mirroring
+        // the JS oracle's `extractJsxKeyAttribute` extractor at
+        // `parity-harness/compat-generator/oracle.mjs:116`.
         let actual = match parsed {
             SwcInput::Expr(expr, comments) => generate_with_comments(&expr, &comments),
-            SwcInput::JsxAttributeFromModule(_, _) => continue,
+            SwcInput::JsxAttributeFromModule(module, comments) => {
+                match find_first_key_jsx_attribute(&module) {
+                    Some(attr) => generate_jsx_attribute_with_comments(attr, &comments),
+                    None => {
+                        divergences.push(format!(
+                            "{} ({}): no key= JSXAttribute found in parsed module",
+                            entry.label, entry.call_site
+                        ));
+                        continue;
+                    }
+                }
+            }
         };
 
         if actual != entry.expected_code {
@@ -347,4 +364,63 @@ fn rust_compat_generator_matches_js_corpus() {
         divergences.len(),
         divergences.join("\n\n")
     );
+}
+
+/// Walk a parsed Module looking for the first `JSXAttribute` whose
+/// name is the identifier `key`. Mirrors the JS oracle's recursive
+/// walk in `parity-harness/compat-generator/oracle.mjs::extractJsxKeyAttribute`
+/// — both must agree on which attribute they pluck out, otherwise
+/// the byte-parity assertion would compare different inputs.
+///
+/// Walks through the Module → top-level `Stmt::Expr(ExprStmt)` → the
+/// expression tree, recursing into JSXElement openings and children
+/// until we land on a `JSXAttr` named `key`. Anything outside that
+/// surface (e.g., a JSXAttribute nested in a non-JSX expression
+/// position) requires extending the walker.
+fn find_first_key_jsx_attribute(module: &Module) -> Option<&JSXAttr> {
+    for item in &module.body {
+        let stmt = match item {
+            ModuleItem::Stmt(s) => s,
+            ModuleItem::ModuleDecl(_) => continue,
+        };
+        if let Some(attr) = walk_stmt_for_key(stmt) {
+            return Some(attr);
+        }
+    }
+    None
+}
+
+fn walk_stmt_for_key(stmt: &Stmt) -> Option<&JSXAttr> {
+    if let Stmt::Expr(es) = stmt {
+        return walk_expr_for_key(&es.expr);
+    }
+    None
+}
+
+fn walk_expr_for_key(expr: &Expr) -> Option<&JSXAttr> {
+    match expr {
+        Expr::JSXElement(e) => walk_jsx_element_for_key(e),
+        Expr::Paren(p) => walk_expr_for_key(&p.expr),
+        _ => None,
+    }
+}
+
+fn walk_jsx_element_for_key(elem: &JSXElement) -> Option<&JSXAttr> {
+    for attr in &elem.opening.attrs {
+        if let JSXAttrOrSpread::JSXAttr(a) = attr {
+            if let JSXAttrName::Ident(i) = &a.name {
+                if i.sym.as_ref() == "key" {
+                    return Some(a);
+                }
+            }
+        }
+    }
+    for child in &elem.children {
+        if let JSXElementChild::JSXElement(inner) = child {
+            if let Some(found) = walk_jsx_element_for_key(inner) {
+                return Some(found);
+            }
+        }
+    }
+    None
 }

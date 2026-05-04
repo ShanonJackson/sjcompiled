@@ -16,7 +16,7 @@
 //! lib/generators/expressions.js            -> generators/expressions.rs
 //! lib/generators/types.js                  -> generators/types.rs
 //! lib/generators/template-literals.js      -> generators/template_literals.rs
-//! lib/generators/jsx.js                    -> generators/jsx.rs (forthcoming)
+//! lib/generators/jsx.js                    -> generators/jsx.rs
 //! lib/generators/{base,classes,methods,modules,statements,flow,typescript}.js
 //!     -> intentionally NOT ported. The 5 call sites in
 //!        packages/babel-plugin/src/utils/ never feed those node
@@ -47,7 +47,7 @@ pub mod node;
 pub mod printer;
 
 use swc_core::common::comments::Comments;
-use swc_core::ecma::ast::Expr;
+use swc_core::ecma::ast::{Expr, JSXAttr};
 
 use printer::Printer;
 
@@ -78,5 +78,36 @@ pub fn generate(expr: &Expr) -> String {
 pub fn generate_with_comments(expr: &Expr, comments: &dyn Comments) -> String {
     let mut p = Printer::with_comments(Some(comments));
     p.print(expr, None);
+    p.finish()
+}
+
+/// `generate(jsxAttribute)` — the JSX-key call site at
+/// `packages/babel-plugin/src/utils/build-compiled-component.ts:30`
+/// hands a `JSXAttribute` (NOT an Expression) to `@babel/generator`.
+/// Babel's `generate(node)` dispatches on `node.type` so it picks the
+/// `JSXAttribute(node)` printer regardless of where the entry point
+/// landed. We can't overload `generate(&Expr)` because the SWC type
+/// for a JSX attribute is `JSXAttr`, not `Expr` — so we expose a
+/// sibling entry point with the same byte contract.
+///
+/// Used by the §4.2 corpus's `jsx-key-attribute` axis (5 fixtures).
+/// Inner `JSXExpressionContainer` values dispatch back through
+/// `Printer::print(&Expr, _)` so the existing precedence /
+/// quote-preservation / comment-threading paths apply.
+pub fn generate_jsx_attribute(attr: &JSXAttr) -> String {
+    let mut p = Printer::new();
+    generators::jsx::jsx_attribute(&mut p, attr);
+    p.finish()
+}
+
+/// Same as `generate_jsx_attribute`, threaded with a SWC comment
+/// store so future fixtures with comments around the attribute /
+/// inside the expression container land correctly.
+pub fn generate_jsx_attribute_with_comments(
+    attr: &JSXAttr,
+    comments: &dyn Comments,
+) -> String {
+    let mut p = Printer::with_comments(Some(comments));
+    generators::jsx::jsx_attribute(&mut p, attr);
     p.finish()
 }
