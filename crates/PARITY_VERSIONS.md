@@ -102,7 +102,7 @@ must run on the same prettier version, otherwise the oracle drifts.
 |---|---|---|
 | `prettier` | **2.8.8** | Resolved from `REFERENCE_LOCK_FILE/yarn.lock`. Parser: `babel-ts`. Pinned in root `package.json` `overrides` so bun's caret resolution cannot drift past it. |
 
-### `@babel/generator` (used by `packages/babel-plugin/src/utils/`)
+### `@babel/generator` + `@babel/parser` (used by `packages/babel-plugin/src/utils/` and the Phase 4 compat-generator parity oracle)
 
 `packages/babel-plugin@0.36.1`'s `css-builders.ts:464` calls
 `hash(generate(expression).code)` to compute keyframe class names.
@@ -112,11 +112,27 @@ divergence between versions silently renames classes in production.
 `crates/babel-plugin/src/compat/generator.rs` (Phase 4 §4.3) ports
 this version verbatim; `packages/babel-plugin/package.json:18`
 declares only the floor (`^7.26.10`) and bun's caret resolution
-floats past it (observed: `7.29.1`).
+floats past it (observed pre-pin: `@babel/generator@7.29.1`,
+`@babel/parser@7.29.3`).
+
+The Phase 4 §4.2 oracle (`parity-harness/compat-generator/oracle.mjs`)
+parses `input_source` strings via `@babel/parser` before calling
+`generate(ast).code`. Both packages must be pinned together — a
+floating parser hands the pinned generator an AST shape from a
+later version, which surfaces as silent generator-shape drift on
+edge cases (TS syntax, JSX, optional-chaining shape).
 
 | npm package | Pinned version | Notes |
 |---|---|---|
-| `@babel/generator` | **7.23.0** | AFM-resolved version under `@compiled/babel-plugin@0.36.1` (commit `16a62b8`). Source of truth: AFM dependency engineer. Pinned in root `package.json#overrides` (2026-05-04). `@babel/parser` pin is the matched dependency for the JS oracle's parse step — pending AFM resolution. |
+| `@babel/generator` | **7.23.0** | AFM-resolved under `@compiled/babel-plugin@0.36.1` (commit `16a62b8`). Source of truth: AFM dependency engineer (2026-05-04). |
+| `@babel/parser` | **7.29.2** | AFM-resolved under `@compiled/babel-plugin@0.36.1` (commit `16a62b8`). Source of truth: AFM dependency engineer (2026-05-04). |
+
+Both pinned in root `package.json#overrides` (2026-05-04). Verified
+no perturbation to the existing 2559-test verification block
+(43 babel-plugin lib + 4 hash_parity over 10037 entries +
+3 transform_css_integration over 120 entries + 56 babel-plugin-strip-runtime lib +
+31 compiled-utils lib + 1132 strip-runtime harness +
+954 babel-plugin harness + 336 equality-harness verify).
 
 ### Direct dependencies of `@compiled/css`
 

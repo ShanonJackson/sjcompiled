@@ -28,6 +28,20 @@ compiled-utils = { path = "../compiled-utils" }
 # solely to prove the consumer-side contract holds before the wiring
 # lands. Once §4.6 ships, this entry is promoted to `[dependencies]`.
 css = { path = "../css" }
+# Phase 4 §4.2 — compat-generator parity gate needs to PARSE the
+# fixture `input_source` strings into SWC AST nodes (Expr / Module
+# with JSX). The lib build doesn't need the parser (the visitor walks
+# already-parsed Programs), so `ecma_parser` is dev-only. Cargo's
+# additive-feature unification means the lib build still ships
+# without the parser surface.
+#
+# IMPORTANT: this re-declares `swc_core` to add ONE feature (`ecma_parser`)
+# to the workspace-pinned set; the version pin (`=54.0.0`) MUST match
+# the workspace dep at crates/Cargo.toml verbatim. `=54.0.0` is the
+# ABI-paired version of `@swc/core@1.15.8` per `crates/PARITY_VERSIONS.md`.
+# Bumping the @swc/core npm pin requires a coordinated `swc_core` bump
+# AND full corpus re-run (PLAN.md §1 constraint 7).
+swc_core = { version = "=54.0.0", features = ["ecma_plugin_transform", "ecma_ast", "ecma_visit", "common", "ecma_parser"] }
 
 [package.metadata.swc]
 # When bumped, update PARITY_VERSIONS.md AND re-run the corpus.

@@ -24,3 +24,8 @@ crates/babel-plugin/tests/hash_corpus.json
 # `bun parity-harness/transform-css/oracle.mjs` to rehydrate before
 # `cargo test -p babel-plugin --test transform_css_integration`.
 crates/babel-plugin/tests/transform_css_corpus.json
+# Phase 4 §4.2 compat-generator corpus is regenerable from the JS oracle
+# walking parity-harness/compat-generator/fixtures.json. Run
+# `bun parity-harness/compat-generator/oracle.mjs` to rehydrate before
+# `cargo test -p babel-plugin --test compat_generator_integration`.
+crates/babel-plugin/tests/compat_generator_corpus.json

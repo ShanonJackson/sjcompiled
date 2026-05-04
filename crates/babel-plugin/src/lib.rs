@@ -24,6 +24,7 @@
 //!   `babel_plugin.rs`.
 
 pub mod babel_plugin;
+pub mod compat;
 pub mod constants;
 pub mod mutation_recorder;
 pub mod state;

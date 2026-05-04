@@ -1,0 +1,285 @@
+{
+  "version": 1,
+  "$comment": "Hand-curated input-source manifest for the Phase 4 §4.2 compat-generator parity oracle. One row per (call_site, AST shape, comment shape) we want to lock. Re-running parity-harness/compat-generator/oracle.mjs against this file emits the cargo-readable corpus at crates/babel-plugin/tests/compat_generator_corpus.json. Adding a fixture here = adding a row to that corpus = adding a parity assertion in compat_generator_integration.rs (no Rust code change needed). See crates/babel-plugin/COMPAT_GENERATOR_COVERAGE.md for the coverage rationale per call_site.",
+  "fixtures": [
+    {
+      "label": "keyframes-expr/object-from-to",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes({ from: { opacity: 1 }, to: { opacity: 0 } })"
+    },
+    {
+      "label": "keyframes-expr/object-string-keys",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes({ '0%': { opacity: 1 }, '50%': { opacity: 0.5 }, '100%': { opacity: 0 } })"
+    },
+    {
+      "label": "keyframes-expr/object-comma-key",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes({ 'from, 25%': { opacity: 1 }, '25%': { opacity: 0.75 }, to: { opacity: 0 } })"
+    },
+    {
+      "label": "keyframes-expr/template-literal-tagged",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes`from { opacity: 1 } to { opacity: 0 }`"
+    },
+    {
+      "label": "keyframes-expr/template-with-interpolation",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes`from { color: ${primary} } to { color: ${secondary} }`"
+    },
+    {
+      "label": "keyframes-expr/nested-object-deep",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes({ from: { transform: 'scale(1)', opacity: 1 }, '50%': { transform: 'scale(1.05)', opacity: 0.8 }, to: { transform: 'scale(1)', opacity: 1 } })"
+    },
+    {
+      "label": "keyframes-expr/conditional-value",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes({ from: { opacity: cond ? 1 : 0 }, to: { opacity: cond ? 0 : 1 } })"
+    },
+    {
+      "label": "keyframes-expr/comment-leading-property",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes({ /* leading */ from: { opacity: 1 }, to: { opacity: 0 } })"
+    },
+    {
+      "label": "keyframes-expr/comment-trailing-property",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes({ from: { opacity: 1 } /* trailing */, to: { opacity: 0 } })"
+    },
+    {
+      "label": "keyframes-expr/comment-eslint-disable",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes({ /* eslint-disable-next-line */ from: { opacity: 1 }, to: { opacity: 0 } })"
+    },
+    {
+      "label": "keyframes-expr/comment-inside-ternary",
+      "call_site": "keyframes-expression",
+      "input_source": "keyframes({ from: { opacity: cond /* hint */ ? 1 : 0 }, to: { opacity: 0 } })"
+    },
+
+    {
+      "label": "generic-expr/identifier",
+      "call_site": "generic-expression",
+      "input_source": "abcd"
+    },
+    {
+      "label": "generic-expr/member-expression",
+      "call_site": "generic-expression",
+      "input_source": "obj.value"
+    },
+    {
+      "label": "generic-expr/member-expression-deep",
+      "call_site": "generic-expression",
+      "input_source": "obj.deeply.nested.value"
+    },
+    {
+      "label": "generic-expr/member-computed",
+      "call_site": "generic-expression",
+      "input_source": "obj['computed-key']"
+    },
+    {
+      "label": "generic-expr/call-expression",
+      "call_site": "generic-expression",
+      "input_source": "fn()"
+    },
+    {
+      "label": "generic-expr/call-with-args",
+      "call_site": "generic-expression",
+      "input_source": "fn(a, b, c)"
+    },
+    {
+      "label": "generic-expr/array-member",
+      "call_site": "generic-expression",
+      "input_source": "arr[0]"
+    },
+    {
+      "label": "generic-expr/string-literal-double",
+      "call_site": "generic-expression",
+      "input_source": "\"hello\""
+    },
+    {
+      "label": "generic-expr/string-literal-single",
+      "call_site": "generic-expression",
+      "input_source": "'hello'"
+    },
+    {
+      "label": "generic-expr/numeric-literal",
+      "call_site": "generic-expression",
+      "input_source": "123"
+    },
+    {
+      "label": "generic-expr/numeric-decimal",
+      "call_site": "generic-expression",
+      "input_source": "1.5"
+    },
+    {
+      "label": "generic-expr/boolean-literal",
+      "call_site": "generic-expression",
+      "input_source": "true"
+    },
+    {
+      "label": "generic-expr/null-literal",
+      "call_site": "generic-expression",
+      "input_source": "null"
+    },
+    {
+      "label": "generic-expr/template-literal-static",
+      "call_site": "generic-expression",
+      "input_source": "`hello world`"
+    },
+    {
+      "label": "generic-expr/template-with-interpolation",
+      "call_site": "generic-expression",
+      "input_source": "`hello ${name}`"
+    },
+    {
+      "label": "generic-expr/binary-add",
+      "call_site": "generic-expression",
+      "input_source": "a + b"
+    },
+    {
+      "label": "generic-expr/binary-precedence",
+      "call_site": "generic-expression",
+      "input_source": "a + b * c"
+    },
+    {
+      "label": "generic-expr/conditional-simple",
+      "call_site": "generic-expression",
+      "input_source": "cond ? a : b"
+    },
+    {
+      "label": "generic-expr/conditional-nested",
+      "call_site": "generic-expression",
+      "input_source": "a ? b : c ? d : e"
+    },
+    {
+      "label": "generic-expr/parenthesized",
+      "call_site": "generic-expression",
+      "input_source": "(a + b) * c"
+    },
+    {
+      "label": "generic-expr/comment-leading-identifier",
+      "call_site": "generic-expression",
+      "input_source": "/* hint */ value"
+    },
+    {
+      "label": "generic-expr/comment-trailing-identifier",
+      "call_site": "generic-expression",
+      "input_source": "value /* hint */"
+    },
+    {
+      "label": "generic-expr/comment-inside-ternary",
+      "call_site": "generic-expression",
+      "input_source": "a /* x */ ? b : c"
+    },
+    {
+      "label": "generic-expr/comment-eslint-disable-line",
+      "call_site": "generic-expression",
+      "input_source": "value // eslint-disable-line"
+    },
+    {
+      "label": "generic-expr/comment-pure-annotation",
+      "call_site": "generic-expression",
+      "input_source": "/*#__PURE__*/ fn()"
+    },
+
+    {
+      "label": "variable-init/string-literal",
+      "call_site": "variable-init",
+      "input_source": "'literal-string'"
+    },
+    {
+      "label": "variable-init/member-expression",
+      "call_site": "variable-init",
+      "input_source": "obj.value"
+    },
+    {
+      "label": "variable-init/call-expression",
+      "call_site": "variable-init",
+      "input_source": "compute()"
+    },
+    {
+      "label": "variable-init/object-literal",
+      "call_site": "variable-init",
+      "input_source": "{ a: 1, b: 2 }"
+    },
+    {
+      "label": "variable-init/conditional",
+      "call_site": "variable-init",
+      "input_source": "isProd ? '#000' : '#fff'"
+    },
+    {
+      "label": "variable-init/template-with-interpolation",
+      "call_site": "variable-init",
+      "input_source": "`prefix-${suffix}`"
+    },
+
+    {
+      "label": "jsx-key/string-literal-attr",
+      "call_site": "jsx-key-attribute",
+      "input_source": "<div key=\"static\" />"
+    },
+    {
+      "label": "jsx-key/numeric-expr-attr",
+      "call_site": "jsx-key-attribute",
+      "input_source": "<div key={123} />"
+    },
+    {
+      "label": "jsx-key/member-expr-attr",
+      "call_site": "jsx-key-attribute",
+      "input_source": "<div key={item.id} />"
+    },
+    {
+      "label": "jsx-key/template-expr-attr",
+      "call_site": "jsx-key-attribute",
+      "input_source": "<div key={`row-${i}`} />"
+    },
+    {
+      "label": "jsx-key/conditional-expr-attr",
+      "call_site": "jsx-key-attribute",
+      "input_source": "<div key={item ? item.id : 'fallback'} />"
+    },
+
+    {
+      "label": "conditional-classname/logical-and",
+      "call_site": "conditional-classname-item",
+      "input_source": "a && 'class-name'"
+    },
+    {
+      "label": "conditional-classname/logical-or",
+      "call_site": "conditional-classname-item",
+      "input_source": "a || 'class-name'"
+    },
+    {
+      "label": "conditional-classname/nullish-coalescing",
+      "call_site": "conditional-classname-item",
+      "input_source": "a ?? 'class-name'"
+    },
+    {
+      "label": "conditional-classname/conditional-expr",
+      "call_site": "conditional-classname-item",
+      "input_source": "cond ? 'a-class' : 'b-class'"
+    },
+    {
+      "label": "conditional-classname/conditional-with-null",
+      "call_site": "conditional-classname-item",
+      "input_source": "cond ? 'a-class' : null"
+    },
+    {
+      "label": "conditional-classname/nested-logical",
+      "call_site": "conditional-classname-item",
+      "input_source": "(a && b) || c"
+    },
+    {
+      "label": "conditional-classname/comment-between-branches",
+      "call_site": "conditional-classname-item",
+      "input_source": "cond ? /* yes */ 'a-class' : 'b-class'"
+    },
+    {
+      "label": "conditional-classname/comment-eslint-disable",
+      "call_site": "conditional-classname-item",
+      "input_source": "/* eslint-disable-next-line */ cond ? 'a' : 'b'"
+    }
+  ]
+}
