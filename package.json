@@ -69,6 +69,8 @@
     "node-releases": "2.0.18",
     "@swc/core": "1.15.8",
     "prettier": "2.8.8",
+    "@babel/generator": "7.23.0",
+    "@babel/parser": "7.29.2",
     "cssnano-preset-default": {
       ".": "5.2.14",
       "postcss-discard-duplicates": "5.1.0"

@@ -102,6 +102,22 @@ must run on the same prettier version, otherwise the oracle drifts.
 |---|---|---|
 | `prettier` | **2.8.8** | Resolved from `REFERENCE_LOCK_FILE/yarn.lock`. Parser: `babel-ts`. Pinned in root `package.json` `overrides` so bun's caret resolution cannot drift past it. |
 
+### `@babel/generator` (used by `packages/babel-plugin/src/utils/`)
+
+`packages/babel-plugin@0.36.1`'s `css-builders.ts:464` calls
+`hash(generate(expression).code)` to compute keyframe class names.
+Output bytes from `@babel/generator` feed `compiled-utils::hash`
+with no prettier downstream, so any whitespace / paren / quote
+divergence between versions silently renames classes in production.
+`crates/babel-plugin/src/compat/generator.rs` (Phase 4 §4.3) ports
+this version verbatim; `packages/babel-plugin/package.json:18`
+declares only the floor (`^7.26.10`) and bun's caret resolution
+floats past it (observed: `7.29.1`).
+
+| npm package | Pinned version | Notes |
+|---|---|---|
+| `@babel/generator` | **7.23.0** | AFM-resolved version under `@compiled/babel-plugin@0.36.1` (commit `16a62b8`). Source of truth: AFM dependency engineer. Pinned in root `package.json#overrides` (2026-05-04). `@babel/parser` pin is the matched dependency for the JS oracle's parse step — pending AFM resolution. |
+
 ### Direct dependencies of `@compiled/css`
 
 | npm package | Range in `packages/css/package.json` | Resolved version | Rust crate | Used in |
