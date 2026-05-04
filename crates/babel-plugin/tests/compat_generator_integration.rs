@@ -63,7 +63,7 @@ use swc_core::ecma::parser::{
     parse_file_as_expr, parse_file_as_module, EsSyntax, Syntax, TsSyntax,
 };
 
-use babel_plugin::compat::generator::generate;
+use babel_plugin::compat::generator::{generate, generate_with_comments};
 
 // AFM-pinned versions; mirror the constants in
 // `parity-harness/compat-generator/oracle.mjs` and the row in
@@ -193,15 +193,18 @@ fn corpus_shape_lock() {
 /// Returns the parsed Expr (and, where applicable, the parsed Module
 /// it lives inside, kept alive for span resolution).
 enum SwcInput {
-    Expr(Box<Expr>),
+    /// Bare expression with its captured comment store. The store
+    /// owns the leading/trailing comment lookups keyed by `BytePos`;
+    /// `compat::generator::generate_with_comments` queries it at
+    /// every node boundary.
+    Expr(Box<Expr>, SingleThreadedComments),
     /// JSX-key attribute: we walk the parsed Module to find the
     /// `JSXAttribute` node — but `compat::generator::generate`
-    /// signature takes `&Expr`, so the attribute case will need a
-    /// distinct generate entry point in §4.3. For §4.2's shape lock
-    /// we just verify the parse succeeds; the byte-parity test is
-    /// gated behind `#[ignore]`, so the unimplemented signature is
-    /// not load-bearing yet.
-    JsxAttributeFromModule(Box<Module>),
+    /// signature takes `&Expr`, so the attribute case needs a
+    /// distinct generate entry point. JSX is the next §4.3 sub-step
+    /// (after comments + multi-line objects). For now the byte-parity
+    /// test skips this branch.
+    JsxAttributeFromModule(Box<Module>, SingleThreadedComments),
 }
 
 fn parser_syntax_for_expression() -> Syntax {
@@ -259,7 +262,7 @@ fn extract_swc_node(call_site: &str, input_source: &str) -> Result<SwcInput, Str
             if !errors.is_empty() {
                 return Err(format!("SWC parse errors: {:?}", errors));
             }
-            Ok(SwcInput::Expr(expr))
+            Ok(SwcInput::Expr(expr, comments))
         }
         "jsx-key-attribute" => {
             let mut errors = Vec::new();
@@ -274,7 +277,7 @@ fn extract_swc_node(call_site: &str, input_source: &str) -> Result<SwcInput, Str
             if !errors.is_empty() {
                 return Err(format!("SWC parse errors: {:?}", errors));
             }
-            Ok(SwcInput::JsxAttributeFromModule(Box::new(module)))
+            Ok(SwcInput::JsxAttributeFromModule(Box::new(module), comments))
         }
         other => Err(format!("unknown call_site: {}", other)),
     }
@@ -304,8 +307,6 @@ fn corpus_input_sources_parse_under_swc() {
 }
 
 #[test]
-#[ignore = "Phase 4 §4.3 not yet ported — flips when compat::generator::generate \
-            returns real bytes. See crates/babel-plugin/src/compat/generator.rs."]
 fn rust_compat_generator_matches_js_corpus() {
     let corpus = load_corpus();
     let mut divergences = Vec::new();
@@ -322,19 +323,14 @@ fn rust_compat_generator_matches_js_corpus() {
             }
         };
 
-        // §4.3 will resolve the JSX-key-attribute case to a generator
+        // §4.3-in-progress: JSX-key-attribute path needs a generate
         // entry point that takes a JSXAttribute (or extends `generate`
-        // to dispatch on more node kinds). Until then we only exercise
-        // the Expr cases; the JSX-key fixtures will be brought online
-        // when §4.3 wires the right dispatch.
+        // to dispatch on more node kinds). For now we only exercise
+        // the Expr cases; JSX-key fixtures will be brought online
+        // when JSX printers land (next sub-step).
         let actual = match parsed {
-            SwcInput::Expr(expr) => generate(&expr),
-            SwcInput::JsxAttributeFromModule(_module) => {
-                // Placeholder: §4.3 must extend the dispatch. The
-                // assertion below will catch any drift from the
-                // expected_code once that lands.
-                continue;
-            }
+            SwcInput::Expr(expr, comments) => generate_with_comments(&expr, &comments),
+            SwcInput::JsxAttributeFromModule(_, _) => continue,
         };
 
         if actual != entry.expected_code {

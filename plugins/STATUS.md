@@ -29,17 +29,20 @@
 tasks — Phase 5 gates, NOT Phase 4 blockers). Phase 1 ☑. Phase 2 ☑.
 Phase 3 ☑ (§3.1–§3.4). Phase 4 §4.1 ☑. Phase 4 §4.2 ☑.
 
-**Next active checkpoint: Phase 4 §4.3** (`compat/generator.rs`).
-The coverage manifest, JS oracle, corpus, integration-test scaffold,
-and the `compat::generator::generate` stub all landed at §4.2.
-§4.3 is the line-for-line port against
-`node_modules/@babel/generator@7.23.0/lib/`; when it returns real
-bytes, removing the `#[ignore]` on `rust_compat_generator_matches_js_corpus`
-in `crates/babel-plugin/tests/compat_generator_integration.rs`
-flips the parity gate on. The corpus already encodes the real
-Babel divergences (paren drop at precedence, source-quote
-preservation, comment whitespace policy) — a shortcut implementation
-will fail immediately.
+**§4.3 in progress** — foundation + 50/55 byte-exact this session.
+Remaining sub-step: port `generators/jsx.js` (JSX printer + a JSX-aware
+`generate` entry point) to bring the 5 jsx-key-attribute fixtures
+online. The 50/55 cover all expression-emitting call sites
+(keyframes-expression, generic-expression, variable-init,
+conditional-classname-item) byte-exact, including the load-bearing
+real divergences from §4.2's corpus (paren drop at precedence,
+source-quote preservation, comment-attachment quirks like
+`/* yes */'a-class'` no-space and `(a && b) || c → a && b || c`).
+The byte-parity gate in `crates/babel-plugin/tests/compat_generator_integration.rs`
+is no longer `#[ignore]`d — it's part of the standard verification
+block, currently passing 50/55 with the 5 JSX fixtures skipped via
+`continue`. Removing that `continue` (after JSX lands) is the §4.3
+close-out signal.
 
 §2.3(b) is a dangling sub-checkpoint (two deferred AST/comment-store
 mutations from §2.3(a)) — NOT a phase gate; bundles with the first
@@ -52,7 +55,7 @@ mutations from §2.3(a)) — NOT a phase gate; bundles with the first
 RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 43/43
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
-RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 2/2 + 1 ignored (§4.3 gate)
+RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (50/55 byte-exact; 5 jsx-key fixtures skip)
 RUSTFLAGS="" cargo test -p babel-plugin-strip-runtime --lib             # 56/56
 RUSTFLAGS="" cargo test -p compiled-utils --lib                         # 31/31
 
@@ -70,8 +73,63 @@ bun parity-harness/transform-css/oracle.mjs
 bun parity-harness/compat-generator/oracle.mjs                          # 55 entries
 ```
 
-Total: **2561 tests, zero failures, 1 ignored (the §4.3 byte-parity
-gate, by design).**
+Total: **2562 tests, zero failures, zero ignored.**
+
+### Phase 4 §4.3 progress summary (50/55 byte-exact; JSX is the open sub-step)
+
+`crates/babel-plugin/src/compat/generator/` mirrors
+`@babel/generator@7.23.0/lib/` 1:1 across 9 files (~1372 LOC):
+- `mod.rs` (entry — `generate` + `generate_with_comments`)
+- `buffer.rs` (output buffer; queue-cursor + drop-trailing-whitespace-before-newline; source-map machinery dropped)
+- `printer.rs` (dispatcher; print/word/token/space/newline; indent + maybe_indent; leading/trailing comment threading)
+- `node/{mod,parentheses}.rs` (paren policy; `PRECEDENCE` table 1:1; logical/binary/conditional rules)
+- `generators/{mod,expressions,types,template_literals}.rs` (Identifier, NumericLiteral, StringLiteral, BooleanLiteral, NullLiteral, BinaryExpression / LogicalExpression, ConditionalExpression, UnaryExpression, MemberExpression, CallExpression, ParenthesizedExpression-as-transparent, ObjectExpression with `printList`-statement-mode, ArrayExpression, ObjectProperty / Spread, TemplateLiteral, TaggedTemplateExpression).
+
+The corpus's 4 known real divergences are all reproduced byte-exact:
+1. `cond ? /* yes */ 'a-class' : 'b-class'` →
+   `cond ? /* yes */'a-class' : 'b-class'` (NO space between `*/`
+   and `'a-class'`).
+2. `(a && b) || c` → `a && b || c` (paren dropped at precedence
+   boundary). Implemented via `Expr::Paren` transparency in
+   `Printer::print` so the inner expression sees the GRANDPARENT
+   when paren policy decides — matches Babel's flattened-shape
+   AST default.
+3. `'a-class'` (single-quote source) → `'a-class'` (preserved). Via
+   `Str.raw` passthrough mirroring Babel's `getPossibleRaw(node)`.
+4. `/* eslint-disable-next-line */ cond ? 'a' : 'b'` → no space
+   between leading block-comment and the next expression.
+
+**SWC↔Babel comment-storage quirk discovered + worked around.**
+A same-line comment between two tokens (e.g.,
+`{ /* leading */ from`) is keyed in SWC's comment store as
+**TRAILING of the previous token**, NOT as leading of the next.
+Specifically: `comments.take_trailing(BytePos(open_brace.lo + 1))`
+returns the comment, while `take_leading(prop.span.lo)` returns
+nothing. Object-property iteration handles this by querying both
+positions before printing the first prop. Documented inline at
+`generators/types.rs::object` so future fixtures hitting the same
+shape have a clear breadcrumb.
+
+**Open sub-step: JSX printer.** `generators/jsx.js` covers
+JSXElement, JSXAttribute, JSXIdentifier, JSXMemberExpression,
+JSXNamespacedName, JSXEmptyExpression, JSXExpressionContainer,
+JSXText, JSXOpeningElement, JSXClosingElement, JSXSpreadAttribute,
+JSXFragment, JSXOpeningFragment, JSXClosingFragment. The 5
+jsx-key-attribute fixtures from §4.2 (covering JSXAttribute with
+StringLiteral / NumericLiteral / MemberExpression / TemplateLiteral
+/ ConditionalExpression values) are reachable from
+`packages/babel-plugin/src/utils/build-compiled-component.ts:30`
+which calls `generate(keyAttribute)` on a JSXAttribute. The Rust
+entry point will need a sibling to `generate_with_comments` that
+takes `&JSXAttribute`. Not load-bearing for the strict-byte hash
+sites (those go through Expr only), but in scope per the §4.2
+"lock byte-exactness identically" hand-off.
+
+**Other deliberately omitted upstream files** (per CLAUDE.md
+"1:1 with what's reachable"): `flow.js`, `typescript.js`,
+`classes.js`, `methods.js`, `modules.js`, `statements.js`,
+`base.js`. None reachable from the 5 call sites; port if a real
+fixture surfaces them.
 
 ### Phase 4 §4.2 closure summary
 
@@ -480,45 +538,48 @@ sign-off (this session):
 
 ### Hand-off — what the next session should do
 
-**Active checkpoint:** Phase 4 §4.3 (`compat/generator.rs`).
-Phase 0/1/2/3 + §4.1 + §4.2 closed. §4.3 doesn't depend on the
-CSS-port agent — it's a pure line-for-line port against
-`node_modules/@babel/generator@7.23.0/lib/`.
+**Active checkpoint:** Phase 4 §4.3 (JSX sub-step). Foundation +
+50/55 byte-exact landed this session (paren policy, comment
+threading, multi-line objects, source-quote preservation).
+The 5 jsx-key-attribute fixtures from §4.2 are still skipped in
+`crates/babel-plugin/tests/compat_generator_integration.rs` via
+a `continue` on the `SwcInput::JsxAttributeFromModule(_, _)`
+match arm.
 
-Phase 4 §4.3 plan:
-1. Read `node_modules/@babel/generator@7.23.0/lib/` (the AFM-pinned
-   source — the override is already in `package.json#overrides` and
-   `devDependencies`). Entry point is `printer.js`; node-kind
-   handlers live under `generators/{expressions,types,jsx,...}.js`.
-2. Port each printer file as a Rust module under
-   `crates/babel-plugin/src/compat/generator/` (mirror file layout,
-   per CLAUDE.md "1:1 file mapping"). The `compat/scope.rs` pattern
-   in `babel-plugin-strip-runtime` is the template — small,
-   well-isolated, byte-locked to upstream.
-3. Rewrite `crates/babel-plugin/src/compat/generator.rs` (currently
-   a stub that `unimplemented!()`s) to dispatch on the node kind.
-   Likely shape: split into `mod.rs` (re-exports) + per-node-kind
-   files; the public API stays `pub fn generate(&Expr) -> String`
-   plus a JSXAttribute entry point for the §4.2 jsx-key-attribute
-   call_site.
-4. Remove the `#[ignore]` on
-   `rust_compat_generator_matches_js_corpus` in
-   `crates/babel-plugin/tests/compat_generator_integration.rs`
-   and run the gate. The corpus already encodes the four real
-   divergences captured at §4.2 (paren drop at precedence,
-   source-quote preservation, no-space-after-block-comment) —
-   any shortcut implementation will fail immediately.
+Phase 4 §4.3 JSX sub-step plan:
+1. Read `node_modules/@babel/generator@7.23.0/lib/generators/jsx.js`
+   (123 LOC — small, well-bounded). Cover: JSXElement, JSXAttribute,
+   JSXIdentifier, JSXMemberExpression, JSXNamespacedName,
+   JSXEmptyExpression, JSXExpressionContainer, JSXText,
+   JSXOpeningElement, JSXClosingElement, JSXSpreadAttribute,
+   JSXFragment, JSXOpeningFragment, JSXClosingFragment.
+2. Add `crates/babel-plugin/src/compat/generator/generators/jsx.rs`
+   (and register in `generators/mod.rs`). Mirror file structure —
+   one Rust function per upstream `function` export.
+3. Add a public entry point for direct JSXAttribute generation
+   (so `build-compiled-component.ts:30`'s `generate(keyAttribute)`
+   call has a Rust analog). Probable signature:
+   `pub fn generate_jsx_attribute(attr: &JSXAttr, comments: &dyn Comments) -> String`.
+4. Update `Printer::print` dispatch for the JSX-* `Expr` variants
+   (currently emits `/*JSX-NOT-PORTED*/` markers).
+5. Update `compat_generator_integration.rs`'s
+   `SwcInput::JsxAttributeFromModule` arm: walk the parsed Module
+   to find the first `JSXAttribute` named `key`, call the new
+   entry point, assert byte-equal vs `expected_code`. Remove the
+   `continue`.
+6. Run the gate. All 55 fixtures should pass byte-exact.
 
-Real divergences §4.3 must reproduce (from the corpus):
-- `cond ? /* yes */ 'a-class' : 'b-class'` →
-  `cond ? /* yes */'a-class' : 'b-class'` (suppress space between
-  block-comment and following expression).
-- `(a && b) || c` → `a && b || c` (drop redundant parens at
-  precedence boundary).
-- `'a-class'` (source) → `'a-class'` (preserve quote style).
-- `/* eslint-disable-next-line */ cond ? 'a' : 'b'` → no space
-  between leading block-comment and the next expression
-  (same axis as the first).
+Other deliberately deferred (NOT urgent):
+- `Expr::Paren` transparency edge cases — only one corpus fixture
+  exercises this (`(a && b) || c`); test passes. If a future fixture
+  surfaces a paren-drop case the current dispatch can't decide
+  (e.g., a deep nested conditional inside a paren), that's a real
+  Drift event worth diagnosing.
+- Synthetic-AST fallbacks (str without `raw`, num without `raw`) —
+  the corpus exclusively exercises parsed nodes which always carry
+  `raw`. The fallback path emits naïvely; when a real consumer
+  case lands a synthetic AST node, port the upstream `_jsesc`
+  details.
 
 See `crates/babel-plugin/COMPAT_GENERATOR_COVERAGE.md` for the
 full per-call-site coverage manifest, divergence table, and
@@ -798,7 +859,7 @@ done before declaring Phase 0 fully signed off across the platform set.
 |---|---|---|---|---|---|
 | §4.1 | ☑ | `transform_css` integration parity test — every JS-corpus input produces byte-identical Rust output from this plugin's perspective | claude-2026-05-04 | `parity-harness/transform-css/oracle.mjs` (imports `@compiled/css.transformCss` directly; pins `BROWSERSLIST_CONFIG` to `crates/browserslist-shim/tests/fixtures/afm/.browserslistrc` — the EXACT production AFM pin per `BROWSER_LIST_FROM_AFM.md`, resolves to the 14-entry list `and_chr 144 / chrome 144..140 / edge 144..143 / firefox 147..146 / ios_saf 26.2..26.1 / safari 26.2..26.1` under workspace-pinned `caniuse-lite@1.0.30001766` + `browserslist@4.24.2`. Unsets `BROWSERSLIST`, `AUTOPREFIXER`, and `COMPILED_CSS_ENGINE`) → emits `crates/babel-plugin/tests/transform_css_corpus.json` (gitignored — regenerable). 30 hand-curated CSS fixtures from `crates/parity-runner/corpus/transform-css/` × 4 opts permutations spanning the babel-plugin's real call shape from `packages/babel-plugin/src/utils/{transform-css-items,build-styled-component}.ts` (`{}`, `{optimizeCss:false}`, `{increaseSpecificity:true}`, `{classHashPrefix:'x'}`). **120/120 entries byte-equal** with `css::transform_css`. New `[dev-dependencies]` entry on `crates/css` in `crates/babel-plugin/Cargo.toml` (will promote to `[dependencies]` when §4.6 wires `transform_css` into the visitor). | `RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration` → 3/3 (120/120 parity, no expected-to-fail). 5 consecutive runs all green confirms the env-race fix is stable. Sibling suites unchanged. |
 | §4.2 | ☑ | Build `crates/babel-plugin/COMPAT_GENERATOR_COVERAGE.md` enumerating every AST node kind reachable from `keyframes(...)` (and any other `generate(...)` call site) in the consuming monorepo | claude-2026-05-04 | `crates/babel-plugin/COMPAT_GENERATOR_COVERAGE.md` (per-call-site coverage manifest + comment-axis fixtures + real-divergence table); `parity-harness/compat-generator/{fixtures.json,oracle.mjs}` (in-tree input manifest + JS oracle that emits `crates/babel-plugin/tests/compat_generator_corpus.json`, gitignored, regenerable; pin guard fail-fasts on `@babel/generator` / `@babel/parser` drift); `crates/babel-plugin/src/compat/{mod.rs,generator.rs}` (stub `generate(&Expr) -> String` that `unimplemented!()`s — by design, callers know §4.3 is a hard prereq); `crates/babel-plugin/tests/compat_generator_integration.rs` (3 tests: corpus shape lock + SWC parse coverage GREEN at §4.2 ship; byte-parity assertion `#[ignore]`d until §4.3 ports the line-for-line generator). Pinned `@babel/generator@7.23.0` + `@babel/parser@7.29.2` (AFM-resolved) in root `package.json#overrides` AND promoted both to top-level devDependencies (workspace's bun-isolated dep layout doesn't symlink `node_modules/@babel/generator`, so without the devDep promotion `require('@babel/generator')` walked PAST the workspace and grabbed `Documents\projects\node_modules\@babel\generator@7.28.5` — a sibling tree's copy. Caught by the oracle's pin guard). Both pins recorded in `crates/PARITY_VERSIONS.md` with the rationale for pinning the parser alongside the generator. 55 fixtures across 5 call_site axes (conditional-classname-item: 8, generic-expression: 25, jsx-key-attribute: 5, keyframes-expression: 11, variable-init: 6) — every call_site has ≥1 fixture; comment-axis fixtures (eslint-disable, ternary-inner, PURE annotations, leading/trailing block comments) seeded explicitly per the user's flag. Real divergences captured in the corpus that §4.3 must reproduce: `cond ? /* yes */'a-class' : 'b-class'` (no space after block comment), `(a && b) \|\| c → a && b \|\| c` (paren drop at precedence boundary), single-quote preservation. | `bun parity-harness/compat-generator/oracle.mjs` writes 55 entries with pin guard `@babel/generator=7.23.0, @babel/parser=7.29.2`. `RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration` → 2 passed (`corpus_shape_lock`, `corpus_input_sources_parse_under_swc`), 1 ignored (`rust_compat_generator_matches_js_corpus` waiting on §4.3). Sibling suites unchanged: 43 babel-plugin lib + 4 hash_parity + 3 transform_css_integration + 56 strip-runtime lib + 31 compiled-utils lib + 1132 strip-runtime harness + 954 babel-plugin full harness + 336 equality-harness. **Verified against current `crates/css` HEAD — §4.1 still 120/120 under both new pins** (defense-in-depth crosscheck per the parallel autoprefixer-agent collision risk note in §4.2 plan). |
-| §4.3 | ☐ | Port `compat/generator.rs` covering every node kind in the manifest | — | `crates/babel-plugin/src/compat/generator.rs` | All compat-generator parity fixtures byte-clean |
+| §4.3 | ▶ | Port `compat/generator.rs` covering every node kind in the manifest | claude-2026-05-04 (foundation + 50/55) | `crates/babel-plugin/src/compat/generator/{mod,buffer,printer}.rs`, `compat/generator/node/{mod,parentheses}.rs`, `compat/generator/generators/{mod,expressions,types,template_literals}.rs` (~1372 LOC across 9 files mirroring upstream `lib/{index,buffer,printer}.js`, `lib/node/{index,parentheses}.js`, `lib/generators/{expressions,types,template-literals}.js`). `compat::generator::generate_with_comments(&Expr, &dyn Comments)` threads the SWC comment store through the printer; the comment-less `generate(&Expr)` form is kept for synthetic-AST callers. Foundation handles: paren-policy with precedence (Babel's PRECEDENCE table 1:1, including `(a && b) \|\| c → a && b \|\| c` redundancy drop), source-quote preservation via `Str.raw` / `Number.raw`, multi-line `ObjectExpression` with 2-space indent and `printList`-statement-mode pre/post newlines, comment threading via `Comments::take_leading` / `take_trailing` keyed at node `BytePos` (with the SWC quirk that same-line comments between tokens are stored as TRAILING-of-previous, not leading-of-next — handled at object-property iteration via `take_trailing(open_brace.lo + 1)` for the first-property case). Comment policy: leading space before block comments unless tail is `[` or `{`, no trailing space (matches the corpus's `cond ? /* yes */'a-class'` divergence). Indent honoured by `print_comment` via `maybe_indent` so `\n  /* leading */` lands at the right column. JSX (`generators/jsx.js` analog) NOT yet ported — the 5 jsx-key-attribute fixtures (covered by §4.2's coverage manifest, reachable from `build-compiled-component.ts:30`) skip via `continue` in the test. JSX is the remaining sub-step before §4.3 closes. Other upstream files (`flow.js`, `typescript.js`, `classes.js`, `methods.js`, `modules.js`, `statements.js`, `base.js`) intentionally NOT ported — none are reachable from the 5 call sites per CLAUDE.md "1:1 with what's reachable, not future-proofing". | `RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration` → 3/3 pass (corpus_shape_lock + corpus_input_sources_parse_under_swc + rust_compat_generator_matches_js_corpus over 50 fixtures byte-exact, 5 jsx-key skipped pending the JSX sub-step). Wasm cdylib still builds clean (`cargo build --target wasm32-wasip1 --release` finishes without errors). All sibling suites unchanged: 43 babel-plugin lib + 4 hash_parity + 3 transform_css_integration + 56 strip-runtime lib + 31 compiled-utils lib + 1132 strip-runtime harness + 954 babel-plugin full harness + 336 equality-harness. **Total: 2562 tests, zero failures, zero ignored.** |
 | §4.4 | ☐ | Port `utils/css_builders.rs` line-for-line | — | `crates/babel-plugin/src/utils/css_builders.rs` | Harness fixtures exercising `keyframes`, `css`, `cssMap` are byte-clean |
 | §4.5 | ☐ | Port `utils/transform_css_items.rs` and `utils/build_css_variables.rs` | — | Both `.rs` files | Same harness gate |
 | §4.6 | ☐ | Wire `transform_css` calls into the visitor (single pass, no scan/apply) | — | Updated `lib.rs` | Harness clean for `keyframes`, `css`, `cssMap` fixtures |
