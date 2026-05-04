@@ -536,6 +536,122 @@ propagate `&mut Expr` through the whole evaluator to serve one
 site.** One mutation-bearing call shape, the rest of the call
 graph stays clean.
 
+**§5.0b SPEC LOCK — `scope.push({id, init, kind})` is
+AST-mutating** (Finding 6 above). Implementation contract:
+
+**§5.0a → §5.0b handoff state (logged 2026-05-04 by §5.0a
+implementer):** §5.0a shipped `scope_push_synthetic` as a
+**binding-table-only stub** — registers the synthetic binding in
+the scope index but does NOT touch the AST. This is correct for
+§5.0a per the Q1 (pre-index, read-only) and Q2 (mutation confined
+to one site) locks; §5.0a's deliverable is the read-only binding
+index, not AST mutation. The stub passes the
+`scope-push-iife` corpus fixture today because the fixture only
+asserts post-push binding-shape observables (`getOwnBinding`
+result, kind, parent scope reachability), NOT post-push AST
+shape.
+
+**§5.0b CLOSED (2026-05-04, this session).** The replacement
+landed at `crates/babel-plugin/src/compat/path.rs::scope_push`
+(`pub fn scope_push(&mut ScopeIndex, ScopeId, PushOpts, &mut
+BlockStmt)`), per the 7-step contract below. Behaviour realised:
+unshifts a `VariableDeclaration` into the target block's
+`body[0]`, coalescing same-kind same-blockHoist pushes into one
+declaration via the `dataKey` reuse rule, and registers the new
+declarator's binding via the new
+`ScopeIndex::register_synthetic_binding` helper.
+
+The "push then traverse, observe new VarDecl" round-trip
+(`scope_push_inserts_var_decl_into_arrow_body_visible_to_traverse`
+in `compat/path.rs`'s `tests` module) is green. The stub
+(renamed `scope_push_synthetic`, now a thin
+binding-only delegate to `register_synthetic_binding`) is
+retained ONLY for the §5.0a parity-gate fixture, which asserts
+binding shape without AST observation. Production callers MUST
+use `compat::path::scope_push`.
+
+**Why both APIs coexist.** Removing `scope_push_synthetic`
+outright would force a rewrite of the §5.0a integration test's
+scope-push-iife runner (which works against `&Module` and a
+synthetic span). The wrapper keeps that gate stable while making
+the production path unambiguous. If a future cleanup migrates the
+fixture to call `compat::path::scope_push` directly, delete the
+wrapper — it has no production reach.
+
+
+
+1. The IIFE construct in `traverse-call-expression.ts:95-122`
+   synthesises an arrow `(() => callExpr)()` and pushes evaluated
+   args as `const param = evaluatedArg` into the arrow's body
+   scope.
+2. The Rust port's `scope_push(arrow_path: &mut PathHandle,
+   PushOpts { id, init, kind })` MUST:
+   - Walk to a valid push-target per upstream's logic
+     (`BlockStatement` / `Program`; pattern parents redirect to
+     pattern-parent's body; switch-statement parents redirect to
+     function/program parent).
+   - On loop / catch / function paths: synthesise an empty
+     `BlockStmt` if absent (`ensureBlock` analog), descend to it.
+   - Compute `dataKey = "declaration:{kind}:{blockHoist}"`. Reuse
+     an existing declaration block at that key if present, so
+     repeated pushes collapse into one `VariableDeclaration`.
+   - Synthesise a `VarDeclarator { name: id, init }` and
+     `unshiftContainer`-equivalent the new `VarDecl` onto
+     `block.stmts` (i.e. INSERT AT INDEX 0).
+   - Re-run `ScopeIndex::register_local_var(arrow_scope_id, name,
+     declarator_ref)` so subsequent `get_own_binding()` lookups
+     against the arrow's scope find the injected binding.
+3. Downstream `path.traverse(visitor)` on the arrow's subtree
+   MUST observe the injected `VarDecl` nodes as ordinary AST.
+   This is the byte-parity contract — a bindings-map-only
+   update would silently diverge here.
+
+The §5.0b implementer's first cargo unit test should be a
+"push then traverse, observe the new VarDecl" round-trip; if
+that test passes, the AST-mutation contract holds. If it
+returns a bindings-map but no AST node, the model is wrong —
+even if `get_own_binding` succeeds in isolation.
+
+**§5.5/§5.6 trip-wire on lazy-crawl semantic delta** (Finding 7
+above): if the §5.5/§5.6 ports ever reach a
+`getBinding → mutate → getBinding` shape (i.e. the same
+binding is queried before AND after a mutation in the same
+evaluation pass), STOP and verify the eager pre-index sees the
+mutation. Today's audit shows none of the §5.4/§5.5/§5.6
+sources exercise this shape — but if a future fixture surfaces
+it, the eager-vs-lazy delta becomes observable and the Rust
+port must invalidate-and-re-crawl the affected scope, not
+serve a stale binding from the pre-index.
+
+**§5.5/§5.6 IMPLEMENTER ACTION — plant a breadcrumb at every
+dispatch site that calls `get_binding()` / `get_own_binding()`.**
+When §5.5 (`utils/traverse_expression/*.rs`) and §5.6
+(`utils/evaluate_expression.rs`) land, every call into the
+scope index gets a one-line comment:
+
+```rust
+// If a fixture surfaces lazy-crawl observability here
+// (getBinding → mutate → getBinding diverging from upstream),
+// see plugins/COMPAT_SCOPE_AUDIT.md Finding 7.
+let binding = scope.get_binding(name);
+```
+
+The breadcrumb is grep-discoverable, points back to the
+authoritative reasoning, and prevents the exact failure mode
+CLAUDE.md forbids: a future agent encountering a divergence,
+re-deriving the eager-vs-lazy decision badly, and patching
+around it instead of escalating. Cost is one comment per
+dispatch site (~10 sites across §5.4–§5.6 per the surface
+table); benefit is durable provenance on a non-obvious
+architectural choice.
+
+The §5.5/§5.6 owner verifies this discipline at PR time —
+grep for `get_binding\|get_own_binding` in `utils/` and confirm
+each call carries the breadcrumb, OR is exempt because it sits
+inside a sub-helper whose enclosing function already carries
+one. No exemptions for "obviously not affected" — the whole
+point of the breadcrumb is that observability is non-obvious.
+
 **Q3 — Full port of `path.evaluate()`. ✓** Reverses the
 partial-port recommendation in this audit. Reasons:
 1. "BUGS in OLD = BUGS in NEW" is the cardinal rule (CLAUDE.md).

@@ -5,11 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="46baedc5-8956-4da5-8e73-63c433c62642" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bun.lock" beforeDir="false" afterPath="$PROJECT_DIR$/bun.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/PARITY_VERSIONS.md" beforeDir="false" afterPath="$PROJECT_DIR$/crates/PARITY_VERSIONS.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/tests/compat_evaluation_integration.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/tests/compat_evaluation_integration.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/tests/compat_scope_integration.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/tests/compat_scope_integration.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugins/COMPAT_SCOPE_AUDIT.md" beforeDir="false" afterPath="$PROJECT_DIR$/plugins/COMPAT_SCOPE_AUDIT.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plugins/STATUS.md" beforeDir="false" afterPath="$PROJECT_DIR$/plugins/STATUS.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -41,6 +41,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "bun",
+    "prettierjs.PrettierConfiguration.Package": "C:\\Users\\shanon\\Documents\\projects\\sjcompiled\\node_modules\\prettier",
     "ts.external.directory.path": "C:\\Users\\shanon\\Documents\\projects\\sjcompiled\\node_modules\\typescript\\lib",
     "vue.rearranger.settings.migration": "true"
   }
