@@ -20,14 +20,22 @@ indexmap = { workspace = true }
 # from compiled-utils. Path-dep (workspace) so version drift between
 # the babel-plugin port and the utils crate is impossible.
 compiled-utils = { path = "../compiled-utils" }
+# §4.4 utils/manipulate_template_literal.rs ports two upstream regex
+# patterns verbatim (the split-statement char class `[;|{|}]` and the
+# block-comment strip `/\*(.|\n)*?\*/`). once_cell wraps them in
+# `Lazy<Regex>` so compilation happens once per WASI instance.
+regex = { workspace = true }
+once_cell = { workspace = true }
+# §4.4 utils/css_builders.rs imports `addUnitIfNeeded` and
+# `cssAffixInterpolation` from `@compiled/css` upstream
+# (packages/babel-plugin/src/utils/css-builders.ts:4). Both helpers
+# are re-exported by `crates/css/src/lib.rs` per
+# CSS_BUILDERS_DEPS.md's RESOLVED action item. Promoted from
+# `[dev-dependencies]` (where §4.1 placed it for the integration
+# parity test) to `[dependencies]` to land the §4.4 wiring.
+css = { workspace = true }
 
 [dev-dependencies]
-# Phase 4 §4.1 — integration parity gate against `css::transform_css`
-# from this plugin's POV. Dev-only: the plugin doesn't yet wire
-# `transform_css` into the visitor (that's §4.6); the dependency exists
-# solely to prove the consumer-side contract holds before the wiring
-# lands. Once §4.6 ships, this entry is promoted to `[dependencies]`.
-css = { path = "../css" }
 # Phase 4 §4.2 — compat-generator parity gate needs to PARSE the
 # fixture `input_source` strings into SWC AST nodes (Expr / Module
 # with JSX). The lib build doesn't need the parser (the visitor walks

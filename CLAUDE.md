@@ -7,6 +7,8 @@ packages/babel-plugin and packages-babel-plugin-strip-runtime to Rust following 
 The ONLY way to do this correctly is to migrate everything 1:1 same folder/file system as ORIGINAL where all the parts are 1:1 and therefore the WHOLE is 1:1. 
 Obviously we have to make some EXTREMELY minor exceptions because babel and swc are not the same. For anything that needs to match a babel-api put that in a compat/* folder with clear comment on usage.
 
+BUGS in OLD! Need to be BUGS In NEW. We are not fixing bugs as part of this; This is EXTREMELY intentional as if we ship something that has same output we can ship it very easily.
+
 
 # DRIFT DETECTION - 
 THIS PART IS CRITICAL!

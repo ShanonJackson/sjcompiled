@@ -117,6 +117,8 @@ dependencies = [
  "compiled-utils",
  "css",
  "indexmap",
+ "once_cell",
+ "regex",
  "serde",
  "serde_json",
  "swc_core",

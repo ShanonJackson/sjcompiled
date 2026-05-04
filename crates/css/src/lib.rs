@@ -28,3 +28,13 @@ pub mod generate_compression_map;
 pub use transform::{transform_css, TransformOpts, TransformResult};
 pub use sort::{sort, SortOpts};
 pub use generate_compression_map::{generate_compression_map, GenerateCompressionMapOpts};
+
+// Mirror the non-orchestrator public re-exports from
+// `packages/css/src/index.ts:1,4-7`. These pure helpers live in
+// `crates/compiled-css/src/utils/`; surfacing them here lets
+// `crates/babel-plugin/src/utils/css_builders.rs` import from `css::`
+// the same way the JS file imports from `@compiled/css`.
+pub use compiled_css::utils::css_property::{add_unit_if_needed, AddUnitValue};
+pub use compiled_css::utils::css_affix_interpolation::{
+    css_affix_interpolation, AfterInterpolation, BeforeInterpolation,
+};
