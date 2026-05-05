@@ -263,6 +263,68 @@ remaining divergences are now CONTAINED to:
   panics resolved by the TaggedTpl deopt fix; net no change).**
   Cumulative across this session: parity 7 → 118 (+111, 23.3% of
   477); divergence 407 → 296 (-111).
+- **§6.8b ☑ — three port-completions on stubbed code paths
+  unblocking the swc-throws cluster** (this session, 2026-05-05).
+  Three 1:1 ports of upstream branches that were stubbed at
+  module boundaries:
+
+  1. **`utils/object_property_to_string.rs::expression_to_string`
+     Identifier/MemberExpression branch.** Was an
+     `unimplemented!()` SHELL panic citing "Phase 4 Phase 6 rewires
+     this call site". Replaced with the upstream
+     `evaluateExpression(expression, meta)` call (object-property-to-string.ts:57-67),
+     followed by recursive `expressionToString` on the folded value
+     or a `Cannot statically evaluate` throw on deopt
+     (`ResultPair::value == None`). Threading required adding
+     `scope_index / parent_scope / own_scope` to
+     `expression_to_string`, `template_literal_to_string`,
+     `binary_expression_to_string`, and `object_property_to_string`
+     (matching the §5.5 explicit-param trio convention). Single
+     call site updated in `css_builders.rs::extract_object_expression`.
+  2. **`utils/css_builders.rs::build_css_inner` Identifier branch.**
+     Was a §4.6 stub that called `resolve_binding(...)` and threw
+     the result away, then fell through to the catch-all "unable
+     to extract" error. This was the root cause of the styled (33)
+     + css-prop (18) swc-throw clusters: every fixture using
+     `styled.div([identifier, ...])`, `styled.div(identifier)`, or
+     `<div css={identifier} />` panicked. Replaced with the full
+     upstream branch (build-css.ts:992-1024): resolve_binding;
+     throw if `None`; throw if `binding.node` is `None`; cssMap
+     collision check; recurse `build_css_inner` on the resolved
+     init expression with the appropriate scope (same-file: keep
+     the current `scope_index`; cross-file: build a fresh
+     `ScopeIndex` from `imported_module` and route through its
+     program scope, mirroring §5.6's cross-file dispatch);
+     `assertNoImportedCssVariables` post-check (throw if an
+     imported binding produced CSS variables).
+  3. **`utils/css_builders.rs::extract_template_literal`
+     `canBuildExpressionAsCss` arm.** Was missing entirely (the
+     Rust port jumped straight from "evaluator wired" to "keyframes
+     branch" to "catch-all CSS variable"). This was the root cause
+     of the class-names tagged-template-expression cluster: every
+     fixture using `` css`${color}` `` (where `color` evaluates to
+     an ObjectExpression / Compiled CSS call / Compiled CSS tagged
+     template) reached the `--_<hash>` CSS-variable path with a
+     non-scalar value. Ported upstream lines 803-838 verbatim:
+     compute `does_expression_contain_css_block` /
+     `does_expression_have_conditional_css` /
+     `can_build_expression_as_css`; if true, recurse
+     `build_css_inner` on the evaluated interpolation (with
+     `MetadataContext::Fragment` swapped in for the template-literal
+     sub-recursion case); on success, push the
+     accumulated-prefix-quasi as `Unconditional` then extend with
+     the recursive result's css + variables; reset `acc` and
+     `continue`.
+
+  **Triage delta: parity 118 → 132 (+14), divergence 296 → 308
+  (+12), swc-throws 62 → 36 (-26).** 26 fixtures moved out of
+  swc-throw — 14 produce byte-equal output, 12 produce
+  not-yet-byte-equal output that lands in divergence (cluster-by-
+  cluster follow-ups). Lib tests stay 433/433. Cumulative across
+  this session: parity 7 → 132 (+125, 27.7% of 477); divergence
+  407 → 308 (-99); swc-throws unchanged-then-down 62 → 36 (-26).
+  Remaining swc-throws by cluster: styled 20, css-prop 10,
+  class-names 6.
 
 ### Verifying the current state from a cold pickup
 

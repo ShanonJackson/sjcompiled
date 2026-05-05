@@ -5,10 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="46baedc5-8956-4da5-8e73-63c433c62642" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/css_builders.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/css_builders.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/object_property_to_string.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/object_property_to_string.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/parity-harness/babel-plugin/run-fixture.mjs" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/parity-harness/babel-plugin/triage-report.json" beforeDir="false" afterPath="$PROJECT_DIR$/parity-harness/babel-plugin/triage-report.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugins/STATUS.md" beforeDir="false" afterPath="$PROJECT_DIR$/plugins/STATUS.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
