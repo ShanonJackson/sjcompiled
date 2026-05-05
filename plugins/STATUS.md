@@ -235,13 +235,75 @@ class_names unit tests). All sibling gates clean: compat_evaluation
 3/3, compat_scope 3/3, compat_generator 3/3, resolver_matrix 8/8,
 transform_css 3/3, hash_parity 4/4. WASI cdylib build clean.
 
-**Next checkpoint: Phase 6 §6.7 — `styled` handler.** Largest
-single fixture set per §6.8 exit gate. Includes `forwardRef`
-wiring + `@emotion/is-prop-valid` table verbatim port
-(`crates/babel-plugin/src/compat/is_prop_valid.rs` per upstream's
-verbatim-table source). The styled handler is the last gating
-piece before §4.8 (Phase 4 exit gate fixtures byte-clean) and
-§6.8 (Phase 6 exit gate full harness green).
+**Phase 6 §6.7 ☑ (this session, 2026-05-05) — `styled` handler.**
+Largest fixture set per §6.8 exit gate. Three new modules + a
+`visit_mut_expr` extension + `visit_mut_var_decl` pre-detect +
+`visit_mut_module_items`/`visit_mut_stmts` displayName drain:
+
+- `crates/babel-plugin/src/compat/is_prop_valid.rs` (~470 LOC +
+  13 unit tests) — VERBATIM port of `@emotion/is-prop-valid@1.4.0`
+  (418-entry sorted `&[&str]` + `data-` / `aria-` /  `x-` prefix
+  branches + `on<UpperAscii>` charcode short-circuit). Pin
+  recorded in `crates/PARITY_VERSIONS.md`. Count-lock test asserts
+  `len() == 418` so a future bump that adds/removes entries fires
+  immediately.
+- `crates/babel-plugin/src/utils/build_styled_component.rs`
+  (~770 LOC + 11 unit tests) — port of
+  `utils/build-styled-component.ts`: `buildStyledComponent` +
+  `styledTemplate` + `styledStyleProp` + `buildComponentTag` +
+  `invalidDomPropsVisitor` + `getInvalidDomProps` +
+  `findOpenSelectors`. Hand-built JSX matches upstream's
+  `@babel/template`-driven shape: `forwardRef(({ as: C = "div",
+  style: __cmpls, ...__cmplp }, __cmplr) => { ... return
+  <CC><CS>{cssArray}</CS><C ...></CC>; })`. Production-vs-dev env
+  gate via `process.env.NODE_ENV` literal in emitted output (NOT
+  build-time gating, mirrors upstream's runtime check).
+- `crates/babel-plugin/src/styled/mod.rs` (~470 LOC + 6 unit
+  tests) — port of `styled/index.ts` `visitStyledPath`:
+  `extractStyledDataFromTemplateLiteral` /
+  `extractStyledDataFromObjectLiteral` / `extractStyledDataFromNode`
+  + `hasInValidExpression` predicate + the dispatch fn returning
+  `Option<StyledReplacement>`. Recognises all four shapes:
+  `styled.div(...)` / `styled(C)(...)` / `styled.div\`...\`` /
+  `styled(C)\`...\``.
+- `crates/babel-plugin/src/babel_plugin.rs` —
+  (a) `visit_mut_expr` extended after the §6.1/§6.2 cleanup
+  matchers to call `styled::try_visit_styled` and replace `*n`
+  on success;
+  (b) `visit_mut_var_decl` pre-detects styled-init shape and
+  captures `decls[0].id` (Ident) for displayName insertion (the
+  upstream `decls[0]`-bug-parity path);
+  (c) `visit_mut_module_items` + `visit_mut_stmts` overrides
+  drain `pending_styled_display_names` after each item walk and
+  splice in `if (process.env.NODE_ENV !== 'production') {
+  X.displayName = 'X'; }` statements.
+
+**SWC vs Babel divergences (documented in module docs):**
+* `@babel/template`-driven JSX → hand-built SWC AST. Same printed
+  bytes (modulo whitespace, prettier flattens before the parity
+  oracle hashes).
+* `path.findParent(isVariableDeclaration)` in upstream → Rust
+  `visit_mut_var_decl` pre-walk + queue. Upstream's
+  `decls[0].id`-regardless-of-which-declarator-triggered quirk is
+  preserved per "BUGS in OLD = BUGS in NEW".
+* Styled call inside an arrow body inside a VarDecl init is the
+  ONE corner case where Rust diverges (no displayName insertion);
+  upstream's `findParent` walk would fire there. Documented as a
+  scope-of-the-pre-detect divergence in `babel_plugin.rs`.
+
+Lib tests: **421/421** (was 387 post-§6.6; +34: 13 is_prop_valid
+unit + 11 build_styled_component unit + 6 styled unit + 4 phase6c
+end-to-end). Sibling integration gates clean: compat_scope 3/3,
+compat_evaluation 3/3, compat_generator 3/3, resolver_matrix 8/8,
+transform_css 3/3, hash_parity 4/4. WASI cdylib build clean.
+
+**Next checkpoint: Phase 6 §6.8 — Phase 6 exit gate.** Full
+harness green: all ~50 babel-plugin fixtures + cross-handler
+fixtures + JSX automatic-runtime fixtures + custom-import-source
+fixtures byte-clean against the parity oracle. With §6.7 closed,
+the §4.8 (Phase 4 exit gate — keyframes/css/cssMap/styled
+fixtures byte-clean) AND §6.8 (Phase 6 exit gate full harness)
+are unblocked and ship together.
 
 **§4.7 (Parcel wrapper) — out of scope.** Treated as a
 downstream-host use case the bridge supports (single

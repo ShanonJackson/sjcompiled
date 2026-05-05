@@ -35,6 +35,7 @@ pub mod keyframes;
 pub mod mutation_recorder;
 pub mod resolver;
 pub mod state;
+pub mod styled;
 pub mod types;
 pub mod utils;
 pub mod xcss_prop;

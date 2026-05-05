@@ -30,6 +30,7 @@
 pub mod ast;
 pub mod build_compiled_component;
 pub mod build_css_variables;
+pub mod build_styled_component;
 pub mod cache;
 pub mod comments;
 pub mod compress_class_names_for_runtime;

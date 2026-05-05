@@ -58,8 +58,12 @@ use crate::css_map::{extract_var_decl_target, visit_css_map_path};
 use crate::keyframes;
 use crate::mutation_recorder::{ApiKind, MutationRecorder, StateDiff};
 use crate::state::State;
+use crate::styled;
 use crate::types::{Metadata, MetadataContext, PluginOptions};
-use crate::utils::is_compiled::is_compiled_css_map_call_expression;
+use crate::utils::is_compiled::{
+    is_compiled_css_map_call_expression, is_compiled_styled_call_expression,
+    is_compiled_styled_tagged_template_expression,
+};
 
 /// Resolve the effective import-sources set: `DEFAULT_IMPORT_SOURCES`
 /// ∪ user `opts.import_sources`. Mirrors upstream `pre()`'s
@@ -78,6 +82,80 @@ pub fn resolve_import_sources(opts: &PluginOptions) -> Vec<String> {
         }
     }
     out
+}
+
+/// `if (process.env.NODE_ENV !== 'production') { X.displayName =
+/// 'X'; }` — Phase 6 §6.7 displayName statement built per upstream
+/// `utils/build-display-name.ts`. Mirrors the template:
+///
+/// ```text
+/// if (process.env.NODE_ENV !== 'production') {
+///   <ident>.displayName = '<displayName>';
+/// }
+/// ```
+fn build_display_name_stmt(name: &str) -> swc_core::ecma::ast::Stmt {
+    use swc_core::common::DUMMY_SP;
+    use swc_core::ecma::ast::{
+        AssignExpr, AssignOp, AssignTarget, BinExpr, BinaryOp, BlockStmt, Expr, ExprStmt, Ident,
+        IdentName, IfStmt, Lit, MemberExpr, MemberProp, SimpleAssignTarget, Stmt, Str,
+    };
+
+    let process_env_node_env = Expr::Member(MemberExpr {
+        span: DUMMY_SP,
+        obj: Box::new(Expr::Member(MemberExpr {
+            span: DUMMY_SP,
+            obj: Box::new(Expr::Ident(Ident::new(
+                "process".into(),
+                DUMMY_SP,
+                Default::default(),
+            ))),
+            prop: MemberProp::Ident(IdentName::new("env".into(), DUMMY_SP)),
+        })),
+        prop: MemberProp::Ident(IdentName::new("NODE_ENV".into(), DUMMY_SP)),
+    });
+    let test = Expr::Bin(BinExpr {
+        span: DUMMY_SP,
+        op: BinaryOp::NotEqEq,
+        left: Box::new(process_env_node_env),
+        right: Box::new(Expr::Lit(Lit::Str(Str {
+            span: DUMMY_SP,
+            value: "production".into(),
+            raw: None,
+        }))),
+    });
+
+    let assign = AssignExpr {
+        span: DUMMY_SP,
+        op: AssignOp::Assign,
+        left: AssignTarget::Simple(SimpleAssignTarget::Member(MemberExpr {
+            span: DUMMY_SP,
+            obj: Box::new(Expr::Ident(Ident::new(
+                name.into(),
+                DUMMY_SP,
+                Default::default(),
+            ))),
+            prop: MemberProp::Ident(IdentName::new("displayName".into(), DUMMY_SP)),
+        })),
+        right: Box::new(Expr::Lit(Lit::Str(Str {
+            span: DUMMY_SP,
+            value: name.into(),
+            raw: None,
+        }))),
+    };
+
+    Stmt::If(IfStmt {
+        span: DUMMY_SP,
+        test: Box::new(test),
+        cons: Box::new(Stmt::Block(BlockStmt {
+            span: DUMMY_SP,
+            stmts: vec![Stmt::Expr(ExprStmt {
+                span: DUMMY_SP,
+                expr: Box::new(Expr::Assign(assign)),
+            })],
+            ctxt: Default::default(),
+        })),
+        alt: None,
+    })
 }
 
 /// Match `userland_module_specifier` against `import_sources`.
@@ -166,6 +244,14 @@ pub struct BabelPluginVisitor<C: Comments> {
     /// same point `scope_index` is built. Avoids an extra method
     /// dispatch on the hot path.
     pub program_scope: Option<ScopeId>,
+    /// §6.7 styled handler: queue of (binding_name) entries to emit
+    /// `X.displayName = 'X';` (wrapped in `if (process.env.NODE_ENV
+    /// !== 'production')`) AFTER each VarDecl whose decls[0].id is
+    /// `Pat::Ident` AND whose decls contain a styled call init.
+    /// Drained at `visit_mut_module_items` / `visit_mut_stmts` walk
+    /// time. Cleared between VarDecls, so the queue's depth never
+    /// grows beyond a single VarDecl's worth of decls.
+    pub pending_styled_display_names: Vec<String>,
 }
 
 impl<C: Comments> BabelPluginVisitor<C> {
@@ -191,6 +277,7 @@ impl<C: Comments> BabelPluginVisitor<C> {
             stub_log: Vec::new(),
             scope_index: None,
             program_scope: None,
+            pending_styled_display_names: Vec::new(),
         }
     }
 
@@ -607,6 +694,29 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         if css::try_queue_cleanup(n, &mut self.state) {
             return;
         }
+
+        // §6.7 — styled handler. Detects `styled.div(...)` /
+        // `styled(C)(...)` / `styled.div\`...\`` /
+        // `styled(C)\`...\`` and replaces with the
+        // `forwardRef(({...}) => <CC>...</CC>)` wrapper. Runs after
+        // the cleanup-only matchers because styled is a
+        // replace-with-different-shape mutation (not queue + drain),
+        // and the cleanup matchers wouldn't fire on a styled call
+        // anyway (they gate on keyframes/css imports, not styled).
+        let (Some(scope_index), Some(parent_scope)) =
+            (self.scope_index.as_mut(), self.program_scope)
+        else {
+            return;
+        };
+        if let Some(replacement) = styled::try_visit_styled(
+            n,
+            &mut self.state,
+            &mut self.recorder,
+            scope_index,
+            parent_scope,
+        ) {
+            *n = replacement.replacement;
+        }
     }
 
     /// `'TaggedTemplateExpression|CallExpression'` upstream. The
@@ -714,6 +824,84 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
             parent_scope,
         ) {
             *n = replacement.new_element;
+        }
+    }
+
+    /// Phase 6 §6.7 — styled displayName pre-detect. The styled
+    /// handler in `visit_mut_expr` swaps `styled.div(...)` for
+    /// `forwardRef(...)` in place, but the `displayName` insert
+    /// requires knowing the binding name AND the surrounding VarDecl
+    /// position, neither of which the Expr visitor can see. We
+    /// pre-detect here: if any declarator's init looks like a styled
+    /// call/tagged-tpl, AND `decls[0].id` is `Pat::Ident`, queue the
+    /// name onto `pending_styled_display_names`. The
+    /// `visit_mut_module_items` / `visit_mut_stmts` overrides drain
+    /// the queue and emit the displayName statement after the
+    /// VarDecl item.
+    ///
+    /// Upstream uses `decls[0].id` regardless of which declarator's
+    /// init triggered the styled handler — that's a quirk we
+    /// replicate per "BUGS in OLD = BUGS in NEW".
+    fn visit_mut_var_decl(&mut self, n: &mut swc_core::ecma::ast::VarDecl) {
+        let any_styled_init = n.decls.iter().any(|d| {
+            d.init
+                .as_deref()
+                .map(|e| {
+                    is_compiled_styled_call_expression(e, &self.state)
+                        || is_compiled_styled_tagged_template_expression(e, &self.state)
+                })
+                .unwrap_or(false)
+        });
+        let captured_name: Option<String> = if any_styled_init {
+            n.decls.first().and_then(|d0| {
+                if let swc_core::ecma::ast::Pat::Ident(swc_core::ecma::ast::BindingIdent {
+                    id, ..
+                }) = &d0.name
+                {
+                    Some(id.sym.as_ref().to_string())
+                } else {
+                    None
+                }
+            })
+        } else {
+            None
+        };
+
+        n.visit_mut_children_with(self);
+
+        if let Some(name) = captured_name {
+            self.pending_styled_display_names.push(name);
+        }
+    }
+
+    /// Drain `pending_styled_display_names` after each item walk.
+    /// Each drained name produces a `if (process.env.NODE_ENV !==
+    /// 'production') { X.displayName = 'X'; }` statement inserted
+    /// directly after the item that triggered the queue write.
+    fn visit_mut_module_items(&mut self, items: &mut Vec<ModuleItem>) {
+        let mut i = 0;
+        while i < items.len() {
+            items[i].visit_mut_with(self);
+            let drained: Vec<String> = std::mem::take(&mut self.pending_styled_display_names);
+            for (offset, name) in drained.iter().enumerate() {
+                items.insert(
+                    i + 1 + offset,
+                    ModuleItem::Stmt(build_display_name_stmt(name)),
+                );
+            }
+            i += 1 + drained.len();
+        }
+    }
+
+    fn visit_mut_stmts(&mut self, stmts: &mut Vec<swc_core::ecma::ast::Stmt>) {
+        let mut i = 0;
+        while i < stmts.len() {
+            stmts[i].visit_mut_with(self);
+            let drained: Vec<String> = std::mem::take(&mut self.pending_styled_display_names);
+            for (offset, name) in drained.iter().enumerate() {
+                stmts.insert(i + 1 + offset, build_display_name_stmt(name));
+            }
+            i += 1 + drained.len();
         }
     }
 
@@ -1726,5 +1914,389 @@ mod tests {
             }
             other => panic!("expected null literal init, got {:?}", other),
         }
+    }
+
+    // ───────── §6.7 — styled handler end-to-end ─────────
+
+    #[test]
+    fn phase6c_styled_member_call_replaced_with_forward_ref_and_display_name_inserted() {
+        // import { styled } from '@compiled/react';
+        // const Button = styled.div({ color: 'red' });
+        // → const Button = forwardRef((...) => <CC>...</CC>);
+        // → if (process.env.NODE_ENV !== 'production') { Button.displayName = 'Button'; }
+        use swc_core::common::SyntaxContext;
+        use swc_core::ecma::ast::{
+            BindingIdent, CallExpr, Callee, Decl, Expr as AstExpr, ExprOrSpread, Ident, IdentName,
+            KeyValueProp, Lit, MemberExpr, MemberProp, ObjectLit, Pat, Prop, PropName,
+            PropOrSpread, Stmt, Str, VarDecl, VarDeclKind, VarDeclarator,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![named_specifier("styled", None)],
+        )));
+
+        let styled_call = AstExpr::Call(CallExpr {
+            span: DUMMY_SP,
+            ctxt: SyntaxContext::empty(),
+            callee: Callee::Expr(Box::new(AstExpr::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(AstExpr::Ident(Ident::new(
+                    "styled".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                ))),
+                prop: MemberProp::Ident(IdentName::new("div".into(), DUMMY_SP)),
+            }))),
+            args: vec![ExprOrSpread {
+                spread: None,
+                expr: Box::new(AstExpr::Object(ObjectLit {
+                    span: DUMMY_SP,
+                    props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key: PropName::Ident(IdentName::new("color".into(), DUMMY_SP)),
+                        value: Box::new(AstExpr::Lit(Lit::Str(Str {
+                            span: DUMMY_SP,
+                            value: "red".into(),
+                            raw: None,
+                        }))),
+                    })))],
+                })),
+            }],
+            type_args: None,
+        });
+
+        let decl = ModuleItem::Stmt(Stmt::Decl(Decl::Var(Box::new(VarDecl {
+            span: DUMMY_SP,
+            ctxt: SyntaxContext::empty(),
+            kind: VarDeclKind::Const,
+            declare: false,
+            decls: vec![VarDeclarator {
+                span: DUMMY_SP,
+                name: Pat::Ident(BindingIdent {
+                    id: Ident::new("Button".into(), DUMMY_SP, SyntaxContext::empty()),
+                    type_ann: None,
+                }),
+                init: Some(Box::new(styled_call)),
+                definite: false,
+            }],
+        }))));
+
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, decl],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!("expected Module")
+        };
+        // Module body now has: import, var decl (with forwardRef
+        // init), AND the displayName if-stmt inserted after.
+        assert_eq!(m.body.len(), 3, "expected import + var + displayName");
+
+        // Item 1: VarDecl with forwardRef init.
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[1] else {
+            panic!("expected VarDecl at body[1]");
+        };
+        let init = vd.decls[0].init.as_deref().expect("init present");
+        let AstExpr::Call(call) = init else {
+            panic!("init not Call");
+        };
+        let Callee::Expr(callee) = &call.callee else {
+            panic!()
+        };
+        let AstExpr::Ident(callee_ident) = &**callee else {
+            panic!()
+        };
+        assert_eq!(callee_ident.sym.as_ref(), "forwardRef");
+
+        // Item 2: displayName if-stmt.
+        let ModuleItem::Stmt(Stmt::If(if_stmt)) = &m.body[2] else {
+            panic!("expected If at body[2]");
+        };
+        // Inner body has the assignment.
+        let Stmt::Block(block) = &*if_stmt.cons else {
+            panic!()
+        };
+        let Stmt::Expr(expr_stmt) = &block.stmts[0] else {
+            panic!()
+        };
+        let AstExpr::Assign(assign) = &*expr_stmt.expr else {
+            panic!("not assign")
+        };
+        let AstExpr::Lit(Lit::Str(s)) = &*assign.right else {
+            panic!()
+        };
+        assert_eq!(s.value.to_atom_lossy().as_str(), "Button");
+    }
+
+    #[test]
+    fn phase6c_styled_call_outside_var_decl_does_not_emit_display_name() {
+        // export default styled.div({ color: 'red' });
+        // → no `displayName` insert (no var binding name).
+        use swc_core::common::SyntaxContext;
+        use swc_core::ecma::ast::{
+            CallExpr, Callee, ExportDefaultExpr, Expr as AstExpr, ExprOrSpread, Ident, IdentName,
+            KeyValueProp, Lit, MemberExpr, MemberProp, ObjectLit, Prop, PropName, PropOrSpread,
+            Str,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![named_specifier("styled", None)],
+        )));
+
+        let styled_call = AstExpr::Call(CallExpr {
+            span: DUMMY_SP,
+            ctxt: SyntaxContext::empty(),
+            callee: Callee::Expr(Box::new(AstExpr::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(AstExpr::Ident(Ident::new(
+                    "styled".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                ))),
+                prop: MemberProp::Ident(IdentName::new("div".into(), DUMMY_SP)),
+            }))),
+            args: vec![ExprOrSpread {
+                spread: None,
+                expr: Box::new(AstExpr::Object(ObjectLit {
+                    span: DUMMY_SP,
+                    props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key: PropName::Ident(IdentName::new("color".into(), DUMMY_SP)),
+                        value: Box::new(AstExpr::Lit(Lit::Str(Str {
+                            span: DUMMY_SP,
+                            value: "red".into(),
+                            raw: None,
+                        }))),
+                    })))],
+                })),
+            }],
+            type_args: None,
+        });
+
+        let export = ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(ExportDefaultExpr {
+            span: DUMMY_SP,
+            expr: Box::new(styled_call),
+        }));
+
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, export],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!()
+        };
+        // Body unchanged length — no displayName inserted.
+        assert_eq!(m.body.len(), 2);
+    }
+
+    #[test]
+    fn phase6c_styled_tagged_template_replaced() {
+        // import { styled } from '@compiled/react';
+        // const Button = styled.div`color: red;`;
+        use swc_core::common::SyntaxContext;
+        use swc_core::ecma::ast::{
+            BindingIdent, Callee, Decl, Expr as AstExpr, Ident, IdentName, MemberExpr, MemberProp,
+            Pat, Stmt, TaggedTpl, Tpl, TplElement, VarDecl, VarDeclKind, VarDeclarator,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![named_specifier("styled", None)],
+        )));
+
+        let tagged = AstExpr::TaggedTpl(TaggedTpl {
+            span: DUMMY_SP,
+            tag: Box::new(AstExpr::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(AstExpr::Ident(Ident::new(
+                    "styled".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                ))),
+                prop: MemberProp::Ident(IdentName::new("div".into(), DUMMY_SP)),
+            })),
+            type_params: None,
+            tpl: Box::new(Tpl {
+                span: DUMMY_SP,
+                exprs: vec![],
+                quasis: vec![TplElement {
+                    span: DUMMY_SP,
+                    tail: true,
+                    cooked: Some("color: red;".into()),
+                    raw: "color: red;".into(),
+                }],
+            }),
+            ctxt: SyntaxContext::empty(),
+        });
+
+        let decl = ModuleItem::Stmt(Stmt::Decl(Decl::Var(Box::new(VarDecl {
+            span: DUMMY_SP,
+            ctxt: SyntaxContext::empty(),
+            kind: VarDeclKind::Const,
+            declare: false,
+            decls: vec![VarDeclarator {
+                span: DUMMY_SP,
+                name: Pat::Ident(BindingIdent {
+                    id: Ident::new("Button".into(), DUMMY_SP, SyntaxContext::empty()),
+                    type_ann: None,
+                }),
+                init: Some(Box::new(tagged)),
+                definite: false,
+            }],
+        }))));
+
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, decl],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!()
+        };
+        // Should now have import + var (rewritten) + displayName.
+        assert_eq!(m.body.len(), 3);
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[1] else {
+            panic!()
+        };
+        let AstExpr::Call(call) = vd.decls[0].init.as_deref().expect("init") else {
+            panic!()
+        };
+        let Callee::Expr(callee) = &call.callee else {
+            panic!()
+        };
+        let AstExpr::Ident(callee_ident) = &**callee else {
+            panic!()
+        };
+        assert_eq!(callee_ident.sym.as_ref(), "forwardRef");
+    }
+
+    #[test]
+    fn phase6c_styled_user_component_call_kind_user_defined() {
+        // import { styled } from '@compiled/react';
+        // const Wrapped = styled(Inner)({ color: 'red' });
+        // The arrow's first ObjectPat default for `as` should be the
+        // Ident `Inner`, NOT a Str.
+        use swc_core::common::SyntaxContext;
+        use swc_core::ecma::ast::{
+            ArrowExpr, AssignPat, BindingIdent, CallExpr, Callee, Decl, Expr as AstExpr,
+            ExprOrSpread, Ident, IdentName, KeyValuePatProp, KeyValueProp, Lit, ObjectLit,
+            ObjectPat, ObjectPatProp, Pat, Prop, PropName, PropOrSpread, Stmt, Str, VarDecl,
+            VarDeclKind, VarDeclarator,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![named_specifier("styled", None)],
+        )));
+
+        let inner_call = AstExpr::Call(CallExpr {
+            span: DUMMY_SP,
+            ctxt: SyntaxContext::empty(),
+            callee: Callee::Expr(Box::new(AstExpr::Ident(Ident::new(
+                "styled".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )))),
+            args: vec![ExprOrSpread {
+                spread: None,
+                expr: Box::new(AstExpr::Ident(Ident::new(
+                    "Inner".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                ))),
+            }],
+            type_args: None,
+        });
+        let outer_call = AstExpr::Call(CallExpr {
+            span: DUMMY_SP,
+            ctxt: SyntaxContext::empty(),
+            callee: Callee::Expr(Box::new(inner_call)),
+            args: vec![ExprOrSpread {
+                spread: None,
+                expr: Box::new(AstExpr::Object(ObjectLit {
+                    span: DUMMY_SP,
+                    props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                        key: PropName::Ident(IdentName::new("color".into(), DUMMY_SP)),
+                        value: Box::new(AstExpr::Lit(Lit::Str(Str {
+                            span: DUMMY_SP,
+                            value: "red".into(),
+                            raw: None,
+                        }))),
+                    })))],
+                })),
+            }],
+            type_args: None,
+        });
+
+        let decl = ModuleItem::Stmt(Stmt::Decl(Decl::Var(Box::new(VarDecl {
+            span: DUMMY_SP,
+            ctxt: SyntaxContext::empty(),
+            kind: VarDeclKind::Const,
+            declare: false,
+            decls: vec![VarDeclarator {
+                span: DUMMY_SP,
+                name: Pat::Ident(BindingIdent {
+                    id: Ident::new("Wrapped".into(), DUMMY_SP, SyntaxContext::empty()),
+                    type_ann: None,
+                }),
+                init: Some(Box::new(outer_call)),
+                definite: false,
+            }],
+        }))));
+
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, decl],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!()
+        };
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[1] else {
+            panic!()
+        };
+        let AstExpr::Call(call) = vd.decls[0].init.as_deref().expect("init") else {
+            panic!()
+        };
+        // forwardRef arg is an ArrowExpr; the first param's `as`
+        // default is `Ident("Inner")`.
+        let AstExpr::Arrow(arrow) = &*call.args[0].expr else {
+            panic!()
+        };
+        let Pat::Object(obj) = &arrow.params[0] else {
+            panic!()
+        };
+        let ObjectPatProp::KeyValue(kv) = &obj.props[0] else {
+            panic!()
+        };
+        let Pat::Assign(assign) = &*kv.value else {
+            panic!()
+        };
+        let AstExpr::Ident(default_ident) = &*assign.right else {
+            panic!("expected Ident default, not Str")
+        };
+        assert_eq!(default_ident.sym.as_ref(), "Inner");
     }
 }

@@ -209,6 +209,27 @@ its pinned version is recorded by §5.4b once the implementer
 selects a version (separate decision from the JS-oracle pins
 above; the matrix corpus is the contract between them).
 
+### `@emotion/is-prop-valid` (used by Phase 6 §6.7 styled handler)
+
+`packages/babel-plugin/src/utils/build-styled-component.ts:7`
+imports `@emotion/is-prop-valid` to filter `__cmplp.<prop>`
+MemberExpression references inside the synthesised styled
+forwardRef body. The output of this predicate decides which
+prop names get destructured out of `__cmplp` before the
+spread, which directly shapes the generated function body
+bytes — divergence here is divergence in the consumer's
+compiled JS.
+
+| npm package | Pinned version | Notes |
+|---|---|---|
+| `@emotion/is-prop-valid` | **1.4.0** | AFM-resolved 2026-05-05. Surface: a 418-entry valid-prop table compiled into the regex `/^((<keys>)|(([Dd][Aa][Tt][Aa]|[Aa][Rr][Ii][Aa]|x)-.*))$/` PLUS the `on<UpperAscii>` short-circuit (`charCodeAt(0)===111 && charCodeAt(1)===110 && charCodeAt(2)<91`). The Rust port (`crates/babel-plugin/src/compat/is_prop_valid.rs`) vendors the table VERBATIM as a sorted `&[&str]`; a count-lock test asserts `len() == 418` so a future bump that adds/removes entries fires immediately. |
+
+The Rust port deliberately omits memoisation — upstream's
+`@emotion/memoize` cache is per-call-site and the binary-search
+lookup against the 418-entry table is cheap enough that the cache
+hit-rate doesn't change observable timing for the typical
+"~5 prop names per styled call" workload.
+
 ### Direct dependencies of `@compiled/css`
 
 | npm package | Range in `packages/css/package.json` | Resolved version | Rust crate | Used in |
