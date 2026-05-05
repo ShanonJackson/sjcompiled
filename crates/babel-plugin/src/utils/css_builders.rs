@@ -720,11 +720,32 @@ pub fn extract_object_expression(
                     continue;
                 };
                 let key = object_property_to_string(&kv.key, meta)?;
-                // upstream: evaluateExpression(prop.value, meta)
-                // Stubbed at the boundary; the `let { value: propValue, meta: updatedMeta } = ...`
-                // shape is honoured by treating prop.value as the
-                // evaluator output for the literal-shape fast paths.
-                let prop_value = &*kv.value;
+                // §6.8a-vi: 1:1 port of upstream `evaluateExpression(prop.value, meta)`.
+                // Resolves Ident / Member / Call / etc. through `resolve_binding`
+                // → recursive evaluator, returning either a literal-folded
+                // node (StringLit / NumLit / ObjectExpr / TaggedTpl / a
+                // recognised keyframes CallExpr) or the original
+                // expression as the babel-evaluator fallback. Without
+                // this, references like `animationName: fadeOut` (where
+                // `fadeOut = keyframes({...})`) bypass the keyframes
+                // matcher below and fall through to the catch-all
+                // CSS-variable emit, producing `var(--_xxx)` plus a
+                // dangling `style={ '--_xxx': ix(fadeOut) }` instead of
+                // hoisting the `@keyframes` sheet and inlining the
+                // generated keyframes name.
+                //
+                // Returned value is owned (Box<Expr>); we borrow into it
+                // for the rest of this prop iteration.
+                let evaluated = evaluate_expression(
+                    &kv.value,
+                    meta,
+                    scope_index,
+                    parent_scope,
+                    own_scope,
+                )
+                .value
+                .unwrap_or_else(|| Box::new((*kv.value).clone()));
+                let prop_value: &Expr = &evaluated;
                 // upstream: `callbackIfFileIncluded(meta, updatedMeta)`. The
                 // `updatedMeta` value is the evaluator's output — Phase 5
                 // §5.6 stub. Until then both args are the same state.
@@ -1112,14 +1133,29 @@ pub fn extract_template_literal(
             let _ = has_nested_template_literals_with_conditional_rules;
         }
 
-        // upstream: `evaluateExpression(nodeExpression, meta)`
-        // Both expression-as-CSS check and keyframes inner walk
-        // depend on the evaluator output.
-        let _ = node_expression; // routed through stub below
+        // §6.8a-vi: 1:1 port of upstream `evaluateExpression(nodeExpression, meta)`.
+        // Resolves the interpolation expression through the binding
+        // resolver / recursive evaluator, returning the folded literal,
+        // a recognised keyframes CallExpr, or the original expression
+        // (via babelEvaluateExpression fallback). Without this, e.g.
+        // `` `${fadeOut} 2s ease-in-out` `` where `fadeOut =
+        // keyframes(...)` bypasses the keyframes detector below and
+        // emits `var(--_xxx)` plus an inline `style` prop instead of
+        // hoisting the `@keyframes` sheet and inlining the generated
+        // keyframes name.
+        let evaluated_interp = evaluate_expression(
+            &node_expression,
+            meta,
+            scope_index,
+            parent_scope,
+            own_scope,
+        )
+        .value
+        .unwrap_or_else(|| Box::new(node_expression.clone()));
 
         // Reaching ANY of the below dispatch arms requires the evaluator.
         if try_keyframes_branch(
-            &node.exprs[index],
+            &evaluated_interp,
             meta,
             &raw,
             &mut css,
@@ -1620,20 +1656,23 @@ mod tests {
         // §4.4 site #2 (css-builders.ts:639). An ObjectExpression
         // property whose value is a non-literal expression that
         // doesn't match any earlier branch hits the catch-all
-        // `--_${hash(variableName)}`. Use a NumericLiteral cast that
-        // doesn't fit Lit::Num / Lit::Str shape — the simplest reach
-        // is a UnaryExpression `-1` (Babel emits `-1`, the hash
-        // input is generate(unary).code = "-1").
+        // `--_${hash(variableName)}`.
+        //
+        // §6.8a-vi: prior shape used `UnaryExpression(-1)` to reach the
+        // catch-all, but that relied on `extract_object_expression`'s
+        // evaluator-stub bypassing the resolver. With the evaluator
+        // wired, `-1` folds to `NumLit(-1)` and hits the unit-applied
+        // numeric branch (matching upstream Babel). Switch to an
+        // unresolved Ident — `evaluate_expression` returns the Ident
+        // unchanged via `babel_evaluate_expression`'s fallback, and
+        // `Expr::Ident` matches none of the typed branches → catch-all
+        // fires.
         let mut state = State::default();
-        let unary = Box::new(Expr::Unary(UnaryExpr {
-            span: DUMMY_SP,
-            op: UnaryOp::Minus,
-            arg: Box::new(Expr::Lit(Lit::Num(Number {
-                span: DUMMY_SP,
-                value: 1.0,
-                raw: None,
-            }))),
-        }));
+        let unresolved = Box::new(Expr::Ident(Ident::new(
+            "unresolved".into(),
+            DUMMY_SP,
+            Default::default(),
+        )));
         let obj = ObjectLit {
             span: DUMMY_SP,
             props: vec![PropOrSpread::Prop(Box::new(Prop::KeyValue(
@@ -1642,12 +1681,12 @@ mod tests {
                         "marginTop".into(),
                         DUMMY_SP,
                     )),
-                    value: unary.clone(),
+                    value: unresolved.clone(),
                 },
             )))],
         };
 
-        let expected_var_name = format!("--_{}", hash(&generate(&unary)));
+        let expected_var_name = format!("--_{}", hash(&generate(&unresolved)));
         let mut meta = fresh_meta(&mut state);
         let (mut idx, prog) = empty_scope();
         let mut recorder = MutationRecorder::new();

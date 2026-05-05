@@ -209,10 +209,60 @@ remaining divergences are now CONTAINED to:
   Idents (the `program_scope_ctxt` fallback to
   `SyntaxContext::empty()` from §6.8a-i). Same edge case as flagged
   there.
-- **Per-handler CSS-extraction defects** (e.g.
-  `css-prop/object-literal` produces different sheet HASHES in
-  some fixtures, not just different UIDs). These are individual
-  handler bugs that need cluster-by-cluster fixes per item 4.
+- **§6.8a-vi ☑ — evaluator wired into extract_object_expression
+  + extract_template_literal** (this session, 2026-05-05). Root
+  cause for the keyframes / css-prop / styled CSS-extraction
+  defects: `crates/babel-plugin/src/utils/css_builders.rs` had
+  TWO stubs that bypassed the upstream `evaluateExpression(prop.value, meta)` /
+  `evaluateExpression(nodeExpression, meta)` calls — the
+  property-value path used `&*kv.value` directly (line 727
+  comment: "Stubbed at the boundary"), and the template-literal
+  interpolation path used `&node.exprs[index]` directly (line
+  1118 `let _ = node_expression`). With both stubs, references
+  like `animationName: fadeOut` (where
+  `fadeOut = keyframes({...})`) bypassed the keyframes matcher
+  and fell through to the `--_<hash>` CSS-variable catch-all,
+  producing `var(--_xxx)` plus a dangling `style={...}` instead
+  of hoisting the `@keyframes` sheet and inlining the generated
+  keyframes name (`k1mv9s16` etc.).
+
+  Fix: 1:1 ports of upstream's two `evaluateExpression(...)` call
+  sites. The Rust port now calls
+  `evaluate_expression(&kv.value / &node_expression, meta,
+  scope_index, parent_scope, own_scope)`, owns the resulting
+  `Box<Expr>`, and references it as `prop_value` / `evaluated_interp`
+  for the rest of the prop iteration. Output flows through the
+  recursive resolver → the keyframes call is detected via
+  `is_compiled_keyframes_call_expression` → `extract_keyframes`
+  emits the `@keyframes` sheet and returns the keyframes name as
+  the value.
+
+  One existing test (`hash_site_extract_object_expression_variable_name`)
+  used a stub-era input shape (`UnaryExpression(-1)`) that relied
+  on the resolver bypass; updated to use an unresolved Ident
+  which correctly flows through the babel-evaluator fallback to
+  reach the catch-all.
+
+  **Knock-on fix: `compat::evaluation::evaluate` TaggedTemplate
+  branch.** With the evaluator wired in, the
+  `extract_object_expression` call site started invoking
+  `babel_evaluate_expression(target)` on TaggedTpl values
+  (e.g. `keyframes\`...\`` shorthand fixtures) when value-resolution
+  returned None. The `compat/evaluation.rs` TaggedTpl branch
+  panicked with `unimplemented!()` based on the (correct-at-the-time)
+  premise that `evaluate-expression.ts:184` short-circuits Compiled
+  tagged templates before reaching this evaluator — but the §6.8a-vi
+  wiring legitimately reaches it for the babel-evaluator FALLBACK
+  call. Replaced the panic with `deopt(state); None` per upstream
+  Babel's behaviour for non-`String.raw` tagged templates (Babel's
+  `path.evaluate()` returns `{confident: false}`, the JS try/catch
+  wrapper returns `fallbackNode`).
+
+  **Triage delta: parity 87 → 118 (+31), divergence 327 → 296
+  (-31), swc-throws 62 → 62 (4 new keyframes-tagged-template
+  panics resolved by the TaggedTpl deopt fix; net no change).**
+  Cumulative across this session: parity 7 → 118 (+111, 23.3% of
+  477); divergence 407 → 296 (-111).
 
 ### Verifying the current state from a cold pickup
 

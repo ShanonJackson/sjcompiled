@@ -311,17 +311,33 @@ fn _evaluate(
         return evaluate_quasis(tpl, state, index, scope, false);
     }
 
-    // evaluation.js:73-84 — TaggedTemplateExpression branch (only
-    // reached for the `String.raw\`...\`` builtin).
-    // Evidenced-unreachable per COMPAT_EVALUATION_COVERAGE.md
-    // §TaggedTemplate.
+    // evaluation.js:73-84 — TaggedTemplateExpression branch.
+    // Upstream Babel only folds `String.raw\`...\``-shaped tagged
+    // templates here; every other shape (including Compiled's
+    // `keyframes\`...\`` / `css\`...\``) falls through to deopt
+    // returning `{confident: false}`, which `babelEvaluateExpression`
+    // converts to the fallback node.
+    //
+    // §6.8a-vi note: prior version of this branch panicked with
+    // `unimplemented!()` based on the (then-correct) premise that
+    // `evaluate-expression.ts:184` short-circuits Compiled tagged
+    // templates BEFORE reaching `babelEvaluateExpression`. That
+    // premise broke once §6.8a-vi wired `evaluate_expression` into
+    // `extract_object_expression` / `extract_template_literal`: those
+    // call sites now invoke `babel_evaluate_expression(target)` on the
+    // ORIGINAL expression (a TaggedTpl) when value-resolution returns
+    // None, and the fallback evaluator legitimately reaches this
+    // branch. Switching to `deopt + None` matches upstream's behaviour
+    // exactly — Babel's `path.evaluate()` returns `{confident:false}`,
+    // the JS try/catch wrapper returns `fallbackNode`, and the rest of
+    // the pipeline emits the original tagged template as a CSS value.
+    //
+    // String.raw-specific folding is still unimplemented (no fixture
+    // surfaces it); if one ever does, port the sub-shape inside this
+    // if-block per upstream evaluation.js:73-84.
     if matches!(expr, Expr::TaggedTpl(_)) {
-        unimplemented!(
-            "compat::evaluation: TaggedTemplateExpression evaluation unreachable from Compiled — \
-             Compiled tagged templates short-circuit at evaluate-expression.ts:184; \
-             user tagged templates are returned as fallback; see \
-             COMPAT_EVALUATION_COVERAGE.md §TaggedTemplate"
-        );
+        deopt(state);
+        return None;
     }
 
     // evaluation.js:85-93 — ConditionalExpression branch.

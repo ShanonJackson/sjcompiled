@@ -1,12 +1,12 @@
 {
   "summary": {
     "total": 477,
-    "parity": 87,
-    "divergence": 327,
+    "parity": 118,
+    "divergence": 296,
     "swc-throws": 62,
     "babel-throws": 0,
     "both-throw": 1,
-    "elapsedSeconds": 44
+    "elapsedSeconds": 46
   },
   "results": {
     "parity": [
@@ -24,6 +24,10 @@
       },
       {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-css-property-access",
+        "sourceFile": "class-names/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-keyframes",
         "sourceFile": "class-names/__tests__/behaviour.test.ts"
       },
       {
@@ -56,6 +60,10 @@
       },
       {
         "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--an-inlined-psuedo-class-object-expression",
+        "sourceFile": "class-names/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--a-declared-psuedo-class-object-expression",
         "sourceFile": "class-names/__tests__/call-expression.test.ts"
       },
       {
@@ -115,6 +123,14 @@
         "sourceFile": "css-prop/__tests__/behaviour.test.ts"
       },
       {
+        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-remove-css-prop",
+        "sourceFile": "css-prop/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-keep-other-props-around",
+        "sourceFile": "css-prop/__tests__/behaviour.test.ts"
+      },
+      {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-bubble-up-top-level-pseudo-inside-a-media-atrule",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts"
       },
@@ -135,7 +151,35 @@
         "sourceFile": "css-prop/__tests__/css-map.test.ts"
       },
       {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-the-variable-when-it-is-a-constant-in-string-css",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-constant-variable",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-constant-object-property-value",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-nested-constant-object-property-value",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-that-has-a-variable-reference",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-string-variable",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-obj-variable",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-inline-template-literal-with-suffix",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
@@ -155,12 +199,52 @@
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-correctly-expand-shorthand-property-with-ternary-expression",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-binary-expression",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts"
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-an-expression",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-identifiers-that-reference-constant-literals",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-member-expressions-that-reference-identifiers-with-simple-values",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-nested-member-expressions-that-reference--simple-values",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-nested-member-expressions-that-reference--identifiers-with-simple-values",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-call-expressions-that-return-simple-values",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-identifiers-that-reference-simple-call-expressions",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-suffixes-prefixed-by-an--identifier-that-references-a-number-literal",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-static-keyframe",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-preserving-runtime-values--for-a-static-keyframe",
+        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-generate-styled-object-call-expression-component-code",
@@ -215,11 +299,39 @@
         "sourceFile": "styled/__tests__/call-expression.test.ts"
       },
       {
+        "name": "styled-tests-call-expression/styled-object-call-expression--should-inline-call-if-it-returns-simple-value",
+        "sourceFile": "styled/__tests__/call-expression.test.ts"
+      },
+      {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-mutable-identifier",
         "sourceFile": "styled/__tests__/call-expression.test.ts"
       },
       {
+        "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-obj-variable",
+        "sourceFile": "styled/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-variable-in-a-nested-template-literal",
+        "sourceFile": "styled/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-variable-in-a-heavily-nested-template-literal",
+        "sourceFile": "styled/__tests__/call-expression.test.ts"
+      },
+      {
         "name": "styled-tests-content-property/handling-of-values-for-css-content-property--should-handle-blank-content",
+        "sourceFile": "styled/__tests__/content-property.test.ts"
+      },
+      {
+        "name": "styled-tests-content-property/handling-of-values-for-css-content-property--should-handle-blank-content-variant-1",
+        "sourceFile": "styled/__tests__/content-property.test.ts"
+      },
+      {
+        "name": "styled-tests-content-property/handling-of-values-for-css-content-property--should-handle-blank-content-variant-2",
+        "sourceFile": "styled/__tests__/content-property.test.ts"
+      },
+      {
+        "name": "styled-tests-content-property/handling-of-values-for-css-content-property--should-handle-blank-content-variant-2#2",
         "sourceFile": "styled/__tests__/content-property.test.ts"
       },
       {
@@ -319,7 +431,19 @@
         "sourceFile": "__tests__/expression-evaluation.test.ts"
       },
       {
+        "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-calculated-value-with-nested-binary",
+        "sourceFile": "__tests__/expression-evaluation.test.ts"
+      },
+      {
+        "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-calculated-value-with-multiple-identifiers",
+        "sourceFile": "__tests__/expression-evaluation.test.ts"
+      },
+      {
         "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--falls-back-to-dynamic-evaluation-when-non-static-value-used",
+        "sourceFile": "__tests__/expression-evaluation.test.ts"
+      },
+      {
+        "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-a-ts-const-expression-in-a-resolved-binding",
         "sourceFile": "__tests__/expression-evaluation.test.ts"
       },
       {
@@ -360,11 +484,6 @@
       }
     ],
     "divergence": [
-      {
-        "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-keyframes",
-        "sourceFile": "class-names/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 7 (a.length=1161, b.length=1109)\n--- a +0..67\nconst _5 = \"._y44vonb9{animation:k1m8j3od 2s ease-in-out}\";\nconst _\n+++ b +0..67\nconst _4 = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\n"
-      },
       {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-not-transform-object-property-access-from-invalid-style-prop",
         "sourceFile": "class-names/__tests__/behaviour.test.ts",
@@ -409,11 +528,6 @@
         "name": "class-names-tests-behaviour/class-names-behaviour--should-apply-array-prop-ternary-based-inline-conditional-css",
         "sourceFile": "class-names/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 19 (a.length=559, b.length=556)\n--- a +0..79\nconst _5 = \"._1wyb1fwx{font-size:12px}\";\nconst _4 = \"._syaz5scu{color:red}\";\nco\n+++ b +0..79\nconst _5 = \"._1wyb1crf{font-size:9pt}\";\nconst _4 = \"._syaz5scu{color:red}\";\ncon"
-      },
-      {
-        "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--a-declared-psuedo-class-object-expression",
-        "sourceFile": "class-names/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 104 (a.length=451, b.length=456)\n--- a +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._1wybgktf{font-size:\n+++ b +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1qs95u35{hover:var(--_ad9zy0)}\";\nconst _ = \"._1wybgktf{font-"
       },
       {
         "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--a-declared-string-literal",
@@ -503,12 +617,12 @@
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-spread-style-identifier-when-there-is-dynamic-styles-in-the-css",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 17 (a.length=599, b.length=542)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
+        "diff": "divergence at byte 17 (a.length=599, b.length=473)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-spread-style-property-access-when-there-is-dynamic-styles-in-the-css",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 17 (a.length=670, b.length=609)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
+        "diff": "divergence at byte 17 (a.length=670, b.length=540)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-spread-style-identifier-when-there-is-styles-already-set",
@@ -518,7 +632,7 @@
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-spread-style-identifier-when-there-is-styles-already-set-and-using-dynami",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 17 (a.length=689, b.length=628)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
+        "diff": "divergence at byte 17 (a.length=689, b.length=585)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-concat-explicit-use-of-class-name-prop-on-an-element",
@@ -538,7 +652,7 @@
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-concat-explicit-use-of-style-prop-on-an-element-when-destructured-templat",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 108 (a.length=383, b.length=427)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst [color] = [\"blue\"];\nReact.createElem\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst [color] = [\"blue\"];\nReact"
+        "diff": "divergence at byte 96 (a.length=383, b.length=335)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst [color] = [\"blue\"];\nReac\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst [color] = [\"blue\"];\nReact.createElement(\n  CC,\n  null,\n  Rea"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-place-suffix-into-ix-call",
@@ -548,7 +662,7 @@
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-inline-multi-interpolation-constant-variable",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 109 (a.length=529, b.length=628)\n--- a +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itk5441{background-image:linear-gradient(45deg,gray 25%,transpa\n+++ b +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itkyw91{background-image:linear-gradient(45deg,var(--_1vrvste) "
+        "diff": "divergence at byte 109 (a.length=529, b.length=521)\n--- a +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itk5441{background-image:linear-gradient(45deg,gray 25%,transpa\n+++ b +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itk1p18{background-image:linear-gradient(45deg,gray 25%,transpa"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-move-dynamic-multi-interpolation-variable-into-css-variable",
@@ -559,16 +673,6 @@
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-allow-expressions-stored-in-a-variable-as-shorthand-property-values",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 90 (a.length=444, b.length=208)\n--- a +30..150\n;\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nlet hello = t\n+++ b +30..150\n;\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nlet hello = true;\nhello = false;\nlet color = hello ? \"red\" :"
-      },
-      {
-        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-remove-css-prop",
-        "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 108 (a.length=379, b.length=423)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst color = \"blue\";\nReact.createElement(\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst color = \"blue\";\nReact.cre"
-      },
-      {
-        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-keep-other-props-around",
-        "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 108 (a.length=406, b.length=450)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst color = \"blue\";\nReact.createElement(\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst color = \"blue\";\nReact.cre"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-add-an-identifier-nonce-to-the-style-element",
@@ -641,26 +745,6 @@
         "diff": "divergence at byte 90 (a.length=300, b.length=291)\n--- a +30..150\n;\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nReact.createElement(\n  CC\n+++ b +30..150\n;\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nimport { jsx } from \"@compiled/react\";\nconst _ = \"._syaz5scu"
       },
       {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-the-variable-when-it-is-a-constant-in-string-css",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 317 (a.length=688, b.length=723)\n--- a +257..377\n4bfu1r31{text-decoration-color:currentColor}\";\nconst _ = \"._bfhk13q2{background-color:blue}\";\nconst bg = \"blue\";\nlet cl \n+++ b +257..377\n4bfu1r31{text-decoration-color:currentColor}\";\nconst _ = \"._11q71iim{background:var(--_1d6dlof)}\";\nconst bg = \"blue\";\nle"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-constant-variable",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 107 (a.length=332, b.length=405)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybgktf{font-size:20px}\";\nconst fontSize = 20;\nReact.createElem\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nconst fontSize = 20;\nRea"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-constant-object-property-value",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 107 (a.length=342, b.length=418)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst colors = {\n  error: \"red\",\n};\nReact.\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1fry{color:var(--_1sjupfm)}\";\nconst colors = {\n  error: \"red"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-nested-constant-object-property-value",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 107 (a.length=386, b.length=473)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syazu67f{color:#fff}\";\nconst theme = {\n  colors: {\n    light: {\n\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1rxo{color:var(--_b7e1h2)}\";\nconst theme = {\n  colors: {\n   "
-      },
-      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-persist-suffix-of-dynamic-property-value-from-objects-into-inline-styles",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
         "diff": "divergence at byte 144 (a.length=490, b.length=486)\n--- a +84..204\nime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._18u018lw{margin-left:var(--_5un9uz)}\";\nlet heading = {\n  depth: 2\n+++ b +84..204\nime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._18u01xoi{margin-left:var(--_5un9uz)rem}\";\nlet heading = {\n  depth"
@@ -693,7 +777,7 @@
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-constant",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 108 (a.length=332, b.length=405)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst fontSize = 12;\nReact.createEleme\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nconst fontSize = 12;\nReac"
+        "diff": "divergence at byte 108 (a.length=332, b.length=331)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst fontSize = 12;\nReact.createEleme\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1crf{font-size:9pt}\";\nconst fontSize = 12;\nReact.createElemen"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-nested-object-into-a-selector",
@@ -711,19 +795,9 @@
         "diff": "divergence at byte 107 (a.length=341, b.length=342)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst mixin = {\n  color: \"red\",\n};\nReact.c\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst mixin = {\n  color: \"red\",\n};\nReact."
       },
       {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-string-variable",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 107 (a.length=326, b.length=394)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst text = \"red\";\nReact.createElement(\n \n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1oxo{color:var(--_1kdvhqb)}\";\nconst text = \"red\";\nReact.crea"
-      },
-      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-string-variable-using-shorthand-notation",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
         "diff": "divergence at byte 96 (a.length=327, b.length=160)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nReact.crea\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst color = \"red\";\nReact.createElement(\"div\", null, \"hello world"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-obj-variable",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 104 (a.length=508, b.length=571)\n--- a +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._30l35scu:hover{color:red}\";\nconst _3 = \"._syaz13q2{color:blu\n+++ b +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._1qs91uu4{hover:var(--_1779ypj)}\";\nconst _3 = \"._syaz13q2{col"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-arrow-function-variable",
@@ -756,11 +830,6 @@
         "diff": "divergence at byte 107 (a.length=349, b.length=350)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst mixin = () => ({\n  color: \"red\",\n});\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst mixin = () => ({\n  color: \"red\",\n})"
       },
       {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-inline-template-literal-with-suffix",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=551, b.length=453)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._19bv1y44{padding-\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1yt4k2my{padding:0"
-      },
-      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-spread-with-no-argument-function-variable",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
         "diff": "divergence at byte 107 (a.length=361, b.length=362)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nfunction mixin() {\n  return {\n    color: \"\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nfunction mixin() {\n  return {\n    color: "
@@ -778,7 +847,7 @@
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-function-properties-belonging-to-a-vari",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=750, b.length=704)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._19itd27t{border:v"
+        "diff": "divergence at byte 97 (a.length=750, b.length=639)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._19it1nsd{border:1"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-function-variable",
@@ -814,11 +883,6 @@
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-member-expression-referencing-a-function-which-returns-an-objec",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
         "diff": "divergence at byte 107 (a.length=387, b.length=461)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nconst mixin = () => (\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1qjj{color:var(--_pvyxdf)}\";\nconst color = \"red\";\nconst mixi"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-correctly-expand-shorthand-property-with-ternary-expression",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=516, b.length=443)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._19bv1ylp{padding-left:40px}\";\nconst _3 = \"._n3td1ul9{\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1yt4na1f{padding:var(--_2ijzgd)}\";\nconst morePadding ="
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-persist-suffix-of-dynamic-value-into-inline-styles",
@@ -893,317 +957,272 @@
       {
         "name": "keyframes-tests-behaviour/keyframes--places-classes-in-given-order-when-static-styles-precede-keyframes-expression",
         "sourceFile": "keyframes/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=917, b.length=929)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _3 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 = \"._y44v18m0{ani"
+        "diff": "divergence at byte 173 (a.length=917, b.length=916)\n--- a +113..233\nct/runtime\";\nconst _4 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 \n+++ b +113..233\nct/runtime\";\nconst _4 = \"@keyframes kfwl3rt{0%{top:0}to{top:75pt}}\";\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 ="
       },
       {
         "name": "keyframes-tests-behaviour/keyframes--places-classes-in-given-order-when-keyframes-expression-precedes-static-styles",
         "sourceFile": "keyframes/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=917, b.length=929)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"@keyframes kvif0b9{0%{top:0}to{top:100px}}\";\nconst _3 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 = \"._2rko1l7b{bor"
+        "diff": "divergence at byte 173 (a.length=917, b.length=916)\n--- a +113..233\nct/runtime\";\nconst _4 = \"@keyframes kvif0b9{0%{top:0}to{top:100px}}\";\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 \n+++ b +113..233\nct/runtime\";\nconst _4 = \"@keyframes kvif0b9{0%{top:0}to{top:75pt}}\";\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 ="
       },
       {
         "name": "keyframes-tests-behaviour/keyframes--evaluates-any-expressions-that-precede-a-keyframes-expression",
         "sourceFile": "keyframes/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=875, b.length=934)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst _ = \"._y44v18"
+        "diff": "divergence at byte 173 (a.length=875, b.length=947)\n--- a +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._y\n+++ b +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:75pt}}\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\ncon"
       },
       {
         "name": "keyframes-tests-behaviour/keyframes--evaluates-keyframes-expression-when-it-precedes-another-expression",
         "sourceFile": "keyframes/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=875, b.length=934)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst _ = \"._y44v18"
+        "diff": "divergence at byte 173 (a.length=875, b.length=947)\n--- a +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._y\n+++ b +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:75pt}}\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\ncon"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 224 (a.length=462, b.length=460)\n--- a +164..284\nnst _ =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +164..284\nnst _ =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=332, b.length=287)\n--- a +0..67\nconst _2 = \"._y44vjvcp{animation:k1wmcptp 2s ease-in-out}\";\nconst _\n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 122 (a.length=332, b.length=330)\n--- a +62..182\nnst _ =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +62..182\nnst _ =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=410, b.length=373)\n--- a +0..67\nconst _3 =\n  \"._y44vwtez{animation:k1m8j3od 2s ease-in-out,k1mcm2lv\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-identifiers-that-reference-constant-literals",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=403, b.length=373)\n--- a +0..67\nconst _2 = \"._j7hq1bo5{animation-name:kej80vs}\";\nconst _ =\n  \"@keyf\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst fromC"
+        "diff": "divergence at byte 20 (a.length=410, b.length=410)\n--- a +0..80\nconst _3 =\n  \"._y44vwtez{animation:k1m8j3od 2s ease-in-out,k1mcm2lv 2s ease-in-o\n+++ b +0..80\nconst _3 =\n  \"._y44v165j{animation:k1m8j3od 2s ease-in-out,k1mcm2lv 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-identifiers-that-reference-an-object-expression",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=345, b.length=339)\n--- a +0..67\nconst _2 = \"._j7hqocb1{animation-name:k1mv9s16}\";\nconst _ = \"@keyfr\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst from "
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-member-expressions-that-reference-identifiers-with-simple-values",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=407, b.length=375)\n--- a +0..67\nconst _2 = \"._j7hqgafb{animation-name:k1qk0qiq}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst from "
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-nested-member-expressions-that-reference--simple-values",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=453, b.length=421)\n--- a +0..67\nconst _2 = \"._j7hq1kkh{animation-name:k1tvirpx}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst anima"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-nested-member-expressions-that-reference--identifiers-with-simple-values",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=569, b.length=537)\n--- a +0..67\nconst _2 = \"._j7hq1kkh{animation-name:k1tvirpx}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst fromO"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-call-expressions-that-return-simple-values",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=334, b.length=304)\n--- a +0..67\nconst _2 = \"._j7hq1rje{animation-name:kykophz}\";\nconst _ =\n  \"@keyf\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst ident"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-identifiers-that-reference-simple-call-expressions",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=470, b.length=440)\n--- a +0..67\nconst _2 = \"._j7hq1bo5{animation-name:kej80vs}\";\nconst _ =\n  \"@keyf\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst ident"
+        "diff": "divergence at byte 7 (a.length=345, b.length=279)\n--- a +0..67\nconst _2 = \"._j7hqocb1{animation-name:k1mv9s16}\";\nconst _ = \"@keyfr\n+++ b +0..67\nconst _ = \"._j7hqocb1{animation-name:k1mv9s16}\";\nconst from = {\n  o"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-an-arrow-function-call-expression-that-returns-an-object-expression",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=423, b.length=391)\n--- a +0..67\nconst _2 = \"._j7hqjcah{animation-name:k1e4zivv}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst from "
+        "diff": "divergence at byte 59 (a.length=423, b.length=490)\n--- a +0..119\nconst _2 = \"._j7hqjcah{animation-name:k1e4zivv}\";\nconst _ =\n  \"@keyframes k1e4zivv{0%{color:blue;opacity:1}to{color:ind\n+++ b +0..119\nconst _2 = \"._j7hqjcah{animation-name:k1e4zivv}\";\nconst _ = \"@keyframes k1e4zivv{from:var(--_1c6ubtl);to:var(--_5y88ij)"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-a-function-declaration-call-expression-that-returns-an-object-expres",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=451, b.length=419)\n--- a +0..67\nconst _2 = \"._j7hqjcah{animation-name:k1e4zivv}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nfunction fr"
+        "diff": "divergence at byte 59 (a.length=451, b.length=518)\n--- a +0..119\nconst _2 = \"._j7hqjcah{animation-name:k1e4zivv}\";\nconst _ =\n  \"@keyframes k1e4zivv{0%{color:blue;opacity:1}to{color:ind\n+++ b +0..119\nconst _2 = \"._j7hqjcah{animation-name:k1e4zivv}\";\nconst _ = \"@keyframes k1e4zivv{from:var(--_1c6ubtl);to:var(--_5y88ij)"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-member-expressions-that-return-object-expressions--through-an-arrow-function-call-expression",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=423, b.length=391)\n--- a +0..67\nconst _2 = \"._j7hqwahf{animation-name:k1fh39u1}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst from "
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-suffixes-prefixed-by-an--identifier-that-references-a-number-literal",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=345, b.length=331)\n--- a +0..67\nconst _2 = \"._j7hq1mki{animation-name:k1o8zrgy}\";\nconst _ = \"@keyfr\n+++ b +0..67\nconst _ = \"._j7hql05r{animation-name:var(--_nu6w6l)}\";\nconst fromFo"
+        "diff": "divergence at byte 92 (a.length=423, b.length=641)\n--- a +32..152\n-name:k1fh39u1}\";\nconst _ =\n  \"@keyframes k1fh39u1{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst from = ()\n+++ b +32..152\n-name:k1fh39u1}\";\nconst _ =\n  \"@keyframes k1fh39u1{0%{color:var(--_188fn0v);opacity:var(--_nn3mv2)}to{color:var(--_19jts"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-suffixes-prefixed-by-an--arrow-function-expression-call-that-returns-a-number-literal",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=357, b.length=343)\n--- a +0..67\nconst _2 = \"._j7hq67nm{animation-name:k1m0lkgc}\";\nconst _ = \"@keyfr\n+++ b +0..67\nconst _ = \"._j7hql05r{animation-name:var(--_nu6w6l)}\";\nconst fromFo"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-static-keyframe",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=596, b.length=330)\n--- a +0..67\nconst _2 = \"._j7hq1vu4{animation-name:ka6olon}\";\nconst _ =\n  \"@keyf\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst getOp"
+        "diff": "divergence at byte 59 (a.length=357, b.length=481)\n--- a +0..119\nconst _2 = \"._j7hq67nm{animation-name:k1m0lkgc}\";\nconst _ = \"@keyframes k1m0lkgc{0%{font-size:14px}to{font-size:18px}}\"\n+++ b +0..119\nconst _2 = \"._j7hq67nm{animation-name:k1m0lkgc}\";\nconst _ =\n  \"@keyframes k1m0lkgc{0%{font-size:var(--_11u0vvv)px}to{fo"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-a-single-element",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=668, b.length=561)\n--- a +0..67\nconst _4 = \"._syaz115e{color:var(--_nfiion)}\";\nconst _3 = \"._bfhk12\n+++ b +0..67\nconst _3 = \"._syaz115e{color:var(--_nfiion)}\";\nconst _2 = \"._bfhk12"
+        "diff": "divergence at byte 296 (a.length=668, b.length=658)\n--- a +236..356\n-_k85g0d);opacity:0}}\";\nconst generateKeyframes = (fromColor, toColor) => null;\nReact.createElement(\n  CC,\n  null,\n  Rea\n+++ b +236..356\n-_k85g0d);opacity:0}}\";\nconst generateKeyframes = (fromColor1, toColor) => null;\nReact.createElement(\n  CC,\n  null,\n  Re"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-multiple-elements",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 61 (a.length=1179, b.length=1118)\n--- a +1..121\nonst _5 = \"._syazjq9z{color:var(--_we82k3)}\";\nconst _4 = \"._syaz115e{color:var(--_nfiion)}\";\nconst _3 = \"._bfhk1220{back\n+++ b +1..121\nonst _5 = \"._syazjq9z{color:var(--_we82k3)}\";\nconst _4 = \"._j7hqvoes{animation-name:var(--_1cpb5gv)}\";\nconst _3 = \"._sya"
+        "diff": "divergence at byte 343 (a.length=1179, b.length=1158)\n--- a +283..403\n-_k85g0d);opacity:0}}\";\nconst generateKeyframes = (fromColor, toColor) => null;\nReact.createElement(\n  React.Fragment,\n \n+++ b +283..403\n-_k85g0d);opacity:0}}\";\nconst generateKeyframes = (fromColor1, toColor) => null;\nReact.createElement(\n  React.Fragment,\n"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 224 (a.length=462, b.length=460)\n--- a +164..284\nnst _ =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +164..284\nnst _ =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=332, b.length=287)\n--- a +0..67\nconst _2 = \"._y44vjvcp{animation:k1wmcptp 2s ease-in-out}\";\nconst _\n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 122 (a.length=332, b.length=330)\n--- a +62..182\nnst _ =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +62..182\nnst _ =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=410, b.length=373)\n--- a +0..67\nconst _3 =\n  \"._y44vwtez{animation:k1m8j3od 2s ease-in-out,k1mcm2lv\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 20 (a.length=410, b.length=410)\n--- a +0..80\nconst _3 =\n  \"._y44vwtez{animation:k1m8j3od 2s ease-in-out,k1mcm2lv 2s ease-in-o\n+++ b +0..80\nconst _3 =\n  \"._y44v165j{animation:k1m8j3od 2s ease-in-out,k1mcm2lv 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 63 (a.length=789, b.length=787)\n--- a +3..123\nst _4 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf\n+++ b +3..123\nst _4 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf{a"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=659, b.length=624)\n--- a +0..67\nconst _2 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 63 (a.length=659, b.length=657)\n--- a +3..123\nst _2 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _ = \"._y44vjvcp{\n+++ b +3..123\nst _2 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _ = \"._y44vjvcp{an"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=737, b.length=714)\n--- a +0..67\nconst _3 = \"@keyframes k1mcm2lv{0%{color:blue}to{color:indigo}}\";\nc\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 147 (a.length=737, b.length=737)\n--- a +87..207\ns k1m8j3od{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44vwtez{animation:k1m8j3od 2s ease-in-out,k1mcm2lv 2s ease-in-o\n+++ b +87..207\ns k1m8j3od{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44v165j{animation:k1m8j3od 2s ease-in-out,k1mcm2lv 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 63 (a.length=789, b.length=787)\n--- a +3..123\nst _4 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf\n+++ b +3..123\nst _4 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf{a"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=659, b.length=624)\n--- a +0..67\nconst _2 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 63 (a.length=659, b.length=657)\n--- a +3..123\nst _2 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _ = \"._y44vjvcp{\n+++ b +3..123\nst _2 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _ = \"._y44vjvcp{an"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=737, b.length=714)\n--- a +0..67\nconst _3 = \"@keyframes k1mcm2lv{0%{color:blue}to{color:indigo}}\";\nc\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 147 (a.length=737, b.length=737)\n--- a +87..207\ns k1m8j3od{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44vwtez{animation:k1m8j3od 2s ease-in-out,k1mcm2lv 2s ease-in-o\n+++ b +87..207\ns k1m8j3od{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44v165j{animation:k1m8j3od 2s ease-in-out,k1mcm2lv 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=460, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 222 (a.length=460, b.length=458)\n--- a +162..282\nonst _ =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +162..282\nonst _ =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=330, b.length=287)\n--- a +0..67\nconst _2 = \"._y44v1go4{animation:khheuil 2s ease-in-out}\";\nconst _ \n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 120 (a.length=330, b.length=328)\n--- a +60..180\nonst _ =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +60..180\nonst _ =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=410, b.length=373)\n--- a +0..67\nconst _3 =\n  \"._y44vheiy{animation:k15szqvw 2s ease-in-out,k164f01r\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 20 (a.length=410, b.length=410)\n--- a +0..80\nconst _3 =\n  \"._y44vheiy{animation:k15szqvw 2s ease-in-out,k164f01r 2s ease-in-o\n+++ b +0..80\nconst _3 =\n  \"._y44v1r29{animation:k15szqvw 2s ease-in-out,k164f01r 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=460, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 222 (a.length=460, b.length=458)\n--- a +162..282\nonst _ =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +162..282\nonst _ =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=330, b.length=287)\n--- a +0..67\nconst _2 = \"._y44v1go4{animation:khheuil 2s ease-in-out}\";\nconst _ \n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 120 (a.length=330, b.length=328)\n--- a +60..180\nonst _ =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +60..180\nonst _ =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=410, b.length=373)\n--- a +0..67\nconst _3 =\n  \"._y44vheiy{animation:k15szqvw 2s ease-in-out,k164f01r\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 20 (a.length=410, b.length=410)\n--- a +0..80\nconst _3 =\n  \"._y44vheiy{animation:k15szqvw 2s ease-in-out,k164f01r 2s ease-in-o\n+++ b +0..80\nconst _3 =\n  \"._y44v1r29{animation:k15szqvw 2s ease-in-out,k164f01r 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=787, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 62 (a.length=787, b.length=785)\n--- a +2..122\nnst _4 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf\n+++ b +2..122\nnst _4 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf{a"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=657, b.length=624)\n--- a +0..67\nconst _2 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}\n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 62 (a.length=657, b.length=655)\n--- a +2..122\nnst _2 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _ = \"._y44v1go4{\n+++ b +2..122\nnst _2 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _ = \"._y44v1go4{an"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=737, b.length=714)\n--- a +0..67\nconst _3 = \"@keyframes k164f01r{0%{color:blue}to{color:indigo}}\";\nc\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 147 (a.length=737, b.length=737)\n--- a +87..207\ns k15szqvw{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44vheiy{animation:k15szqvw 2s ease-in-out,k164f01r 2s ease-in-o\n+++ b +87..207\ns k15szqvw{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44v1r29{animation:k15szqvw 2s ease-in-out,k164f01r 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=787, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 62 (a.length=787, b.length=785)\n--- a +2..122\nnst _4 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf\n+++ b +2..122\nnst _4 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf{a"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=657, b.length=624)\n--- a +0..67\nconst _2 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}\n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 62 (a.length=657, b.length=655)\n--- a +2..122\nnst _2 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _ = \"._y44v1go4{\n+++ b +2..122\nnst _2 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _ = \"._y44v1go4{an"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=737, b.length=714)\n--- a +0..67\nconst _3 = \"@keyframes k164f01r{0%{color:blue}to{color:indigo}}\";\nc\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 147 (a.length=737, b.length=737)\n--- a +87..207\ns k15szqvw{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44vheiy{animation:k15szqvw 2s ease-in-out,k164f01r 2s ease-in-o\n+++ b +87..207\ns k15szqvw{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44v1r29{animation:k15szqvw 2s ease-in-out,k164f01r 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 224 (a.length=462, b.length=460)\n--- a +164..284\nnst _ =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +164..284\nnst _ =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=332, b.length=287)\n--- a +0..67\nconst _2 = \"._y44v1e4p{animation:k1a3bdtb 2s ease-in-out}\";\nconst _\n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 122 (a.length=332, b.length=330)\n--- a +62..182\nnst _ =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +62..182\nnst _ =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=410, b.length=373)\n--- a +0..67\nconst _3 =\n  \"._y44vt6c7{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 20 (a.length=410, b.length=410)\n--- a +0..80\nconst _3 =\n  \"._y44vt6c7{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk 2s ease-in-o\n+++ b +0..80\nconst _3 =\n  \"._y44v1tac{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 224 (a.length=462, b.length=460)\n--- a +164..284\nnst _ =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +164..284\nnst _ =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=332, b.length=287)\n--- a +0..67\nconst _2 = \"._y44v1e4p{animation:k1a3bdtb 2s ease-in-out}\";\nconst _\n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 122 (a.length=332, b.length=330)\n--- a +62..182\nnst _ =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst fadeOut = null;\n\n+++ b +62..182\nnst _ =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst fadeOut = null;\nRe"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=410, b.length=373)\n--- a +0..67\nconst _3 =\n  \"._y44vt6c7{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 20 (a.length=410, b.length=410)\n--- a +0..80\nconst _3 =\n  \"._y44vt6c7{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk 2s ease-in-o\n+++ b +0..80\nconst _3 =\n  \"._y44v1tac{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-identifiers-that-reference-constant-literals",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=405, b.length=373)\n--- a +0..67\nconst _2 = \"._j7hqkl5x{animation-name:k1nhciry}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst fromC"
+        "diff": "divergence at byte 92 (a.length=405, b.length=609)\n--- a +32..152\n-name:k1nhciry}\";\nconst _ =\n  \"@keyframes k1nhciry{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst fromColor\n+++ b +32..152\n-name:k1nhciry}\";\nconst _ =\n  \"@keyframes k1nhciry{0%{color:var(--_i3ou63);opacity:var(--_z30vqw)}to{color:var(--_175azr"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-member-expressions-that-reference-identifiers-with-simple-values",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=407, b.length=375)\n--- a +0..67\nconst _2 = \"._j7hq6mn5{animation-name:k1qntra6}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst from "
+        "diff": "divergence at byte 92 (a.length=407, b.length=617)\n--- a +32..152\n-name:k1qntra6}\";\nconst _ =\n  \"@keyframes k1qntra6{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst from = {\n\n+++ b +32..152\n-name:k1qntra6}\";\nconst _ =\n  \"@keyframes k1qntra6{0%{color:var(--_1r9fuyd);opacity:var(--_1y596wu)}to{color:var(--_191h"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-nested-member-expressions-that-reference--simple-values",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=453, b.length=421)\n--- a +0..67\nconst _2 = \"._j7hqzznm{animation-name:k1m6gmtw}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst anima"
+        "diff": "divergence at byte 92 (a.length=453, b.length=717)\n--- a +32..152\n-name:k1m6gmtw}\";\nconst _ =\n  \"@keyframes k1m6gmtw{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst animation\n+++ b +32..152\n-name:k1m6gmtw}\";\nconst _ =\n  \"@keyframes k1m6gmtw{0%{color:var(--_7s8g9m);opacity:var(--_3dj1t1)}to{color:var(--_1cct6v"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-nested-member-expressions-that-reference--identifiers-with-simple-values",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=569, b.length=537)\n--- a +0..67\nconst _2 = \"._j7hqzznm{animation-name:k1m6gmtw}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst fromO"
+        "diff": "divergence at byte 92 (a.length=569, b.length=833)\n--- a +32..152\n-name:k1m6gmtw}\";\nconst _ =\n  \"@keyframes k1m6gmtw{0%{color:blue;opacity:1}to{color:indigo;opacity:1}}\";\nconst fromOpaci\n+++ b +32..152\n-name:k1m6gmtw}\";\nconst _ =\n  \"@keyframes k1m6gmtw{0%{color:var(--_7s8g9m);opacity:var(--_3dj1t1)}to{color:var(--_1cct6v"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-call-expressions-that-return-simple-values",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=334, b.length=304)\n--- a +0..67\nconst _2 = \"._j7hqi8pm{animation-name:krmwxos}\";\nconst _ =\n  \"@keyf\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst ident"
+        "diff": "divergence at byte 90 (a.length=334, b.length=560)\n--- a +30..150\non-name:krmwxos}\";\nconst _ =\n  \"@keyframes krmwxos{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst identity \n+++ b +30..150\non-name:krmwxos}\";\nconst _ =\n  \"@keyframes krmwxos{0%{color:var(--_z3h39m);opacity:var(--_155kfue)}to{color:var(--_1aucw"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-identifiers-that-reference-simple-call-expressions",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=472, b.length=440)\n--- a +0..67\nconst _2 = \"._j7hqkl5x{animation-name:k1nhciry}\";\nconst _ =\n  \"@key\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst ident"
+        "diff": "divergence at byte 92 (a.length=472, b.length=676)\n--- a +32..152\n-name:k1nhciry}\";\nconst _ =\n  \"@keyframes k1nhciry{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst identity \n+++ b +32..152\n-name:k1nhciry}\";\nconst _ =\n  \"@keyframes k1nhciry{0%{color:var(--_i3ou63);opacity:var(--_z30vqw)}to{color:var(--_175azr"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-suffixes-prefixed-by-an--identifier-that-references-a-number-literal",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=343, b.length=331)\n--- a +0..67\nconst _2 = \"._j7hqrsut{animation-name:k1e6gzsx}\";\nconst _ = \"@keyfr\n+++ b +0..67\nconst _ = \"._j7hql05r{animation-name:var(--_nu6w6l)}\";\nconst fromFo"
-      },
-      {
-        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-preserving-runtime-values--for-a-static-keyframe",
-        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=596, b.length=330)\n--- a +0..67\nconst _2 = \"._j7hq17yp{animation-name:kuadg5o}\";\nconst _ =\n  \"@keyf\n+++ b +0..67\nconst _ = \"._j7hq13il{animation-name:var(--_129ax8o)}\";\nconst getOp"
+        "diff": "divergence at byte 59 (a.length=343, b.length=463)\n--- a +0..119\nconst _2 = \"._j7hqrsut{animation-name:k1e6gzsx}\";\nconst _ = \"@keyframes k1e6gzsx{0%{fontSize:14px}to{fontSize:18px}}\";\n\n+++ b +0..119\nconst _2 = \"._j7hqrsut{animation-name:k1e6gzsx}\";\nconst _ =\n  \"@keyframes k1e6gzsx{0%{fontSize:var(--_2g99x6)px}to{font"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 63 (a.length=789, b.length=787)\n--- a +3..123\nst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf\n+++ b +3..123\nst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf{a"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=659, b.length=624)\n--- a +0..67\nconst _2 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 63 (a.length=659, b.length=657)\n--- a +3..123\nst _2 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _ = \"._y44v1e4p{\n+++ b +3..123\nst _2 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _ = \"._y44v1e4p{an"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=737, b.length=714)\n--- a +0..67\nconst _3 = \"@keyframes k1tsdnyk{0%{color:blue}to{color:indigo}}\";\nc\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 147 (a.length=737, b.length=737)\n--- a +87..207\ns k1i6i4z9{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44vt6c7{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk 2s ease-in-o\n+++ b +87..207\ns k1i6i4z9{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44v1tac{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk 2s ease-in-o"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
+        "diff": "divergence at byte 63 (a.length=789, b.length=787)\n--- a +3..123\nst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf\n+++ b +3..123\nst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf{a"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=659, b.length=624)\n--- a +0..67\nconst _2 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _ = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\nc"
+        "diff": "divergence at byte 63 (a.length=659, b.length=657)\n--- a +3..123\nst _2 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _ = \"._y44v1e4p{\n+++ b +3..123\nst _2 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _ = \"._y44v1e4p{an"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-multiple-animations",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=737, b.length=714)\n--- a +0..67\nconst _3 = \"@keyframes k1tsdnyk{0%{color:blue}to{color:indigo}}\";\nc\n+++ b +0..67\nconst _ =\n  \"._y44v1yp8{animation:var(--_129ax8o) 2s ease-in-out,va"
+        "diff": "divergence at byte 147 (a.length=737, b.length=737)\n--- a +87..207\ns k1i6i4z9{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44vt6c7{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk 2s ease-in-o\n+++ b +87..207\ns k1i6i4z9{0%{opacity:1}to{opacity:0}}\";\nconst _ =\n  \"._y44v1tac{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk 2s ease-in-o"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-add-an-identifier-nonce-to-the-style-element",
@@ -1481,11 +1500,6 @@
         "diff": "divergence at byte 6 (a.length=553, b.length=507)\n--- a +0..66\nconst _ = \"._syaz13q2{color:blue}\";\nconst em = (str) => str;\nconst\n+++ b +0..66\nconst em = (str) => str;\nconst color = em(\"blue\");\nconst ListItem "
       },
       {
-        "name": "styled-tests-call-expression/styled-object-call-expression--should-inline-call-if-it-returns-simple-value",
-        "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 18 (a.length=527, b.length=604)\n--- a +0..78\nconst _ = \"._syaz13q2{color:blue}\";\nconst em = (str) => str;\nconst ListItem = \n+++ b +0..78\nconst _ = \"._syaz1cwo{color:var(--_16ywsic)}\";\nconst em = (str) => str;\nconst "
-      },
-      {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-inline-constant-string-literal",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
         "diff": "divergence at byte 6 (a.length=524, b.length=478)\n--- a +0..66\nconst _ = \"._syaz13q2{color:blue}\";\nconst color = \"blue\";\nconst Li\n+++ b +0..66\nconst color = \"blue\";\nconst ListItem = forwardRef(\n  ({ as: C = \"d"
@@ -1499,11 +1513,6 @@
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-spread-from-variable",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
         "diff": "divergence at byte 7 (a.length=594, b.length=539)\n--- a +0..67\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1fwx{font-size\n+++ b +0..67\nconst _ = \"._syaz5scu{color:red}\";\nconst h100 = {\n  fontSize: \"12px"
-      },
-      {
-        "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-obj-variable",
-        "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 14 (a.length=597, b.length=662)\n--- a +0..74\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._1wybgktf{font-size:\n+++ b +0..74\nconst _2 = \"._1qs95u35{hover:var(--_ad9zy0)}\";\nconst _ = \"._1wybgktf{font-"
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-no-argument-arrow-function-variable",
@@ -1523,7 +1532,7 @@
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-no-argument-function-properties-belonging-to-a-vari",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=976, b.length=903)\n--- a +0..67\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +0..67\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._19itd27t{border:v"
+        "diff": "divergence at byte 7 (a.length=976, b.length=834)\n--- a +0..67\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +0..67\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._19it1nsd{border:1"
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-argument-arrow-function-variable",
@@ -1561,16 +1570,6 @@
         "diff": "divergence at byte 6 (a.length=703, b.length=537)\n--- a +0..66\nconst _3 = \"._k48p1nn1{font-weight:400}\";\nconst _2 = \"._syaz11x8{c\n+++ b +0..66\nconst styles = {\n  default: null,\n  success: null,\n  fail: null,\n "
       },
       {
-        "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-variable-in-a-nested-template-literal",
-        "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 17 (a.length=553, b.length=626)\n--- a +0..77\nconst _ = \"._bfhkxtzx{background-color:var(--my-variable,red)}\";\nconst color \n+++ b +0..77\nconst _ = \"._bfhk4zeb{background-color:var(--my-variable,var(--_1ylxx6h))}\";\n"
-      },
-      {
-        "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-variable-in-a-heavily-nested-template-literal",
-        "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 17 (a.length=553, b.length=630)\n--- a +0..77\nconst _ = \"._16qs89dc{box-shadow:0 8px var(--my-variable,red)}\";\nconst color \n+++ b +0..77\nconst _ = \"._16qs1y4d{box-shadow:0 8px var(--_l8trrq)}\";\nconst color = \"red\";"
-      },
-      {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-variables-within-nested-template-literals-that-are-all-in-an-in",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
         "diff": "divergence at byte 7 (a.length=789, b.length=789)\n--- a +0..67\nconst _2 = \"._16qs1j0n{box-shadow:var(--my-other-variable,blue)}\";\n\n+++ b +0..67\nconst _ = \"._16qs1cd5{box-shadow:var(--_2wqa78)}\";\nconst color = \"r"
@@ -1584,21 +1583,6 @@
         "name": "styled-tests-call-expression/styled-object-call-expression--should-refuse-to-expand-shorthand-property-when-value-is-unknown-at-build-time-t",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
         "diff": "divergence at byte 7 (a.length=967, b.length=607)\n--- a +0..67\nconst _5 = \"._19bvftgi{padding-left:8px}\";\nconst _4 = \"._n3td1y44{p\n+++ b +0..67\nconst _ = \"._1yt41cd5{padding:var(--_2wqa78)}\";\nconst Container = f"
-      },
-      {
-        "name": "styled-tests-content-property/handling-of-values-for-css-content-property--should-handle-blank-content-variant-1",
-        "sourceFile": "styled/__tests__/content-property.test.ts",
-        "diff": "divergence at byte 132 (a.length=712, b.length=666)\n--- a +72..192\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = '._1sb2b3bt{content:\"\"}';\nconst ListItem = forwardRef(\n \n+++ b +72..192\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst ListItem = forwardRef(\n  ({ as: C = \"div\", style: __cmpls, ."
-      },
-      {
-        "name": "styled-tests-content-property/handling-of-values-for-css-content-property--should-handle-blank-content-variant-2",
-        "sourceFile": "styled/__tests__/content-property.test.ts",
-        "diff": "divergence at byte 136 (a.length=730, b.length=804)\n--- a +76..196\n ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = '._1sb2b3bt{content:\"\"}';\nconst hello = \"\";\nconst ListItem =\n+++ b +76..196\n ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1sb212tt{content:var(--_1rn7hzf)}\";\nconst hello = \"\";\ncon"
-      },
-      {
-        "name": "styled-tests-content-property/handling-of-values-for-css-content-property--should-handle-blank-content-variant-2#2",
-        "sourceFile": "styled/__tests__/content-property.test.ts",
-        "diff": "divergence at byte 136 (a.length=762, b.length=820)\n--- a +76..196\n ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = '._1sb21icm{content:\"this is a string\"}';\nconst hello = \"thi\n+++ b +76..196\n ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1sb212tt{content:var(--_1rn7hzf)}\";\nconst hello = \"this i"
       },
       {
         "name": "styled-tests-content-property/handling-of-values-for-css-content-property--should-not-add-quotes-if-they-exist-already",
@@ -1798,7 +1782,7 @@
       {
         "name": "tests-expression-evaluation/import-specifiers--should-evaluate-simple-expressions",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 17 (a.length=311, b.length=380)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
+        "diff": "divergence at byte 17 (a.length=311, b.length=311)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--should-inline-mutable-identifier-that-is-not-mutated",
@@ -1833,42 +1817,27 @@
       {
         "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-calculated-value-with-identifier",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 107 (a.length=296, b.length=364)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pkexct{margin-top:16px}\";\nconst spacing = 8;\nReact.createEleme\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pk1oo6{margin-top:var(--_18g810j)}\";\nconst spacing = 8;\nReact."
-      },
-      {
-        "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-calculated-value-with-nested-binary",
-        "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 107 (a.length=295, b.length=370)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pkftgi{margin-top:8px}\";\nconst spacing = 8;\nReact.createElemen\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pkmrgg{margin-top:var(--_1m1bb9w)}\";\nconst spacing = 8;\nReact."
-      },
-      {
-        "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-calculated-value-with-multiple-identifiers",
-        "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 107 (a.length=321, b.length=398)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pkidpf{margin-top:0}\";\nconst one = 1;\nconst two = 2;\nconst thr\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pk3qt6{margin-top:var(--_197oacw)}\";\nconst one = 1;\nconst two "
+        "diff": "divergence at byte 107 (a.length=296, b.length=295)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pkexct{margin-top:16px}\";\nconst spacing = 8;\nReact.createEleme\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pk7vkz{margin-top:1pc}\";\nconst spacing = 8;\nReact.createElemen"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-calculated-value-within-calc-utility",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 107 (a.length=304, b.length=374)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsbj0q6{width:calc(100% - 16px)}\";\nconst spacing = 8;\nReact.cre\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsbeyqn{width:calc(100% - var(--_18g810j)px)}\";\nconst spacing ="
+        "diff": "divergence at byte 107 (a.length=304, b.length=303)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsbj0q6{width:calc(100% - 16px)}\";\nconst spacing = 8;\nReact.cre\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsb5cnj{width:calc(100% - 1pc)}\";\nconst spacing = 8;\nReact.crea"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-calculated-value-with-string-literal-containing-numeric-val",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 107 (a.length=304, b.length=378)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pkexct{margin-top:16px}\";\nconst stringSpacing = \"8\";\nReact.cre\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pk1m2u{margin-top:var(--_1xdxffq)}\";\nconst stringSpacing = \"8\""
+        "diff": "divergence at byte 107 (a.length=304, b.length=303)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pkexct{margin-top:16px}\";\nconst stringSpacing = \"8\";\nReact.cre\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pk7vkz{margin-top:1pc}\";\nconst stringSpacing = \"8\";\nReact.crea"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-calculated-value-with-unary-expression",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 107 (a.length=306, b.length=379)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pk4h84{margin-top:-16px}\";\nconst getSpacing = () => 8;\nReact.c\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pk1hj1{margin-top:var(--_1i3w3gt)}\";\nconst getSpacing = () => "
+        "diff": "divergence at byte 107 (a.length=306, b.length=305)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pk4h84{margin-top:-16px}\";\nconst getSpacing = () => 8;\nReact.c\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pk1h22{margin-top:-1pc}\";\nconst getSpacing = () => 8;\nReact.cr"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-a-ts-const-expression",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
         "diff": "divergence at byte 96 (a.length=307, b.length=160)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst styles = {\n  color: \"red\"\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst styles = {\n  color: \"red\",\n};\nReact.createElement(\"div\", nul"
-      },
-      {
-        "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-a-ts-const-expression-in-a-resolved-binding",
-        "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 139 (a.length=776, b.length=830)\n--- a +79..199\n, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1rwq5scu input{background-color:red}\";\nconst style = {\n  bac\n+++ b +79..199\n, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._vitrp1ig{input:var(--_jv864j)}\";\nconst style = {\n  backgroun"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--should-bail-out-evaluating-non-exist-call-expression-which-has-member-expression",
