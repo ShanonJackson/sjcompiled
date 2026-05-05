@@ -206,6 +206,30 @@ pub struct Metadata<'a> {
     pub parent_id: u32,
     pub own_id: Option<u32>,
     pub context: MetadataContext,
+    /// **§5.5 closure addition (claude-2026-05-05).** Per-call own-scope
+    /// override read by the §5.6 evaluator's dispatch closure.
+    ///
+    /// JS upstream mutates `meta.ownPath = arrowFunctionExpressionPath`
+    /// in `traverse-call-expression.ts:121` to swap the IIFE arrow's
+    /// scope into the recursive `evaluateExpression(callee, meta)` call.
+    /// The Rust port mirrors with this scoped, restorable field:
+    /// `traverse_call_expression` sets it to `Some(iife_scope_id)`
+    /// around the recursive evaluator call, then restores the prior
+    /// value.
+    ///
+    /// **Read contract (§5.6):** when constructing the recursive
+    /// `evaluate_expression` closure, the §5.6 evaluator reads
+    /// `meta.own_scope_override` at each invocation. If `Some(id)`,
+    /// the dispatch uses `id` as the `own_scope` parameter to leaves
+    /// that take it (`traverse_identifier`, `evaluate_identifier`,
+    /// `traverse_member_expression`, etc.). If `None`, the dispatch
+    /// uses its environment-captured default.
+    ///
+    /// **Existing leaves are unaffected.** None of the §5.5 leaves
+    /// read this field; they take `own_scope` as an explicit
+    /// parameter. The override is dispatched-at-the-closure-boundary,
+    /// not consumed by leaves.
+    pub own_scope_override: Option<u32>,
 }
 
 impl<'a> Metadata<'a> {
@@ -226,6 +250,7 @@ impl<'a> Metadata<'a> {
             parent_id: self.parent_id,
             own_id: self.own_id,
             context,
+            own_scope_override: self.own_scope_override,
         }
     }
 
@@ -239,6 +264,7 @@ impl<'a> Metadata<'a> {
             parent_id: self.parent_id,
             own_id: self.own_id,
             context: self.context.clone(),
+            own_scope_override: self.own_scope_override,
         }
     }
 }

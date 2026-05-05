@@ -137,6 +137,7 @@ mod tests {
             parent_id: 0,
             own_id: None,
             context: MetadataContext::Root,
+            own_scope_override: None,
         };
         let expr = bin(BinaryOp::Add, num_lit(2.0), num_lit(3.0));
         let mut eval = identity_evaluator;
@@ -160,6 +161,7 @@ mod tests {
             parent_id: 0,
             own_id: None,
             context: MetadataContext::Root,
+            own_scope_override: None,
         };
         let expr = bin(BinaryOp::Add, str_lit("4"), str_lit("5"));
         let mut eval = identity_evaluator;
@@ -184,6 +186,7 @@ mod tests {
             parent_id: 0,
             own_id: None,
             context: MetadataContext::Root,
+            own_scope_override: None,
         };
         let expr = bin(BinaryOp::Add, num_lit(2.0), str_lit("hello"));
         let mut eval = identity_evaluator;
@@ -202,6 +205,7 @@ mod tests {
             parent_id: 0,
             own_id: None,
             context: MetadataContext::Root,
+            own_scope_override: None,
         };
         let expr = bin(BinaryOp::Add, num_lit(2.0), num_lit(3.0));
         // JS-undefined emulator: returns None.

@@ -372,12 +372,72 @@ per §5.0c Finding 7 still binding at each `get_binding` /
 
 ```bash
 RUSTFLAGS="" cargo test -p babel-plugin --lib resolver::               # 42/42 (unchanged)
-RUSTFLAGS="" cargo test -p babel-plugin --lib utils::resolve_binding   # 5/5 (NEW)
+RUSTFLAGS="" cargo test -p babel-plugin --lib utils::resolve_binding   # 7/7 (post-drift-fix; +1 cross-file imported_module gate)
 RUSTFLAGS="" cargo test -p babel-plugin --lib utils::traversers        # 16/16 (NEW)
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 270/270
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 286/286 (270 post-§5.4e + 15 §5.5 closure + 1 §5.4e drift-fix)
 RUSTFLAGS="" cargo test -p babel-plugin --test resolver_matrix_integration  # 8/8 (canary)
 RUSTFLAGS="" cargo build -p babel-plugin --target wasm32-wasip1 --release    # clean
 ```
+
+**§5.4e drift-fix landed (post-§5.5-close, 2026-05-05) —
+cross-file scope-swap parity:**
+
+The §5.5 closure agent's drift report flagged a real fixture-class
+divergence: the JS plugin's `resolveBinding` returns a Metadata
+swapped to point at the imported file's parentPath/state, so the
+§5.6 evaluator's recursive fold of the resolved node walks
+identifiers AGAINST THE IMPORTED FILE'S SCOPE. The §5.4e shape
+dropped that field (lifetime aliasing constraint), forcing
+§5.5/§5.6 consumers to forward the caller's scope info instead.
+Effect: imported literals fold correctly (the common path), but
+**deep cross-file chains** (`export const a = b where b is
+another binding in the imported file`) deopt where JS would
+fold — a class-hash-affecting divergence at AFM theme-file scale
+(`const PRIMARY = PRIMARY_RAW; export const colors = { primary:
+PRIMARY };` is a real shape).
+
+**Patch:** extend `PartialBindingWithMeta` with
+`imported_module: Option<Arc<Module>>`; populate from
+`resolve_binding.rs`'s locally-parsed module. The §5.6 evaluator
+constructs a fresh `compat::scope::ScopeIndex::build(&*imported_module)`
+at the recursive-fold boundary so identifier references in the
+imported AST resolve against the imported file's scope (not the
+caller's). The Arc means multiple recursive folds within a
+single transform share the same parsed AST.
+
+Why an Arc<Module> and not a re-parse from `imported_filename`:
+parsing is the dominant cost. Doing it once in `resolve_binding`
+and threading the Arc forward amortises across every fold inside
+the imported file. The alternative (re-parse at the §5.6 fold
+boundary) doubles the parse cost for every cross-file resolution.
+
+**§5.6 consumer contract** (locked at this drift-fix):
+
+```rust
+// In §5.6 evaluator's recursive-fold boundary:
+if matches!(resolved.source, BindingSource::Import) {
+    if let Some(imported_module) = resolved.imported_module.as_ref() {
+        let imported_scope = ScopeIndex::build(imported_module);
+        // Walk `resolved.node` AGAINST `imported_scope`, not the
+        // caller's scope. Recursive identifier resolution inside
+        // the imported AST now finds bindings in the imported file.
+        ...
+    }
+}
+```
+
+**New unit test gate:**
+`utils::resolve_binding::tests::cross_file_import_carries_imported_module_arc`
+synthesises a tempdir-fixture (consumer.ts importing colors from
+./theme.ts), calls `resolve_binding`, asserts both `imported_filename`
+AND `imported_module` are `Some`, and confirms the Arc carries
+the parsed AST containing the expected `colors` export.
+
+**§5.5 closure agent action:** the cross-file scope-swap drift
+note in `traverse_identifier`/`evaluate_identifier` module docs
+can be retired. `resolve_binding` now returns a forward-compatible
+shape; the wiring lands at §5.6 (when the evaluator dispatches
+into the resolved node).
 
 **Deferred-by-evidence (handed to §5.5 closure / §5.6
 implementers):**
@@ -469,25 +529,51 @@ production resolution paths (`resolve.sync` fallback at :185-189
 subtree) unblocks; §5.6 (`traversers/` + `evaluate_expression.rs`)
 follows.
 
-**§5.5 PARTIAL — three resolve-binding-INDEPENDENT leaves landed
-in parallel with §5.4 (claude-2026-05-05).** Per a coordination
-contract from the §5.4 owner: `traverse_binary_expression`,
-`traverse_unary_expression`, and `traverse_function` (verified by
-grep to NOT reach `resolveBinding` / `meta.state.cache` /
-`resolveRequest`) ported 1:1 with their helper deps
-(`create_result_pair`, `has_numeric_value`). Lib-test count:
-180 → 204 (+24 across the 5 new modules). WASM build clean.
-Remaining 11 §5.5 files (`traverse-identifier`,
-`traverse-call-expression`, `traverse-member-expression/**`
-including `resolve-expression/` and `evaluate-path/`) sit behind
-§5.4 — the §5.5 closure agent picks them up after
-`resolve_binding.rs` lands. Drift discipline preserved: no stubs
-for `resolve_binding`; no patching of pre-existing breadcrumbs;
-the JS-undefined fall-through path in `traverse-function.ts` was
-modelled with `Option<Box<Expr>>` in `ResultPair::value` rather
-than substituting an `Expr::Ident("undefined")` sentinel (which
-would have flipped `is_empty_value` semantics relative to JS —
-documented in `create_result_pair.rs` module docs).
+**§5.5 PARTIAL (closure-stubs) — claude-2026-05-05 (two-pass).**
+
+*Pass 1 (parallel-with-§5.4):* three resolve-binding-INDEPENDENT
+leaves landed alongside §5.4a/b/c/d/e — `traverse_binary_expression`,
+`traverse_unary_expression`, `traverse_function` (verified by grep
+to NOT reach `resolveBinding` / `meta.state.cache` /
+`resolveRequest`) ported 1:1 with helper deps `create_result_pair`,
+`has_numeric_value`. The JS-undefined fall-through path in
+`traverse-function.ts` was modelled with `Option<Box<Expr>>` in
+`ResultPair::value` rather than substituting an
+`Expr::Ident("undefined")` sentinel (which would have flipped
+`is_empty_value` semantics relative to JS).
+
+*Pass 2 (post-§5.4e closure):* 9 leaves landed —
+`traverse_identifier.rs` plus the entire
+`traverse_member_expression/**` subtree (8 files including
+`traverse_access_path/{evaluate_path,resolve_expression}/**`).
+Lib-test count: 270 → 285 (+15). All cross-file scope info threaded
+as explicit parameters per the §5.4e convention (Metadata stays
+invariant — adding `&'idx ScopeIndex` would touch the entire
+callgraph and isn't justified by §5.5 surface alone).
+
+*Two SHELL stubs landed with `unimplemented!()` bodies + upstream
+JS quoted in full + grep-discoverable unblock checklists:*
+`traverse_call_expression.rs` (needs IIFE CallExpr wrap +
+`replace_expr_returning_wrapping_path` + `register_new_scope` +
+MemberExpr property-mutation infra) and
+`evaluate_path/namespace_import.rs` (needs cross-file ScopeIndex
+synthesis at `evaluate_path` boundary + the chain threading
+imported `Module`). These are blocked on §5.0d-or-equivalent
+compat layer extension; the §5.6 owner (or a new §5.0d) replaces
+them after landing the missing infra.
+
+*Documented drift:* cross-file scope-swap divergence in
+`traverse_identifier`/`evaluate_identifier`. JS uses
+`resolved.meta` (the imported file's parentPath/state) for the
+recursive `evaluateExpression` call. The §5.4e
+`PartialBindingWithMeta` redesign drops the `meta` field, so the
+Rust port forwards the CALLER's scope info into the recursion.
+Correct for imported literals (most fixtures); deopts on deep
+cross-file constant chains (`export const a = b;` where `b` is
+also in the imported file). Flagged in module docs, NOT patched
+— per CLAUDE.md "DRIFT DETECTION", that's not the §5.5 closure
+agent's call. The proper fix lives in §5.6 (cross-file
+ScopeIndex synthesis at the `evaluate_expression` boundary).
 
 The §5.4 owner inherits two §5.0c-bundled scope-shape extensions
 they should NOT re-derive:
@@ -525,7 +611,7 @@ mutations from §2.3(a)) — NOT a phase gate; bundles with the first
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 270/270 (was 246; +24 §5.4e: 16 traversers + 5 resolve_binding + 3 binding-field-extension impact)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 286/286 (270 post-§5.4e + 15 §5.5 closure + 1 §5.4e drift-fix `cross_file_import_carries_imported_module_arc`)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact, zero skips)
@@ -3156,6 +3242,7 @@ done before declaring Phase 0 fully signed off across the platform set.
 | §5.0a | ☑ | Port `crates/babel-plugin/src/compat/scope.rs` — pre-indexed scope tree, 1:1 with `@babel/traverse@7.29.0`. | claude-2026-05-04 | `crates/babel-plugin/src/compat/scope.rs` (~1100 LOC + 6 unit tests), `crates/babel-plugin/src/compat/globals.rs` (vendored `@babel/helper-globals@7.28.0` + 4 unit tests), un-ignored `rust_compat_scope_matches_js_corpus` byte-parity gate (23/23) | `cargo test -p babel-plugin --lib` → 155/155; `cargo test -p babel-plugin --test compat_scope_integration` → 3/3 |
 | §5.0b | ☑ | Port `crates/babel-plugin/src/compat/path.rs` — `PathHandle`, `replace_expr` (single-site IIFE), `traverse_subtree(visitor)`, `ensure_block`, AST-mutating `scope_push` (Finding 6). §5.0a's `scope_push_synthetic` reduced to a binding-only thin wrapper around the new `register_synthetic_binding` helper; production callers route through `compat::path::scope_push`. | claude-2026-05-04 | `crates/babel-plugin/src/compat/path.rs` (~960 LOC + 10 unit tests, including the "push then traverse, observe new VarDecl" round-trip), `compat/scope.rs::register_synthetic_binding` extraction | `cargo test -p babel-plugin --lib` → 165/165 (was 155 + 10 path tests); `cargo test -p babel-plugin --test compat_scope_integration` → 3/3 (unchanged); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean |
 | §5.0c | ☑ | Port `crates/babel-plugin/src/compat/evaluation.rs` — full line-by-line port of `path/evaluation.js` (Q3 lock). Bundled scope-shape extensions: `Binding::init_expr` (gated on `Const` + `Pat::Ident`) and `ScopeIndex::parent_kind_of` (proxy for `scope.path.parentPath` kind via parent SCOPE's owner kind). Four evidenced-unreachable branches emit `unimplemented!()` with citation. | claude-2026-05-04 | `crates/babel-plugin/src/compat/evaluation.rs` (~600 LOC + 15 unit tests + JS-semantic helpers); `Binding::init_expr` field on `compat/scope.rs`; `ScopeIndex::parent_kind_of` + `scope_kind_to_node_kind` helper; new `NodeKind` variants (`ForStatement`/`ForInStatement`/`ForOfStatement`/`CatchClause`/`SwitchStatement`); un-ignored `rust_compat_evaluation_matches_js_corpus` byte-parity gate (45/45) | `cargo test -p babel-plugin --lib compat::evaluation` → 15/15; `cargo test -p babel-plugin --test compat_evaluation_integration` → 3/3 (45-entry corpus byte-clean); `cargo test -p babel-plugin --lib` → 180/180; `cargo test -p babel-plugin --test compat_scope_integration` → 3/3 (regression canary); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean |
+| §5.0d | ☐ | **NEW** (escalated by §5.5 closure agent's drift report on `traverse_call_expression.rs`, 2026-05-05). Compat infra extensions required to unblock the IIFE-wrap path in `traverseCallExpression`. Four deliverables: (1) `compat::path::wrap_node_in_iife(expr) -> CallExpr` — outer CallExpr wrap + arrow-body ReturnStatement on top of §5.0b's `synthesize_iife_arrow_with_empty_block`; (2) `compat::path::replace_expr_returning_wrapping_path` — variant of §5.0b's fire-and-forget `replace_expr` that returns a PathHandle to the new wrapping CallExpr; (3) `compat::scope::ScopeIndex::register_new_scope(parent, kind) -> ScopeId` — runtime new-scope synthesis (§5.0a only pre-indexes scopes at build time; the IIFE arrow's scope is brand new); (4) `&mut MemberExpr` mutation/undo thread for the `callee.property = newProperty` rewrite (or upstream JS-side simplification — see traverse_call_expression.rs module docs). | — | `crates/babel-plugin/src/utils/traverse_expression/traverse_call_expression.rs` body (currently `unimplemented!()` SHELL stub) — depends on this checkpoint | All four §5.0d deliverables shipped; `traverse_call_expression`'s `unimplemented!()` body replaced with the 1:1 port; `traverseCallExpression`-touching fixtures (e.g. `${userFn(...)}` in CSS interpolation) byte-clean. **§5.6 (`evaluate_expression.rs` port) cannot ship without §5.0d** because the evaluator dispatches into `traverseCallExpression` at `evaluate-expression.ts:62-65`. |
 | §5.1 | ☑ | Re-confirm `STATE_MUTATIONS.md` is current vs upstream Babel; reconcile any new mutation sites | claude-2026-05-04 | Updated STATE_MUTATIONS.md (line-number drift on sites #6/#7); zero new variants needed; reach of §5.5/§5.6 subtree into state writes is exactly one site (`set-imported-compiled-imports.ts:23`, already in OUT-of-capture list). | `grep -rEn 'state\.(includedFiles\|compiledImports\|sheets\|cssMap\|ignoreMemberExpressions)\b'` over `packages/babel-plugin/src/` returns 8 matches matching the doc's site list |
 | §5.2 | ☐ | Land the consumer-monorepo refactor (zero outside-cwd includes) | — | refactor PR | §0.10 audit reports zero outliers |
 | §5.3 | ☑ | Port `utils/cache.rs` — Layer 1 in-memory + Layer 2 postcard `cache.bin` per PLAN.md §3.9 | claude-2026-05-04 | `crates/babel-plugin/src/utils/cache.rs` (1:1 Layer 1 `Cache<T>` + Rust-only `Layer2` handle with atomic-write protocol), `crates/babel-plugin/src/cache_schema.rs` (postcard `CacheFile` / `Layer2Entry` / `SerializedExpr` / `TransitiveDep`; `CACHE_VERSION = 1`; `compute_schema_hash()` 32-byte deterministic FNV-1a-XOR fingerprint). Layer 2 NOT yet wired into `State::cache` — gated on §5.4–§5.6 (no producer exists). | `cargo test -p babel-plugin cache_schema::` → 7/7; `cargo test -p babel-plugin utils::cache::` → 20/20; size + entry caps locked at the type level + tested |
@@ -3163,9 +3250,9 @@ done before declaring Phase 0 fully signed off across the platform set.
 | §5.4b | ☑ | Port the resolver engine: `crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs` — generic Node-style resolver wrapping `oxc_resolver` with per-context dispatch (extensions today; mainFields + exports.fields + conditions land alongside §5.4c/d). Defaults match `createDefaultResolver` empty-config. Rejects `resolver: <string>` / `resolver: <function>` at config-parse with hard error citing RESOLVER_SPEC_PART_TWO.md. Schema parses every field per RESOLVER_SPEC_PART_TWO.md §2.1 with `#[serde(deny_unknown_fields)]` so consumer typos fail fast. | claude-2026-05-05 | `crates/babel-plugin/src/resolver/{mod,config,default,engine}.rs` (~600 LOC + 7 unit tests for `config::ResolverConfig::parse_value`); `crates/babel-plugin/Cargo.toml` (oxc_resolver added); `crates/Cargo.toml` (workspace pin `oxc_resolver = "11"`); un-ignored `rust_resolver_matches_js_corpus` byte-parity gate (4/4 fixtures green against `enhanced-resolve@5.18.3`). | `cargo test -p babel-plugin --lib resolver::` → 7/7 (the new `config::tests` module); `cargo test -p babel-plugin --test resolver_matrix_integration` → **3/3 (zero ignored)** — `corpus_shape_lock` + `corpus_observed_matches_expected_oracle_self_consistency` + `rust_resolver_matches_js_corpus` (4 fixtures byte-clean against enhanced-resolve@5.18.3); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean |
 | §5.4c | ☑ | Port `crates/babel-plugin/src/resolver/transforms.rs` — the 5-op `packageJsonTransforms` engine (`ensureObject`, `renameKey`, `renameMapEntry`, `setDefault`, `deleteKey`) per RESOLVER_SPEC_PART_TWO.md §2.2 + the `TransformingFileSystem` adapter that wraps `oxc_resolver::FileSystemOs` and intercepts `package.json` `read()` calls to apply transforms before exports/mainFields resolution sees the bytes. WASI-safe: NO on-disk mutation; transforms run at the read site, matching spec §2.2 wording ("applied... after reading and before exports resolution"). | claude-2026-05-05 | `crates/babel-plugin/src/resolver/transforms.rs` (~330 LOC + 22 unit tests covering each of the 5 ops + composed Jira sequences from RESOLVER_SPEC_PART_TWO.md §2.4 + defensive cases); `crates/babel-plugin/src/resolver/engine.rs` extended with `TransformingFileSystem` impl + `Resolver::from_transforming` constructor + `ResolverInner` enum dispatch (zero overhead when transforms list is empty); `parity-harness/resolver-matrix/fixtures-source/axis-10-package-json-transforms/delete-exports/` (real on-disk fixture: package with both `main` and `exports`); 2 new tests in `resolver_matrix_integration.rs` (`axis_10_no_transform_resolves_via_exports` baseline + `axis_10_delete_exports_transform_falls_back_to_main` E2E proving the FS wrapper genuinely mutates what oxc_resolver consumes). | `cargo test -p babel-plugin --lib resolver::` → 30/30 (was 7; +22 transforms unit tests + 1 engine round-trip); `cargo test -p babel-plugin --test resolver_matrix_integration` → 5/5 (was 3; +2 axis-10 transform E2E); `cargo test -p babel-plugin --lib` → 234/234 (was 211); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean |
 | §5.4d | ☑ | Port `crates/babel-plugin/src/resolver/prefer_first.rs` — the `preferFirst` dispatcher per RESOLVER_SPEC_PART_TWO.md §2.3. Architecture: option (b) per-rule pre-built resolvers — each rule clones base `ResolveOptions`, overrides `exports.fields` / `main.fields` per `use_`, owns one `ResolverGeneric<TransformingFileSystem>`. Prefixes loaded once at config-load (inline arrays verbatim; `{fromFile}` reads relative to the consumer config's directory; accepts both bare-array and `{"prefixes": [...]}` shapes). First-match-wins; non-matched requests fall through to the base resolver. `build_from_config` signature changed to `(cfg, config_dir) -> Result<Resolver, PreferFirstError>` to support `fromFile` resolution. Also wires `cfg.exports.fields` into the base resolver's `ResolveOptions::exports_fields` (was parses-but-not-honoured at §5.4c). | claude-2026-05-05 | `crates/babel-plugin/src/resolver/prefer_first.rs` (~510 LOC + 12 unit tests covering inline / fromFile-bare / fromFile-prefixes-object / missing-fromFile / wrong-shape / non-string-entry / build_rule_options × 3 / dispatcher × 3); `crates/babel-plugin/src/resolver/engine.rs` extended with `ResolverInner::PreferFirst` variant + `Resolver::from_prefer_first` constructor + `TransformingFileSystem::with_transforms_arc` for shared-Arc rule resolvers; `crates/babel-plugin/src/resolver/mod.rs` re-exports `PreferFirstError`; `parity-harness/resolver-matrix/fixtures-source/axis-11-prefer-first/match-by-prefix/` (real on-disk fixture: package with `main` + `af:exports`, `@matched/` scope); 3 new tests in `resolver_matrix_integration.rs` (`axis_11_no_prefer_first_uses_main` baseline + `axis_11_matched_prefix_routes_to_af_exports` + `axis_11_unmatched_prefix_falls_through_to_base`). | `cargo test -p babel-plugin --lib resolver::` → 42/42 (was 30; +12 prefer_first unit tests); `cargo test -p babel-plugin --test resolver_matrix_integration` → 8/8 (was 5; +3 axis-11 E2E); `cargo test -p babel-plugin --lib` → 246/246 (was 234); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean (zero babel-plugin warnings) |
-| §5.4e | ☑ | 1:1 port of `packages/babel-plugin/src/utils/resolve-binding.ts` → `crates/babel-plugin/src/utils/resolve_binding.rs`, wiring through `resolver::Resolver`. Bundles the `traversers/` subtree (originally §5.6) since `resolve-binding.ts` has hard deps on `getDefaultExport`/`getNamedExport`/`setImportedCompiledImports`. Extends `Binding` with `import_info: Option<ImportInfo>` carrying `(source, kind, imported_name)` per the §5.0c precedent for `init_expr`. Breadcrumb at every `get_binding`/`get_own_binding` call site per §5.0c Finding 7. State extended with `resolver: Option<Arc<Resolver>>` + `filename: Option<String>` slots (visitor sets on `Program::enter`; tests set directly). `PartialBindingWithMeta` redesigned: drops `'a` lifetime + `meta: Metadata<'a>` field (cross-file Metadata can't reference a different file's State); `node` is now `Option<Box<Expr>>` (`None` for non-Expr resolutions); adds `imported_filename: Option<String>` for cross-file pointers. `evaluate_expression` callback parameter threaded through `resolve_binding_with_evaluator` for the destructuring-resolution recursion path; §5.6 wires it in. The §4.4 SHELL `resolve_binding_stub` retained as `#[allow(dead_code)]` until Phase 6 rewires the lone in-tree caller (which is in a dead-code branch already). | claude-2026-05-05 | `crates/babel-plugin/src/utils/resolve_binding.rs` (~750 LOC + 5 unit tests); `crates/babel-plugin/src/utils/traversers/{mod,get_export,object,set_imported_compiled_imports,types}.rs` (~360 LOC + 16 unit tests); `crates/babel-plugin/src/compat/scope.rs` extended with `ImportInfo` + `ImportSpecifierKind` + `Binding::import_info` field populated in `register_import`; `crates/babel-plugin/src/state.rs` extended with `resolver` + `filename` slots + `set_resolver`/`set_filename`/`resolver()`/`filename()` methods; `crates/babel-plugin/src/resolver/engine.rs` `Resolver` gets `Debug` impl; `crates/babel-plugin/Cargo.toml` `swc_core` features add `ecma_parser` (was dev-only at §4.2/§4.4; lib-level now because resolve-binding parses imported modules at runtime). | `cargo test -p babel-plugin --lib` → 270/270 (was 246; +24: traversers + resolve_binding tests); `cargo test -p babel-plugin --test resolver_matrix_integration` → 8/8 (regression canary, unchanged); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean (zero babel-plugin warnings) |
-| §5.5 | ▶ PARTIAL | Port the entire `traverse_expression/` subtree file-for-file (leaves first). 3/14 leaves landed in parallel with §5.4a (the resolve-binding-independent ones); remaining 11 files (`traverse-identifier`, `traverse-call-expression`, the entire `traverse-member-expression/**` subtree) gated on §5.4e. | claude-2026-05-05 (parallel leaves) / — (closure) | Landed: `crates/babel-plugin/src/utils/traverse_expression/{traverse_binary_expression,traverse_unary_expression,traverse_function}.rs` + `utils/{create_result_pair,has_numeric_value}.rs` (+ 24 unit tests). Remaining: `traverse_expression/{traverse_identifier,traverse_call_expression,traverse_member_expression/**}.rs` — depends on §5.4e. | Lib-level: `cargo test -p babel-plugin --lib` → 204/204 (was 180; +24 tests across the 5 new modules). WASM: `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean. Harness `module-traversal` / `expression-evaluation` fixtures byte-clean — DEFERRED to §5.5 closure agent (full pipeline cannot run until §5.4e + §5.6 land; §4.4 `evaluate_expression_stub` still panics on dispatch). |
-| §5.6 | ☐ | Port `evaluate_expression.rs` (200 LOC). The `traversers/` subtree (5 files) was bundled into §5.4e because `resolve_binding.rs` had a hard dep on `getDefaultExport`/`getNamedExport`/`setImportedCompiledImports` — see §5.4e closure summary. | — | `crates/babel-plugin/src/utils/evaluate_expression.rs` — depends on §5.4e + §5.5 closure | Harness `module-traversal` and `expression-evaluation` fixtures byte-clean |
+| §5.4e | ☑ (incl. 2026-05-05 drift-fix patch) | 1:1 port of `packages/babel-plugin/src/utils/resolve-binding.ts` → `crates/babel-plugin/src/utils/resolve_binding.rs`, wiring through `resolver::Resolver`. Bundles the `traversers/` subtree (originally §5.6) since `resolve-binding.ts` has hard deps on `getDefaultExport`/`getNamedExport`/`setImportedCompiledImports`. Extends `Binding` with `import_info: Option<ImportInfo>` carrying `(source, kind, imported_name)` per the §5.0c precedent for `init_expr`. Breadcrumb at every `get_binding`/`get_own_binding` call site per §5.0c Finding 7. State extended with `resolver: Option<Arc<Resolver>>` + `filename: Option<String>` slots (visitor sets on `Program::enter`; tests set directly). `PartialBindingWithMeta` redesigned: drops `'a` lifetime + `meta: Metadata<'a>` field (cross-file Metadata can't reference a different file's State); `node` is now `Option<Box<Expr>>` (`None` for non-Expr resolutions); adds `imported_filename: Option<String>` for cross-file pointers AND **`imported_module: Option<Arc<Module>>` for cross-file scope-swap parity (post-§5.5-close drift fix)** — §5.6 evaluator builds a fresh `ScopeIndex` from this Arc at the recursive-fold boundary so deep cross-file chains (e.g. `export const a = b where b is another binding in the imported file`) fold correctly instead of deopting against the caller's scope. Class-hash-affecting fix; closes the §5.5 closure agent's drift report. `evaluate_expression` callback parameter threaded through `resolve_binding_with_evaluator` for the destructuring-resolution recursion path; §5.6 wires it in. The §4.4 SHELL `resolve_binding_stub` retained as `#[allow(dead_code)]` until Phase 6 rewires the lone in-tree caller (which is in a dead-code branch already). | claude-2026-05-05 | `crates/babel-plugin/src/utils/resolve_binding.rs` (~750 LOC + 5 unit tests); `crates/babel-plugin/src/utils/traversers/{mod,get_export,object,set_imported_compiled_imports,types}.rs` (~360 LOC + 16 unit tests); `crates/babel-plugin/src/compat/scope.rs` extended with `ImportInfo` + `ImportSpecifierKind` + `Binding::import_info` field populated in `register_import`; `crates/babel-plugin/src/state.rs` extended with `resolver` + `filename` slots + `set_resolver`/`set_filename`/`resolver()`/`filename()` methods; `crates/babel-plugin/src/resolver/engine.rs` `Resolver` gets `Debug` impl; `crates/babel-plugin/Cargo.toml` `swc_core` features add `ecma_parser` (was dev-only at §4.2/§4.4; lib-level now because resolve-binding parses imported modules at runtime). | `cargo test -p babel-plugin --lib` → 270/270 (was 246; +24: traversers + resolve_binding tests); `cargo test -p babel-plugin --test resolver_matrix_integration` → 8/8 (regression canary, unchanged); `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean (zero babel-plugin warnings) |
+| §5.5 | ▶ PARTIAL (closure-stubs; per-stub unblock differentiated post-§5.4e drift-fix) | Port the entire `traverse_expression/` subtree file-for-file. **All 14 leaves accounted for**: 3 resolve-binding-independent leaves landed in parallel with §5.4 (commit before §5.4e); 9 closure leaves landed post-§5.4e; 2 SHELL stubs gated on different unblocks: **`namespace_import.rs` is SHAPE-UNBLOCKED** post-§5.4e drift-fix (`PartialBindingWithMeta::imported_module: Option<Arc<Module>>` landed) — wiring is §5.6 work (thread imported_module down the access-path chain; ~30 LOC port once threaded). **`traverse_call_expression.rs` is STILL BLOCKED** by missing AST-mutation compat infra — escalated as **§5.0d** (a new compat checkpoint covering `wrap_node_in_iife`, `replace_expr_returning_wrapping_path`, `register_new_scope`, MemberExpr mutation/undo). | claude-2026-05-05 | Landed (1:1 ports + tests, post-§5.4e): `traverse_expression/traverse_identifier.rs`; `traverse_expression/traverse_member_expression/{mod.rs, traverse_access_path/{mod.rs, evaluate_path/{mod.rs, object.rs}, resolve_expression/{mod.rs, function_args.rs, identifier.rs}}}` (8 files). SHELL stubs (`unimplemented!()` body, upstream JS quoted in full + grep-discoverable unblock checklist in module docs): `traverse_call_expression.rs` (gated on `wrap_node_in_iife` CallExpr wrap + `replace_expr_returning_wrapping_path` + `ScopeIndex::register_new_scope`); `traverse_member_expression/traverse_access_path/evaluate_path/namespace_import.rs` (gated on cross-file ScopeIndex synthesis + the access-path chain threading the imported file's parsed Module). Drift escalations recorded in module docs: cross-file scope-swap (`resolved.meta` from JS dropped per §5.4e shape — `traverse_identifier`/`evaluate_identifier` forward caller's scope info, deopts on deep cross-file chains; correct for imported literals); flagged to coordinator, NOT patched **at §5.5 close — PATCHED post-§5.5 by extending `PartialBindingWithMeta::imported_module: Option<Arc<Module>>` (see §5.4e drift-fix in §5.4e closure summary)**. The §5.5 stubs' module-docs drift notes can be retired once §5.6 wires the consumer side: `if let Some(imported) = result.imported_module { ScopeIndex::build(&*imported) }` at the recursive-fold boundary. | Lib: `cargo test -p babel-plugin --lib` → 286/286 (270 post-§5.4e + 15 §5.5 closure + 1 §5.4e drift-fix `cross_file_import_carries_imported_module_arc`). Integration: compat_scope 3/3, compat_evaluation 3/3, compat_generator 3/3, hash_parity 4/4, transform_css_integration 3/3, resolver-matrix 8/8 — regression-canary clean. WASM: `cargo build --target wasm32-wasip1 --release` clean. Harness `module-traversal` / `expression-evaluation` fixtures byte-clean — DEFERRED to §5.6 (full pipeline can't dispatch until `evaluate_expression.rs` lands AND the 2 §5.5 SHELL stubs are unblocked by §5.0d-or-equivalent compat infra). |
+| §5.6 | ☐ | Port `evaluate_expression.rs` (200 LOC). The `traversers/` subtree (5 files) was bundled into §5.4e because `resolve_binding.rs` had a hard dep on `getDefaultExport`/`getNamedExport`/`setImportedCompiledImports` — see §5.4e closure summary. **§5.6 also wires up the §5.5 namespace_import.rs stub** (shape-unblocked by §5.4e drift-fix; needs `imported_module: Option<&Module>` threaded down the access-path chain — see post-drift-fix unblock checklist in `namespace_import.rs` module docs). | — | `crates/babel-plugin/src/utils/evaluate_expression.rs` + access-path-chain signature update for namespace_import wiring — depends on §5.4e + §5.5 closure + **§5.0d** (the evaluator dispatches into `traverseCallExpression`; can't ship while §5.0d's `traverse_call_expression` SHELL stub still panics) | Harness `module-traversal` and `expression-evaluation` fixtures byte-clean |
 | §5.7 | ☐ | Wire `includedFiles` accumulation → `<callScratch>/included-files.json` sidecar | — | Updated lib.rs Program::exit | Harness fixtures with cross-file imports produce non-empty sidecar; host's `asset.invalidateOnFileChange` matches Babel's |
 | §5.8 | ☐ | Promote `scripts/audit-included-files.ts` to CI guardrail | — | CI config update | Audit failure blocks PR merge |
 | §5.9 | ☐ | **Phase 5 exit gate:** module-traversal + expression-evaluation byte-clean; `MutationRecorder` shadow-eval suite reports zero replay/live divergence; pre-commit state-mutation lint clean | — | STATUS.md updated | All exit-gate sub-conditions met |

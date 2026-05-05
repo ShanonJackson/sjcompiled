@@ -615,6 +615,64 @@ impl ScopeIndex {
         self.bindings_by_scope[scope as usize].insert(name.to_string(), binding);
     }
 
+    /// **§5.5 closure addition (claude-2026-05-05).** Allocate a fresh
+    /// runtime-synthesised scope under `parent`. Returns the new
+    /// `ScopeId`.
+    ///
+    /// Used by the `traverse-call-expression.ts` IIFE site at
+    /// `traverse_expression/traverse_call_expression.rs`: when
+    /// resolving `userFunc(<args>)` against a constant function
+    /// definition, the leaf needs a fresh scope to host the
+    /// `(param := evaluatedArg)` synthetic bindings the JS plugin
+    /// installs via `arrowFunctionExpressionPath.scope.push(...)`.
+    /// Babel resolves that scope via `NodePath.scope` walking; SWC
+    /// resolves via `ScopeIndex` lookup, so the Rust port allocates a
+    /// `ScopeId` directly here rather than synthesising the IIFE
+    /// arrow into the AST and re-deriving the scope.
+    ///
+    /// **Why this isn't a full §5.0a-style scope build:**
+    /// - The AST node owning this scope is transient (an IIFE arrow
+    ///   that exists in memory only for the duration of one
+    ///   `traverse_call_expression` call). Its span doesn't
+    ///   correspond to a real source-code position, so
+    ///   `scope_at_pos` won't ever return it (the runtime-allocated
+    ///   scope is invisible to span-based lookups by design).
+    /// - The owner-kind is always `ScopeKind::Arrow` for the IIFE
+    ///   site — the upstream `wrapNodeInIIFE` helper at
+    ///   `utils/ast.ts:64-65` always emits an arrow. Future callers
+    ///   that need a different kind can extend this signature.
+    /// - `has_pattern_param: false` — the IIFE arrow takes zero
+    ///   params (the JS plugin pushes `const`-bindings INTO the
+    ///   arrow's scope, NOT as arrow params).
+    /// - `parent`-walk semantics work: subsequent
+    ///   [`Self::get_binding`] calls with `scope = <new id>` walk up
+    ///   to the parent on miss, so caller-scope bindings stay
+    ///   visible through the IIFE's scope.
+    ///
+    /// **Why this isn't drift on the §5.0a/§5.0c/§5.4e shape:** the
+    /// shape extension precedent — adding a single field
+    /// (`init_expr`, `import_info`) or a single registration entry
+    /// point — was set by §5.0c and §5.4e. This is the same pattern:
+    /// one new entry point that adds a row to `scopes` +
+    /// `bindings_by_scope`, no behavioural change to existing
+    /// methods.
+    pub fn register_new_scope(&mut self, parent: ScopeId, kind: ScopeKind) -> ScopeId {
+        let id = self.scopes.len() as ScopeId;
+        self.scopes.push(ScopeData {
+            kind,
+            parent: Some(parent),
+            // DUMMY_SP — the §5.5 IIFE site's arrow has no source
+            // position. `scope_at_pos` filters by `lo <= pos <= hi`
+            // and `DUMMY_SP` has `lo = hi = BytePos(0)`, so a
+            // runtime-synthesised scope is invisible to position-based
+            // lookups by design (see `scope_at_pos` semantics above).
+            span: swc_core::common::DUMMY_SP,
+            has_pattern_param: false,
+        });
+        self.bindings_by_scope.push(IndexMap::new());
+        id
+    }
+
     /// **Deprecated convenience wrapper.** Construct a synthetic
     /// `VariableDeclarator`-shaped `Binding` and register it via
     /// [`Self::register_synthetic_binding`]. Used by the §5.0a parity
@@ -2119,6 +2177,74 @@ mod tests {
         assert!(idx
             .get_binding(idx.program_scope(), "unknownGlobal")
             .is_none());
+    }
+
+    #[test]
+    fn register_new_scope_sets_parent_pointer() {
+        let m = parse("const x = 1;");
+        let mut idx = ScopeIndex::build(&m);
+        let prog = idx.program_scope();
+        let new_scope = idx.register_new_scope(prog, ScopeKind::Arrow);
+        assert_eq!(idx.parent_of(new_scope), Some(prog));
+        assert_eq!(idx.kind_of(new_scope), ScopeKind::Arrow);
+    }
+
+    #[test]
+    fn register_new_scope_get_binding_walks_up_to_parent() {
+        // Caller-scope bindings are visible from the runtime-allocated
+        // scope through normal `get_binding` parent-chain walking.
+        let m = parse("const color = 'blue';");
+        let mut idx = ScopeIndex::build(&m);
+        let prog = idx.program_scope();
+        let new_scope = idx.register_new_scope(prog, ScopeKind::Arrow);
+        let binding = idx
+            .get_binding(new_scope, "color")
+            .expect("parent-scope binding visible from new scope");
+        assert_eq!(binding.kind, BindingKind::Const);
+    }
+
+    #[test]
+    fn register_new_scope_register_synthetic_binding_into_new_scope() {
+        // The §5.5 IIFE site's contract: allocate a new scope, then
+        // push (param := evaluatedArg) bindings into it via
+        // `register_synthetic_binding`. Verifies the binding lands in
+        // the right `bindings_by_scope` row.
+        let m = parse("const outer = 'o';");
+        let mut idx = ScopeIndex::build(&m);
+        let prog = idx.program_scope();
+        let iife = idx.register_new_scope(prog, ScopeKind::Arrow);
+        idx.scope_push_synthetic(
+            iife,
+            "param",
+            BindingKind::Const,
+            Some("evaluated".to_string()),
+            swc_core::common::DUMMY_SP,
+        );
+        // Own binding lookup against the new scope.
+        let own = idx
+            .get_own_binding(iife, "param")
+            .expect("synthetic param binding");
+        assert_eq!(own.kind, BindingKind::Const);
+        assert_eq!(own.binding_init_string.as_deref(), Some("evaluated"));
+        // Parent scope still doesn't see the IIFE-local binding.
+        assert!(idx.get_own_binding(prog, "param").is_none());
+        // But the IIFE scope DOES see the parent's `outer` binding.
+        assert!(idx.get_binding(iife, "outer").is_some());
+    }
+
+    #[test]
+    fn register_new_scope_invisible_to_scope_at_pos() {
+        // Position-based lookups must NOT flow into a runtime-allocated
+        // scope because its DUMMY_SP is `[BytePos(0), BytePos(0)]`.
+        // Any non-zero position will skip past it.
+        let m = parse("const x = 1; const y = x;");
+        let mut idx = ScopeIndex::build(&m);
+        let prog = idx.program_scope();
+        let _new_scope = idx.register_new_scope(prog, ScopeKind::Arrow);
+        // BytePos(20) is somewhere inside `const y = x;`. Should resolve
+        // to a real source-derived scope, not the runtime-allocated one.
+        let resolved = idx.scope_at_pos(BytePos(20));
+        assert_ne!(resolved, _new_scope);
     }
 
     #[test]

@@ -499,6 +499,7 @@ where
             constant: binding.constant,
             source: BindingSource::Module,
             imported_filename: None,
+            imported_module: None,
         });
     }
 
@@ -514,6 +515,7 @@ where
             constant: binding.constant,
             source: BindingSource::Module,
             imported_filename: None,
+            imported_module: None,
         });
     };
     let import_source = import_info.source.as_str();
@@ -567,21 +569,31 @@ where
         &mut Vec::new(),
     )
     .ok()?;
+    // Wrap the imported AST in Arc so it can be threaded forward
+    // to the §5.6 evaluator via `PartialBindingWithMeta::imported_module`
+    // — see the type-level doc-comment on `PartialBindingWithMeta`
+    // for the cross-file scope-swap parity contract. Multiple
+    // recursive folds inside the same imported file share the Arc.
+    let imported_module_arc: std::sync::Arc<Module> = std::sync::Arc::new(imported_module);
 
     // Find the matching export.
     let export_result: Option<ExportResult> = match import_info.kind {
         crate::compat::scope::ImportSpecifierKind::Default => {
-            get_default_export(&imported_module)
+            get_default_export(&imported_module_arc)
         }
         crate::compat::scope::ImportSpecifierKind::Namespace => {
             // import * as theme from 'theme' — no foldable expression.
             // Return Some-with-None so the caller knows it was found
-            // but isn't a single Expr.
+            // but isn't a single Expr. We still attach the imported
+            // module so the §5.6 evaluator's namespace-member
+            // walking path (e.g. `theme.colors`) has the AST to
+            // walk against.
             return Some(PartialBindingWithMeta {
                 node: None,
                 constant: binding.constant,
                 source: BindingSource::Import,
                 imported_filename: Some(module_path_str),
+                imported_module: Some(imported_module_arc),
             });
         }
         crate::compat::scope::ImportSpecifierKind::Named => {
@@ -599,7 +611,7 @@ where
                 .imported_name
                 .as_deref()
                 .unwrap_or(reference_name);
-            get_named_export(&imported_module, imported_name)
+            get_named_export(&imported_module_arc, imported_name)
         }
     };
 
@@ -611,6 +623,7 @@ where
         constant: binding.constant,
         source: BindingSource::Import,
         imported_filename: Some(module_path_str),
+        imported_module: Some(imported_module_arc),
     })
 }
 
@@ -631,6 +644,7 @@ mod tests {
             parent_id: 0,
             own_id: None,
             context: MetadataContext::Root,
+            own_scope_override: None,
         }
     }
 
@@ -854,14 +868,129 @@ mod tests {
         if let Some(r) = result {
             // If the binding chain reached resolve, we must have a
             // resolved import_filename pointing at the fixture's
-            // entry.js.
+            // entry.js, AND an imported_module Arc so the §5.6
+            // evaluator can scope-swap.
             if matches!(r.source, BindingSource::Import) {
                 let imported = r.imported_filename.expect("imported filename");
                 assert!(
                     imported.contains("parity-pkg-main-only"),
                     "imported filename should point at the fixture pkg, got {imported}"
                 );
+                // §5.4e drift-fix contract: cross-file Import
+                // resolutions MUST carry the imported AST so the
+                // §5.6 evaluator can build a fresh ScopeIndex.
+                // Without this, deep cross-file chains deopt.
+                assert!(
+                    r.imported_module.is_some(),
+                    "imported_module must be Some for cross-file Import resolutions \
+                     — see PartialBindingWithMeta type-level doc-comment"
+                );
             }
         }
+    }
+
+    /// §5.4e drift-fix gate: when resolve_binding returns
+    /// `source: Import`, the `imported_module` Arc MUST be
+    /// populated and MUST point at a Module containing the
+    /// expected exports. Direct test against a synthesised
+    /// imported file (no fixture-on-disk dependency) so the
+    /// §5.4e shape contract is locked even when the §5.4a
+    /// fixture skeleton is unavailable.
+    #[test]
+    fn cross_file_import_carries_imported_module_arc() {
+        use crate::resolver::build_default;
+        use std::sync::Arc;
+
+        // Synthesise an imported file under tempdir + a consumer
+        // file in the same directory. The default-config resolver
+        // walks node_modules from the consumer's parent — we
+        // sidestep that by using a relative-path import.
+        let tmp = std::env::temp_dir().join("§5.4e_drift_fix_imported_module");
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let imported_path = tmp.join("theme.ts");
+        std::fs::write(
+            &imported_path,
+            "export const colors = { primary: '#0052cc' };\n",
+        )
+        .unwrap();
+        let consumer_path = tmp.join("consumer.ts");
+        let consumer_src =
+            "import { colors } from './theme';\nexport { colors };\n";
+        std::fs::write(&consumer_path, consumer_src).unwrap();
+
+        // Parse the consumer + build its ScopeIndex.
+        let cm: Lrc<SourceMap> = Lrc::new(SourceMap::default());
+        let fm = cm.new_source_file(
+            Lrc::new(FileName::Real(consumer_path.clone())),
+            consumer_src.to_string(),
+        );
+        let module = parse_file_as_module(
+            &fm,
+            Syntax::Typescript(TsSyntax::default()),
+            EsVersion::Es2022,
+            None,
+            &mut Vec::new(),
+        )
+        .unwrap();
+        let scope_index = ScopeIndex::build(&module);
+
+        // Wire State + meta.
+        let mut state = fresh_state();
+        let resolver = Arc::new(build_default(Some(&[
+            ".js".to_string(),
+            ".jsx".to_string(),
+            ".ts".to_string(),
+            ".tsx".to_string(),
+        ])));
+        state.set_resolver(resolver);
+        state.set_filename(consumer_path.to_string_lossy().to_string());
+        let meta = meta_for_state(&mut state);
+
+        let result = resolve_binding(
+            "colors",
+            &meta,
+            &scope_index,
+            scope_index.program_scope(),
+            None,
+        );
+
+        // The binding-builder + resolver pipeline should reach
+        // the imported file. If it doesn't (for a §5.0a/oxc-resolver
+        // reason this test surfaces), fail loudly — the drift fix
+        // depends on this end-to-end shape.
+        let result = result
+            .expect("resolve_binding for `colors` import should reach the imported file");
+        assert!(
+            matches!(result.source, BindingSource::Import),
+            "expected source: Import, got {:?}",
+            result.source,
+        );
+        let imported_filename = result
+            .imported_filename
+            .as_deref()
+            .expect("imported_filename populated");
+        assert!(
+            imported_filename.contains("theme.ts"),
+            "imported_filename should point at theme.ts, got {imported_filename}",
+        );
+
+        // The §5.4e drift-fix contract: imported_module is Some
+        // and contains the imported file's parsed AST.
+        let imported_module = result
+            .imported_module
+            .as_ref()
+            .expect("imported_module populated for cross-file Import");
+        // Quick AST-shape sanity: walk the imported module's
+        // top-level body for an export-decl named `colors`. If
+        // the Arc carries the wrong file's AST, this lookup would
+        // miss.
+        use crate::utils::traversers::get_named_export;
+        let export = get_named_export(imported_module, "colors")
+            .expect("imported_module must contain `export const colors = ...`");
+        assert!(
+            export.node.is_some(),
+            "the `colors` export MUST resolve to its init expression"
+        );
     }
 }

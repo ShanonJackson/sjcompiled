@@ -19,7 +19,9 @@
 //! traverse-expression layer (Phase 5 §5.6). No analog needed here —
 //! callers thread a closure / fn-pointer directly.
 
-use swc_core::ecma::ast::Expr;
+use std::sync::Arc;
+
+use swc_core::ecma::ast::{Expr, Module};
 
 /// `{ type: 'unconditional', css: string }` — a static rule.
 #[derive(Debug, Clone)]
@@ -122,15 +124,68 @@ pub struct CSSOutput {
 /// surface for path-shaped data).
 ///
 /// The `node` is the resolved expression cloned out of the source
-/// module, so the caller doesn't need to keep the imported AST
-/// alive. `imported_filename` carries the resolved module's
-/// absolute path so the §5.6 evaluator can include-files-track and
-/// re-construct a `Metadata` pointed at the imported file when it
-/// needs to fold deeper.
+/// module. `imported_module` (NEW — see drift fix below) carries
+/// the imported file's parsed AST as `Arc<Module>` so the §5.6
+/// evaluator can build a fresh `ScopeIndex` against it at the
+/// recursive-fold boundary.
 ///
 /// `node = None` is a meaningful "binding found but resolved to a
 /// non-expression shape" — function/class/interface decls, etc.
 /// Callers deopt.
+///
+/// ## Cross-file scope-swap parity (§5.4e drift fix, 2026-05-05)
+///
+/// The JS plugin's `resolveBinding` (resolve-binding.ts:407-414)
+/// returns a Metadata pointing at the IMPORTED FILE:
+///
+/// ```js
+/// return {
+///   ...,
+///   meta: {
+///     ...meta,
+///     parentPath: foundParentPath,   // path INSIDE imported file
+///     state: { ...meta.state, file: ast, filename: modulePath },
+///   },
+/// };
+/// ```
+///
+/// When the §5.6 evaluator recursively folds `foundNode`, identifier
+/// references resolve AGAINST THE IMPORTED FILE'S SCOPE — which
+/// means deep cross-file chains fold correctly:
+///
+/// ```js
+/// // theme.ts
+/// const PRIMARY_RAW = '#0052cc';
+/// const PRIMARY = PRIMARY_RAW;
+/// export const colors = { primary: PRIMARY };
+///
+/// // consumer.ts
+/// const x = css({ color: colors.primary });
+/// ```
+///
+/// `colors.primary` resolves to `Identifier(PRIMARY)` from
+/// `theme.ts`. Folding `PRIMARY` requires looking up its binding
+/// IN `theme.ts`'s scope (where it resolves to `PRIMARY_RAW`,
+/// which folds to `'#0052cc'`). Without `imported_module`, the
+/// §5.6 evaluator can only walk against the consumer's scope —
+/// where `PRIMARY` isn't bound — and deopts. **A class-hash-
+/// affecting divergence** (different folded value → different
+/// CSS bytes → different atomic class hash).
+///
+/// **§5.6 consumer contract:** when `source == Import` and
+/// `imported_module.is_some()`, the recursive-fold boundary
+/// constructs a fresh `crate::compat::scope::ScopeIndex` from
+/// the imported module's AST and walks identifiers against IT,
+/// not the caller's scope. The Arc means multiple recursive
+/// folds within a single transform share the same parsed AST
+/// without re-parsing.
+///
+/// **Why an `Arc<Module>` and not a re-parse from
+/// `imported_filename`:** parsing is the dominant cost; doing it
+/// once in `resolve_binding` and threading the Arc forward
+/// amortises across every fold inside the imported file. The
+/// alternative (re-parse at the §5.6 fold boundary) doubles the
+/// parse cost for every cross-file resolution.
 #[derive(Debug)]
 pub struct PartialBindingWithMeta {
     /// The resolved expression. `None` when the binding's resolved
@@ -140,8 +195,18 @@ pub struct PartialBindingWithMeta {
     pub source: BindingSource,
     /// Absolute path of the imported module, when `source ==
     /// Import`. `None` for same-file (`source == Module`)
-    /// resolutions and for namespace-import resolutions.
+    /// resolutions.
     pub imported_filename: Option<String>,
+    /// **§5.4e drift-fix (2026-05-05).** The imported file's
+    /// parsed AST, when `source == Import`. The §5.6 evaluator
+    /// builds a fresh `ScopeIndex` from this for the recursive-
+    /// fold boundary so deep cross-file chains resolve against
+    /// the imported file's scope (mirroring JS Babel's
+    /// `meta.parentPath` swap at resolve-binding.ts:407-414).
+    /// `None` for same-file resolutions and for namespace-import
+    /// resolutions where there's no foldable expression. See the
+    /// type-level doc-comment for the full semantics.
+    pub imported_module: Option<Arc<Module>>,
 }
 
 

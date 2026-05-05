@@ -30,6 +30,7 @@ mod tests {
             parent_id: 0,
             own_id: None,
             context: MetadataContext::Root,
+            own_scope_override: None,
         }
     }
 
