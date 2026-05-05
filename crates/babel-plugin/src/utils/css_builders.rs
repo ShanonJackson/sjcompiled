@@ -421,8 +421,10 @@ pub fn extract_conditional_expression(
     let mut css: Vec<CssItem> = Vec::new();
     let mut variables: Vec<Variable> = Vec::new();
 
-    let consequent_css = extract_branch(&node.cons, meta, node, scope_index, parent_scope, own_scope, recorder)?;
-    let alternate_css = extract_branch(&node.alt, meta, node, scope_index, parent_scope, own_scope, recorder)?;
+    let (consequent_css, consequent_vars) =
+        extract_branch(&node.cons, meta, node, scope_index, parent_scope, own_scope, recorder)?;
+    let (alternate_css, alternate_vars) =
+        extract_branch(&node.alt, meta, node, scope_index, parent_scope, own_scope, recorder)?;
 
     match (consequent_css, alternate_css) {
         (Some(c), Some(a)) => {
@@ -450,14 +452,21 @@ pub fn extract_conditional_expression(
         (None, None) => {}
     }
 
-    // Variables propagated by extract_branch are folded back below.
-    // (Mirror upstream's `variables.push(...cssOutput.variables)`.)
-    let _ = &mut variables; // silence unused warning when both branches return None
+    // Mirrors upstream `variables.push(...consequentCss.variables);
+    // variables.push(...alternateCss.variables);` (css-builders.ts:444-445)
+    // — branch variables bubble up unconditionally regardless of whether
+    // the branch produced a CssItem.
+    variables.extend(consequent_vars);
+    variables.extend(alternate_vars);
     Ok(CSSOutput { css, variables })
 }
 
 /// Helper shared by extract_conditional_expression for each ternary
-/// branch. Returns Ok(None) when the branch isn't a CSS-shape.
+/// branch. Returns `(css_item_opt, variables)`:
+///   - `css_item_opt` is `None` when the branch isn't a CSS-shape.
+///   - `variables` is propagated up regardless — upstream pushes
+///     `cssOutput.variables` unconditionally even when a branch
+///     contributes no CSS item (css-builders.ts:444-445).
 fn extract_branch(
     path_node: &Expr,
     meta: &mut Metadata<'_>,
@@ -466,7 +475,7 @@ fn extract_branch(
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
     recorder: &mut MutationRecorder,
-) -> Result<Option<CssItem>, CssBuildError> {
+) -> Result<(Option<CssItem>, Vec<Variable>), CssBuildError> {
     let css_output: Option<CSSOutput> = match path_node {
         Expr::Object(_)
             | Expr::Lit(Lit::Str(_))
@@ -594,7 +603,7 @@ fn extract_branch(
     };
 
     let Some(css_output) = css_output else {
-        return Ok(None);
+        return Ok((None, Vec::new()));
     };
 
     // Each branch should evaluate down to a single logical or
@@ -606,7 +615,7 @@ fn extract_branch(
             Some(parent_node.span),
         ));
     }
-    Ok(merged.into_iter().next())
+    Ok((merged.into_iter().next(), css_output.variables))
 }
 
 fn path_is_compiled_css_shape(expr: &Expr, meta: &mut Metadata<'_>) -> bool {
@@ -1002,20 +1011,49 @@ pub fn extract_object_expression(
                 }));
             }
             PropOrSpread::Spread(SpreadElement { expr, .. }) => {
-                // §4.6 bridge: real resolver + evaluator dispatch. The
-                // surrounding JS branch (consume the resolved Variable
-                // shape into the CSS emit) is Phase 6 handler work;
-                // bridge discards both results.
+                // §6.8j — port-completion of upstream `css-builders.ts`
+                // lines 646-665 spread-element branch. Resolves the
+                // spread expression and recurses `build_css_inner` on
+                // the evaluated value, merging the result's css +
+                // variables into the current accumulators. Without
+                // this, `<div css={{ color: 'blue', ...mixin }} />`
+                // (where `mixin = { color: 'red' }`) emitted
+                // `color:blue` (the literal) and dropped the spread —
+                // upstream emits `color:red` (spread overrides
+                // because it appears later in source order).
                 if let Expr::Ident(i) = &**expr {
-                    let _ = resolve_binding(
+                    let resolved = resolve_binding(
                         i.sym.as_str(),
                         &*meta,
                         &*scope_index,
                         parent_scope,
                         own_scope,
                     );
+                    if resolved.is_none() {
+                        return Err(build_code_frame_error(
+                            "Variable could not be found",
+                            Some(expression_span(expr)),
+                        ));
+                    }
                 }
-                let _ = evaluate_expression(expr, meta, scope_index, parent_scope, own_scope);
+
+                let evaluated =
+                    evaluate_expression(expr, meta, scope_index, parent_scope, own_scope);
+                let prop_value = evaluated
+                    .value
+                    .unwrap_or_else(|| Box::new((**expr).clone()));
+
+                let result = build_css_inner(
+                    &*prop_value,
+                    meta,
+                    scope_index,
+                    parent_scope,
+                    own_scope,
+                    recorder,
+                )?;
+
+                css.extend(result.css);
+                variables.extend(result.variables);
             }
         }
     }
@@ -1288,45 +1326,19 @@ pub fn extract_template_literal(
         //   - `raw` (this iteration's local copy of `quasi_raws[index]`)
         //     is re-read so the downstream `format!("{}{}", prefix, raw)`
         //     writes the post-mutation form.
-        // Conservative §6.8f gate: in addition to upstream's
-        // `!hasNestedTemplateLiteralsWithConditionalRules` check, also
-        // require that BOTH ternary branches are simple literals
-        // (Lit::Num / Lit::Str / Tpl). Upstream's `optimize_conditional_expression`
-        // wraps non-literal branches in a synthetic Tpl, which then
-        // re-enters `extract_template_literal` recursively. For branches
-        // like `colors.N20` (where `colors` is an imported foreign
-        // module that the resolver can't fold), the inner recursion's
-        // `evaluate_expression` path can panic. The simple-literal gate
-        // covers the styled / css-prop cluster's common shapes
-        // (`p.x ? 10 : 1`, `p.x ? 'blue' : 'red'`, `p.x ? \`...\` : \`...\``)
-        // without triggering the foreign-import panic. Open follow-up:
-        // §6.8h port-completion of optimize-with-foreign-MemberExpr
-        // branches once the evaluator's foreign-module fold semantics
-        // are made resilient.
-        let cond_has_literal_branches = match &node_expression {
-            Expr::Arrow(arrow) => match &*arrow.body {
-                BlockStmtOrExpr::Expr(e) => match crate::compat::paren::unwrap_paren(e) {
-                    Expr::Cond(c) => {
-                        let is_simple = |branch: &Expr| {
-                            matches!(
-                                crate::compat::paren::unwrap_paren(branch),
-                                Expr::Lit(Lit::Num(_))
-                                    | Expr::Lit(Lit::Str(_))
-                                    | Expr::Tpl(_)
-                            )
-                        };
-                        is_simple(&c.cons) && is_simple(&c.alt)
-                    }
-                    _ => false,
-                },
-                _ => false,
-            },
-            _ => false,
-        };
-
+        // §6.8h: dropped the conservative `cond_has_literal_branches`
+        // gate that §6.8f added defensively. Upstream's
+        // `optimize_conditional_expression` (manipulate-template-literal.ts:80-122)
+        // wraps non-literal branches like `colors.N20` in a synthetic Tpl
+        // that re-enters `extract_template_literal` — producing the
+        // per-branch atomic class-names + per-branch CSS-variable shape
+        // that Babel emits for `${({ x }) => x ? colors.N20 : colors.N40}`.
+        // The §6.8f panic concern (foreign-MemberExpr branches tripping
+        // `evaluate_expression`) was resolved by §6.8a-vi (TaggedTpl
+        // deopt) — the recursion now bubbles up cleanly through the
+        // babel-evaluator fallback.
         if is_mid_statement
             && does_expression_have_conditional_css
-            && cond_has_literal_branches
             && !meta.in_conditional_branch
             && !has_nested_template_literals_with_conditional_rules(node, meta)
         {

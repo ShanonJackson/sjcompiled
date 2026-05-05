@@ -46,7 +46,7 @@
 use compiled_utils::jsx::{jsx_annotation_regex, jsx_source_annotation_regex};
 use compiled_utils::DEFAULT_IMPORT_SOURCES;
 use swc_core::common::comments::Comments;
-use swc_core::common::{Spanned, SyntaxContext};
+use swc_core::common::{Mark, Spanned, SyntaxContext};
 use swc_core::ecma::ast::{
     Expr, ImportDecl, ImportSpecifier, ModuleDecl, ModuleExportName, ModuleItem, Program,
 };
@@ -222,34 +222,105 @@ fn remove_empty_compiled_imports(
 /// (`forwardRef`, `ax`/`ix`/`CC`/`CS`) DON'T need this — only
 /// `React` collides with a downstream-transform-synthesised Ident
 /// of the same name.
-fn program_scope_ctxt(module: &swc_core::ecma::ast::Module) -> SyntaxContext {
+fn program_scope_ctxt(
+    module: &swc_core::ecma::ast::Module,
+    unresolved_mark: Option<Mark>,
+) -> SyntaxContext {
     use swc_core::ecma::visit::{Visit, VisitWith};
 
-    /// Walk every Ident in the module looking for the first one with
-    /// a non-empty `SyntaxContext`. SWC's pre-plugin resolver applies
-    /// `top_level_mark` (or the unresolved mark) to ALL Idents in the
-    /// source, so any Ident found here carries that mark. We use it
-    /// to colour our inserted React import so it lands in the same
-    /// hygiene namespace.
+    /// Walk every Ident in the module looking for one whose
+    /// `SyntaxContext` is derived from `top_level_mark` — i.e., it's a
+    /// user-source TOP-LEVEL BINDING (or a reference to one). SWC's
+    /// `hygiene` pass preserves identifiers whose mark chain descends
+    /// from `top_level_mark` and renames everything else. So our
+    /// injected `import * as React` MUST sit in the same mark family
+    /// as a top-level binding to avoid getting renamed to `React1`.
     ///
-    /// We can't just look at module.body[*] specifier locals because
-    /// side-effect imports (`import '@compiled/react'`) have no
-    /// specifiers, and some fixtures have ONLY side-effect imports +
-    /// JSX with no value-reference Idents at the top level. The
-    /// recursive visitor catches Idents nested inside JSX
-    /// expressions, member-expr objects, call-expr callees, etc.
-    struct FirstNonEmpty(Option<SyntaxContext>);
-    impl Visit for FirstNonEmpty {
+    /// Distinguishing top_level_mark from unresolved_mark: we know
+    /// `unresolved_mark` from plugin metadata. Any Ident whose ctxt
+    /// equals `SyntaxContext::empty().apply_mark(unresolved_mark)` is
+    /// a free reference (e.g., `console`, `React.useState` when React
+    /// isn't imported, `<div>` JSX intrinsics). Skip those — they're
+    /// in the unresolved family, not the top-level family.
+    struct Finder {
+        unresolved_ctxt: SyntaxContext,
+        first_top_level: Option<SyntaxContext>,
+        first_any: Option<SyntaxContext>,
+    }
+    impl Visit for Finder {
         fn visit_ident(&mut self, id: &swc_core::ecma::ast::Ident) {
-            if self.0.is_none() && id.ctxt != SyntaxContext::empty() {
-                self.0 = Some(id.ctxt);
+            if id.ctxt == SyntaxContext::empty() {
+                return;
+            }
+            if self.first_any.is_none() {
+                self.first_any = Some(id.ctxt);
+            }
+            if self.first_top_level.is_none() && id.ctxt != self.unresolved_ctxt {
+                self.first_top_level = Some(id.ctxt);
             }
         }
     }
 
-    let mut finder = FirstNonEmpty(None);
+    let unresolved_ctxt = unresolved_mark
+        .map(|m| SyntaxContext::empty().apply_mark(m))
+        .unwrap_or(SyntaxContext::empty());
+
+    let mut finder = Finder {
+        unresolved_ctxt,
+        first_top_level: None,
+        first_any: None,
+    };
     module.visit_with(&mut finder);
-    finder.0.unwrap_or(SyntaxContext::empty())
+
+    // Preferred: a top-level-mark-derived ctxt from any user binding.
+    // Fallback: the +1 mark (in @swc/core's pipeline `top_level_mark`
+    // is allocated via `Mark::new()` immediately after `unresolved_mark`,
+    // making the raw u32 sequential). This is empirically reliable for
+    // the @swc/core pipeline this plugin targets — fixtures with no
+    // user top-level binding (e.g., `import '@compiled/react'; <div ...
+    // />`) hit this path. If the assumption ever drifts, we surface as
+    // a `React1` rename divergence in the §6.8 corpus.
+    // Final fallback: any non-empty ctxt (preserves prior behaviour).
+    if let Some(c) = finder.first_top_level {
+        return c;
+    }
+    if let Some(m) = unresolved_mark {
+        return SyntaxContext::empty().apply_mark(Mark::from_u32(m.as_u32() + 1));
+    }
+    finder.first_any.unwrap_or(SyntaxContext::empty())
+}
+
+/// §6.8i — Re-colour every free `React` Ident in the module from the
+/// `unresolved_mark` ctxt to the supplied `target_ctxt`. Used at
+/// `Program::exit` AFTER injecting `import * as React from 'react'`
+/// so existing source-level `React.<x>` member references unify with
+/// our new binding. Without it, SWC's rename pass sees `React`
+/// occupying the unresolved-symbols set and picks `React1` for our
+/// binding.
+fn rebind_free_react(
+    module: &mut swc_core::ecma::ast::Module,
+    unresolved_mark: Mark,
+    target_ctxt: SyntaxContext,
+) {
+    use swc_core::ecma::visit::{VisitMut, VisitMutWith};
+
+    struct Rebind {
+        from_ctxt: SyntaxContext,
+        to_ctxt: SyntaxContext,
+    }
+    impl VisitMut for Rebind {
+        fn visit_mut_ident(&mut self, id: &mut swc_core::ecma::ast::Ident) {
+            if id.sym.as_ref() == "React" && id.ctxt == self.from_ctxt {
+                id.ctxt = self.to_ctxt;
+            }
+        }
+    }
+
+    let mut rebind = Rebind {
+        from_ctxt: SyntaxContext::empty().apply_mark(unresolved_mark),
+        to_ctxt: target_ctxt,
+    };
+    module.visit_mut_with(&mut rebind);
 }
 
 /// `import * as React from 'react'` — the namespace-import shape
@@ -442,6 +513,12 @@ pub struct BabelPluginVisitor<C: Comments> {
     /// time. Cleared between VarDecls, so the queue's depth never
     /// grows beyond a single VarDecl's worth of decls.
     pub pending_styled_display_names: Vec<String>,
+    /// SWC plugin metadata's `unresolved_mark`. Used as the `Mark` for
+    /// the synthesised `import * as React from 'react'` local Ident's
+    /// `SyntaxContext`. Bridge into `Program::exit` from `process()`.
+    /// `None` only in non-WASM in-process tests — production paths
+    /// always set it via the `lib.rs` plugin entry.
+    pub unresolved_mark: Option<Mark>,
 }
 
 impl<C: Comments> BabelPluginVisitor<C> {
@@ -468,6 +545,7 @@ impl<C: Comments> BabelPluginVisitor<C> {
             scope_index: None,
             program_scope: None,
             pending_styled_display_names: Vec::new(),
+            unresolved_mark: None,
         }
     }
 
@@ -749,18 +827,25 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
                         _ => false,
                     };
                     if !has_react_binding {
-                        // Snapshot program-scope hygiene context so
-                        // our React Ident lands in the same namespace
-                        // as the downstream react-classic transform's
-                        // synthesised `React.createElement(...)` Idents.
-                        // See `build_react_namespace_import` doc-comment
-                        // for the full rename-collision explanation.
-                        // Done HERE (not earlier) so the snapshot reads
-                        // a context that's already been through the
-                        // resolver pass — earlier in the visit, the
-                        // children walk hadn't run yet.
-                        let ctxt = program_scope_ctxt(m);
+                        // §6.8i — pick a `top_level_mark`-derived
+                        // `SyntaxContext` for our injected `React`
+                        // Ident so SWC's hygiene preserves it. See
+                        // `program_scope_ctxt` doc-comment.
+                        let ctxt = program_scope_ctxt(m, self.unresolved_mark);
                         m.body.insert(0, build_react_namespace_import(ctxt));
+                        // §6.8i — re-bind any pre-existing FREE
+                        // `React` reference (e.g. `React.useState`)
+                        // from `unresolved_mark` ctxt to our import's
+                        // ctxt. Without this, the rename pass treats
+                        // the symbol `React` as already-in-use in the
+                        // unresolved set and renames our binding to
+                        // `React1`. Safe because we only enter this
+                        // branch when no `React` binding is in scope —
+                        // every existing `React` Ident is a free ref
+                        // resolving to our injected binding.
+                        if let Some(unresolved) = self.unresolved_mark {
+                            rebind_free_react(m, unresolved, ctxt);
+                        }
                     }
                 }
 

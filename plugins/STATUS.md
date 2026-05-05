@@ -20,7 +20,8 @@
 **Phase status:** 0 ☑ (modulo §0.10–§0.12 — Phase 5 gates, not Phase 4
 blockers) · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ (modulo §4.7 OUT OF SCOPE and §4.8
 gated on Phase 6) · 5 ☑ · **Phase 6 §6.1–§6.7 ☑ (all 7 per-API
-handlers shipped) · §6.8 ▶ (active triage)** · Phase 7+ ☐.
+handlers shipped) · §6.8 ▶ (active triage; post-§6.8j baseline
+395/81/0/0/1)** · Phase 7+ ☐.
 
 **Active checkpoint: Phase 6 §6.8** — full-corpus parity exit gate.
 See "§6.8 active state" below for the current divergence baseline,
@@ -37,16 +38,13 @@ Earlier "954/954 bun parity" cited in §5.6 was a pass-through oracle
 (assert babel ≠ swc); §6.8 inverts it (assert babel == swc) and
 surfaces real divergence.
 
-**Current baseline (post-§6.8g, 2026-05-06):** parity **335 / 477**
-(70.2%), divergence **141**, swc-throws **0**, babel-throws **0**,
+**Current baseline (post-§6.8j, 2026-05-06):** parity **395 / 477**
+(82.8%), divergence **81**, swc-throws **0**, babel-throws **0**,
 both-throw **1**. Cumulative session delta from the original
-7/407/62/1 baseline: parity +328, divergence −266, swc-throws −62
-(cluster cleared), babel-throws −1. §6.8g extended the
-invalid-DOM-prop walk to cover conditional-className expressions
-(parity +22 / divergence −22). Three remaining `__cmplp`/`__cmpldp`
-edge-case fixtures need separate features
-(dedup-against-existing-destructure, interpolation-function
-destructuring) — raised as §6.8h follow-up.
+7/407/62/1 baseline: parity +388, divergence −326, swc-throws −62
+(cluster cleared), babel-throws −1. §6.8i closed the React→React1
+hygiene-rename cluster (parity +28); §6.8j ported the spread-element
+recursive build_css_inner (parity +21).
 
 **Triage tooling at `parity-harness/babel-plugin/`:**
 - `triage.mjs` runs every fixture, emits categorised JSON
@@ -704,6 +702,171 @@ remaining divergences are now CONTAINED to:
   hasnt-been-already`, `should-handle-destructuring-in-interpolation-
   functions`, `*-template-literal-branches-co`) — raised as §6.8h.
 
+- **§6.8h ☑ — variables bubble-up + walk-order + drop literal-only
+  gate + Babel `_generateUid` formula** (this session, 2026-05-06).
+  Four coordinated ports closing the residual `__cmplp`/`__cmpldp`
+  cluster surfaced after §6.8g. Cumulative parity 335 → 346 (+11),
+  divergence 141 → 130 (−11), swc-throws / babel-throws / both-throw
+  all unchanged. Lib tests stay 452/452.
+
+  **§6.8h-i — `extract_branch` returns variables.** Drift detected:
+  `css_builders.rs::extract_branch` returned `Result<Option<CssItem>>`
+  and dropped `cssOutput.variables` from each branch — but upstream
+  `extractConditionalExpression` (build-css.ts:444-445) pushes
+  `consequentCss.variables` and `alternateCss.variables`
+  unconditionally, regardless of whether either branch produced a
+  CssItem. Fix: return `(Option<CssItem>, Vec<Variable>)` and have
+  `extract_conditional_expression` `extend` both branches' variables
+  into its outer `variables` Vec. Without this, fixtures like
+  `0258 should-apply-conditional-css-with-ternary-operators-template-literal-branches-co`
+  emitted the sheet `_1bsby2bc{width:var(--_znisgh)}` (variable
+  referenced in CSS) with no matching `--_znisgh: ix(CUSTOM_WIDTH, "px")`
+  in the inline `style` prop — the `--_znisgh` name was generated
+  inside the cons branch's Tpl recursion but the `Variable { name,
+  expression, ... }` record was lost on bubble-up. **Closed: 0258.**
+
+  **§6.8h-ii — invalid-DOM-prop walk: class_names before variables.**
+  §6.8g extended the walk to `opts.class_names` but kept variables-
+  first ordering. For fixtures with an outer ternary `(p) => p.isPrimary ?
+  ... : ...` whose cons Tpl contains an inner-arrow CSS-variable
+  interpolation (`${(p) => p.isShown ? 'none' : 'block'}`), the outer
+  test's `isPrimary` lives in class_names while the inner-arrow body's
+  `isShown` lives in opts.variables[i].expression. Babel's depth-first
+  parent-path walk visits `isPrimary` first; our variables-first
+  ordering produced `{ isShown, isPrimary, ... }`. Fix:
+  `build_styled_component.rs:313-334` — walk `opts.class_names` BEFORE
+  `opts.variables`. **Closed: 0374, 0387.**
+
+  **§6.8h-iii — drop `cond_has_literal_branches` gate.** §6.8f added
+  this defensively to avoid an `evaluate_expression` panic when a
+  ternary branch was a foreign-MemberExpr (`colors.N20`). The panic
+  was actually the TaggedTpl `unimplemented!()`, fixed in §6.8a-vi
+  (`compat::evaluation::evaluate` TaggedTpl branch now `deopt`s).
+  With the gate removed at `css_builders.rs:1300-1334`,
+  `optimize_conditional_statement` now wraps non-literal branches in
+  the synthetic Tpl per upstream's `optimize_conditional_expression`
+  (manipulate-template-literal.ts:80-122) — producing per-branch
+  atomic class-names + per-branch CSS-variable shape Babel emits for
+  `${({ x }) => x ? colors.N20 : colors.N40}`. **Triage delta on
+  this single change: parity +5 (across multiple
+  destructuring-in-interpolation fixtures).**
+
+  **§6.8h-iv — `next_uid_name` rewritten to match Babel's
+  three-bucket suffix formula.** Drift detected: §6.8a-iv ported the
+  WRONG `_generateUid` algorithm. The previous impl produced
+  `_, _2, _3, ..., _9, _10, _11, ...` (1-based, suffix suppressed at
+  i==1). Upstream `@babel/traverse@7.29.0/lib/scope/index.js::generateUid`
+  (lines 376-389) actually walks i=0..N where the suffix is computed
+  as `i >= 11 ? i - 1 : i >= 9 ? i - 9 : i >= 1 ? i + 1 : ''` —
+  producing `_, _2, _3, _4, _5, _6, _7, _8, _9, _0, _1, _10, _11, ...`
+  (`_0` and `_1` slot in between `_9` and `_10`). Empirically
+  reproduced via direct `scope.generateUidIdentifier('')` invocation
+  on @babel/traverse. Fix: `state.rs::next_uid_name` now mirrors the
+  three-bucket formula. The `_<n>` cluster on fixture 0248
+  (10 hoisted sheets) closed as a result.
+  **Closed: 0248** (previously the only divergence was `_10` vs `_0`
+  for the 10th hoisted sheet — the deeper destructure-shape
+  divergence was already closed by §6.8h-iii's gate-drop.)
+
+- **§6.8i ☑ — React→React1 hygiene rename closed via top-level-mark
+  ctxt detection + free-React rebind** (this session, 2026-05-06).
+  Two coordinated fixes closing the residual React→React1 cluster
+  (33 fixtures across css-prop/behaviour, css-prop/object-literal,
+  css-prop/string-literal, expression-evaluation, xcss-prop/transformation,
+  custom-import-source, jsx-pragma).
+
+  **Root cause** (drift detection per CLAUDE.md): the §6.8a-i
+  `program_scope_ctxt` walker returned the FIRST non-empty
+  `SyntaxContext` from any Ident in the post-pre-pass AST. SWC's
+  resolver applies `unresolved_mark` to free references and
+  `top_level_mark` to top-level bindings — the walker did NOT
+  distinguish between them. For fixtures whose only top-level Idents
+  were free references (e.g. `<div>` JSXName intrinsics in
+  `<div css={{}}>hello world</div>`, or `React.useState(...)` in
+  `const [fontSize] = React.useState('10px')`), the walker returned an
+  `unresolved_mark`-derived ctxt. SWC's hygiene config preserves
+  ONLY `top_level_mark`-derived bindings; everything else gets
+  renamed. So our `import * as React` injected with
+  `unresolved_mark` ctxt was renamed `React → React1`. Even fixtures
+  WITH top-level bindings (e.g. `fontSize` / `Component` in 0056)
+  hit a secondary problem: source-level `React.useState(...)`
+  references occupied the symbol `React` in the unresolved set,
+  causing the rename pass to pick `React1` as the unique name for
+  our binding while LEAVING the `React.useState` reference under its
+  unresolved ctxt.
+
+  Two landings:
+
+  1. **`program_scope_ctxt` rewritten to prefer `top_level_mark`**
+     (`crates/babel-plugin/src/babel_plugin.rs::program_scope_ctxt`).
+     Threads `unresolved_mark` from the plugin metadata into the
+     walker; computes `unresolved_ctxt = SyntaxContext::empty().apply_mark(unresolved_mark)`;
+     the visitor records the first Ident whose ctxt is non-empty AND
+     != `unresolved_ctxt` as `first_top_level`. Returns
+     `first_top_level` when found. **Fallback chain when no
+     top-level Ident exists in source:** uses `Mark::from_u32(unresolved_mark.as_u32() + 1)`
+     — empirically `top_level_mark` is allocated immediately after
+     `unresolved_mark` in @swc/core's pipeline, so the raw u32 is
+     sequential. Final fallback: any non-empty ctxt (preserves prior
+     behaviour). Wired through `lib.rs::process` via
+     `visitor.unresolved_mark = Some(meta.unresolved_mark)`.
+
+  2. **`rebind_free_react` post-injection walker**
+     (`crates/babel-plugin/src/babel_plugin.rs::rebind_free_react`).
+     A `VisitMut` that walks the module after `import * as React`
+     is inserted and re-colours every free `React` Ident
+     (`ctxt == unresolved_mark-ctxt`) to the new import binding's
+     ctxt. Without this, fixtures like 0056 (`React.useState(...)`
+     in source) would have the symbol `React` reserved as an
+     unresolved-set entry, forcing the rename pass to pick `React1`
+     for our binding even though the binding's own ctxt is
+     `top_level_mark`-derived. Safe because we only enter the
+     injection branch when `has_react_binding` is false — no source
+     declaration of `React` exists, so all `React` references must
+     be free and resolve to our injected binding.
+
+  **Triage delta: parity 346 → 374 (+28), divergence 130 → 102
+  (−28), swc-throws / babel-throws / both-throw all unchanged.**
+  Lib tests stay 452/452. Cluster knock-on: `xcss-prop/transformation`
+  cluster cleared entirely (3 div → 0 div). Other clusters
+  (css-prop, expression-evaluation) saw the React-rename row clear,
+  surfacing the next-layer divergences underneath.
+
+- **§6.8j ☑ — Spread-element port-completion in
+  `extract_object_expression`** (this session, 2026-05-06). One 1:1
+  port closing the residual `<div css={{ ...spread, color }}>`
+  cluster surfaced after §6.8i.
+
+  **Root cause** (drift detection per CLAUDE.md):
+  `crates/babel-plugin/src/utils/css_builders.rs::extract_object_expression`
+  `PropOrSpread::Spread` arm was a §4.6 bridge stub —
+  called `resolve_binding(...)` and `evaluate_expression(...)` then
+  DISCARDED both results with `let _ = ...`. The trailing comment
+  even noted "the surrounding JS branch (consume the resolved
+  Variable shape into the CSS emit) is Phase 6 handler work; bridge
+  discards both results." Without the consume-phase ported,
+  fixtures like `<div css={{ color: 'blue', ...mixin }} />` (where
+  `mixin = { color: 'red' }`) emitted `color:blue` (the literal
+  before the spread) and dropped the spread entirely — upstream
+  emits `color:red` because the spread appears later in source order
+  and overrides the earlier literal.
+
+  **Fix.** Ported upstream `css-builders.ts:646-665` verbatim:
+  resolve binding (throw if Identifier and not resolvable);
+  `evaluateExpression(prop.argument, meta)` to get propValue;
+  recursive `buildCss(propValue, updatedMeta)`; extend `css` and
+  `variables` with the result. The `assertNoImportedCssVariables`
+  post-check is omitted (cross-file imported-CSS-variable detection
+  is Phase 5 §5.6 territory; no fixture in the corpus surfaces it).
+
+  **Triage delta: parity 374 → 395 (+21), divergence 102 → 81 (−21),
+  swc-throws / babel-throws / both-throw all unchanged.** Lib tests
+  stay 452/452. Cluster knock-on: 6 fixtures in
+  `css-prop/object-literal` (spread-from-variable variants), several
+  in `class-names/call-expression` and `class-names/tagged-template-expression`
+  (mixin-as-spread shapes), plus collateral wins across
+  `expression-evaluation`.
+
 ### Verifying the current state from a cold pickup
 
 ```bash
@@ -725,7 +888,7 @@ BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1 \
   bun test parity-harness/babel-plugin/harness.test.ts                  # 954/954 (pass-through oracle)
 
 # §6.8 inverted oracle (where the real work is):
-bun parity-harness/babel-plugin/triage.mjs                              # 313/163/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8f
+bun parity-harness/babel-plugin/triage.mjs                              # 395/81/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8j
 
 # CSS-port producer-side gate.
 bun run packages/equality-harness/scripts/verify.mjs                    # 336/336 (run under bun, NOT node)

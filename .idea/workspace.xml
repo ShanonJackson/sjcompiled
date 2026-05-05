@@ -5,51 +5,55 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="46baedc5-8956-4da5-8e73-63c433c62642" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/2f0f12f8fdb766cd869be3361b6e966dd8a82fef5e5a604bcca8a01db9e9aa18.wasmer-v7" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/7f0a396cd7226b2f52dbc8e8379398129bc793683526bc4dc19f95bbf13e34a8.wasmer-v7" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/941db56c7eeef65353ad5de62594465020dc16417646e79da1e56c5a98e9ad9c.wasmer-v7" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/a6bf939803e5049b7fe29724ef3436ef91e1f3c93f1412eee8c62c9c4336bee3.wasmer-v7" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/a7601a4182c8f5c9237afbe2cb52af7c3d17e804c448a21bdf031540e6c0ea2f.wasmer-v7" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/ae65b1e55df76b6f1c529177bb0bbb8f3f6ea679bfc04394d591e575e29a4b21.wasmer-v7" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/be6cbf3e8dafc6ad7326ab201842fbbf5f90f32ab6a9acd22c19ec5d2d417b8a.wasmer-v7" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/c590cafff173e70940c7b15eeddb418d2878011ea7e19a693a8e097b7485eae9.wasmer-v7" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/d658cf6e47acc8399e10b8ef13537e3693e3d8836e9767dfc8eabbaa656e9745.wasmer-v7" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/eac4041c47fcaa2f59b52b4c51884e15baa8ad5fee7dbe7e64ac08a0e95074e6.wasmer-v7" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/MORNING.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/generators/statements.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/016b9dc7b700b4ee74c126e72da2c34bdd888e73cc427a664477fbbc0c140653.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/0bbe716907e3f2c46da905f072c1408445db89fcef0d3761a0755e8c53d67824.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/0c0d2b21072e632f87991f0c531f6850818be75680c5f9f774c59f097b068561.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/0cc6d5c6a9909d332f9d85fd625a6849364b1b3d31918ed0189ee325257dc588.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/100d7795a51d58e0bbac1ec318e5b3cef2a9c13c2735e88f5ba77675806852c8.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/2107c7cec61da73446b58cbdb8f0d96f25b14f3977b076ed1428adf03019a0d0.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/240c61b29d82dbce0f9f35a455b9ed3411730947a1afb4802d76c85550a322d6.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/2b1656be7ae8f4625e7124aef58b5d4c507964e85e02334f13bc2d31e0e781a8.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/2f0f12f8fdb766cd869be3361b6e966dd8a82fef5e5a604bcca8a01db9e9aa18.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/305b6533e72c4bcfa0b40e63f592d04c07b9756cd49370ed721b5e75622ad834.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/312becdb666b0d8e0f529b95105fcc1ec46eff894804fab0391e22d47a660e29.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/31cfe374c8595c5f94644e74dbab07b791e92b96b71ac302cc014a01061d077a.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/34fb7e5e8e4bcec992d0a896d1522a6ccc4ae9e7b653dcc8850f11224b5f703c.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/36cad3ae3a084bef200205808012bec7a00a6a20b7a282d65fad1449e8aa4759.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/3e22f334adaf12cec2d3d55a5e32ad7af04f728f20319c6a64121a4344c95eb1.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/4069bed6da273511994b8e23f1b8867ffa2c9056dd27d5c46eb7843989cf816e.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/4097c577d248c2803c3cf4d6efaab78a896bd2f3a26aff3c0aae7a3e6ea518f6.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/454097c0632b2a4f9678c655e38f25356a5159bcf0adc41371a19af0f52baaf8.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/4822d8820d722dc3cd29905dc589f7fbc1be537d414a5a499d09a47a81012aba.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/4873e3a6af0862d250bb2fd5d1e1e3db06b1b3b8cb88796d5f24f5c205ec491b.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/53eaa406b2755a2a659006a5a7216274fc82b2652cc59e2a3cc5b687e16121b8.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/54da20dac5e495ac40811b78f82fcca530509356aa2303a223c485d56e9453b6.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/58c7fa59d49c1f5ddd84e89c5e08c6011d4d160311ff66f33b19e3a9a4bf06c3.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/59d907eaf0340092032df400c30bc8f79b11f1fca8cf7c902dab3b317f92bb30.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/5aa1bd32e0fa219ae91d4a398750f490e8bd5af81a7b077c22b80852fc25e214.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/6589c1644307ac3c31153150ff67db4f786b6d28b123180d814bfe17791837f7.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/66144401a18b527b1526c97bb3e5b59d7896695e4c0a599b84793f9d77eafba6.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/6cb6db1b001ade3e4fc0ada923867dce174b01ec6dd05da384af570630641a8d.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/71e5cf73b911a2193e6642ace2baabc028fed47b7a84d83806d92c2a2fa63274.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/726cf25856eb68f30aeddab281c3228d7647f4ceefe5a13d14109e10dc89c3d8.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/7a67c64fe42bde505ffb16a39c5149294adcafa54339274d41aa0f60225367af.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/7f0a396cd7226b2f52dbc8e8379398129bc793683526bc4dc19f95bbf13e34a8.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/7fc30f17436fe626dc6151ad30b27a4c8454b99fd74a2fdc9f192241d6b6de49.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/82424d5c2e3fa372ab7d7b1113ae72c1ea47e4874c354e32068a393ffaea324a.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/8325b67adb13cbeb0438bdca60e71d124a13ea52e0014ca69501d63bc4fd0b89.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/859d7167c4b6dd18e3746f5c7127f26ff26461807590b98570607080a61824fb.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/8929336d703e1d913cba248fed5e9340ed2f5358c4cac19cee5a11738e1567d0.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/8d04d10a2a06e8a8645163cd85242affcc75f3d377e3c1865219b71e00933bf6.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/8e875ec6be374819f9386cb5de7071a06e9b4c0fe4be4ce16ff167a2e9920d1d.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/941db56c7eeef65353ad5de62594465020dc16417646e79da1e56c5a98e9ad9c.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/94ac380f5015e915a5feb6abd7680a93acde59c3359ba9ff3085670d77245459.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/968cfd8f50b62fabdee5afc9ac0828348c9681e042502acf4f7623be901aa7a1.wasmer-v7" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/9e126fc5581a6ef785f13585b22f413d1ba71a9cc935047e26ae6e64a747889f.wasmer-v7" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/babel_plugin.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/babel_plugin.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/class_names/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/class_names/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/generators/expressions.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/generators/expressions.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/generators/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/generators/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/printer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/printer.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/css_map/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/css_map/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/css_prop/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/css_prop/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/styled/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/styled/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/types.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_compiled_component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_compiled_component.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/state.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/state.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_styled_component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_styled_component.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/create_result_pair.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/create_result_pair.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/css_builders.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/css_builders.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/evaluate_expression.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/evaluate_expression.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/get_runtime_class_name_library.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/get_runtime_class_name_library.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/hoist_sheet.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/hoist_sheet.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/manipulate_template_literal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/manipulate_template_literal.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/object_property_to_string.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/object_property_to_string.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/resolve_binding.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/resolve_binding.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/transform_css_items.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/transform_css_items.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_binary_expression.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_binary_expression.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_call_expression.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_call_expression.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_function.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_function.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_identifier.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_identifier.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/namespace_import.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/namespace_import.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/object.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/object.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/resolve_expression/identifier.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/resolve_expression/identifier.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_unary_expression.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_unary_expression.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/xcss_prop/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/xcss_prop/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/parity-harness/babel-plugin/triage-report.json" beforeDir="false" afterPath="$PROJECT_DIR$/parity-harness/babel-plugin/triage-report.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plugins/STATUS.md" beforeDir="false" afterPath="$PROJECT_DIR$/plugins/STATUS.md" afterDir="false" />
     </list>

@@ -306,32 +306,47 @@ impl State {
     }
 
     /// Mint a fresh `_<n>` UID name for this pass. Mirrors Babel's
-    /// `scope.generateUidIdentifier('')` shape:
-    /// `@babel/traverse/lib/scope/index.js::_generateUid` returns
-    /// `_<name><i>` where `<i>` is omitted when `i == 1`. With the
-    /// empty input name (`''`), this yields `_`, `_2`, `_3`, ... —
-    /// the singleton case is `_` with no numeric suffix.
+    /// `scope.generateUidIdentifier('')` shape — see
+    /// `@babel/traverse/lib/scope/index.js::generateUid` (~line 376):
     ///
-    /// **§6.8a-iv:** the counter starts at 1 (not 0) and the suffix
-    /// is suppressed when it equals 1 — exact match for upstream's
-    /// `i > 1 ? id += i : id` branch. Without this, every fixture
-    /// with a single hoisted sheet diverged from Babel as
-    /// `const _0 = ...` vs `const _ = ...`.
+    /// ```js
+    /// let i = 0;
+    /// do {
+    ///   uid = `_${name}`;
+    ///   if (i >= 11) uid += i - 1;
+    ///   else if (i >= 9) uid += i - 9;
+    ///   else if (i >= 1) uid += i + 1;
+    ///   i++;
+    /// } while (hasBinding(uid) || ...);
+    /// ```
+    ///
+    /// For empty input name, this produces the sequence
+    /// `_, _2, _3, _4, _5, _6, _7, _8, _9, _0, _1, _10, _11, _12, ...`.
+    /// The bare `_` is i=0; `_0` and `_1` slot in between `_9` and `_10`.
+    ///
+    /// **§6.8h:** rewritten to match the upstream three-bucket suffix
+    /// formula. The §6.8a-iv impl produced `_, _2, ..., _9, _10, _11`
+    /// which diverged for fixtures with ≥10 hoisted sheets (e.g.
+    /// `0248-styled-tests-behaviour--should-handle-destructuring-in-interpolation-functions`
+    /// — Babel emits `_0` for the 10th, we emitted `_10`).
     ///
     /// Future Phase 5 §5.4 work will make this fully scope-aware
     /// (collision-walk against existing bindings); today's bump
-    /// preserves the singleton-format parity Babel actually emits
-    /// for the common case (no `_<n>` collisions in user source).
+    /// preserves the format Babel actually emits for the common case
+    /// (no `_<n>` collisions in user source).
     pub(crate) fn next_uid_name(&mut self) -> String {
-        // Counter is 1-based to mirror Babel's `i = 1; do { ... ; i++ }`
-        // initial state. First call returns `_`, second `_2`, third
-        // `_3`, etc.
+        let i = self.uid_counter;
         self.uid_counter += 1;
-        if self.uid_counter == 1 {
-            "_".to_string()
+        let suffix: String = if i >= 11 {
+            (i - 1).to_string()
+        } else if i >= 9 {
+            (i - 9).to_string()
+        } else if i >= 1 {
+            (i + 1).to_string()
         } else {
-            format!("_{}", self.uid_counter)
-        }
+            String::new()
+        };
+        format!("_{}", suffix)
     }
 }
 

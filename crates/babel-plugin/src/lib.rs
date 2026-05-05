@@ -90,6 +90,15 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
         visitor.state.set_filename(filename);
     }
     visitor.state.set_resolver(resolver);
+    // §6.8i — bridge SWC's `unresolved_mark` from plugin metadata into
+    // the visitor so the `Program::exit` React-import injection can
+    // colour its local Ident with the same hygiene context downstream
+    // free references (e.g. the react-classic JSX transform's
+    // `React.createElement(...)` Idents) carry. Without this, fixtures
+    // with no top-level user bindings fall back to an empty
+    // `SyntaxContext` and SWC's hygiene pass renames our import to
+    // `React1`. See `babel_plugin.rs::build_react_namespace_import`.
+    visitor.unresolved_mark = Some(meta.unresolved_mark);
     let mut p = program;
     p.visit_mut_with(&mut visitor);
     p

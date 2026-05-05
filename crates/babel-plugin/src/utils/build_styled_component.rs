@@ -312,19 +312,23 @@ fn styled_template(
     // the variable expression bodies.
     let invalid_dom_props: Vec<String> = if is_in_built_component {
         let mut names: indexmap::IndexSet<String> = indexmap::IndexSet::new();
-        for var in &opts.variables {
-            for n in get_invalid_dom_props(&var.expression) {
+        // §6.8g extended the walk to `opts.class_names`. §6.8h orders
+        // class_names BEFORE variables so the resulting destructure
+        // matches upstream's source-order traversal of `meta.parentPath`:
+        // for a fixture like `(p) => p.isPrimary ? \`...${(p) => p.isShown ?
+        // 'none' : 'block'}...\` : '...'`, Babel's depth-first visit reaches
+        // the outer ternary's TEST (`isPrimary`) before recursing into the
+        // cons branch's inner arrow (`isShown`). Our variables list carries
+        // inner-arrow-body MemberExprs (`isShown`), and class_names carries
+        // the outer ternary (`isPrimary` at the test root); class_names-first
+        // produces the matching `{ isPrimary, isShown, ...__cmpldp }` order.
+        for cn in &opts.class_names {
+            for n in get_invalid_dom_props(cn) {
                 names.insert(n);
             }
         }
-        // §6.8g — upstream walks `meta.parentPath` (the entire styled
-        // call subtree), which covers conditional/logical class-name
-        // expressions too. Conditional className shapes like
-        // `(p) => p.isRounded ? 'a' : 'b'` carry `__cmplp.isRounded`
-        // MemberExprs that the variables-only walk misses, leaving the
-        // consumed prop spread onto the underlying DOM tag.
-        for cn in &opts.class_names {
-            for n in get_invalid_dom_props(cn) {
+        for var in &opts.variables {
+            for n in get_invalid_dom_props(&var.expression) {
                 names.insert(n);
             }
         }
