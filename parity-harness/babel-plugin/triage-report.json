@@ -1,12 +1,12 @@
 {
   "summary": {
     "total": 477,
-    "parity": 142,
-    "divergence": 323,
-    "swc-throws": 11,
+    "parity": 184,
+    "divergence": 292,
+    "swc-throws": 0,
     "babel-throws": 0,
     "both-throw": 1,
-    "elapsedSeconds": 50
+    "elapsedSeconds": 49
   },
   "results": {
     "parity": [
@@ -67,11 +67,23 @@
         "sourceFile": "class-names/__tests__/call-expression.test.ts"
       },
       {
+        "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--a-dynamic-property-value-and-suffix-using-inline-styles",
+        "sourceFile": "class-names/__tests__/call-expression.test.ts"
+      },
+      {
         "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--no-expressions",
         "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts"
       },
       {
+        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-declared-numeric-literal-expression",
+        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts"
+      },
+      {
         "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-declared-object-expression",
+        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-suffixed-dynamic-expression-using-inline-styles",
         "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts"
       },
       {
@@ -120,6 +132,10 @@
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-concat-explicit-use-of-class-name-prop-from-an-identifier-on-an-element",
+        "sourceFile": "css-prop/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-place-suffix-into-ix-call",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts"
       },
       {
@@ -179,6 +195,18 @@
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-persist-suffix-of-dynamic-property-value-from-objects-into-inline-styles",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-persist-prefix-of-dynamic-property-value-into-inline-styles",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-move-prefix-of-grouped-interpolation-into-inline-styles",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-that-has-a-variable-reference",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
@@ -227,6 +255,14 @@
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-parse-an-inline-string-interpolation-delimited-by-multiple-spaces-and-suf",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-parse-an-inline-string-interpolation-delimited-by-multiple-spaces-and-mul",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-do-nothing-when-content-already-has-double-quotes",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
@@ -247,7 +283,31 @@
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-persist-suffix-of-dynamic-value-into-inline-styles",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-persist-suffix-of-constant-value",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-inline-constant-object-property-value",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-evaluate-deep-member-expression-referencing-an-identifier",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-inline-nested-constant-object-property-value",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-binary-expression",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-inline-constant-expression",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts"
       },
       {
@@ -256,6 +316,18 @@
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-literal-with-obj-variable",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-functions",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-inline-multiple-constant-interpolations",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-reference-multiple-interpolations-in-a-group",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts"
       },
       {
@@ -299,8 +371,40 @@
         "sourceFile": "keyframes/__tests__/call-expression.test.ts"
       },
       {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-suffixes-prefixed-by-an--arrow-function-expression-call-that-returns-a-number-literal",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-static-keyframe",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-identifiers-that-reference-constant-literals",
+        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-member-expressions-that-reference-identifiers-with-simple-values",
+        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-nested-member-expressions-that-reference--simple-values",
+        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-nested-member-expressions-that-reference--identifiers-with-simple-values",
+        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-call-expressions-that-return-simple-values",
+        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-identifiers-that-reference-simple-call-expressions",
+        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-suffixes-prefixed-by-an--identifier-that-references-a-number-literal",
+        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-preserving-runtime-values--for-a-static-keyframe",
@@ -315,11 +419,19 @@
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
       {
+        "name": "styled-tests-behaviour/styled-component-behaviour--creates-a-separate-var-name-for-positive-and-negative-values-of-the-same-interpo",
+        "sourceFile": "styled/__tests__/behaviour.test.ts"
+      },
+      {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-compose-a-component-using-tagged-template-expression",
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-compose-a-component-using-object-call-expression",
+        "sourceFile": "styled/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-inline-constant-identifier-string-literal",
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
       {
@@ -411,7 +523,55 @@
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
       },
       {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-inline-constant-numeric-literal",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-to-inline-styles-when-referencing-a-mutable-numeric-literal",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-to-inline-styles-when-referencing-a-mutable-numeric-literal-w",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-a-static-template-literal",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-inline-constant-string-literal",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-resolve-identifier-pointing-to-a-call-expression-if-it-returns-simple-val",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-inline-call-if-it-returns-simple-value",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-functions",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-and-prefix-of-a-dynamic-property-into-the-style-property",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-do-nothing-with-suffix-prefix-when-referencing-constant-literal",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-identifier-referencing-an-expression-with-suffix",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-inline-arrow-function-with-suffix",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-arrow-function-call-that-has-a-complex-body",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
       },
       {
@@ -423,7 +583,15 @@
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
       },
       {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-variables-within-nested-template-literals-in-two-properties",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-variables-within-nested-template-literals-within-the-same-prope",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-variable-within-a-heavily-nested-template-literal",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts"
       },
       {
@@ -641,11 +809,6 @@
         "diff": "divergence at byte 130 (a.length=508, b.length=405)\n--- a +70..190\nled/react/runtime\";\nimport { useState } from \"react\";\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nconst [fontSize\n+++ b +70..190\nled/react/runtime\";\nimport { useState } from \"react\";\nconst [fontSize] = useState(\"10px\");\nconst ListItem = () =>\n  Reac"
       },
       {
-        "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--a-dynamic-property-value-and-suffix-using-inline-styles",
-        "sourceFile": "class-names/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 141 (a.length=508, b.length=504)\n--- a +81..201\nuntime\";\nimport { useState } from \"react\";\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nconst fontSize = useState(\n+++ b +81..201\nuntime\";\nimport { useState } from \"react\";\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nconst fontSize = useStat"
-      },
-      {
         "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--a-spread-element-call-expression-referencing-an-arrow-function-that-returns-an-o",
         "sourceFile": "class-names/__tests__/call-expression.test.ts",
         "diff": "divergence at byte 96 (a.length=769, b.length=542)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._bfhk13q2{background-color:blue}\";\nconst _3 = \"._syaz\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst color1 = \"black\";\nconst mixin = ({ color1, color2: c }, colo"
@@ -663,17 +826,7 @@
       {
         "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-declared-string-literal-expression",
         "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 107 (a.length=385, b.length=396)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst fontSize = \"12px\";\nconst ListIt\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nconst fontSize = \"12px\";\nc"
-      },
-      {
-        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-declared-numeric-literal-expression",
-        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 107 (a.length=379, b.length=392)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1ial{font-size:12}\";\nconst fontSize = 12;\nconst ListItem = (\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nconst fontSize = 12;\nconst"
-      },
-      {
-        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-suffixed-dynamic-expression-using-inline-styles",
-        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 141 (a.length=477, b.length=473)\n--- a +81..201\nuntime\";\nimport { fontSize } from \"./nah\";\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nconst ListItem = () =>\n  R\n+++ b +81..201\nuntime\";\nimport { fontSize } from \"./nah\";\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nconst ListItem = () =>\n "
+        "diff": "divergence at byte 108 (a.length=385, b.length=384)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst fontSize = \"12px\";\nconst ListIte\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1crf{font-size:9pt}\";\nconst fontSize = \"12px\";\nconst ListItem"
       },
       {
         "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-multi-arity-call-expression-referencing-an-arrow-function-that-returns-an-obje",
@@ -781,11 +934,6 @@
         "diff": "divergence at byte 96 (a.length=383, b.length=335)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst [color] = [\"blue\"];\nReac\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst [color] = [\"blue\"];\nReact.createElement(\n  CC,\n  null,\n  Rea"
       },
       {
-        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-place-suffix-into-ix-call",
-        "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 141 (a.length=443, b.length=439)\n--- a +81..201\nuntime\";\nimport { useState } from \"react\";\nconst _ = \"._1wyb4vkz{font-size:var(--_kre2x8)}\";\nconst size = useState(10);\n\n+++ b +81..201\nuntime\";\nimport { useState } from \"react\";\nconst _ = \"._1wyb1eem{font-size:var(--_kre2x8)px}\";\nconst size = useState(10)"
-      },
-      {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-inline-multi-interpolation-constant-variable",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 109 (a.length=529, b.length=521)\n--- a +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itk5441{background-image:linear-gradient(45deg,gray 25%,transpa\n+++ b +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itk1p18{background-image:linear-gradient(45deg,gray 25%,transpa"
@@ -838,7 +986,7 @@
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-apply-array-prop-ternary-based-conditional-css-that-reference-css-variabl",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 97 (a.length=647, b.length=374)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._1wyb1fwx{font-size:12px}\";\nconst _4 = \"._syaz5scu{col\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1crf{font-size:9pt}\";\nconst positive = null;\nconst"
+        "diff": "divergence at byte 109 (a.length=647, b.length=644)\n--- a +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._1wyb1fwx{font-size:12px}\";\nconst _4 = \"._syaz5scu{color:red}\";\nco\n+++ b +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._1wyb1crf{font-size:9pt}\";\nconst _4 = \"._syaz5scu{color:red}\";\ncon"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-apply-partial-logical-based-conditional-css-rule",
@@ -876,24 +1024,9 @@
         "diff": "divergence at byte 90 (a.length=300, b.length=291)\n--- a +30..150\n;\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nReact.createElement(\n  CC\n+++ b +30..150\n;\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nimport { jsx } from \"@compiled/react\";\nconst _ = \"._syaz5scu"
       },
       {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-persist-suffix-of-dynamic-property-value-from-objects-into-inline-styles",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 144 (a.length=490, b.length=486)\n--- a +84..204\nime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._18u018lw{margin-left:var(--_5un9uz)}\";\nlet heading = {\n  depth: 2\n+++ b +84..204\nime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._18u01xoi{margin-left:var(--_5un9uz)rem}\";\nlet heading = {\n  depth"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-persist-prefix-of-dynamic-property-value-into-inline-styles",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 143 (a.length=485, b.length=481)\n--- a +83..203\ntime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1jxy{font-size:calc(100% - var(--_1j2e0s2))}\";\nlet fontSize \n+++ b +83..203\ntime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb9sxt{font-size:calc(100% - var(--_1j2e0s2)px)}\";\nlet fontSiz"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-move-prefix-of-grouped-interpolation-into-inline-styles",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 108 (a.length=449, b.length=445)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._18u019z3{margin-left:calc(100% - var(--_5un9uz))}\";\nlet heading =\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._18u01i4m{margin-left:calc(100% - var(--_5un9uz)rem)}\";\nlet headin"
-      },
-      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-move-multiple-groups-of-interpolations-into-inline-styles",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 109 (a.length=529, b.length=628)\n--- a +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itk1dr4{background-image:linear-gradient(45deg,gray 25%,transpa\n+++ b +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itkyw91{background-image:linear-gradient(45deg,var(--_1vrvste) "
+        "diff": "divergence at byte 110 (a.length=529, b.length=521)\n--- a +50..170\nC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itk1dr4{background-image:linear-gradient(45deg,gray 25%,transpar\n+++ b +50..170\nC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itk1p18{background-image:linear-gradient(45deg,gray 25%,transpar"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-move-multiple-groups-of-interpolations-into-inline-styles-with-css-variab",
@@ -981,16 +1114,6 @@
         "diff": "divergence at byte 107 (a.length=361, b.length=362)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nfunction mixin() {\n  return {\n    color: \"\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nfunction mixin() {\n  return {\n    color: "
       },
       {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-parse-an-inline-string-interpolation-delimited-by-multiple-spaces-and-suf",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=595, b.length=513)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._19bvidpf{padding-\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1yt41n0h{padding:0"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-parse-an-inline-string-interpolation-delimited-by-multiple-spaces-and-mul",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=601, b.length=563)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._19bvftgi{padding-\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ =\n  \"._1yt41gwy{padding"
-      },
-      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-do-nothing-when-content-already-has-single-quotes",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
         "diff": "divergence at byte 100 (a.length=331, b.length=331)\n--- a +40..160\n ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1sb25hbz{content:'hello'}\";\nconst yeah = true;\nReact.crea\n+++ b +40..160\n ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = '._1sb21e8g{content:\"hello\"}';\nconst yeah = true;\nReact.crea"
@@ -1011,44 +1134,14 @@
         "diff": "divergence at byte 97 (a.length=442, b.length=379)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._bfhkbf54{background-color:green}\";\nconst _ = \"._syaz1\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1cnh{color:purple}\";\nconst backgroundColor = \"gree"
       },
       {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-persist-suffix-of-dynamic-value-into-inline-styles",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 143 (a.length=472, b.length=468)\n--- a +83..203\ntime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nlet fontSize = 20;\nfontSiz\n+++ b +83..203\ntime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nlet fontSize = 20;\nfontS"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-persist-suffix-of-constant-value",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 107 (a.length=332, b.length=405)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybgktf{font-size:20px}\";\nconst fontSize = 20;\nReact.createElem\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nconst fontSize = 20;\nRea"
-      },
-      {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-string-literal",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
         "diff": "divergence at byte 17 (a.length=311, b.length=312)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
       },
       {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-inline-constant-object-property-value",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 107 (a.length=342, b.length=418)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst colors = {\n  error: \"red\",\n};\nReact.\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1fry{color:var(--_1sjupfm)}\";\nconst colors = {\n  error: \"red"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-evaluate-deep-member-expression-referencing-an-identifier",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 108 (a.length=464, b.length=551)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst primaryColor = \"blue\";\nconst theme =\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1rxo{color:var(--_b7e1h2)}\";\nconst primaryColor = \"blue\";\ncon"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-inline-nested-constant-object-property-value",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 107 (a.length=429, b.length=516)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syazu67f{color:#fff}\";\nconst theme = {\n  colors: {\n    light: {\n\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1rxo{color:var(--_b7e1h2)}\";\nconst theme = {\n  colors: {\n   "
-      },
-      {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-no-template-string-literal",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
         "diff": "divergence at byte 17 (a.length=311, b.length=312)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-inline-constant-expression",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 108 (a.length=329, b.length=397)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst color = \"blue\";\nReact.createElement(\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst color = \"blue\";\nReact.cre"
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-be-able-to-override-properties-in-a-mixin",
@@ -1066,14 +1159,9 @@
         "diff": "divergence at byte 186 (a.length=552, b.length=550)\n--- a +126..246\nx}\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._bfhk1x77{background-color:white}\";\nconst _ = \"._19it97hw{border:\n+++ b +126..246\nx}\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._bfhku67f{background-color:#fff}\";\nconst _ = \"._19it1ujt{border:1"
       },
       {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-functions",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 109 (a.length=703, b.length=853)\n--- a +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._irr313q2:hover{background-color:blue}\";\nconst _3 = \"._ect4lftf{fo\n+++ b +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._irr31pav:hover{background-color:var(--_ylwyqi)}\";\nconst _3 = \"._e"
-      },
-      {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-function-properties-belonging-",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 108 (a.length=682, b.length=851)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{font-size:12p\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pkz1d{font-weight:var(--_zabg57)}\";\nconst _3 = \"._1wyb1nsi{fo"
+        "diff": "divergence at byte 151 (a.length=682, b.length=680)\n--- a +91..211\nonst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{font-size:12px}\";\nconst _2 = \"._syaz13q2{color:blue}\";\nc\n+++ b +91..211\nonst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1crf{font-size:9pt}\";\nconst _2 = \"._syaz13q2{color:blue}\";\nco"
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-function-variable",
@@ -1094,16 +1182,6 @@
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-argument-arrow-function-variable-inside-me",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
         "diff": "divergence at byte 108 (a.length=769, b.length=844)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syazlvfy{color:var(--_zo7lop)}\";\nconst _4 = \"._19pkgktf{margin-t\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz13g7{color:var(--_j2chn6)}\";\nconst _4 = \"._19pkgktf{margin-t"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-inline-multiple-constant-interpolations",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 135 (a.length=409, b.length=517)\n--- a +75..195\neact/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._t9ec7ung{transform:translate3d(1px,2px,0)}\";\nconst x = 1\n+++ b +75..195\neact/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ =\n  \"._t9eccqp0{transform:translate3d(var(--_65u76s)px,var(--"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-reference-multiple-interpolations-in-a-group",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 135 (a.length=533, b.length=531)\n--- a +75..195\neact/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._t9ec9ya9{transform:translate3d(var(--_65u76s),var(--_1oh\n+++ b +75..195\neact/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ =\n  \"._t9eccqp0{transform:translate3d(var(--_65u76s)px,var(--"
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-function-returning-an-object",
@@ -1128,12 +1206,12 @@
       {
         "name": "keyframes-tests-behaviour/keyframes--evaluates-any-expressions-that-precede-a-keyframes-expression",
         "sourceFile": "keyframes/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 173 (a.length=875, b.length=947)\n--- a +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._y\n+++ b +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:75pt}}\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\ncon"
+        "diff": "divergence at byte 173 (a.length=875, b.length=874)\n--- a +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._y\n+++ b +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:75pt}}\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._y4"
       },
       {
         "name": "keyframes-tests-behaviour/keyframes--evaluates-keyframes-expression-when-it-precedes-another-expression",
         "sourceFile": "keyframes/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 173 (a.length=875, b.length=947)\n--- a +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._y\n+++ b +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:75pt}}\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\ncon"
+        "diff": "divergence at byte 173 (a.length=875, b.length=874)\n--- a +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._y\n+++ b +113..233\nct/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:75pt}}\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._y4"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
@@ -1154,11 +1232,6 @@
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-identifiers-that-reference-an-object-expression",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
         "diff": "divergence at byte 7 (a.length=345, b.length=279)\n--- a +0..67\nconst _2 = \"._j7hqocb1{animation-name:k1mv9s16}\";\nconst _ = \"@keyfr\n+++ b +0..67\nconst _ = \"._j7hqocb1{animation-name:k1mv9s16}\";\nconst from = {\n  o"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-suffixes-prefixed-by-an--arrow-function-expression-call-that-returns-a-number-literal",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 59 (a.length=357, b.length=481)\n--- a +0..119\nconst _2 = \"._j7hq67nm{animation-name:k1m0lkgc}\";\nconst _ = \"@keyframes k1m0lkgc{0%{font-size:14px}to{font-size:18px}}\"\n+++ b +0..119\nconst _2 = \"._j7hq67nm{animation-name:k1m0lkgc}\";\nconst _ =\n  \"@keyframes k1m0lkgc{0%{font-size:var(--_11u0vvv)px}to{fo"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-a-single-element",
@@ -1306,41 +1379,6 @@
         "diff": "divergence at byte 20 (a.length=410, b.length=410)\n--- a +0..80\nconst _3 =\n  \"._y44vt6c7{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk 2s ease-in-o\n+++ b +0..80\nconst _3 =\n  \"._y44v1tac{animation:k1i6i4z9 2s ease-in-out,k1tsdnyk 2s ease-in-o"
       },
       {
-        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-identifiers-that-reference-constant-literals",
-        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 92 (a.length=405, b.length=609)\n--- a +32..152\n-name:k1nhciry}\";\nconst _ =\n  \"@keyframes k1nhciry{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst fromColor\n+++ b +32..152\n-name:k1nhciry}\";\nconst _ =\n  \"@keyframes k1nhciry{0%{color:var(--_i3ou63);opacity:var(--_z30vqw)}to{color:var(--_175azr"
-      },
-      {
-        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-member-expressions-that-reference-identifiers-with-simple-values",
-        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 92 (a.length=407, b.length=617)\n--- a +32..152\n-name:k1qntra6}\";\nconst _ =\n  \"@keyframes k1qntra6{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst from = {\n\n+++ b +32..152\n-name:k1qntra6}\";\nconst _ =\n  \"@keyframes k1qntra6{0%{color:var(--_1r9fuyd);opacity:var(--_1y596wu)}to{color:var(--_191h"
-      },
-      {
-        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-nested-member-expressions-that-reference--simple-values",
-        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 92 (a.length=453, b.length=717)\n--- a +32..152\n-name:k1m6gmtw}\";\nconst _ =\n  \"@keyframes k1m6gmtw{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst animation\n+++ b +32..152\n-name:k1m6gmtw}\";\nconst _ =\n  \"@keyframes k1m6gmtw{0%{color:var(--_7s8g9m);opacity:var(--_3dj1t1)}to{color:var(--_1cct6v"
-      },
-      {
-        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-nested-member-expressions-that-reference--identifiers-with-simple-values",
-        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 92 (a.length=569, b.length=833)\n--- a +32..152\n-name:k1m6gmtw}\";\nconst _ =\n  \"@keyframes k1m6gmtw{0%{color:blue;opacity:1}to{color:indigo;opacity:1}}\";\nconst fromOpaci\n+++ b +32..152\n-name:k1m6gmtw}\";\nconst _ =\n  \"@keyframes k1m6gmtw{0%{color:var(--_7s8g9m);opacity:var(--_3dj1t1)}to{color:var(--_1cct6v"
-      },
-      {
-        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-call-expressions-that-return-simple-values",
-        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 90 (a.length=334, b.length=560)\n--- a +30..150\non-name:krmwxos}\";\nconst _ =\n  \"@keyframes krmwxos{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst identity \n+++ b +30..150\non-name:krmwxos}\";\nconst _ =\n  \"@keyframes krmwxos{0%{color:var(--_z3h39m);opacity:var(--_155kfue)}to{color:var(--_1aucw"
-      },
-      {
-        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-identifiers-that-reference-simple-call-expressions",
-        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 92 (a.length=472, b.length=676)\n--- a +32..152\n-name:k1nhciry}\";\nconst _ =\n  \"@keyframes k1nhciry{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst identity \n+++ b +32..152\n-name:k1nhciry}\";\nconst _ =\n  \"@keyframes k1nhciry{0%{color:var(--_i3ou63);opacity:var(--_z30vqw)}to{color:var(--_175azr"
-      },
-      {
-        "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-suffixes-prefixed-by-an--identifier-that-references-a-number-literal",
-        "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 59 (a.length=343, b.length=463)\n--- a +0..119\nconst _2 = \"._j7hqrsut{animation-name:k1e6gzsx}\";\nconst _ = \"@keyframes k1e6gzsx{0%{fontSize:14px}to{fontSize:18px}}\";\n\n+++ b +0..119\nconst _2 = \"._j7hqrsut{animation-name:k1e6gzsx}\";\nconst _ =\n  \"@keyframes k1e6gzsx{0%{fontSize:var(--_2g99x6)px}to{font"
-      },
-      {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
         "diff": "divergence at byte 63 (a.length=789, b.length=787)\n--- a +3..123\nst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75}50%{opacity:0.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf\n+++ b +3..123\nst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:.75}50%{opacity:.5}to{opacity:0}}\";\nconst _3 = \"._1pgl1ytf{a"
@@ -1373,7 +1411,7 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-add-an-identifier-nonce-to-the-style-element",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 144 (a.length=875, b.length=794)\n--- a +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1cj8{font-size:var(--_xexnhp)}\";\nconst ListItem = forwardRef(\n+++ b +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1dim{font-size:var(--_2wqa78)px}\";\nconst ListItem = forwardRe"
+        "diff": "divergence at byte 145 (a.length=875, b.length=798)\n--- a +85..205\nCC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1cj8{font-size:var(--_xexnhp)}\";\nconst ListItem = forwardRef(\n\n+++ b +85..205\nCC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1cd5{font-size:var(--_2wqa78)}\";\nconst ListItem = forwardRef(\n"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-compose-css-from-multiple-sources",
@@ -1393,22 +1431,12 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-shortcircuit-props-with-suffix-to-a-empty-string-to-avoid-undefined-in-cs",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 144 (a.length=851, b.length=797)\n--- a +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1sqb{font-size:var(--_8t6091)}\";\nconst ListItem = forwardRef(\n+++ b +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1dim{font-size:var(--_2wqa78)px}\";\nconst ListItem = forwardRe"
+        "diff": "divergence at byte 144 (a.length=851, b.length=801)\n--- a +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1sqb{font-size:var(--_8t6091)}\";\nconst ListItem = forwardRef(\n+++ b +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1cd5{font-size:var(--_2wqa78)}\";\nconst ListItem = forwardRef("
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-prefix-interpolation",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 143 (a.length=858, b.length=799)\n--- a +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1w5y{font-size:var(--_8t6091-)}\";\nconst ListItem = forwardRe\n+++ b +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybx6tr{font-size:var(--_2wqa78-)px}\";\nconst ListItem = forward"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--creates-a-separate-var-name-for-positive-and-negative-values-of-the-same-interpo",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 145 (a.length=966, b.length=953)\n--- a +85..205\nCC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._18u01s7m{margin-left:var(--_1hnpmp1)}\";\nconst _ = \"._2hwxjtuq{mar\n+++ b +85..205\nCC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._18u01ct8{margin-left:var(--_1hnpmp1)px}\";\nconst _ = \"._2hwx1xze{m"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-inline-constant-identifier-string-literal",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 143 (a.length=741, b.length=816)\n--- a +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybgktf{font-size:20px}\";\nconst fontSize = \"20px\";\nconst ListIt\n+++ b +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nconst fontSize = \"20px\";\nc"
+        "diff": "divergence at byte 144 (a.length=858, b.length=808)\n--- a +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1w5y{font-size:var(--_8t6091-)}\";\nconst ListItem = forwardRef\n+++ b +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1oeq{font-size:var(--_2wqa78-)}\";\nconst ListItem = forwardRef"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-transform-an-arrow-function-with-a-body-into-an-iife",
@@ -1419,6 +1447,11 @@
         "name": "styled-tests-behaviour/styled-component-behaviour--should-transform-an-arrow-function-with-a-body-into-an-iife-by-preventing-passin",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 143 (a.length=919, b.length=867)\n--- a +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybiub2{font-size:var(--_1eiw442)}\";\nconst ListItem = forwardRe\n+++ b +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1cd5{font-size:var(--_2wqa78)}\";\nconst ListItem = forwardRef"
+      },
+      {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-move-suffix-and-prefix-of-a-dynamic-arrow-function-with-a-body-into-an-ii",
+        "sourceFile": "styled/__tests__/behaviour.test.ts",
+        "diff": "divergence at byte 144 (a.length=898, b.length=896)\n--- a +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1sb21rmr{content:var(--_63bh2t)}\";\nconst ListItem = forwardRef(\n \n+++ b +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1sb21cd5{content:var(--_2wqa78)}\";\nconst ListItem = forwardRef(\n "
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-collect-args-as-styles",
@@ -1448,12 +1481,12 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operators-and-suffix",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=916, b.length=821)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._2rko1aa3{border-radius:1px!important}\";\nconst _ = \"._\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._2rko1ajv{border-radius:var(--_2wqa78)px!important}\";\nc"
+        "diff": "divergence at byte 133 (a.length=916, b.length=825)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._2rko1aa3{border-radius:1px!important}\";\nconst _ = \"._\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._2rko1umz{border-radius:var(--_2wqa78)!important}\";\ncon"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operator-for-object-styles",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1190, b.length=954)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _6 = \"._2hwx19bv{margin-right:10px}\";\nconst _5 = \"._2hwx14y2{\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._2hwx1dim{margin-right:var(--_2wqa78)px}\";\nconst _2 = "
+        "diff": "divergence at byte 133 (a.length=1190, b.length=950)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _6 = \"._2hwx19bv{margin-right:10px}\";\nconst _5 = \"._2hwx14y2{\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._2hwx1cd5{margin-right:var(--_2wqa78)}\";\nconst _2 = \"."
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operator-and-tagged-templates-branches",
@@ -1621,14 +1654,24 @@
         "diff": "divergence at byte 132 (a.length=718, b.length=814)\n--- a +72..192\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst Component = forwardRef(\n  ({ as: C = \"div\", style: __cmpls, \n+++ b +72..192\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1cd5{color:var(--_2wqa78)}\";\nconst Component = fo"
       },
       {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-conditionally-apply-css-mixins",
+        "sourceFile": "styled/__tests__/behaviour.test.ts",
+        "diff": "divergence at byte 144 (a.length=1099, b.length=1047)\n--- a +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz11x8{color:black}\";\nconst _4 = \"._bfhk1x77{background-color:\n+++ b +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syazr3uz{color:#000}\";\nconst _4 = \"._bfhku67f{background-color:#"
+      },
+      {
         "name": "styled-tests-behaviour/styled-component-behaviour--falls-back-to-using-css-variable-when-conditional-is-not-sole-expression-in-stat",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 143 (a.length=893, b.length=881)\n--- a +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsb1dlf{width:calc(10px + var(--_1e9pbah))}\";\nconst gutter = 10\n+++ b +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsb31ww{width:calc(var(--_14trm8g)px + var(--_2wqa78)px)}\";\ncon"
+        "diff": "divergence at byte 144 (a.length=893, b.length=836)\n--- a +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsb1dlf{width:calc(10px + var(--_1e9pbah))}\";\nconst gutter = 10;\n+++ b +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsb132d{width:calc(10px + var(--_2wqa78))}\";\nconst gutter = 10;\n"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--falls-back-to-using-css-variable-when-conditional-followed-by-another-expression",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 143 (a.length=893, b.length=881)\n--- a +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsb5cma{width:calc(var(--_1e9pbah) - 10px)}\";\nconst gutter = 10\n+++ b +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsb15vm{width:calc(var(--_2wqa78)px - var(--_14trm8g)px)}\";\ncon"
+        "diff": "divergence at byte 143 (a.length=893, b.length=836)\n--- a +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsb5cma{width:calc(var(--_1e9pbah) - 10px)}\";\nconst gutter = 10\n+++ b +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1bsb1m4n{width:calc(var(--_2wqa78) - 10px)}\";\nconst gutter = 10;"
+      },
+      {
+        "name": "styled-tests-behaviour/styled-component-behaviour--falls-back-to-using-css-variable-when-conditional-is-inside-quotes",
+        "sourceFile": "styled/__tests__/behaviour.test.ts",
+        "diff": "divergence at byte 144 (a.length=887, b.length=833)\n--- a +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1kt91xca:before{content:var(--_8txsa8)}\";\nconst Component = forwa\n+++ b +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1kt91cd5:before{content:var(--_2wqa78)}\";\nconst Component = forwa"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-to-related-selector",
@@ -1648,17 +1691,17 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--does-not-conflict-conditional-css-with-above-selectors",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1043, b.length=949)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._irr31i1c:hover{background-color:cyan}\";\nconst _2 = \"."
+        "diff": "divergence at byte 133 (a.length=1043, b.length=953)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._irr31i1c:hover{background-color:cyan}\";\nconst _2 = \"."
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--does-not-conflict-conditional-css-with-below-selectors",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1043, b.length=949)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._irr31i1c:hover{background-color:cyan}\";\nconst _2 = \"."
+        "diff": "divergence at byte 133 (a.length=1043, b.length=953)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._irr31i1c:hover{background-color:cyan}\";\nconst _2 = \"."
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--does-not-conflict-conditional-css-with-surrounding-selectors",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1043, b.length=949)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._irr31i1c:hover{background-color:cyan}\";\nconst _2 = \"."
+        "diff": "divergence at byte 133 (a.length=1043, b.length=953)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._irr31i1c:hover{background-color:cyan}\";\nconst _2 = \"."
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-respect-the-definition-of-pseudo-element-content-ala-emotion-with-single-",
@@ -1683,7 +1726,7 @@
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-not-pass-down-invalid-html-attributes-to-the-node-when-property-has-a-suf",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 18 (a.length=641, b.length=587)\n--- a +0..78\nconst _ = \"._1wyb1sqb{font-size:var(--_8t6091)}\";\nconst ListItem = forwardRef(\n+++ b +0..78\nconst _ = \"._1wyb1dim{font-size:var(--_2wqa78)px}\";\nconst ListItem = forwardRe"
+        "diff": "divergence at byte 18 (a.length=641, b.length=591)\n--- a +0..78\nconst _ = \"._1wyb1sqb{font-size:var(--_8t6091)}\";\nconst ListItem = forwardRef(\n+++ b +0..78\nconst _ = \"._1wyb1cd5{font-size:var(--_2wqa78)}\";\nconst ListItem = forwardRef("
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-resolve-identifier-pointing-to-a-call-expression-if-it-returns-simple-val",
@@ -1781,34 +1824,24 @@
         "diff": "divergence at byte 136 (a.length=717, b.length=717)\n--- a +76..196\n ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1sb25hbz{content:'hello'}\";\nconst ListItem = forwardRef(\n\n+++ b +76..196\n ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = '._1sb21e8g{content:\"hello\"}';\nconst ListItem = forwardRef(\n"
       },
       {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--only-transforms-compiled-react-usages-when-an-invalid-conditional-expression-is-",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 17 (a.length=655, b.length=654)\n--- a +0..77\nconst _ = \"._1wybexct{font-size:16px}\";\nconst fontSize = 16;\nconst StyledComp\n+++ b +0..77\nconst _ = \"._1wyb7vkz{font-size:1pc}\";\nconst fontSize = 16;\nconst StyledCompo"
+      },
+      {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-not-pass-down-invalid-html-attributes-to-the-node-when-property-has-a-suf",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 18 (a.length=641, b.length=587)\n--- a +0..78\nconst _ = \"._1wyb1sqb{font-size:var(--_8t6091)}\";\nconst ListItem = forwardRef(\n+++ b +0..78\nconst _ = \"._1wyb1dim{font-size:var(--_2wqa78)px}\";\nconst ListItem = forwardRe"
+        "diff": "divergence at byte 18 (a.length=641, b.length=591)\n--- a +0..78\nconst _ = \"._1wyb1sqb{font-size:var(--_8t6091)}\";\nconst ListItem = forwardRef(\n+++ b +0..78\nconst _ = \"._1wyb1cd5{font-size:var(--_2wqa78)}\";\nconst ListItem = forwardRef("
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-use-css-mixins",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 94 (a.length=712, b.length=711)\n--- a +34..154\n;\nconst _2 = \"._1wyb1wqb{font-size:60px}\";\nconst _ = \"._1kl797hw{border-left:1px solid black}\";\nconst big = `font-size: \n+++ b +34..154\n;\nconst _2 = \"._1wyb1wqb{font-size:60px}\";\nconst _ = \"._1kl71ujt{border-left:1px solid #000}\";\nconst big = `font-size: 6"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-be-able-to-override-properties-in-a-mixin",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
         "diff": "divergence at byte 138 (a.length=758, b.length=757)\n--- a +78..198\nconst _2 = \"._k48p8n31{font-weight:bold}\";\nconst _ = \"._19itl468{border:2px solid black}\";\nconst primary = null;\nconst s\n+++ b +78..198\nconst _2 = \"._k48p8n31{font-weight:bold}\";\nconst _ = \"._19it1lah{border:2px solid #000}\";\nconst primary = null;\nconst se"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-inline-constant-numeric-literal",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 17 (a.length=527, b.length=604)\n--- a +0..77\nconst _ = \"._1wybgktf{font-size:20px}\";\nconst fontSize = 20;\nconst ListItem =\n+++ b +0..77\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nconst fontSize = 20;\ncon"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-to-inline-styles-when-referencing-a-mutable-numeric-literal",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 17 (a.length=621, b.length=617)\n--- a +0..77\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nlet fontSize = 20;\nfontSiz\n+++ b +0..77\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nlet fontSize = 20;\nfontS"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-to-inline-styles-when-referencing-a-mutable-numeric-literal-w",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 17 (a.length=621, b.length=617)\n--- a +0..77\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nlet fontSize = 20;\nfontSiz\n+++ b +0..77\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nlet fontSize = 20;\nfontS"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-inline-constant-string-literal",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 17 (a.length=531, b.length=606)\n--- a +0..77\nconst _ = \"._1wybgktf{font-size:20px}\";\nconst fontSize = \"20px\";\nconst ListIt\n+++ b +0..77\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nconst fontSize = \"20px\";\nc"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-literal-with-prop-reference",
@@ -1826,19 +1859,19 @@
         "diff": "divergence at byte 17 (a.length=709, b.length=657)\n--- a +0..77\nconst _ = \"._1wybiub2{font-size:var(--_1eiw442)}\";\nconst ListItem = forwardRe\n+++ b +0..77\nconst _ = \"._1wyb1cd5{font-size:var(--_2wqa78)}\";\nconst ListItem = forwardRef"
       },
       {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-and-prefix-of-a-dynamic-arrow-function-with-a-body-into-an-ii",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 18 (a.length=688, b.length=686)\n--- a +0..78\nconst _ = \"._1sb21rmr{content:var(--_63bh2t)}\";\nconst ListItem = forwardRef(\n \n+++ b +0..78\nconst _ = \"._1sb21cd5{content:var(--_2wqa78)}\";\nconst ListItem = forwardRef(\n "
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-and-prefix-of-a-dynamic-arrow-function-with-a-body-into-an-ii",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 17 (a.length=741, b.length=689)\n--- a +0..77\nconst _ = \"._1sb2iub2{content:var(--_1eiw442)}\";\nconst ListItem = forwardRef(\n+++ b +0..77\nconst _ = \"._1sb21cd5{content:var(--_2wqa78)}\";\nconst ListItem = forwardRef(\n"
+      },
+      {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-literal-with-obj-variable",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
         "diff": "divergence at byte 55 (a.length=595, b.length=594)\n--- a +0..115\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst h200 = {\n  fontSize: \"12px\",\n};\n\n+++ b +0..115\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._1wyb1crf{font-size:9pt}\";\nconst h200 = {\n  fontSize: \"12px\",\n};\nc"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-resolve-identifier-pointing-to-a-call-expression-if-it-returns-simple-val",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 18 (a.length=553, b.length=625)\n--- a +0..78\nconst _ = \"._syaz13q2{color:blue}\";\nconst em = (str) => str;\nconst color = em(\n+++ b +0..78\nconst _ = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst em = (str) => str;\nconst "
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-inline-call-if-it-returns-simple-value",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 18 (a.length=527, b.length=604)\n--- a +0..78\nconst _ = \"._syaz13q2{color:blue}\";\nconst em = (str) => str;\nconst ListItem = \n+++ b +0..78\nconst _ = \"._syaz1cwo{color:var(--_16ywsic)}\";\nconst em = (str) => str;\nconst "
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-arrow-function-variable",
@@ -1851,19 +1884,24 @@
         "diff": "divergence at byte 18 (a.length=670, b.length=668)\n--- a +0..78\nconst _3 = \"._bfhk1x77{background-color:white}\";\nconst _2 = \"._syaz5scu{color:\n+++ b +0..78\nconst _3 = \"._bfhku67f{background-color:#fff}\";\nconst _2 = \"._syaz5scu{color:r"
       },
       {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-functions",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 19 (a.length=929, b.length=1087)\n--- a +0..79\nconst _4 = \"._irr313q2:hover{background-color:blue}\";\nconst _3 = \"._ect4lftf{fo\n+++ b +0..79\nconst _4 = \"._irr31pav:hover{background-color:var(--_ylwyqi)}\";\nconst _3 = \"._e"
-      },
-      {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-function-properties-belonging-",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 19 (a.length=1004, b.length=1227)\n--- a +0..79\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \"._k48pbfng{fo\n+++ b +0..79\nconst _5 = \"._irr31pav:hover{background-color:var(--_ylwyqi)}\";\nconst _4 = \"._k"
+        "diff": "divergence at byte 115 (a.length=1004, b.length=1002)\n--- a +55..175\nonst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{font-size:12px}\";\nconst _2 = \"._syaz13q2{color:blue}\";\nc\n+++ b +55..175\nonst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1crf{font-size:9pt}\";\nconst _2 = \"._syaz13q2{color:blue}\";\nco"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-and-prefix-of-a-dynamic-arrow-func-property-into-the-style-pr",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 19 (a.length=592, b.length=590)\n--- a +0..79\nconst _ = \"._1sb21cj8{content:var(--_xexnhp)}\";\nconst ListItem = forwardRef(\n  \n+++ b +0..79\nconst _ = \"._1sb21cd5{content:var(--_2wqa78)}\";\nconst ListItem = forwardRef(\n  "
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-any-prefix-of-a-dynamic-arrow-func-property-into-the-style-property",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 19 (a.length=592, b.length=590)\n--- a +0..79\nconst _ = \"._1sb21cj8{content:var(--_xexnhp)}\";\nconst ListItem = forwardRef(\n  \n+++ b +0..79\nconst _ = \"._1sb21cd5{content:var(--_2wqa78)}\";\nconst ListItem = forwardRef(\n  "
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-any-suffix-of-a-dynamic-arrow-func-property-into-the-style-property",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 18 (a.length=590, b.length=584)\n--- a +0..78\nconst _ = \"._1wyb1cj8{font-size:var(--_xexnhp)}\";\nconst ListItem = forwardRef(\n+++ b +0..78\nconst _ = \"._1wyb1dim{font-size:var(--_2wqa78)px}\";\nconst ListItem = forwardRe"
+        "diff": "divergence at byte 19 (a.length=590, b.length=588)\n--- a +0..79\nconst _ = \"._1wyb1cj8{font-size:var(--_xexnhp)}\";\nconst ListItem = forwardRef(\n\n+++ b +0..79\nconst _ = \"._1wyb1cd5{font-size:var(--_2wqa78)}\";\nconst ListItem = forwardRef(\n"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-function-variable",
@@ -1891,16 +1929,6 @@
         "diff": "divergence at byte 55 (a.length=974, b.length=773)\n--- a +0..115\nconst _4 = \"._syaz5scu{color:red}\";\nconst _3 = \"._mola15e1 >:last-child{opacity:var(--_lif2d7)}\";\nconst _2 = \"._1cb\n+++ b +0..115\nconst _4 = \"._syaz5scu{color:red}\";\nconst _3 = \"._mola1cd5 >:last-child{opacity:var(--_2wqa78)}\";\nconst _2 = \"._1cb"
       },
       {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-identifier-referencing-an-expression-with-suffix",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 53 (a.length=656, b.length=652)\n--- a +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rko1qga{border-radius:var(--_1hwymmh)}\";\nlet br = 2 + 2;\nbr += \n+++ b +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rko8r6c{border-radius:var(--_1hwymmh)px}\";\nlet br = 2 + 2;\nbr +"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-inline-arrow-function-with-suffix",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 53 (a.length=577, b.length=650)\n--- a +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rko1y44{border-radius:4px}\";\nconst getBr = () => 4;\nconst Div =\n+++ b +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rkoep3h{border-radius:var(--_yutjvi)px}\";\nconst getBr = () => 4"
-      },
-      {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-arrow-function-call-that-returns-css-like-object",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
         "diff": "divergence at byte 54 (a.length=594, b.length=593)\n--- a +0..114\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst getBr = () => ({\n  fontSize: 12,\n+++ b +0..114\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1crf{font-size:9pt}\";\nconst getBr = () => ({\n  fontSize: 12,\n"
@@ -1908,12 +1936,7 @@
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-arrow-function-call-that-returns-number",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 54 (a.length=575, b.length=651)\n--- a +0..114\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst getBr = () => 12;\nconst Div = fo\n+++ b +0..114\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1gsi{font-size:var(--_1y3et89)px}\";\nconst getBr = () => 12;\nc"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-arrow-function-call-that-has-a-complex-body",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 53 (a.length=602, b.length=679)\n--- a +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wybt94y{font-size:1px}\";\nconst getBr = () => {\n  return true ? \n+++ b +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1gsi{font-size:var(--_1y3et89)px}\";\nconst getBr = () => {\n  "
+        "diff": "divergence at byte 54 (a.length=575, b.length=574)\n--- a +0..114\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst getBr = () => 12;\nconst Div = fo\n+++ b +0..114\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1crf{font-size:9pt}\";\nconst getBr = () => 12;\nconst Div = for"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-function-returning-an-object",
@@ -1924,16 +1947,6 @@
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-member-expression-referencing-a-function-which-returns-an-objec",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
         "diff": "divergence at byte 17 (a.length=582, b.length=660)\n--- a +0..77\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nconst mixin = () => (\n+++ b +0..77\nconst _ = \"._syaz1qjj{color:var(--_pvyxdf)}\";\nconst color = \"red\";\nconst mixi"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-variables-within-nested-template-literals-in-two-properties",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 73 (a.length=794, b.length=916)\n--- a +13..133\n_syazxtzx{color:var(--my-variable,red)}\";\nconst _3 = \"._1xi212am{right:50px}\";\nconst _2 = \"._154i14y2{top:5px}\";\nconst _\n+++ b +13..133\n_syazxtzx{color:var(--my-variable,red)}\";\nconst _3 = \"._1xi2malo{right:var(--_14wnuwh)px}\";\nconst _2 = \"._154i14y2{top:5"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-variable-within-a-heavily-nested-template-literal",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 17 (a.length=621, b.length=671)\n--- a +0..77\nconst _ = \"._19itqan6{border:1px solid var(--my-variable,red)}\";\nconst color \n+++ b +0..77\nconst _ = \"._19it18hn{border:var(--_x3k6pz)}\";\nconst color = \"red\";\nconst int"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-handle-destructuring-in-interpolation-functions",
@@ -2197,63 +2210,7 @@
       }
     ],
     "babel-throws": [],
-    "swc-throws": [
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-move-suffix-and-prefix-of-a-dynamic-arrow-function-with-a-body-into-an-ii",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-conditionally-apply-css-mixins",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--falls-back-to-using-css-variable-when-conditional-is-inside-quotes",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--only-transforms-compiled-react-usages-when-an-invalid-conditional-expression-is-",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-use-css-mixins",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-and-prefix-of-a-dynamic-arrow-function-with-a-body-into-an-ii",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-and-prefix-of-a-dynamic-arrow-function-with-a-body-into-an-ii",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-and-prefix-of-a-dynamic-arrow-func-property-into-the-style-pr",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-any-prefix-of-a-dynamic-arrow-func-property-into-the-style-property",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-and-prefix-of-a-dynamic-property-into-the-style-property",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-do-nothing-with-suffix-prefix-when-referencing-constant-literal",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      }
-    ],
+    "swc-throws": [],
     "both-throw": [
       {
         "name": "styled-tests-content-property/handling-of-values-for-css-content-property--should-not-add-quotes-to-content-values-that-shouldn-t-accept-them",

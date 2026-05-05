@@ -90,14 +90,23 @@ pub fn try_visit_styled(
         return None;
     }
 
-    // Pre-walk: invalid-expression check on tagged-template form.
+    // Resolve the styled-data shape FIRST. The invalid-expression check
+    // must only run on tagged-templates that are recognised as
+    // Compiled-styled — otherwise we'd panic on unrelated tagged
+    // templates (e.g. `styled` imported from `styled-components` where
+    // a separate `styled2` is the Compiled binding). Upstream gates the
+    // entire handler dispatch through `isCompiledStyledTaggedTemplateExpression`
+    // / `isCompiledStyledCallExpression` (babel-plugin.ts:316), so the
+    // invalid-expression check is only reachable for Compiled tags.
+    let data = extract_styled_data_from_node(expr, &styled_names)?;
+
+    // Now safe to run invalid-expression check — `data` is `Some` only
+    // when the tag/callee matches a Compiled styled name.
     if let Expr::TaggedTpl(tpl) = expr {
         if has_invalid_expression(tpl) {
             panic!("{}", invalid_expression_error_message());
         }
     }
-
-    let data = extract_styled_data_from_node(expr, &styled_names)?;
 
     // Build the CSSOutput by running build_css on the node (or array
     // of nodes for the call form).

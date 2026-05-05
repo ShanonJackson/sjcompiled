@@ -70,22 +70,20 @@ Snippet-slicing in `engines.ts::babelEngine` cuts on the FIRST
 `if (process.env.NODE_ENV` substring, so the misplaced wrapper broke
 81 fixtures. Removing the outer wrapper dropped throws 143 → 62.
 
-### §6.8 cluster table (post-§6.8a re-triage)
+### §6.8 cluster table (post-§6.8c re-triage; baseline parity=184/477, divergence=292, swc-throws=0)
 
 | Cluster | Count | Likely root cause |
 |---|---|---|
-| `styled/behaviour` divergences | 56 | forwardRef body / sheet decls / runtime imports |
-| `css-prop/object-literal` | 41 | wrapper emit-shape |
-| `css-prop/behaviour` | 39 | same family as above |
-| `keyframes/call-expression` | 39 | keyframes ref + dynamic-value handling |
-| `styled/call-expression` + `tagged-template-expression` | 63 | sibling clusters of styled/behaviour |
-| `expression-evaluation` | 22 | identifier resolution / partial-eval edges |
-| `class-names/tagged-template-expression` THROWS | 6 of 62 | panic in `class_names::CssCallReplacer` on `${...}` interpolation |
-| Other class-names panics | 56 | likely same CssCallReplacer panic on similar shapes |
-| `__tests__/custom-import-source` | 4 div + 1 throw | `importSources` opt not parsed; `./foo/index.js` panics |
-| `xcss-prop/transformation` | 12 | runtime-imports not injected for xcss-only paths; `processXcss: false` not honoured |
-| `__tests__/jsx-automatic` | 4 | import-statement order |
-| `css-map/at-rules-and-selectors` | 6 | object-property emit-shape (Ident vs Str key — §6.3 SWC divergence) |
+| `styled/behaviour` divergences | TBD | forwardRef body / sheet decls / runtime imports |
+| `css-prop/object-literal` | TBD | wrapper emit-shape |
+| `css-prop/behaviour` | TBD | same family as above |
+| `keyframes/call-expression` | TBD | keyframes ref + dynamic-value handling |
+| `styled/call-expression` + `tagged-template-expression` | TBD | sibling clusters of styled/behaviour |
+| Color-name minification (`black` → `#000`, `white` → `#fff`) | many | lightningcss vs babel-postcss-css-syntax minifier divergence; cosmetic only |
+
+NOTE: post-§6.8c the swc-throws column is empty (0 throws across 477).
+Run `bun parity-harness/babel-plugin/triage.mjs` and re-categorise the
+remaining 292 divergences before picking the next cluster.
 
 ### §6.8 punch list (next agent)
 
@@ -325,6 +323,84 @@ remaining divergences are now CONTAINED to:
   407 → 308 (-99); swc-throws unchanged-then-down 62 → 36 (-26).
   Remaining swc-throws by cluster: styled 20, css-prop 10,
   class-names 6.
+- **§6.8c ☑ — Babel↔SWC paren-shim + 6 port-completions
+  zeroing out the swc-throws cluster** (this session, 2026-05-05).
+  Six fixes that drove `swc-throws 36 → 0` and `parity 132 → 184`:
+
+  1. **`compat/paren.rs` — Babel parser strips
+     `ParenthesizedExpression` by default; SWC keeps it.** New
+     `unwrap_paren` / `unwrap_paren_and_ts_as` helpers wired into
+     `evaluate_expression`'s `target_expression` normalisation,
+     `is_compiled_*` predicates, `extract_template_literal`'s
+     `Expr::Object`/conditional/logical pattern matches, and
+     `build_css_inner`'s arrow-body match. Without this every
+     `() => ({...})` (arrow returning object) deopted via the
+     catch-all CSS-variable path because `arrow.body` was
+     `Paren(Object)` instead of `Object`. Single biggest cluster
+     fix — 17 throws cleared in one swing.
+  2. **`compat/scope.rs::register_fn_decl` synthesised
+     `init_expr`.** Function declarations were registered with
+     `init_expr: None`, so `traverse_identifier` couldn't fold
+     them. Babel's `binding.path.node` IS the FunctionDeclaration
+     and `t.isFunction(FunctionDeclaration)` returns true, so
+     upstream `evaluateExpression(binding.path.node)` flows into
+     `traverseFunction`. Fix: synthesize an `Expr::Fn(FnExpr)`
+     wrapping the same `Function` body — gives evaluator's
+     `Expr::Fn|Arrow` arm something to fold.
+  3. **`utils/css_builders.rs::extract_member_expression_optional`
+     fallback branch — port-completion of the `evaluateExpression
+     + buildCss` re-dispatch.** Was a §4.6 stub that discarded the
+     ResultPair. Replaced with the full upstream behaviour
+     (build-css.ts:746-749): evaluate the member expression,
+     recurse `build_css_inner` on the folded value. Cleared all 3
+     `css-prop/object-literal` `extract-collocated-mixin-from-*`
+     panics.
+  4. **`utils/css_builders.rs::extract_template_literal`
+     mutable-quasi-raw walk + `suffix: after.variable_suffix`.**
+     Upstream mutates `nextQuasis.value.raw = after.css`
+     (build-css.ts:874) so the next iteration sees the
+     suffix-stripped quasi. The Rust port walked `node.quasis` by
+     `&` borrow; the mutation was deferred. Replaced with a
+     parallel `Vec<String>` of working raws (mutated in place), and
+     plumbed `after.variable_suffix` through to the emitted
+     `Variable.suffix` (was always `None`). Without this, e.g.
+     `content: "${dynamic}";` kept the closing `"` in the CSS,
+     producing `content:"var(--_x)"<unclosed string>` and a
+     parse-error panic. Single change cleared 8 styled
+     suffix/prefix throws AND moved 13 fixtures into byte-equal
+     parity.
+  5. **`utils/css_builders.rs::extract_branch` Identifier arm —
+     port-completion of conditional-CSS resolved-binding handling.**
+     Was a §4.6 stub that discarded the evaluator result.
+     Replaced with the full upstream behaviour (build-css.ts:374-385):
+     `resolve_binding(ident)`; if resolved init is a Compiled
+     `css(...)` call or `css\`...\`` tagged template, recurse
+     `build_css_inner` on it. Cleared the `${(p) => p.x ? dark :
+     light}` cluster.
+  6. **`utils/css_builders.rs::extract_template_literal`
+     StringLiteral/NumericLiteral fast-inline branch.** Was missing
+     entirely. Ported upstream lines 798-801 verbatim: when
+     evaluator returns a `Lit::Str` / `Lit::Num`, push directly
+     into `acc` and `continue`. Without this, `${big}` where
+     `big = \`...css...\`` (tpl-no-exprs folded to StringLiteral
+     by `babel_evaluate`) reached the catch-all CSS-variable path.
+  7. **`styled/mod.rs` invalid-expression check ordering.** The
+     `has_invalid_expression(tpl)` panic ran BEFORE
+     `extract_styled_data_from_node` returned `None` for non-
+     Compiled tags — so a `styled-components` tagged template
+     panicked even when the user's Compiled binding was a
+     different name. Reordered: extract data first; the panic is
+     now only reachable for tags recognised as Compiled-styled.
+
+  **Triage delta: parity 132 → 184 (+52, 38.6% of 477),
+  divergence 308 → 292 (-16), swc-throws 36 → 0 (-36 — cluster
+  fully cleared).** Lib tests 433 → 439 (+6 from `compat::paren`
+  unit tests). All other integration suites unchanged
+  (hash_parity 4/4, transform_css 3/3, compat_evaluation 3/3,
+  compat_scope 3/3, resolver_matrix 8/8). Cumulative across
+  this session: parity 7 → 184 (+177); divergence 407 → 292
+  (-115); swc-throws 62 → 0 (-62, cluster cleared);
+  babel-throws 1 → 0.
 
 ### Verifying the current state from a cold pickup
 

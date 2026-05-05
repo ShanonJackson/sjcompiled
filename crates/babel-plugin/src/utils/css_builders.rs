@@ -495,13 +495,79 @@ fn extract_branch(
         {
             Some(build_css_inner(path_node, meta, scope_index, parent_scope, own_scope, recorder)?)
         }
-        Expr::Ident(_) => {
-            // §4.6 bridge: real evaluator dispatch. The surrounding
-            // JS branch (re-dispatch on the folded value) is Phase 6
-            // handler work; the bridge ships the call shape and
-            // discards the ResultPair until that surrounding port lands.
-            let _ = evaluate_expression(path_node, meta, scope_index, parent_scope, own_scope);
-            None
+        Expr::Ident(ident) => {
+            // 1:1 port of upstream `extractConditionalExpression`
+            // Identifier arm (build-css.ts:374-385). Resolves the
+            // ident to its binding init expr; if that init is a
+            // Compiled css(...) call or css`...` tagged template,
+            // recurse `build_css_inner` on the resolved node.
+            let resolved = resolve_binding(
+                ident.sym.as_str(),
+                &*meta,
+                &*scope_index,
+                parent_scope,
+                own_scope,
+            );
+            if let Some(resolved) = resolved {
+                if let Some(node_expr) = resolved.node.as_ref() {
+                    let is_css_shape = is_compiled_css_tagged_template_expression(
+                        node_expr,
+                        meta.state,
+                    ) || is_compiled_css_call_expression(node_expr, meta.state);
+                    if is_css_shape {
+                        let cloned = node_expr.clone();
+                        let result = if resolved.source == BindingSource::Import {
+                            if let Some(imported_module) = resolved.imported_module.as_ref() {
+                                let mut imp_idx = ScopeIndex::build(&**imported_module);
+                                let imp_prog = imp_idx.program_scope();
+                                build_css_inner(
+                                    &cloned,
+                                    meta,
+                                    &mut imp_idx,
+                                    imp_prog,
+                                    None,
+                                    recorder,
+                                )?
+                            } else {
+                                build_css_inner(
+                                    &cloned,
+                                    meta,
+                                    scope_index,
+                                    parent_scope,
+                                    own_scope,
+                                    recorder,
+                                )?
+                            }
+                        } else {
+                            build_css_inner(
+                                &cloned,
+                                meta,
+                                scope_index,
+                                parent_scope,
+                                own_scope,
+                                recorder,
+                            )?
+                        };
+                        // assertNoImportedCssVariables — upstream line 384.
+                        if resolved.source == BindingSource::Import
+                            && !result.variables.is_empty()
+                        {
+                            return Err(build_code_frame_error(
+                                "Identifier contains values that can't be statically evaluated"
+                                    .to_string(),
+                                Some(ident.span),
+                            ));
+                        }
+                        Some(result)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         }
         Expr::Cond(c) => Some(extract_conditional_expression(c, meta, scope_index, parent_scope, own_scope, recorder)?),
         Expr::Member(m) => extract_member_expression_optional(m, meta, false, scope_index, parent_scope, own_scope, recorder)?,
@@ -1209,6 +1275,34 @@ pub fn extract_template_literal(
         )
         .value
         .unwrap_or_else(|| Box::new(node_expression.clone()));
+
+        // 1:1 port of upstream `extractTemplateLiteral` lines 798-801:
+        //   if (t.isStringLiteral(interpolation) || t.isNumericLiteral(interpolation)) {
+        //     return acc + quasi.value.raw + interpolation.value;
+        //   }
+        // Inlines literal interpolations directly into the CSS string.
+        // Without this, `${big}` where `big = \`font-size: 60px;\``
+        // (TemplateLiteral with no exprs, folded to StringLiteral by
+        // babel_evaluate) reaches the catch-all CSS-variable path and
+        // emits `var(--_xxx)` plus an inline-style declaration —
+        // producing invalid CSS for adjacent declarations.
+        match &*crate::compat::paren::unwrap_paren(&evaluated_interp) {
+            Expr::Lit(Lit::Str(s)) => {
+                acc.push_str(&raw);
+                acc.push_str(s.value.to_atom_lossy().as_str());
+                continue;
+            }
+            Expr::Lit(Lit::Num(n)) => {
+                acc.push_str(&raw);
+                if let Some(raw_text) = &n.raw {
+                    acc.push_str(raw_text.as_str());
+                } else {
+                    acc.push_str(&n.value.to_string());
+                }
+                continue;
+            }
+            _ => {}
+        }
 
         // §6.8b: 1:1 port of upstream `canBuildExpressionAsCss`
         // branch (build-css.ts:803-838). When the evaluated
