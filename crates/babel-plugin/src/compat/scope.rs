@@ -1003,6 +1003,23 @@ impl Builder {
     fn register_fn_decl(&mut self, fn_decl: &FnDecl) {
         let target_scope = self.function_or_program_parent(self.current_scope());
         let span = fn_decl.ident.span;
+        // Babel's `binding.path.node` for a FunctionDeclaration IS the
+        // FunctionDeclaration node, and `t.isFunction(FunctionDeclaration)`
+        // returns true — so upstream `traverseIdentifier`'s
+        // `evaluateExpression(binding.path.node)` flows into
+        // `traverseFunction` and walks for the first ReturnStatement.
+        //
+        // The Rust port stores `init_expr: Option<Box<Expr>>` on
+        // `Binding`. FunctionDeclaration is a Stmt-level node, not an
+        // Expr — so we synthesize an `Expr::Fn(FnExpr)` wrapping the
+        // same `Function` body. This gives `evaluate_expression`'s
+        // `Expr::Fn(_) | Expr::Arrow(_)` dispatch arm something to fold
+        // and matches Babel's behaviour 1:1. Matches the §5.0c
+        // single-purpose `init_expr` extension precedent.
+        let init_expr = Some(Box::new(Expr::Fn(FnExpr {
+            ident: Some(fn_decl.ident.clone()),
+            function: fn_decl.function.clone(),
+        })));
         let binding = Binding {
             kind: BindingKind::Hoisted,
             identifier_name: fn_decl.ident.sym.to_string(),
@@ -1012,7 +1029,7 @@ impl Builder {
             binding_node_type: "FunctionDeclaration",
             parent_node_type: parent_for_module_item(self.current_scope_kind()),
             binding_init_string: None,
-            init_expr: None,
+            init_expr,
             binding_id_type: None,
             scope: target_scope,
             span,

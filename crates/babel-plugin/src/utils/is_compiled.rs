@@ -14,6 +14,7 @@
 
 use swc_core::ecma::ast::{Callee, CallExpr, Expr, MemberExpr, MemberProp, TaggedTpl};
 
+use crate::compat::paren::unwrap_paren;
 use crate::state::{CompiledImports, State};
 
 /// Helper: get the bound names for a given API kind on
@@ -37,6 +38,7 @@ fn get_compiled_names<'a>(
 /// `state.importedCompiledImports.css` (single string) and checks
 /// membership against the callee identifier name.
 pub fn is_compiled_css_call_expression(expr: &Expr, state: &State) -> bool {
+    let expr = unwrap_paren(expr);
     let Expr::Call(call) = expr else { return false };
     let Some(callee_name) = call_callee_ident_name(call) else {
         return false;
@@ -65,6 +67,7 @@ pub fn is_compiled_css_call_expression(expr: &Expr, state: &State) -> bool {
 /// `importedCompiledImports.css` (matches upstream — only the call
 /// variant does the merge).
 pub fn is_compiled_css_tagged_template_expression(expr: &Expr, state: &State) -> bool {
+    let expr = unwrap_paren(expr);
     let Expr::TaggedTpl(tpl) = expr else {
         return false;
     };
@@ -74,6 +77,7 @@ pub fn is_compiled_css_tagged_template_expression(expr: &Expr, state: &State) ->
 /// Returns `true` if the node is using `keyframes` from
 /// `@compiled/react` as a call expression.
 pub fn is_compiled_keyframes_call_expression(expr: &Expr, state: &State) -> bool {
+    let expr = unwrap_paren(expr);
     let Expr::Call(call) = expr else { return false };
     let Some(callee_name) = call_callee_ident_name(call) else {
         return false;
@@ -86,6 +90,7 @@ pub fn is_compiled_keyframes_call_expression(expr: &Expr, state: &State) -> bool
 /// Returns `true` if the node is using `cssMap` from `@compiled/react`
 /// as a call expression.
 pub fn is_compiled_css_map_call_expression(expr: &Expr, state: &State) -> bool {
+    let expr = unwrap_paren(expr);
     let Expr::Call(call) = expr else { return false };
     let Some(callee_name) = call_callee_ident_name(call) else {
         return false;
@@ -98,6 +103,7 @@ pub fn is_compiled_css_map_call_expression(expr: &Expr, state: &State) -> bool {
 /// Returns `true` if the node is using `keyframes` from
 /// `@compiled/react` as a tagged template expression.
 pub fn is_compiled_keyframes_tagged_template_expression(expr: &Expr, state: &State) -> bool {
+    let expr = unwrap_paren(expr);
     let Expr::TaggedTpl(tpl) = expr else {
         return false;
     };
@@ -123,6 +129,7 @@ fn is_compiled_styled_member_expression(expr: &Expr, state: &State) -> bool {
 /// Returns `true` if the node is `styled(Component)` call expression —
 /// the composition variant. Mirrors upstream lines 101–107.
 fn is_compiled_styled_composition_call_expression(expr: &Expr, state: &State) -> bool {
+    let expr = unwrap_paren(expr);
     let Expr::Call(call) = expr else { return false };
     let Some(callee_name) = call_callee_ident_name(call) else {
         return false;
@@ -136,6 +143,7 @@ fn is_compiled_styled_composition_call_expression(expr: &Expr, state: &State) ->
 /// as a call expression — covers both `styled.div(...)` and
 /// `styled(Component)(...)` shapes.
 pub fn is_compiled_styled_call_expression(expr: &Expr, state: &State) -> bool {
+    let expr = unwrap_paren(expr);
     let Expr::Call(call) = expr else { return false };
     let Callee::Expr(callee_expr) = &call.callee else {
         return false;
@@ -147,6 +155,7 @@ pub fn is_compiled_styled_call_expression(expr: &Expr, state: &State) -> bool {
 /// Returns `true` if the node is using `styled` from `@compiled/react`
 /// as a tagged template expression — covers both shapes.
 pub fn is_compiled_styled_tagged_template_expression(expr: &Expr, state: &State) -> bool {
+    let expr = unwrap_paren(expr);
     let Expr::TaggedTpl(tpl) = expr else {
         return false;
     };

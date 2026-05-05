@@ -197,10 +197,17 @@ fn dispatch_evaluate<'a>(
 
     // JS: `t.isTSAsExpression(expression) ? expression.expression : expression`.
     // Skip TS-as wrappers; CSS-value evaluation is type-irrelevant.
-    let target_expression: &Expr = match expression {
-        Expr::TsAs(ts) => &*ts.expr,
-        _ => expression,
-    };
+    //
+    // ALSO unwrap `Expr::Paren`: Babel's parser strips
+    // `ParenthesizedExpression` nodes by default, so upstream's
+    // `t.isObjectExpression(value)` / `t.isCallExpression(value)`
+    // checks NEVER see a paren wrapper. SWC's parser keeps them, so
+    // `() => ({x: 1})` parses with arrow body `Paren(Object)`. Without
+    // this unwrap, every "arrow-returning-object" idiom would deopt
+    // through the catch-all CSS-variable path. See
+    // `crates/babel-plugin/src/compat/paren.rs` for the full rationale.
+    let target_expression: &Expr =
+        crate::compat::paren::unwrap_paren_and_ts_as(expression);
 
     // §5.4e drift-fix consumer contract: cross-file fold against
     // imported scope. When an Identifier resolves to an Import binding

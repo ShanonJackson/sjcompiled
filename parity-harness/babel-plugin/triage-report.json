@@ -1,12 +1,12 @@
 {
   "summary": {
     "total": 477,
-    "parity": 132,
-    "divergence": 308,
-    "swc-throws": 36,
+    "parity": 142,
+    "divergence": 323,
+    "swc-throws": 11,
     "babel-throws": 0,
     "both-throw": 1,
-    "elapsedSeconds": 40
+    "elapsedSeconds": 50
   },
   "results": {
     "parity": [
@@ -72,6 +72,14 @@
       },
       {
         "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-declared-object-expression",
+        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-zero-arity-call-expression-referencing-an-arrow-function-that-returns-an-objec",
+        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts"
+      },
+      {
+        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-zero-arity-call-expression-referencing-a-function-declaration-that-returns-an-",
         "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts"
       },
       {
@@ -187,11 +195,27 @@
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-arrow-function",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-extract-mixin-from-identifier",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-extract-collocated-mixin-from-member-expression",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-extract-collocated-mixin-from-deeply-nested-member-expression",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-identifier-referencing-an-template-literal",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-function-variable",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
@@ -212,6 +236,10 @@
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-the-css-call-expression",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-the-css-call-expression-from-member-expression",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
@@ -252,6 +280,18 @@
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-identifiers-that-reference-simple-call-expressions",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-an-arrow-function-call-expression-that-returns-an-object-expression",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-a-function-declaration-call-expression-that-returns-an-object-expres",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-member-expressions-that-return-object-expressions--through-an-arrow-function-call-expression",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts"
       },
       {
@@ -636,6 +676,26 @@
         "diff": "divergence at byte 141 (a.length=477, b.length=473)\n--- a +81..201\nuntime\";\nimport { fontSize } from \"./nah\";\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nconst ListItem = () =>\n  R\n+++ b +81..201\nuntime\";\nimport { fontSize } from \"./nah\";\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nconst ListItem = () =>\n "
       },
       {
+        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-multi-arity-call-expression-referencing-an-arrow-function-that-returns-an-obje",
+        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 150 (a.length=958, b.length=989)\n--- a +90..210\nconst _7 = \"._1wybgktf{font-size:20px}\";\nconst _6 = \"._bfhk13q2{background-color:blue}\";\nconst _5 = \"._syaz5scu{color:re\n+++ b +90..210\nconst _7 = \"._1wybgktf{font-size:20px}\";\nconst _6 = \"._bfhk1zjr{background-color:var(--_ch3w3t)}\";\nconst _5 = \"._syazr3u"
+      },
+      {
+        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-multi-arity-member-call-expression-referencing-an-arrow-function-that-returns-",
+        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 151 (a.length=762, b.length=838)\n--- a +91..211\nonst _5 = \"._k48p8n31{font-weight:bold}\";\nconst _4 = \"._syazlvfy{color:var(--_zo7lop)}\";\nconst _3 = \"._1wybgktf{font-siz\n+++ b +91..211\nonst _5 = \"._k48p8n31{font-weight:bold}\";\nconst _4 = \"._syaz13g7{color:var(--_j2chn6)}\";\nconst _3 = \"._1wybgktf{font-siz"
+      },
+      {
+        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-call-expression-with-unresolved-arguments",
+        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 254 (a.length=926, b.length=929)\n--- a +194..314\n= \"._1wyb4vkz{font-size:var(--_kre2x8)}\";\nconst _3 = \"._syazlvfy{color:var(--_zo7lop)}\";\nconst _2 = \"._2rko19bv{border-r\n+++ b +194..314\n= \"._1wyb4vkz{font-size:var(--_kre2x8)}\";\nconst _3 = \"._syaz13g7{color:var(--_j2chn6)}\";\nconst _2 = \"._2rko19bv{border-r"
+      },
+      {
+        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--duplicate-properties",
+        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 228 (a.length=632, b.length=631)\n--- a +168..288\nconst _2 = \"._k48p8n31{font-weight:bold}\";\nconst _ = \"._19itl468{border:2px solid black}\";\nconst primary = () => ({\n  fo\n+++ b +168..288\nconst _2 = \"._k48p8n31{font-weight:bold}\";\nconst _ = \"._19it1lah{border:2px solid #000}\";\nconst primary = () => ({\n  fon"
+      },
+      {
         "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-parse-a-mix-of-at-rules-and-the-selectors-object",
         "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts",
         "diff": "divergence at byte 97 (a.length=973, b.length=972)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _0 = \"@media screen and (min-width:500px){._1taki9ra{font-siz\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _10 = \"@media screen and (min-width:500px){._1taki9ra{font-si"
@@ -906,24 +966,14 @@
         "diff": "divergence at byte 107 (a.length=361, b.length=362)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nfunction mixin() {\n  return {\n    color: \"\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nfunction mixin() {\n  return {\n    color: "
       },
       {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-arrow-function",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 104 (a.length=406, b.length=469)\n--- a +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._syaz13q2{color:blue\n+++ b +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1qs918gj{hover:var(--_3xdusa)}\";\nconst _ = \"._syaz13q2{color"
-      },
-      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-functions",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=872, b.length=747)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \".\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1qs91jn8{hover:var(--_fx2uzu)}\";\nconst _ = \"._syaz13q"
+        "diff": "divergence at byte 97 (a.length=872, b.length=751)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \".\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._irr313q2:hover{background-color:blue}\";\nconst _2 = \"."
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-function-properties-belonging-to-a-vari",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
         "diff": "divergence at byte 97 (a.length=750, b.length=639)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._19it1nsd{border:1"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-function-variable",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 104 (a.length=418, b.length=481)\n--- a +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._syaz13q2{color:blue\n+++ b +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1qs918gj{hover:var(--_3xdusa)}\";\nconst _ = \"._syaz13q2{color"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-spread-with-no-argument-function-variable#2",
@@ -948,12 +998,12 @@
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-function-returning-an-object",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 107 (a.length=363, b.length=436)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nconst mixin = () => (\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1asi{color:var(--_hg40w)}\";\nconst color = \"red\";\nconst mixin"
+        "diff": "divergence at byte 96 (a.length=363, b.length=196)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nconst mixi\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst color = \"red\";\nconst mixin = () => ({\n  color,\n});\nReact.cre"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-member-expression-referencing-a-function-which-returns-an-objec",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 107 (a.length=387, b.length=461)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nconst mixin = () => (\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1qjj{color:var(--_pvyxdf)}\";\nconst color = \"red\";\nconst mixi"
+        "diff": "divergence at byte 96 (a.length=387, b.length=220)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nconst mixi\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst color = \"red\";\nconst mixin = () => ({\n  color,\n});\nconst col"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-the-css-call-expression-and-traverse-referenced-variables",
@@ -1001,6 +1051,21 @@
         "diff": "divergence at byte 108 (a.length=329, b.length=397)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst color = \"blue\";\nReact.createElement(\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst color = \"blue\";\nReact.cre"
       },
       {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-be-able-to-override-properties-in-a-mixin",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
+        "diff": "divergence at byte 228 (a.length=639, b.length=638)\n--- a +168..288\nconst _2 = \"._k48p8n31{font-weight:bold}\";\nconst _ = \"._19itl468{border:2px solid black}\";\nconst primary = () => ({\n  fo\n+++ b +168..288\nconst _2 = \"._k48p8n31{font-weight:bold}\";\nconst _ = \"._19it1lah{border:2px solid #000}\";\nconst primary = () => ({\n  fon"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-arrow-function-variable",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
+        "diff": "divergence at byte 229 (a.length=609, b.length=607)\n--- a +169..289\nx}\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._19it97hw{border:1px solid black}\";\nconst _ = \"._bfhk1x77{backgro\n+++ b +169..289\nx}\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._19it1ujt{border:1px solid #000}\";\nconst _ = \"._bfhku67f{backgrou"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-arrow-function-call-variable",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
+        "diff": "divergence at byte 186 (a.length=552, b.length=550)\n--- a +126..246\nx}\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._bfhk1x77{background-color:white}\";\nconst _ = \"._19it97hw{border:\n+++ b +126..246\nx}\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._bfhku67f{background-color:#fff}\";\nconst _ = \"._19it1ujt{border:1"
+      },
+      {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-functions",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
         "diff": "divergence at byte 109 (a.length=703, b.length=853)\n--- a +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._irr313q2:hover{background-color:blue}\";\nconst _3 = \"._ect4lftf{fo\n+++ b +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._irr31pav:hover{background-color:var(--_ylwyqi)}\";\nconst _3 = \"._e"
@@ -1009,6 +1074,26 @@
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-function-properties-belonging-",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
         "diff": "divergence at byte 108 (a.length=682, b.length=851)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{font-size:12p\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pkz1d{font-weight:var(--_zabg57)}\";\nconst _3 = \"._1wyb1nsi{fo"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-function-variable",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
+        "diff": "divergence at byte 186 (a.length=481, b.length=480)\n--- a +126..246\n0px}\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._19it97hw{border:1px solid black}\";\nfunction mixin() {\n  return {\n+++ b +126..246\n0px}\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._19it1ujt{border:1px solid #000}\";\nfunction mixin() {\n  return {\n"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-argument-arrow-function-variable",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
+        "diff": "divergence at byte 152 (a.length=900, b.length=1050)\n--- a +92..212\nnst _6 = \"._k48p8n31{font-weight:bold}\";\nconst _5 = \"._bfhk13q2{background-color:blue}\";\nconst _4 = \"._syaz5scu{color:re\n+++ b +92..212\nnst _6 = \"._k48p8n31{font-weight:bold}\";\nconst _5 = \"._bfhk1zjr{background-color:var(--_ch3w3t)}\";\nconst _4 = \"._syazr3u"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-unresolved-argument-arrow-function-variabl",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
+        "diff": "divergence at byte 252 (a.length=924, b.length=927)\n--- a +192..312\n= \"._1wyb4vkz{font-size:var(--_kre2x8)}\";\nconst _3 = \"._syazlvfy{color:var(--_zo7lop)}\";\nconst _2 = \"._2rko19bv{border-r\n+++ b +192..312\n= \"._1wyb4vkz{font-size:var(--_kre2x8)}\";\nconst _3 = \"._syaz13g7{color:var(--_j2chn6)}\";\nconst _2 = \"._2rko19bv{border-r"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-argument-arrow-function-variable-inside-me",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
+        "diff": "divergence at byte 108 (a.length=769, b.length=844)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syazlvfy{color:var(--_zo7lop)}\";\nconst _4 = \"._19pkgktf{margin-t\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz13g7{color:var(--_j2chn6)}\";\nconst _4 = \"._19pkgktf{margin-t"
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-inline-multiple-constant-interpolations",
@@ -1069,21 +1154,6 @@
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-identifiers-that-reference-an-object-expression",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
         "diff": "divergence at byte 7 (a.length=345, b.length=279)\n--- a +0..67\nconst _2 = \"._j7hqocb1{animation-name:k1mv9s16}\";\nconst _ = \"@keyfr\n+++ b +0..67\nconst _ = \"._j7hqocb1{animation-name:k1mv9s16}\";\nconst from = {\n  o"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-an-arrow-function-call-expression-that-returns-an-object-expression",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 59 (a.length=423, b.length=490)\n--- a +0..119\nconst _2 = \"._j7hqjcah{animation-name:k1e4zivv}\";\nconst _ =\n  \"@keyframes k1e4zivv{0%{color:blue;opacity:1}to{color:ind\n+++ b +0..119\nconst _2 = \"._j7hqjcah{animation-name:k1e4zivv}\";\nconst _ = \"@keyframes k1e4zivv{from:var(--_1c6ubtl);to:var(--_5y88ij)"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-a-function-declaration-call-expression-that-returns-an-object-expres",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 59 (a.length=451, b.length=518)\n--- a +0..119\nconst _2 = \"._j7hqjcah{animation-name:k1e4zivv}\";\nconst _ =\n  \"@keyframes k1e4zivv{0%{color:blue;opacity:1}to{color:ind\n+++ b +0..119\nconst _2 = \"._j7hqjcah{animation-name:k1e4zivv}\";\nconst _ = \"@keyframes k1e4zivv{from:var(--_1c6ubtl);to:var(--_5y88ij)"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-member-expressions-that-return-object-expressions--through-an-arrow-function-call-expression",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 92 (a.length=423, b.length=641)\n--- a +32..152\n-name:k1fh39u1}\";\nconst _ =\n  \"@keyframes k1fh39u1{0%{color:blue;opacity:1}to{color:indigo;opacity:0}}\";\nconst from = ()\n+++ b +32..152\n-name:k1fh39u1}\";\nconst _ =\n  \"@keyframes k1fh39u1{0%{color:var(--_188fn0v);opacity:var(--_nn3mv2)}to{color:var(--_19jts"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-suffixes-prefixed-by-an--arrow-function-expression-call-that-returns-a-number-literal",
@@ -1456,6 +1526,16 @@
         "diff": "divergence at byte 133 (a.length=1006, b.length=838)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._syaz13q2{color:blue}\";\nconst _3 = \"._syaz5scu{color:r\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz5scu{color:red}\";\nconst _2 = \"._bfhku67f{backgrou"
       },
       {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-unconditional-css-with-props",
+        "sourceFile": "styled/__tests__/behaviour.test.ts",
+        "diff": "divergence at byte 143 (a.length=844, b.length=793)\n--- a +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1q2z{color:var(--_1r7cl4y)}\";\nconst Component = forwardRef(\n\n+++ b +83..203\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syazbdu3{color:var(--_dtcx2j)}\";\nconst Component = forwardRef(\n "
+      },
+      {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-unconditional-css-with-and-without-props",
+        "sourceFile": "styled/__tests__/behaviour.test.ts",
+        "diff": "divergence at byte 144 (a.length=905, b.length=854)\n--- a +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz1q2z{color:var(--_1r7cl4y)}\";\nconst _ = \"._bfhk5scu{backgrou\n+++ b +84..204\n CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syazbdu3{color:var(--_dtcx2j)}\";\nconst _ = \"._bfhk5scu{backgroun"
+      },
+      {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-object-styles",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 133 (a.length=879, b.length=714)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._syaz5scu{color:re\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst Component = forwardRef(\n  "
@@ -1638,7 +1718,7 @@
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-no-argument-functions",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=1098, b.length=946)\n--- a +0..67\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \".\n+++ b +0..67\nconst _2 = \"._1qs91jn8{hover:var(--_fx2uzu)}\";\nconst _ = \"._syaz13q"
+        "diff": "divergence at byte 7 (a.length=1098, b.length=946)\n--- a +0..67\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \".\n+++ b +0..67\nconst _3 = \"._irr313q2:hover{background-color:blue}\";\nconst _2 = \"."
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-no-argument-function-properties-belonging-to-a-vari",
@@ -1663,12 +1743,12 @@
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-function-returning-an-object",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 17 (a.length=558, b.length=635)\n--- a +0..77\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nconst mixin = () => (\n+++ b +0..77\nconst _ = \"._syaz1asi{color:var(--_hg40w)}\";\nconst color = \"red\";\nconst mixin"
+        "diff": "divergence at byte 6 (a.length=558, b.length=513)\n--- a +0..66\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nconst mixi\n+++ b +0..66\nconst color = \"red\";\nconst mixin = () => ({\n  color,\n});\nconst Lis"
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-member-expression-referencing-a-function-which-returns-an-objec",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 17 (a.length=582, b.length=660)\n--- a +0..77\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nconst mixin = () => (\n+++ b +0..77\nconst _ = \"._syaz1qjj{color:var(--_pvyxdf)}\";\nconst color = \"red\";\nconst mixi"
+        "diff": "divergence at byte 6 (a.length=582, b.length=537)\n--- a +0..66\nconst _ = \"._syaz5scu{color:red}\";\nconst color = \"red\";\nconst mixi\n+++ b +0..66\nconst color = \"red\";\nconst mixin = () => ({\n  color,\n});\nconst col"
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-handle-destructuring-in-interpolation-functions",
@@ -1761,6 +1841,16 @@
         "diff": "divergence at byte 18 (a.length=527, b.length=604)\n--- a +0..78\nconst _ = \"._syaz13q2{color:blue}\";\nconst em = (str) => str;\nconst ListItem = \n+++ b +0..78\nconst _ = \"._syaz1cwo{color:var(--_16ywsic)}\";\nconst em = (str) => str;\nconst "
       },
       {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-arrow-function-variable",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 95 (a.length=756, b.length=754)\n--- a +35..155\n\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 = \"._bfhk1x77{background-color:white}\";\nconst _ = \"._19it97hw{border:\n+++ b +35..155\n\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 = \"._bfhku67f{background-color:#fff}\";\nconst _ = \"._19it1ujt{border:1"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-arrow-function-variable-when-n",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 18 (a.length=670, b.length=668)\n--- a +0..78\nconst _3 = \"._bfhk1x77{background-color:white}\";\nconst _2 = \"._syaz5scu{color:\n+++ b +0..78\nconst _3 = \"._bfhku67f{background-color:#fff}\";\nconst _2 = \"._syaz5scu{color:r"
+      },
+      {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-functions",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
         "diff": "divergence at byte 19 (a.length=929, b.length=1087)\n--- a +0..79\nconst _4 = \"._irr313q2:hover{background-color:blue}\";\nconst _3 = \"._ect4lftf{fo\n+++ b +0..79\nconst _4 = \"._irr31pav:hover{background-color:var(--_ylwyqi)}\";\nconst _3 = \"._e"
@@ -1776,6 +1866,26 @@
         "diff": "divergence at byte 18 (a.length=590, b.length=584)\n--- a +0..78\nconst _ = \"._1wyb1cj8{font-size:var(--_xexnhp)}\";\nconst ListItem = forwardRef(\n+++ b +0..78\nconst _ = \"._1wyb1dim{font-size:var(--_2wqa78)px}\";\nconst ListItem = forwardRe"
       },
       {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-function-variable",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 54 (a.length=682, b.length=680)\n--- a +0..114\nconst _3 = \"._syaz5scu{color:red}\";\nconst _2 = \"._bfhk1x77{background-color:white}\";\nconst _ = \"._19it97hw{border:\n+++ b +0..114\nconst _3 = \"._syaz5scu{color:red}\";\nconst _2 = \"._bfhku67f{background-color:#fff}\";\nconst _ = \"._19it1ujt{border:1"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-argument-arrow-function-variable",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 62 (a.length=1059, b.length=1217)\n--- a +2..122\nnst _6 = \"._k48p8n31{font-weight:bold}\";\nconst _5 = \"._bfhk13q2{background-color:blue}\";\nconst _4 = \"._syaz5scu{color:re\n+++ b +2..122\nnst _6 = \"._k48p8n31{font-weight:bold}\";\nconst _5 = \"._bfhk1zjr{background-color:var(--_ch3w3t)}\";\nconst _4 = \"._syazr3u"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-unresolved-argument-arrow-function-variabl",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 122 (a.length=1140, b.length=1142)\n--- a +62..182\n= \"._1wyb4vkz{font-size:var(--_kre2x8)}\";\nconst _4 = \"._syazlvfy{color:var(--_zo7lop)}\";\nconst _3 = \"._19it97hw{border:1\n+++ b +62..182\n= \"._1wyb4vkz{font-size:var(--_kre2x8)}\";\nconst _4 = \"._syaz13g7{color:var(--_j2chn6)}\";\nconst _3 = \"._19it1ujt{border:1"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-argument-arrow-function-variable-inside-me",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 61 (a.length=982, b.length=1062)\n--- a +1..121\nonst _5 = \"._k48p8n31{font-weight:bold}\";\nconst _4 = \"._syazlvfy{color:var(--_zo7lop)}\";\nconst _3 = \"._1wybgktf{font-siz\n+++ b +1..121\nonst _5 = \"._k48p8n31{font-weight:bold}\";\nconst _4 = \"._syaz13g7{color:var(--_j2chn6)}\";\nconst _3 = \"._1wybgktf{font-siz"
+      },
+      {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-only-destructure-a-prop-if-hasnt-been-already",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
         "diff": "divergence at byte 55 (a.length=974, b.length=773)\n--- a +0..115\nconst _4 = \"._syaz5scu{color:red}\";\nconst _3 = \"._mola15e1 >:last-child{opacity:var(--_lif2d7)}\";\nconst _2 = \"._1cb\n+++ b +0..115\nconst _4 = \"._syaz5scu{color:red}\";\nconst _3 = \"._mola1cd5 >:last-child{opacity:var(--_2wqa78)}\";\nconst _2 = \"._1cb"
@@ -1789,6 +1899,11 @@
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-inline-arrow-function-with-suffix",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
         "diff": "divergence at byte 53 (a.length=577, b.length=650)\n--- a +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rko1y44{border-radius:4px}\";\nconst getBr = () => 4;\nconst Div =\n+++ b +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rkoep3h{border-radius:var(--_yutjvi)px}\";\nconst getBr = () => 4"
+      },
+      {
+        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-arrow-function-call-that-returns-css-like-object",
+        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
+        "diff": "divergence at byte 54 (a.length=594, b.length=593)\n--- a +0..114\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst getBr = () => ({\n  fontSize: 12,\n+++ b +0..114\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1crf{font-size:9pt}\";\nconst getBr = () => ({\n  fontSize: 12,\n"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-arrow-function-call-that-returns-number",
@@ -2084,97 +2199,7 @@
     "babel-throws": [],
     "swc-throws": [
       {
-        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-zero-arity-call-expression-referencing-an-arrow-function-that-returns-an-objec",
-        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-zero-arity-call-expression-referencing-a-function-declaration-that-returns-an-",
-        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-multi-arity-call-expression-referencing-an-arrow-function-that-returns-an-obje",
-        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-multi-arity-member-call-expression-referencing-an-arrow-function-that-returns-",
-        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-call-expression-with-unresolved-arguments",
-        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--duplicate-properties",
-        "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-extract-collocated-mixin-from-member-expression",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-extract-collocated-mixin-from-deeply-nested-member-expression",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-the-css-call-expression-from-member-expression",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-be-able-to-override-properties-in-a-mixin",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-arrow-function-variable",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-arrow-function-call-variable",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-function-variable",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-argument-arrow-function-variable",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-unresolved-argument-arrow-function-variabl",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-argument-arrow-function-variable-inside-me",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-move-suffix-and-prefix-of-a-dynamic-arrow-function-with-a-body-into-an-ii",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-unconditional-css-with-props",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-unconditional-css-with-and-without-props",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
         "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
       },
@@ -2209,16 +2234,6 @@
         "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
       },
       {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-arrow-function-variable",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-arrow-function-variable-when-n",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-suffix-and-prefix-of-a-dynamic-arrow-func-property-into-the-style-pr",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
         "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
@@ -2235,31 +2250,6 @@
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-do-nothing-with-suffix-prefix-when-referencing-constant-literal",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-function-variable",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-argument-arrow-function-variable",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-unresolved-argument-arrow-function-variabl",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-argument-arrow-function-variable-inside-me",
-        "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
-      },
-      {
-        "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-arrow-function-call-that-returns-css-like-object",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
         "error": "plugin\n\n  x failed to invoke plugin on 'None'\n"
       }

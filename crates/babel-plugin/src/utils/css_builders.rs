@@ -802,7 +802,17 @@ pub fn extract_object_expression(
                     let mut tpl_clone = tpl.clone();
                     let first_expr = tpl_clone.exprs.first().map(|e| (**e).clone());
                     let result = if tpl_clone.exprs.len() == 1
-                        && matches!(&first_expr, Some(Expr::Arrow(arrow)) if matches!(&*arrow.body, BlockStmtOrExpr::Expr(e) if matches!(&**e, Expr::Cond(_))))
+                        && matches!(
+                            &first_expr,
+                            Some(Expr::Arrow(arrow))
+                                if matches!(
+                                    &*arrow.body,
+                                    BlockStmtOrExpr::Expr(e) if matches!(
+                                        crate::compat::paren::unwrap_paren(e),
+                                        Expr::Cond(_)
+                                    )
+                                )
+                        )
                     {
                         recompose_template_literal(&mut tpl_clone, &format!("{}:", kebab_case(&key)), ";");
                         extract_template_literal(&tpl_clone, meta, scope_index, parent_scope, own_scope, recorder)?
@@ -1061,16 +1071,34 @@ fn extract_member_expression_optional(
         }
     }
     if fallback_to_evaluate {
-        // §4.6 bridge: real evaluator dispatch. The surrounding JS
-        // branch (re-dispatch on the folded value into build_css_inner)
-        // is Phase 6 work; bridge discards the ResultPair.
-        let _ = evaluate_expression(
+        // 1:1 port of upstream `extractMemberExpression` lines 746–749:
+        //   const { value, meta: updatedMeta } = evaluateExpression(node, meta);
+        //   return buildCss(value, updatedMeta);
+        // Resolves member-expression accesses such as `styles.success`
+        // where `styles = {success: {color: 'green'}}` to the inner
+        // ObjectExpression and recurses `build_css_inner`.
+        let pair = evaluate_expression(
             &Expr::Member(node.clone()),
             meta,
             scope_index,
             parent_scope,
             own_scope,
         );
+        // `evaluateExpression` always returns a value (babel fallback
+        // re-emits the input on deopt), so `value` is never None in
+        // upstream's flow. The Rust port mirrors via fallback to the
+        // original member expression on the rare None.
+        let value = pair
+            .value
+            .unwrap_or_else(|| Box::new(Expr::Member(node.clone())));
+        return Ok(Some(build_css_inner(
+            &value,
+            meta,
+            scope_index,
+            parent_scope,
+            own_scope,
+            recorder,
+        )?));
     }
     Ok(None)
 }
@@ -1090,16 +1118,39 @@ pub fn extract_template_literal(
     let mut variables: Vec<Variable> = Vec::new();
 
     let mut acc = String::new();
-    for (index, quasi) in node.quasis.iter().enumerate() {
-        let raw = quasi.raw.as_str().to_string();
+    // Mutable working copy of `quasi.raw` values. Upstream
+    // `extractTemplateLiteral` does `nextQuasis.value.raw = after.css`
+    // in the catch-all branch (build-css.ts:874), and the next
+    // iteration reads its `quasi.value.raw` from that mutated
+    // `node.quasis[index + 1]`. The Rust port walks `node.quasis` by
+    // `&` borrow so it can't mutate in place; instead we keep a parallel
+    // `Vec<String>` and update both `quasi_raws[index + 1]` for the
+    // next iteration AND `quasi_raws[index]` if an earlier iteration
+    // had already updated it.
+    let mut quasi_raws: Vec<String> = node
+        .quasis
+        .iter()
+        .map(|q| q.raw.as_str().to_string())
+        .collect();
+    for index in 0..node.quasis.len() {
+        let quasi = &node.quasis[index];
+        let raw = quasi_raws[index].clone();
         let node_expression = node.exprs.get(index).map(|e| (**e).clone());
 
         // No expression OR arrow-body that is logical → just append.
+        // Unwrap `Expr::Paren` on the body before matching since SWC
+        // keeps parens that Babel strips.
         let is_terminal_or_logical = match &node_expression {
             None => true,
             Some(Expr::Arrow(arrow)) => matches!(
                 &*arrow.body,
-                BlockStmtOrExpr::Expr(e) if matches!(&**e, Expr::Bin(b) if matches!(b.op, BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing))
+                BlockStmtOrExpr::Expr(e) if matches!(
+                    crate::compat::paren::unwrap_paren(e),
+                    Expr::Bin(b) if matches!(
+                        b.op,
+                        BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing
+                    )
+                )
             ),
             _ => false,
         };
@@ -1117,7 +1168,13 @@ pub fn extract_template_literal(
         let node_expression = node_expression.expect("checked above");
         let _is_mid_statement = is_quasi_mid_statement(quasi);
         let _does_expression_have_conditional_css = match &node_expression {
-            Expr::Arrow(arrow) => matches!(&*arrow.body, BlockStmtOrExpr::Expr(e) if matches!(&**e, Expr::Cond(_))),
+            Expr::Arrow(arrow) => matches!(
+                &*arrow.body,
+                BlockStmtOrExpr::Expr(e) if matches!(
+                    crate::compat::paren::unwrap_paren(e),
+                    Expr::Cond(_)
+                )
+            ),
             _ => false,
         };
 
@@ -1161,13 +1218,24 @@ pub fn extract_template_literal(
         // `` css`${color}` `` where `color = { color: 'blue' }`
         // panics inside the catch-all CSS-variable path that
         // expects scalar interpolations only.
-        let does_expression_contain_css_block = matches!(&*evaluated_interp, Expr::Object(_))
+        // Babel parser strips ParenthesizedExpression; SWC keeps it.
+        // Unwrap before pattern-matching `Expr::Object` so the
+        // SWC-shape `Paren(Object(...))` (from `() => ({...})`) is
+        // recognised. See `crates/babel-plugin/src/compat/paren.rs`.
+        let evaluated_inner = crate::compat::paren::unwrap_paren(&evaluated_interp);
+        let does_expression_contain_css_block = matches!(evaluated_inner, Expr::Object(_))
             || is_compiled_css_tagged_template_expression(&evaluated_interp, meta.state)
             || is_compiled_css_call_expression(&evaluated_interp, meta.state);
 
         let does_expression_have_conditional_css = matches!(
             &node_expression,
-            Expr::Arrow(arrow) if matches!(&*arrow.body, BlockStmtOrExpr::Expr(e) if matches!(&**e, Expr::Cond(_)))
+            Expr::Arrow(arrow) if matches!(
+                &*arrow.body,
+                BlockStmtOrExpr::Expr(e) if matches!(
+                    crate::compat::paren::unwrap_paren(e),
+                    Expr::Cond(_)
+                )
+            )
         );
 
         let can_build_expression_as_css = (!_is_mid_statement && does_expression_contain_css_block)
@@ -1228,11 +1296,7 @@ pub fn extract_template_literal(
         // emit with cssAffixInterpolation prefix-detection.
         let (expression, variable_name) =
             get_variable_declarator_value_for_own_path((*node.exprs[index]).clone().into(), meta);
-        let next_quasi_raw = node
-            .quasis
-            .get(index + 1)
-            .map(|q| q.raw.as_str().to_string())
-            .unwrap_or_default();
+        let next_quasi_raw = quasi_raws.get(index + 1).cloned().unwrap_or_default();
         let (before, after) = css_affix_interpolation(&raw, &next_quasi_raw);
         let suffix_marker = if before.variable_prefix == "-" {
             "-"
@@ -1241,15 +1305,22 @@ pub fn extract_template_literal(
         };
         let name = format!("--_{}{}", hash(&variable_name), suffix_marker);
 
-        // upstream: `nextQuasis.value.raw = after.css;`. We can't
-        // mutate `node.quasis[index+1]` through the &-borrow; the
-        // Rust port walks a clone of the input Tpl when this branch
-        // is reached. Phase 5 §5.6's mutable-walker shape lands the
-        // proper model. For §4.4 the unit test passes a fresh Tpl
-        // built per-call so the mutation has no observable downstream
-        // effect — the test asserts on the emitted Variable name
-        // which is the close-out signal.
-        let _ = after; // mutation deferred per above
+        // 1:1 port of upstream `nextQuasis.value.raw = after.css`
+        // (build-css.ts:874). Subsequent iterations read the mutated
+        // value from `quasi_raws[index + 1]`. Strips the affix the
+        // runtime call (`ix(value, prefix, suffix)`) re-adds, so the
+        // CSS sheet doesn't double-wrap. Without this, e.g.
+        // `content: "${dynamic}"` keeps the closing `"` in the CSS,
+        // producing `content:"var(--_x);"<unclosed string>`.
+        if let Some(next) = quasi_raws.get_mut(index + 1) {
+            *next = after.css.clone();
+        }
+
+        let suffix = if after.variable_suffix.is_empty() {
+            None
+        } else {
+            Some(after.variable_suffix.clone())
+        };
 
         variables.push(Variable {
             name: name.clone(),
@@ -1259,7 +1330,7 @@ pub fn extract_template_literal(
             } else {
                 Some(before.variable_prefix.clone())
             },
-            suffix: None,
+            suffix,
         });
         acc.push_str(&before.css);
         acc.push_str(&format!("var({})", name));
@@ -1272,7 +1343,13 @@ pub fn extract_template_literal(
         if let Expr::Arrow(arrow) = &**prop {
             if matches!(
                 &*arrow.body,
-                BlockStmtOrExpr::Expr(e) if matches!(&**e, Expr::Bin(b) if matches!(b.op, BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing))
+                BlockStmtOrExpr::Expr(e) if matches!(
+                    crate::compat::paren::unwrap_paren(e),
+                    Expr::Bin(b) if matches!(
+                        b.op,
+                        BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing
+                    )
+                )
             ) {
                 // §4.6 bridge: real evaluator dispatch. Surrounding JS
                 // branch (LogicalCssItem emission keyed on the folded
@@ -1395,7 +1472,13 @@ fn build_css_inner(
 
     if let Expr::Arrow(arrow) = node {
         if let BlockStmtOrExpr::Expr(body_expr) = &*arrow.body {
-            match &**body_expr {
+            // SWC parser keeps `Expr::Paren` (e.g. `() => ({ x: 1 })`
+            // body is `Paren(Object)`); Babel's parser strips it. Unwrap
+            // before pattern-matching so the `t.isObjectExpression(node.body)`
+            // check in upstream `buildCss` line 974 fires identically.
+            // See `crates/babel-plugin/src/compat/paren.rs`.
+            let body_inner = crate::compat::paren::unwrap_paren(body_expr);
+            match body_inner {
                 Expr::Object(obj) => {
                     return extract_object_expression(obj, meta, scope_index, parent_scope, own_scope, recorder)
                 }

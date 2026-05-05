@@ -18,5 +18,6 @@ pub mod evaluation;
 pub mod generator;
 pub mod globals;
 pub mod is_prop_valid;
+pub mod paren;
 pub mod path;
 pub mod scope;
