@@ -262,6 +262,7 @@ impl<'c> Printer<'c> {
             Expr::Array(a) => generators::types::array(self, a, node),
             Expr::Tpl(t) => generators::template_literals::tpl(self, t, node),
             Expr::TaggedTpl(t) => generators::template_literals::tagged_tpl(self, t, node),
+            Expr::Arrow(a) => generators::expressions::arrow(self, a, node),
             Expr::Paren(_) => unreachable!("handled above"),
             Expr::JSXElement(e) => generators::jsx::jsx_element(self, e),
             Expr::JSXFragment(f) => generators::jsx::jsx_fragment(self, f),

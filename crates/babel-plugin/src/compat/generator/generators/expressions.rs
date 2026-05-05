@@ -3,8 +3,9 @@
 use crate::compat::generator::printer::Printer;
 
 use swc_core::ecma::ast::{
-    BinExpr, BinaryOp, CallExpr, Callee, CondExpr, Expr, ExprOrSpread, MemberExpr, MemberProp,
-    ParenExpr, UnaryExpr, UnaryOp,
+    ArrayPat, ArrowExpr, AssignPat, AssignPatProp, BinExpr, BinaryOp, BindingIdent, BlockStmtOrExpr,
+    CallExpr, Callee, CondExpr, Expr, ExprOrSpread, KeyValuePatProp, MemberExpr, MemberProp,
+    ObjectPat, ObjectPatProp, ParenExpr, Pat, PropName, RestPat, UnaryExpr, UnaryOp,
 };
 
 /// `UnaryExpression(node)`.
@@ -161,4 +162,161 @@ pub fn parenthesized(p: &mut Printer, node: &ParenExpr, outer_parent: &Expr) {
     // `needs_parens_for(inner_expr, outer_parent)` decides paren
     // policy on the FLATTENED shape, matching Babel exactly.
     p.print(&node.expr, Some(outer_parent));
+}
+
+/// `ArrowFunctionExpression(node, parent)` — 1:1 port of
+/// `@babel/generator@7.23.0/lib/generators/methods.js:111`.
+///
+/// Reachable from `getVariableDeclaratorValueForOwnPath` →
+/// `generate(arrow).code` whenever a styled / css-prop / keyframes
+/// interpolation is `${(props) => props.x}` or similar. Without this
+/// arm, the printer's catch-all emits `/*UNHANDLED-EXPR*/` for every
+/// arrow, collapsing every CSS-variable hash to the same constant
+/// (`hash("/*UNHANDLED-EXPR*/") = "2wqa78"`).
+///
+/// Body coverage: expression bodies recurse via `print()`. Block
+/// bodies are not yet ported (would need `BlockStatement` printer);
+/// emit a placeholder until a fixture surfaces the gap.
+pub fn arrow(p: &mut Printer, node: &ArrowExpr, parent: &Expr) {
+    if node.is_async {
+        p.word("async");
+        p.space();
+    }
+    let single_simple_ident = node.params.len() == 1
+        && matches!(&node.params[0], Pat::Ident(bi) if bi.type_ann.is_none() && !bi.id.optional);
+    if single_simple_ident {
+        // Single Identifier parameter without TypeAnnotation /
+        // optional / decorators / comments — emit without parens
+        // (`x => x` rather than `(x) => x`).
+        pat(p, &node.params[0], parent);
+    } else {
+        p.token_char(b'(');
+        for (i, par) in node.params.iter().enumerate() {
+            if i > 0 {
+                p.token_char(b',');
+                p.space();
+            }
+            pat(p, par, parent);
+        }
+        p.token_char(b')');
+    }
+    p.space();
+    p.token("=>");
+    p.space();
+    match &*node.body {
+        BlockStmtOrExpr::Expr(e) => p.print(e, Some(parent)),
+        BlockStmtOrExpr::BlockStmt(_) => {
+            // Block bodies require a BlockStatement printer (not yet
+            // ported). Emit a deterministic placeholder so hash sites
+            // still produce a stable string — but distinct from the
+            // catch-all so block-body fixtures surface as their own
+            // cluster if they appear.
+            p.buf.append("/*UNHANDLED-BLOCK*/");
+        }
+    }
+}
+
+/// Minimal `Pat` printer covering the shapes reachable from arrow
+/// parameter lists in our hash-call corpus. Extend as new shapes
+/// surface.
+fn pat(p: &mut Printer, node: &Pat, parent: &Expr) {
+    match node {
+        Pat::Ident(bi) => binding_ident(p, bi),
+        Pat::Object(o) => object_pat(p, o, parent),
+        Pat::Array(a) => array_pat(p, a, parent),
+        Pat::Rest(r) => rest_pat(p, r, parent),
+        Pat::Assign(a) => assign_pat(p, a, parent),
+        Pat::Expr(e) => p.print(e, Some(parent)),
+        Pat::Invalid(_) => {
+            p.buf.append("/*UNHANDLED-PAT*/");
+        }
+    }
+}
+
+fn binding_ident(p: &mut Printer, bi: &BindingIdent) {
+    p.word(bi.id.sym.as_ref());
+}
+
+fn object_pat(p: &mut Printer, node: &ObjectPat, parent: &Expr) {
+    p.token_char(b'{');
+    for (i, prop) in node.props.iter().enumerate() {
+        if i > 0 {
+            p.token_char(b',');
+            p.space();
+        }
+        match prop {
+            ObjectPatProp::KeyValue(KeyValuePatProp { key, value }) => {
+                prop_name(p, key, parent);
+                p.token_char(b':');
+                p.space();
+                pat(p, value, parent);
+            }
+            ObjectPatProp::Assign(AssignPatProp { key, value, .. }) => {
+                p.word(key.sym.as_ref());
+                if let Some(v) = value {
+                    p.space();
+                    p.token_char(b'=');
+                    p.space();
+                    p.print(v, Some(parent));
+                }
+            }
+            ObjectPatProp::Rest(r) => rest_pat(p, r, parent),
+        }
+    }
+    p.token_char(b'}');
+}
+
+fn array_pat(p: &mut Printer, node: &ArrayPat, parent: &Expr) {
+    p.token_char(b'[');
+    for (i, elem) in node.elems.iter().enumerate() {
+        if i > 0 {
+            p.token_char(b',');
+            p.space();
+        }
+        if let Some(e) = elem {
+            pat(p, e, parent);
+        }
+    }
+    p.token_char(b']');
+}
+
+fn rest_pat(p: &mut Printer, node: &RestPat, parent: &Expr) {
+    p.token("...");
+    pat(p, &node.arg, parent);
+}
+
+fn assign_pat(p: &mut Printer, node: &AssignPat, parent: &Expr) {
+    pat(p, &node.left, parent);
+    p.space();
+    p.token_char(b'=');
+    p.space();
+    p.print(&node.right, Some(parent));
+}
+
+fn prop_name(p: &mut Printer, key: &PropName, parent: &Expr) {
+    match key {
+        PropName::Ident(i) => p.word(i.sym.as_ref()),
+        PropName::Str(s) => {
+            p.token_char(b'"');
+            let v = s.value.to_atom_lossy();
+            p.buf.append(v.as_str());
+            p.token_char(b'"');
+        }
+        PropName::Num(n) => {
+            if let Some(raw) = &n.raw {
+                p.number(raw.as_ref());
+            } else {
+                p.number(&n.value.to_string());
+            }
+        }
+        PropName::Computed(c) => {
+            p.token_char(b'[');
+            p.print(&c.expr, Some(parent));
+            p.token_char(b']');
+        }
+        PropName::BigInt(b) => {
+            p.number(&b.value.to_string());
+            p.token_char(b'n');
+        }
+    }
 }

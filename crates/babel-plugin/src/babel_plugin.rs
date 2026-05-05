@@ -61,9 +61,11 @@ use crate::state::State;
 use crate::styled;
 use crate::types::{Metadata, MetadataContext, PluginOptions};
 use crate::utils::is_compiled::{
-    is_compiled_css_map_call_expression, is_compiled_styled_call_expression,
+    is_compiled_css_call_expression, is_compiled_css_map_call_expression,
+    is_compiled_css_tagged_template_expression, is_compiled_styled_call_expression,
     is_compiled_styled_tagged_template_expression,
 };
+use crate::utils::normalize_props_usage::normalize_props_usage;
 
 /// Resolve the effective import-sources set: `DEFAULT_IMPORT_SOURCES`
 /// ∪ user `opts.import_sources`. Mirrors upstream `pre()`'s
@@ -978,6 +980,19 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
     /// `keyframes::run_cleanup_replace`. Mirrors upstream
     /// `pathsToCleanup` semantics.
     fn visit_mut_expr(&mut self, n: &mut Expr) {
+        // 1:1 port of `babel-plugin.ts:321-329` `hasStyles` →
+        // `normalizePropsUsage(path)`. Runs BEFORE the children walk
+        // so the rewritten AST flows into all downstream readers
+        // (CSS extraction, hash inputs, runtime emit). Idempotent on
+        // already-normalised arrows.
+        let has_styles = is_compiled_css_call_expression(n, &self.state)
+            || is_compiled_styled_call_expression(n, &self.state)
+            || is_compiled_css_tagged_template_expression(n, &self.state)
+            || is_compiled_styled_tagged_template_expression(n, &self.state);
+        if has_styles {
+            normalize_props_usage(n);
+        }
+
         n.visit_mut_children_with(self);
 
         // §6.1 — keyframes cleanup-only. Returns `true` if the node

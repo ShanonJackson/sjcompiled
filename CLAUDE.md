@@ -40,3 +40,4 @@ One-time exception (2026-05-04): a historic fork-prefix rename was reverted to `
 ## Final bit of important info.
 - crates/css is a FAITHFUL 1:1 port of packages/css; It's MUTABLE not IMMUTABLE but when editing it it's important you run all the parity tests AND fix issues 1:1 with where it DIVERGES in BEHAVIOUR from the ORIGINAL. Preferably in same folder/file location as original.
 Preferably use parity tests to find it where it diverges very quickly using the js oracle.
+- Although packages/babel-plugin, packages/babel-plugin-strip-runtime are 100% immutable you may add logging aslong as you clean it up afterwards to see where an input diverges from what you have in your copy.

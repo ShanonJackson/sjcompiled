@@ -47,6 +47,7 @@ pub mod hoist_sheet;
 pub mod is_compiled;
 pub mod is_empty;
 pub mod manipulate_template_literal;
+pub mod normalize_props_usage;
 pub mod object_property_to_string;
 pub mod resolve_binding;
 pub mod transform_css_items;
