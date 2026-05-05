@@ -112,13 +112,84 @@ Snippet-slicing in `engines.ts::babelEngine` cuts on the FIRST
 5. **`importSources` plugin option** — parse it from `PluginOptions`,
    thread to the `is_compiled_*_call_expression` matchers so they
    recognise renamed imports.
-6. **Specifier removal (§2.3(b))** — close "original
-   `import { ClassNames } from '@compiled/react'` not removed" subset
-   by wiring the deferred mutation queue per PLAN.md §3.9.8.
+6. **§6.8a-iii ☑ — Specifier removal (this session, 2026-05-05).**
+   See `crates/babel-plugin/src/babel_plugin.rs::record_compiled_import`
+   (now `&mut`; uses `Vec::retain` to drop matched API specifiers
+   in-place per `babel-plugin.ts:280-294`) +
+   `remove_empty_compiled_imports` (post-children-walk filter that
+   drops any Compiled-source `ImportDecl` with empty specifiers,
+   covering both the "drained-by-strip" and "side-effect import"
+   shapes). Two new unit tests:
+   `record_compiled_import_keeps_unrecognised_specifiers_intact`
+   (jsx + non-API specifiers preserved) and
+   `remove_empty_compiled_imports_drops_emptied_imports`. Eight
+   existing phase6a/6b/6c visitor tests updated for the new body
+   shape. Lib tests 427 → 433.
 7. **Once parity is at full corpus minus documented carve-outs**
    (comment-disable directive — §6.5; styled-in-arrow displayName —
    §6.7), flip `harness.test.ts:143-155` from expect-divergence to
    expect-parity, allowlist the carve-outs, and close §6.8.
+
+**§6.8a-ii ☑ — sheet hoist emitter at `Program::exit` (this session,
+2026-05-05).** Added
+`crates/babel-plugin/src/utils/hoist_sheet.rs::emit_hoisted_sheets`:
+reads `state.sheets()` (populated during the children walk by
+`hoist_sheet`) and inserts a
+`const <hoisted_name> = "<sheet>";` `ModuleItem::Stmt(VarDecl)` for
+each, immediately before the first non-`ImportDeclaration` body
+item — same insertion point as upstream's
+`parentBody.filter(p => !p.isImportDeclaration())[0].insertBefore(...)`.
+IndexMap insertion order preserved. Wired from
+`babel_plugin.rs::visit_mut_program` exit AFTER the runtime / React /
+forwardRef injections (so the "first non-import" target shifts
+predictably). Edge cases: empty sheets → no-op; all-import module →
+append at end (Babel skips the AST insert here; we emit defensively;
+no fixture surfaces this shape today).
+
+Four new unit tests in `hoist_sheet::tests`
+(`emit_no_op_when_sheets_empty`,
+`emit_inserts_const_before_first_non_import`,
+`emit_appends_when_module_is_all_imports`,
+`emit_preserves_indexmap_insertion_order`). Four existing phase6c
+styled visitor tests updated to expect the new sheet-const item in
+their post-exit body shape. Lib tests 421 → 427 then to 431 with
+new tests.
+
+**§6.8a-iii ☑ — Compiled import-specifier removal (this session,
+2026-05-05).** Per item 6 above. Combined cluster delta after both
+landings: re-running `bun parity-harness/babel-plugin/triage.mjs`
+moved the report from `parity=7 / divergence=407 / swc-throws=62 /
+babel-throws=1 / both=0` to `parity=10 / divergence=404 /
+swc-throws=62 / babel-throws=0 / both=1`. The raw count change
+understates the fix: pre-fix, the SWC output emitted a dangling
+`[_0]` reference with no `const _0 = "..."` declaration — broken JS
+that prettier still formatted, scored as "divergence". Post-fix the
+declaration emits and the structural shape matches Babel; the
+remaining divergences are now CONTAINED to:
+- **§6.8a-iv ☑ — UID-name singleton format** (this session,
+  2026-05-05). `state.rs::next_uid_name` rewritten to be 1-based
+  with the suffix suppressed when `i == 1`, matching Babel's
+  `_generateUid(name, i) { let id = name; if (i > 1) id += i;
+  return '_' + id; }` shape. First call returns `_`; subsequent
+  calls return `_2`, `_3`, ... — exact match for upstream when
+  there are no `_<n>` user-source collisions (the common case).
+  Six existing `hoist_sheet::tests` updated for the new
+  expectations. Lib tests stay 433/433. **Triage delta: parity
+  10 → 58, divergence 404 → 356** (+48 fixtures move from
+  divergence to byte-equal parity in one swing).
+- **Multi-sheet UID counter divergence** — Babel's UIDs depend on
+  scope-binding collision-checks, so different test fixtures
+  produce different starting values (e.g. `_4`, `_5` vs `_0`,
+  `_1`). Real fix: 1:1 port of `Scope.generateUid` collision-walk
+  using the §5.0a `ScopeIndex`. Bigger lift than the singleton fix.
+- **Residual React→React1 rename** in fixtures with no top-level
+  Idents (the `program_scope_ctxt` fallback to
+  `SyntaxContext::empty()` from §6.8a-i). Same edge case as flagged
+  there.
+- **Per-handler CSS-extraction defects** (e.g.
+  `css-prop/object-literal` produces different sheet HASHES in
+  some fixtures, not just different UIDs). These are individual
+  handler bugs that need cluster-by-cluster fixes per item 4.
 
 ### Verifying the current state from a cold pickup
 

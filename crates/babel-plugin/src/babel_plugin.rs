@@ -158,6 +158,40 @@ fn build_display_name_stmt(name: &str) -> swc_core::ecma::ast::Stmt {
     })
 }
 
+/// §6.8a-iii — drop any `ImportDeclaration` whose source is a
+/// Compiled origin (per `import_sources`) AND whose specifier list
+/// is empty.
+///
+/// This catches both:
+/// - imports that lost all their specifiers via §6.8a-iii's
+///   `record_compiled_import` retain (e.g.
+///   `import { styled } from '@compiled/react'` after `styled`
+///   is stripped → 0 specifiers);
+/// - side-effect Compiled imports that came in with 0 specifiers
+///   (`import '@compiled/react';`). Upstream's
+///   `if (path.node.specifiers.length === 0) path.remove()` removes
+///   both shapes — bytes-equivalent here.
+///
+/// Order: called from `visit_mut_program` AFTER the children walk
+/// (so all `record_compiled_import` retain passes are done) and
+/// BEFORE the runtime-import injection (so `appendRuntimeImports`'s
+/// "find existing import" search sees the post-strip body).
+fn remove_empty_compiled_imports(
+    module: &mut swc_core::ecma::ast::Module,
+    import_sources: &[String],
+) {
+    module.body.retain(|item| {
+        let ModuleItem::ModuleDecl(ModuleDecl::Import(decl)) = item else {
+            return true;
+        };
+        if !decl.specifiers.is_empty() {
+            return true;
+        }
+        let userland_atom = decl.src.value.to_atom_lossy();
+        !is_compiled_module_source(userland_atom.as_str(), import_sources)
+    });
+}
+
 /// Snapshot the program-scope `SyntaxContext` from the existing
 /// module body. We walk the body looking for the FIRST top-level
 /// Ident we can read — typically the local name of an existing
@@ -436,14 +470,24 @@ impl<C: Comments> BabelPluginVisitor<C> {
     }
 
     /// Recognise an `ImportDeclaration` and update `state.compiledImports`
-    /// with each Compiled API's local name(s). Does NOT remove the
-    /// specifier or the import — that's §2.3(b) work via
-    /// `state.queue_cleanup(...)`. Output stays pass-through.
+    /// with each Compiled API's local name(s). §6.8a-iii additionally
+    /// REMOVES every recognised API specifier (`styled` / `ClassNames`
+    /// / `css` / `keyframes` / `cssMap`) from `decl.specifiers`,
+    /// matching upstream `babel-plugin.ts:280-294`'s `specifier.remove()`
+    /// behaviour. Empty-import removal (when specifiers ends up empty)
+    /// happens at `visit_mut_program` exit-time via the
+    /// `remove_empty_compiled_imports` walker.
     ///
     /// API-name pushes route through `MutationRecorder::apply` with
     /// `StateDiff::CompiledImportsAppend` (STATE_MUTATIONS.md site 4 —
     /// the FIRST evaluation-visible mutation, captured by the cache).
-    fn record_compiled_import(&mut self, decl: &ImportDecl) {
+    ///
+    /// **NOT removed here:** the classic-pragma `jsx` specifier — that
+    /// lives in `scan_classic_jsx_pragma_import` (a separate upstream
+    /// code path, `findClassicJsxPragmaImport`). Adding `jsx` to this
+    /// retain filter would double-remove and corrupt the pragma scan
+    /// state.
+    fn record_compiled_import(&mut self, decl: &mut ImportDecl) {
         let userland_atom = decl.src.value.to_atom_lossy();
         let userland = userland_atom.as_str();
         if !is_compiled_module_source(userland, &self.import_sources) {
@@ -457,26 +501,35 @@ impl<C: Comments> BabelPluginVisitor<C> {
         // STATE_MUTATIONS.md site 3 (init, not captured).
         self.state.ensure_compiled_imports();
 
-        for spec in &decl.specifiers {
-            let ImportSpecifier::Named(named) = spec else { continue };
-            // `imported` defaults to the local name when absent
-            // (`import { foo }` vs `import { foo as bar }`).
+        // Two-step: record each matched API specifier into state, then
+        // retain only specifiers that are NOT recognised API names.
+        //
+        // We collect the (api, local_name) pairs first so the recorder
+        // call (which borrows `&mut self.state`) doesn't overlap with
+        // the `&mut decl.specifiers` borrow below.
+        let mut to_record: Vec<(ApiKind, String)> = Vec::new();
+        decl.specifiers.retain(|spec| {
+            let ImportSpecifier::Named(named) = spec else {
+                return true; // keep default / namespace specifiers
+            };
             let name = imported_name(named);
-            if let Some(api) = ApiKind::from_imported_name(&name) {
-                let local = named.local.sym.as_ref().to_string();
-                self.recorder.apply(
-                    StateDiff::CompiledImportsAppend {
-                        api,
-                        local_name: local,
-                    },
-                    &mut self.state,
-                );
+            match ApiKind::from_imported_name(&name) {
+                Some(api) => {
+                    to_record.push((api, named.local.sym.as_ref().to_string()));
+                    false // drop — matches upstream `specifier.remove()`
+                }
+                None => true, // keep non-API specifiers verbatim
             }
-            // §2.3(b): state.queue_cleanup(CleanupAction { action:
-            // Remove, id: <recorder-issued-handle> }) — upstream calls
-            // `specifier.remove()` here and, when the specifier list
-            // empties, `path.remove()`. Deferred until §2.3(b) wires
-            // the AST-handle table.
+        });
+
+        for (api, local_name) in to_record {
+            self.recorder.apply(
+                StateDiff::CompiledImportsAppend {
+                    api,
+                    local_name,
+                },
+                &mut self.state,
+            );
         }
     }
 
@@ -640,6 +693,14 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         // CallExpression / JSXElement / JSXOpeningElement visitors fire here.
         program.visit_mut_children_with(self);
 
+        // Phase 6 §6.8a-iii — drop emptied / side-effect Compiled
+        // imports BEFORE runtime-import injection so `appendRuntimeImports`'s
+        // "find existing import" search doesn't pin onto an empty
+        // `@compiled/react` shell.
+        if let Program::Module(m) = &mut *program {
+            remove_empty_compiled_imports(m, &self.import_sources);
+        }
+
         // Phase 6 §6.8 — `Program::exit` runtime-import injection.
         // Mirrors upstream `babel-plugin.ts:183-216`. Order:
         //   1. Early-out gate: skip when no Compiled imports were
@@ -743,9 +804,11 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
     }
 
     /// `ImportDeclaration` upstream visitor (lines 241–294).
-    /// Recognition only — populates `state.compiled_imports[apiName]`
-    /// via `MutationRecorder::apply` and recurses into children.
-    /// Specifier removal is §2.3(b) work.
+    /// Populates `state.compiled_imports[apiName]` via
+    /// `MutationRecorder::apply`, removes recognised API specifiers
+    /// in-place (§6.8a-iii), and recurses into children. Empty-import
+    /// removal happens at `visit_mut_program` exit via
+    /// `remove_empty_compiled_imports`.
     fn visit_mut_module_decl(&mut self, decl: &mut ModuleDecl) {
         if let ModuleDecl::Import(import) = decl {
             self.record_compiled_import(import);
@@ -1252,24 +1315,95 @@ mod tests {
     #[test]
     fn record_styled_import_populates_state() {
         let mut v = fresh();
-        let decl = import_decl(
+        let mut decl = import_decl(
             "@compiled/react",
             vec![named_specifier("styled", None)],
         );
-        v.record_compiled_import(&decl);
+        v.record_compiled_import(&mut decl);
         let imports = v.state.compiled_imports().expect("compiled_imports populated");
         let styled = imports.styled.as_deref().expect("styled recorded");
         assert_eq!(styled, &["styled".to_string()][..]);
+        // §6.8a-iii — the matched specifier is stripped in place;
+        // the import declaration ends up empty.
+        assert!(decl.specifiers.is_empty(), "styled specifier should be stripped");
+    }
+
+    #[test]
+    fn record_compiled_import_keeps_unrecognised_specifiers_intact() {
+        // §6.8a-iii — `jsx` is NOT in the API list (it's handled by
+        // findClassicJsxPragmaImport). It must NOT be stripped here.
+        let mut v = fresh();
+        let mut decl = import_decl(
+            "@compiled/react",
+            vec![
+                named_specifier("styled", None),
+                named_specifier("jsx", None),
+            ],
+        );
+        v.record_compiled_import(&mut decl);
+        // styled stripped, jsx retained.
+        assert_eq!(decl.specifiers.len(), 1);
+        let ImportSpecifier::Named(named) = &decl.specifiers[0] else {
+            panic!()
+        };
+        assert_eq!(named.local.sym.as_ref(), "jsx");
+    }
+
+    #[test]
+    fn remove_empty_compiled_imports_drops_emptied_imports() {
+        // After stripping, an emptied @compiled/react import is
+        // removed; a non-Compiled empty import (e.g. `import 'react';`)
+        // is preserved.
+        use swc_core::ecma::ast::{ImportDecl, ImportPhase, Str as AstStr};
+
+        let import_sources = vec!["@compiled/react".to_string()];
+        let mut module = Module {
+            span: DUMMY_SP,
+            body: vec![
+                ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+                    span: DUMMY_SP,
+                    specifiers: vec![],
+                    src: Box::new(AstStr {
+                        span: DUMMY_SP,
+                        value: "@compiled/react".into(),
+                        raw: None,
+                    }),
+                    type_only: false,
+                    with: None,
+                    phase: ImportPhase::Evaluation,
+                })),
+                ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+                    span: DUMMY_SP,
+                    specifiers: vec![],
+                    src: Box::new(AstStr {
+                        span: DUMMY_SP,
+                        value: "react".into(),
+                        raw: None,
+                    }),
+                    type_only: false,
+                    with: None,
+                    phase: ImportPhase::Evaluation,
+                })),
+            ],
+            shebang: None,
+        };
+        super::remove_empty_compiled_imports(&mut module, &import_sources);
+        // @compiled/react dropped; bare `react` side-effect import kept.
+        assert_eq!(module.body.len(), 1);
+        let ModuleItem::ModuleDecl(ModuleDecl::Import(im)) = &module.body[0] else {
+            panic!()
+        };
+        assert_eq!(im.src.value.to_atom_lossy().as_str(), "react");
     }
 
     #[test]
     fn record_renamed_import_uses_local_name() {
         let mut v = fresh();
-        let decl = import_decl(
+        let mut decl = import_decl(
             "@compiled/react",
             vec![named_specifier("MyCss", Some("css"))],
         );
-        v.record_compiled_import(&decl);
+        v.record_compiled_import(&mut decl);
         let imports = v.state.compiled_imports().expect("compiled");
         assert_eq!(imports.css.as_deref(), Some(&["MyCss".to_string()][..]));
     }
@@ -1277,7 +1411,7 @@ mod tests {
     #[test]
     fn record_multiple_apis_in_one_import() {
         let mut v = fresh();
-        let decl = import_decl(
+        let mut decl = import_decl(
             "@compiled/react",
             vec![
                 named_specifier("styled", None),
@@ -1285,7 +1419,7 @@ mod tests {
                 named_specifier("keyframes", None),
             ],
         );
-        v.record_compiled_import(&decl);
+        v.record_compiled_import(&mut decl);
         let imports = v.state.compiled_imports().expect("compiled");
         assert_eq!(imports.styled.as_deref(), Some(&["styled".to_string()][..]));
         assert_eq!(imports.css.as_deref(), Some(&["css".to_string()][..]));
@@ -1298,11 +1432,11 @@ mod tests {
     #[test]
     fn record_ignores_non_compiled_source() {
         let mut v = fresh();
-        let decl = import_decl(
+        let mut decl = import_decl(
             "@emotion/react",
             vec![named_specifier("css", None)],
         );
-        v.record_compiled_import(&decl);
+        v.record_compiled_import(&mut decl);
         // `state.compiled_imports` stays None — the visitor never
         // recognised the source as Compiled.
         assert!(v.state.compiled_imports().is_none());
@@ -1332,13 +1466,25 @@ mod tests {
         // §6.8 — Program::exit injects runtime imports + React +
         // forwardRef (styled was imported, so all three fire). Body
         // grows by 3 prepended items: forwardRef, React, runtime.
-        // The two original imports stay intact at indices 3 and 4.
+        //
+        // §6.8a-iii — both `styled` and `ClassNames` specifiers were
+        // recognised and stripped from the @compiled/react import,
+        // leaving it empty. The empty Compiled-source import is then
+        // removed by `remove_empty_compiled_imports`. So the only
+        // surviving original import is the `react` one. Body shape:
+        //   [forwardRef, React, runtime, react] (4 items).
+        // No sheet hoist (handlers didn't run on these imports — no
+        // styled/css call expressions in the input).
         if let Program::Module(m) = &program {
-            assert_eq!(m.body.len(), 5);
-            // Specifier counts unchanged on the ORIGINAL @compiled/react
-            // import — confirms we didn't drop any import.
+            assert_eq!(m.body.len(), 4);
+            // The single surviving original import is `react`.
             if let ModuleItem::ModuleDecl(ModuleDecl::Import(im)) = &m.body[3] {
-                assert_eq!(im.specifiers.len(), 2);
+                assert_eq!(
+                    im.src.value.to_atom_lossy().as_str(),
+                    "react",
+                    "@compiled/react import should be dropped (empty after specifier strip)"
+                );
+                assert_eq!(im.specifiers.len(), 1);
             }
         }
     }
@@ -1350,14 +1496,14 @@ mod tests {
         // §2.4 contract: every captured mutation lands in
         // recorder.diff_log() in iteration order.
         let mut v = fresh();
-        let decl = import_decl(
+        let mut decl = import_decl(
             "@compiled/react",
             vec![
                 named_specifier("styled", None),
                 named_specifier("css", None),
             ],
         );
-        v.record_compiled_import(&decl);
+        v.record_compiled_import(&mut decl);
         let log = v.recorder.diff_log();
         assert_eq!(log.len(), 2);
         assert!(matches!(
@@ -1383,11 +1529,11 @@ mod tests {
         // append for it. The classic-pragma flags ARE set (init-time,
         // not captured).
         let mut v = fresh();
-        let decl = import_decl(
+        let mut decl = import_decl(
             "@compiled/react",
             vec![named_specifier("jsx", None)],
         );
-        v.record_compiled_import(&decl);
+        v.record_compiled_import(&mut decl);
         // No StateDiff entries — `jsx` isn't an ApiKind.
         assert!(v.recorder.diff_log().is_empty());
     }
@@ -1720,17 +1866,22 @@ mod tests {
         };
         let body = &m.body;
         // §6.8 — Program::exit prepends `import * as React` + the
-        // runtime import. Original [import, expr_stmt] becomes
-        // [React, runtime, import, expr_stmt]. Original import
-        // preserved (specifier removal is §2.3(b), not 6a).
+        // runtime import. §6.8a-iii — `keyframes` specifier was
+        // stripped, leaving the @compiled/react import empty, which
+        // is then removed by `remove_empty_compiled_imports`. So
+        // [import, expr_stmt] becomes [React, runtime, expr_stmt].
         assert!(matches!(
-            &body[2],
+            &body[0],
+            ModuleItem::ModuleDecl(ModuleDecl::Import(_))
+        ));
+        assert!(matches!(
+            &body[1],
             ModuleItem::ModuleDecl(ModuleDecl::Import(_))
         ));
         // The standalone keyframes call was replaced with `null`,
         // span anchored at the original call span.
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &body[3] else {
-            panic!("expected ExprStmt at body[3]");
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &body[2] else {
+            panic!("expected ExprStmt at body[2]");
         };
         match &*es.expr {
             AstExpr::Lit(Lit::Null(n)) => {
@@ -1787,8 +1938,10 @@ mod tests {
             panic!("expected Module")
         };
         // §6.8 — body shifted by 2 (React + runtime prepended).
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[3] else {
-            panic!("expected ExprStmt at body[3]");
+        // §6.8a-iii — keyframes specifier stripped → @compiled/react
+        // import dropped. Body becomes [React, runtime, expr_stmt].
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[2] else {
+            panic!("expected ExprStmt at body[2]");
         };
         match &*es.expr {
             AstExpr::Lit(Lit::Null(n)) => {
@@ -1849,7 +2002,10 @@ mod tests {
         };
         // §6.8 — body shifted by 2 (React + runtime prepended;
         // styled was NOT imported here so forwardRef is skipped).
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[3] else {
+        // §6.8a-iii — keyframes + css specifiers stripped → empty
+        // @compiled/react import removed. Body becomes
+        // [React, runtime, expr_stmt].
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[2] else {
             panic!("expected ExprStmt");
         };
         // Still a call expression — §6.1 left it alone.
@@ -1908,12 +2064,10 @@ mod tests {
         };
         let body = &m.body;
         // §6.8 — body shifted by 2 (React + runtime prepended).
-        assert!(matches!(
-            &body[2],
-            ModuleItem::ModuleDecl(ModuleDecl::Import(_))
-        ));
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &body[3] else {
-            panic!("expected ExprStmt at body[3]");
+        // §6.8a-iii — css specifier stripped → empty @compiled/react
+        // import dropped. Body becomes [React, runtime, expr_stmt].
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &body[2] else {
+            panic!("expected ExprStmt at body[2]");
         };
         match &*es.expr {
             AstExpr::Lit(Lit::Null(n)) => {
@@ -1969,8 +2123,10 @@ mod tests {
             panic!("expected Module")
         };
         // §6.8 — body shifted by 2 (React + runtime prepended).
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[3] else {
-            panic!("expected ExprStmt at body[3]");
+        // §6.8a-iii — css specifier stripped → empty @compiled/react
+        // import dropped. Body becomes [React, runtime, expr_stmt].
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[2] else {
+            panic!("expected ExprStmt at body[2]");
         };
         match &*es.expr {
             AstExpr::Lit(Lit::Null(n)) => {
@@ -2033,8 +2189,10 @@ mod tests {
         };
         // §6.8 — `styled` was imported alongside `css`, so the
         // forwardRef + React + runtime imports all prepend (3 items).
-        // Original [import, expr_stmt] → body[3] = import, body[4] = stmt.
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[4] else {
+        // §6.8a-iii — both specifiers stripped → empty @compiled/react
+        // import dropped. Body becomes
+        // [forwardRef, React, runtime, expr_stmt].
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[3] else {
             panic!("expected ExprStmt");
         };
         assert!(matches!(&*es.expr, AstExpr::Call(_)));
@@ -2084,8 +2242,11 @@ mod tests {
         };
         // §6.8 — body shifted by 2 (React + runtime prepended;
         // styled NOT imported here).
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[3] else {
-            panic!("expected ExprStmt at body[3]");
+        // §6.8a-iii — `c` (renamed `css`) specifier stripped → empty
+        // @compiled/react import dropped. Body becomes
+        // [React, runtime, expr_stmt].
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[2] else {
+            panic!("expected ExprStmt at body[2]");
         };
         match &*es.expr {
             AstExpr::Lit(Lit::Null(n)) => {
@@ -2162,7 +2323,10 @@ mod tests {
         };
         // §6.8 — body shifted by 2 (React + runtime prepended;
         // styled NOT imported here).
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[3] else {
+        // §6.8a-iii — keyframes specifier stripped → empty
+        // @compiled/react import dropped. Body becomes
+        // [React, runtime, var_decl].
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[2] else {
             panic!("expected VarDecl");
         };
         let init = vd.decls[0].init.as_deref().expect("init");
@@ -2256,19 +2420,20 @@ mod tests {
         // imports (3 items) because styled was imported, AND emits
         // the §6.8a-ii hoisted sheet const (1 item) immediately
         // before the first non-import body item.
-        // Pre-prepend body: [import, var, displayName] (3 items).
-        // Post-prepend body:
-        //   [forwardRef, React, runtime, import, sheet, var, displayName]
-        //   (7 items).
+        // §6.8a-iii — `styled` specifier stripped → empty
+        // @compiled/react import dropped.
+        // Post-everything body:
+        //   [forwardRef, React, runtime, sheet, var, displayName]
+        //   (6 items).
         assert_eq!(
             m.body.len(),
-            7,
-            "expected forwardRef + React + runtime + import + sheet + var + displayName"
+            6,
+            "expected forwardRef + React + runtime + sheet + var + displayName"
         );
 
-        // Item 4: hoisted sheet `const _0 = "._...";` from §6.8a-ii.
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(sheet_vd))) = &m.body[4] else {
-            panic!("expected hoisted-sheet VarDecl at body[4]");
+        // Item 3: hoisted sheet `const _0 = "._...";` from §6.8a-ii.
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(sheet_vd))) = &m.body[3] else {
+            panic!("expected hoisted-sheet VarDecl at body[3]");
         };
         let Pat::Ident(sheet_id) = &sheet_vd.decls[0].name else {
             panic!()
@@ -2278,9 +2443,9 @@ mod tests {
             "sheet ident should match `_<n>` pattern"
         );
 
-        // Item 5 (was 1): VarDecl with forwardRef init.
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[5] else {
-            panic!("expected VarDecl at body[5]");
+        // Item 4 (was 1): VarDecl with forwardRef init.
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[4] else {
+            panic!("expected VarDecl at body[4]");
         };
         let init = vd.decls[0].init.as_deref().expect("init present");
         let AstExpr::Call(call) = init else {
@@ -2294,9 +2459,9 @@ mod tests {
         };
         assert_eq!(callee_ident.sym.as_ref(), "forwardRef");
 
-        // Item 6 (was 2): displayName if-stmt.
-        let ModuleItem::Stmt(Stmt::If(if_stmt)) = &m.body[6] else {
-            panic!("expected If at body[6]");
+        // Item 5 (was 2): displayName if-stmt.
+        let ModuleItem::Stmt(Stmt::If(if_stmt)) = &m.body[5] else {
+            panic!("expected If at body[5]");
         };
         // Inner body has the assignment.
         let Stmt::Block(block) = &*if_stmt.cons else {
@@ -2378,10 +2543,11 @@ mod tests {
             panic!()
         };
         // §6.8 — body grew by 3 (forwardRef + React + runtime
-        // prepended) + 1 (§6.8a-ii hoisted sheet). No displayName
-        // inserted (export-default styled call has no var-binding
-        // name). Original length 2 → 6.
-        assert_eq!(m.body.len(), 6);
+        // prepended) + 1 (§6.8a-ii hoisted sheet). §6.8a-iii — styled
+        // specifier stripped → empty @compiled/react import dropped.
+        // No displayName inserted (export-default styled call has
+        // no var-binding name). Original length 2 → 5.
+        assert_eq!(m.body.len(), 5);
     }
 
     #[test]
@@ -2453,10 +2619,13 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!()
         };
-        // §6.8 — Body now: [forwardRef, React, runtime, import, sheet, var, displayName]
-        // (3 prepended + sheet hoist + original 3) = 7 items.
-        assert_eq!(m.body.len(), 7);
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[5] else {
+        // §6.8 — Body now:
+        //   [forwardRef, React, runtime, sheet, var, displayName]
+        // (3 prepended + sheet hoist + var + displayName; §6.8a-iii
+        // drops the emptied @compiled/react import). Original length
+        // 2 → 6 (displayName drained at module-item exit per §6.7).
+        assert_eq!(m.body.len(), 6);
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[4] else {
             panic!()
         };
         let AstExpr::Call(call) = vd.decls[0].init.as_deref().expect("init") else {
@@ -2559,8 +2728,10 @@ mod tests {
             panic!()
         };
         // §6.8 — body shifted by 4 (forwardRef + React + runtime +
-        // §6.8a-ii hoisted sheet).
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[5] else {
+        // §6.8a-ii hoisted sheet) and §6.8a-iii drops the emptied
+        // @compiled/react import. Net body[4] = the var with the
+        // forwardRef-wrapped Arrow init.
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[4] else {
             panic!()
         };
         let AstExpr::Call(call) = vd.decls[0].init.as_deref().expect("init") else {

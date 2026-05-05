@@ -306,14 +306,32 @@ impl State {
     }
 
     /// Mint a fresh `_<n>` UID name for this pass. Mirrors Babel's
-    /// `scope.generateUidIdentifier('')` shape; see `uid_counter`
-    /// docs for the scope-tracking caveat (Phase 5 §5.4 makes this
-    /// fully scope-aware). Used by `utils::hoist_sheet` today;
-    /// future hoists can reuse the same counter.
+    /// `scope.generateUidIdentifier('')` shape:
+    /// `@babel/traverse/lib/scope/index.js::_generateUid` returns
+    /// `_<name><i>` where `<i>` is omitted when `i == 1`. With the
+    /// empty input name (`''`), this yields `_`, `_2`, `_3`, ... —
+    /// the singleton case is `_` with no numeric suffix.
+    ///
+    /// **§6.8a-iv:** the counter starts at 1 (not 0) and the suffix
+    /// is suppressed when it equals 1 — exact match for upstream's
+    /// `i > 1 ? id += i : id` branch. Without this, every fixture
+    /// with a single hoisted sheet diverged from Babel as
+    /// `const _0 = ...` vs `const _ = ...`.
+    ///
+    /// Future Phase 5 §5.4 work will make this fully scope-aware
+    /// (collision-walk against existing bindings); today's bump
+    /// preserves the singleton-format parity Babel actually emits
+    /// for the common case (no `_<n>` collisions in user source).
     pub(crate) fn next_uid_name(&mut self) -> String {
-        let name = format!("_{}", self.uid_counter);
+        // Counter is 1-based to mirror Babel's `i = 1; do { ... ; i++ }`
+        // initial state. First call returns `_`, second `_2`, third
+        // `_3`, etc.
         self.uid_counter += 1;
-        name
+        if self.uid_counter == 1 {
+            "_".to_string()
+        } else {
+            format!("_{}", self.uid_counter)
+        }
     }
 }
 

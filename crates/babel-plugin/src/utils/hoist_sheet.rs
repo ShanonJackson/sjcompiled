@@ -173,23 +173,27 @@ mod tests {
     }
 
     #[test]
-    fn first_hoist_mints_underscore_zero() {
+    fn first_hoist_mints_bare_underscore() {
+        // §6.8a-iv: Babel's `scope.generateUidIdentifier('')` returns
+        // `_` for the first call (no numeric suffix when i==1).
         let mut state = State::default();
         let mut recorder = MutationRecorder::new();
         let mut meta = fresh_meta(&mut state);
         let name = hoist_sheet("._abc{color:red}", &mut meta, &mut recorder);
-        assert_eq!(name, "_0");
+        assert_eq!(name, "_");
     }
 
     #[test]
     fn distinct_sheets_get_distinct_uids() {
+        // §6.8a-iv: first → `_`, second → `_2`, ... matching Babel's
+        // `i > 1 ? '_<i>' : '_'` UID scheme.
         let mut state = State::default();
         let mut recorder = MutationRecorder::new();
         let mut meta = fresh_meta(&mut state);
         let a = hoist_sheet("._a{color:red}", &mut meta, &mut recorder);
         let b = hoist_sheet("._b{color:blue}", &mut meta, &mut recorder);
-        assert_eq!(a, "_0");
-        assert_eq!(b, "_1");
+        assert_eq!(a, "_");
+        assert_eq!(b, "_2");
         assert_ne!(a, b);
     }
 
@@ -219,7 +223,7 @@ mod tests {
                 hoisted_name,
             } => {
                 assert_eq!(sheet_text, "._a{color:red}");
-                assert_eq!(hoisted_name, "_0");
+                assert_eq!(hoisted_name, "_");
             }
             other => panic!("expected SheetsInsert, got {:?}", other),
         }
@@ -340,8 +344,8 @@ mod tests {
 
         // Body now: [import, import, sheet0, sheet1, var].
         assert_eq!(module.body.len(), 5);
-        assert_sheet_const(&module.body[2], "_0", "._a{color:red}");
-        assert_sheet_const(&module.body[3], "_1", "._b{color:blue}");
+        assert_sheet_const(&module.body[2], "_", "._a{color:red}");
+        assert_sheet_const(&module.body[3], "_2", "._b{color:blue}");
     }
 
     #[test]
@@ -363,7 +367,7 @@ mod tests {
         };
         emit_hoisted_sheets(&mut module, &state);
         assert_eq!(module.body.len(), 2);
-        assert_sheet_const(&module.body[1], "_0", "._a{color:red}");
+        assert_sheet_const(&module.body[1], "_", "._a{color:red}");
     }
 
     #[test]
@@ -383,8 +387,8 @@ mod tests {
         emit_hoisted_sheets(&mut module, &state);
         // Insertion order: c, a, b. Var stays last.
         assert_eq!(module.body.len(), 4);
-        assert_sheet_const(&module.body[0], "_0", "c");
-        assert_sheet_const(&module.body[1], "_1", "a");
-        assert_sheet_const(&module.body[2], "_2", "b");
+        assert_sheet_const(&module.body[0], "_", "c");
+        assert_sheet_const(&module.body[1], "_2", "a");
+        assert_sheet_const(&module.body[2], "_3", "b");
     }
 }
