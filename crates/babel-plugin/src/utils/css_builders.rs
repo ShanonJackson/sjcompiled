@@ -63,13 +63,15 @@ use compiled_utils::{hash, kebab_case};
 
 use crate::compat::generator::generate;
 use crate::compat::scope::{ScopeId, ScopeIndex};
+use crate::mutation_recorder::MutationRecorder;
 use crate::state::State;
 use crate::types::{Metadata, MetadataContext};
 use crate::utils::ast::{build_code_frame_error, CssBuildError};
 use crate::utils::evaluate_expression::evaluate_expression;
 use crate::utils::is_compiled::{
-    is_compiled_css_call_expression, is_compiled_css_tagged_template_expression,
-    is_compiled_keyframes_call_expression, is_compiled_keyframes_tagged_template_expression,
+    is_compiled_css_call_expression, is_compiled_css_map_call_expression,
+    is_compiled_css_tagged_template_expression, is_compiled_keyframes_call_expression,
+    is_compiled_keyframes_tagged_template_expression,
 };
 use crate::utils::is_empty::is_empty_value;
 use crate::utils::manipulate_template_literal::{
@@ -414,12 +416,13 @@ pub fn extract_conditional_expression(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<CSSOutput, CssBuildError> {
     let mut css: Vec<CssItem> = Vec::new();
     let mut variables: Vec<Variable> = Vec::new();
 
-    let consequent_css = extract_branch(&node.cons, meta, node, scope_index, parent_scope, own_scope)?;
-    let alternate_css = extract_branch(&node.alt, meta, node, scope_index, parent_scope, own_scope)?;
+    let consequent_css = extract_branch(&node.cons, meta, node, scope_index, parent_scope, own_scope, recorder)?;
+    let alternate_css = extract_branch(&node.alt, meta, node, scope_index, parent_scope, own_scope, recorder)?;
 
     match (consequent_css, alternate_css) {
         (Some(c), Some(a)) => {
@@ -462,6 +465,7 @@ fn extract_branch(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<Option<CssItem>, CssBuildError> {
     let css_output: Option<CSSOutput> = match path_node {
         Expr::Object(_)
@@ -481,7 +485,7 @@ fn extract_branch(
                     _ => false,
                 };
                 if is_css_shape {
-                    Some(build_css_inner(path_node, meta, scope_index, parent_scope, own_scope)?)
+                    Some(build_css_inner(path_node, meta, scope_index, parent_scope, own_scope, recorder)?)
                 } else {
                     None
                 }
@@ -489,7 +493,7 @@ fn extract_branch(
         Expr::TaggedTpl(_) | Expr::Call(_)
             if path_is_compiled_css_shape(path_node, meta) =>
         {
-            Some(build_css_inner(path_node, meta, scope_index, parent_scope, own_scope)?)
+            Some(build_css_inner(path_node, meta, scope_index, parent_scope, own_scope, recorder)?)
         }
         Expr::Ident(_) => {
             // §4.6 bridge: real evaluator dispatch. The surrounding
@@ -499,8 +503,8 @@ fn extract_branch(
             let _ = evaluate_expression(path_node, meta, scope_index, parent_scope, own_scope);
             None
         }
-        Expr::Cond(c) => Some(extract_conditional_expression(c, meta, scope_index, parent_scope, own_scope)?),
-        Expr::Member(m) => extract_member_expression_optional(m, meta, false, scope_index, parent_scope, own_scope)?,
+        Expr::Cond(c) => Some(extract_conditional_expression(c, meta, scope_index, parent_scope, own_scope, recorder)?),
+        Expr::Member(m) => extract_member_expression_optional(m, meta, false, scope_index, parent_scope, own_scope, recorder)?,
         _ => None,
     };
 
@@ -534,6 +538,7 @@ pub fn extract_logical_expression(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    _recorder: &mut MutationRecorder,
 ) -> Result<CSSOutput, CssBuildError> {
     // Mirrors upstream `if (t.isExpression(node.body))`. The body
     // walk would be `evaluateExpression(node.body, meta)`.
@@ -578,6 +583,7 @@ pub fn extract_keyframes(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<CSSOutput, CssBuildError> {
     // §4.4 hash-call-shape #1: line 464 — keyframes name from full
     // expression source.
@@ -606,7 +612,7 @@ pub fn extract_keyframes(
             // upstream: `t.isCallExpression(expression) ? (expression.arguments as t.Expression[]) : expression.quasi`
             // For an arguments-array we need extractArray semantics.
             let mut child = meta.reborrow_with_context(kf_context.clone());
-            extract_array(&arg_exprs, &mut child, scope_index, parent_scope, own_scope)?
+            extract_array(&arg_exprs, &mut child, scope_index, parent_scope, own_scope, recorder)?
         }
         Expr::TaggedTpl(tpl) => {
             let mut child = meta.reborrow_with_context(kf_context.clone());
@@ -616,6 +622,7 @@ pub fn extract_keyframes(
                 scope_index,
                 parent_scope,
                 own_scope,
+                recorder,
             )?
         }
         _ => {
@@ -698,6 +705,7 @@ pub fn extract_object_expression(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<CSSOutput, CssBuildError> {
     let mut css: Vec<CssItem> = Vec::new();
     let mut variables: Vec<Variable> = Vec::new();
@@ -762,7 +770,7 @@ pub fn extract_object_expression(
                 {
                     let result = to_css_rule(
                         &key,
-                        build_css_inner(prop_value, meta, scope_index, parent_scope, own_scope)?,
+                        build_css_inner(prop_value, meta, scope_index, parent_scope, own_scope, recorder)?,
                     );
                     css.extend(result.css);
                     variables.extend(result.variables);
@@ -776,9 +784,9 @@ pub fn extract_object_expression(
                         && matches!(&first_expr, Some(Expr::Arrow(arrow)) if matches!(&*arrow.body, BlockStmtOrExpr::Expr(e) if matches!(&**e, Expr::Cond(_))))
                     {
                         recompose_template_literal(&mut tpl_clone, &format!("{}:", kebab_case(&key)), ";");
-                        extract_template_literal(&tpl_clone, meta, scope_index, parent_scope, own_scope)?
+                        extract_template_literal(&tpl_clone, meta, scope_index, parent_scope, own_scope, recorder)?
                     } else {
-                        let inner = extract_template_literal(&tpl_clone, meta, scope_index, parent_scope, own_scope)?;
+                        let inner = extract_template_literal(&tpl_clone, meta, scope_index, parent_scope, own_scope, recorder)?;
                         to_css_declaration(&key, inner)
                     };
                     css.extend(result.css);
@@ -835,7 +843,7 @@ pub fn extract_object_expression(
                     }
                     if let Some(mut opt) = optimised {
                         recompose_template_literal(&mut opt, &format!("{}:", kebab_case(&key)), ";");
-                        let result = extract_template_literal(&opt, meta, scope_index, parent_scope, own_scope)?;
+                        let result = extract_template_literal(&opt, meta, scope_index, parent_scope, own_scope, recorder)?;
                         css.extend(result.css);
                         variables.extend(result.variables);
                         continue;
@@ -854,6 +862,7 @@ pub fn extract_object_expression(
                         scope_index,
                         parent_scope,
                         own_scope,
+                        recorder,
                     )?;
                     css.extend(result.css);
                     variables.extend(result.variables);
@@ -902,42 +911,94 @@ pub fn extract_object_expression(
 }
 
 /// `generateCacheForCSSMap` upstream lines 683–709. Resolve-binding
-/// + visitCssMapPath path — Phase 6 §6.3.
+/// + visitCssMapPath path — closed in Phase 6 §6.5 with the
+/// MutationRecorder threading through the build_css call graph.
+///
+/// Mirrors upstream verbatim:
+/// 1. Cache-hit / ignore-list check — bail.
+/// 2. `resolveBinding(node.name, meta, evaluateExpression)`.
+/// 3. If resolved.node is a Compiled cssMap call, run
+///    `visitCssMapPath` against the resolved init expression. The
+///    visit publishes `state.cssMap[binding] = sheets` via
+///    StateDiff::CssMapInsert.
+/// 4. Otherwise mark `state.ignoreMemberExpressions[node.name] = true`
+///    so future references skip the resolver.
+///
+/// **Diff-log replay note (§5.3 / PLAN.md §3.9.8):** the visit_css_map_path
+/// call below routes its mutations through the SAME `recorder` the
+/// caller threads in. When the §5.3 cache wires into State, late-resolve
+/// cssMap publications appear in the consumer's diff_log alongside any
+/// other mutations the consumer's pass produced. No special replay
+/// handling needed.
 fn generate_cache_for_css_map(
     node: &Ident,
     meta: &mut Metadata<'_>,
-    _scope_index: &mut ScopeIndex,
-    _parent_scope: ScopeId,
-    _own_scope: Option<ScopeId>,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) {
-    if meta.state.css_map().contains_key(&node.sym.to_string())
-        || meta.state.ignore_member_expressions().contains_key(&node.sym.to_string())
+    let name = node.sym.to_string();
+    if meta.state.css_map().contains_key(&name)
+        || meta.state.ignore_member_expressions().contains_key(&name)
     {
         return;
     }
-    // Phase 6 §6.3 SHIP — the primary cssMap dispatch site is
-    // `babel_plugin.rs::visit_mut_var_declarator` (which owns the
-    // parent-binding context the upstream `getPathOfNode` call needs).
-    // This LATE-RESOLVE path mirrors upstream `generateCacheForCSSMap`
-    // (`utils/css-builders.ts:683-709`) and only fires when a
-    // member-expression consumer (e.g. `css({ color: styles.red })`,
-    // `<div xcss={styles.danger} />`, `styled.div(styles.root)`)
-    // resolves a cssMap-bound identifier BEFORE the visitor reaches
-    // the cssMap declaration. Porting this path properly requires
-    // threading `&mut MutationRecorder` through the entire `build_css`
-    // call graph (currently it terminates at the `visit_mut_*`
-    // dispatchers) — bundled with Phase 6 §6.4 (xcss-prop), the first
-    // handler whose corpus exercises this late-resolve scenario.
-    //
-    // Until §6.4 lands the threading: panic remains. The §6.3 corpus
-    // (cssMap declared as VarDeclarator init, consumers in source
-    // order AFTER the declaration) does not reach this site.
-    unimplemented!(
-        "generateCacheForCSSMap late-resolve path — Phase 6 §6.4 \
-         reachability gate (requires MutationRecorder threading \
-         through build_css). The §6.3 primary dispatch at \
-         `visit_mut_var_declarator` handles the source-order case."
-    );
+
+    // Resolve the binding. Upstream pulls the resolver from
+    // `meta.state.resolver` plus filename; the Rust port's
+    // `resolve_binding` does the same via `state.resolver()` /
+    // `state.filename()`. A None result means the binding could not
+    // be resolved (no scope binding, no cross-file resolution
+    // available); upstream then falls through to the ignore-marking
+    // branch, which we mirror.
+    let resolved = resolve_binding(name.as_str(), &*meta, &*scope_index, parent_scope, own_scope);
+
+    if let Some(resolved_pair) = resolved {
+        // Upstream: `if (resolved && isCompiledCSSMapCallExpression(resolved.node, meta.state))`.
+        // PartialBindingWithMeta::node is `Option<Box<Expr>>` because
+        // some bindings (cross-file imports without a direct AST anchor
+        // in this file) arrive as None. Cache-generation only fires
+        // when we have a concrete in-scope CallExpr to visit.
+        let Some(boxed_node) = resolved_pair.node.as_deref() else {
+            return;
+        };
+        if is_compiled_css_map_call_expression(boxed_node, meta.state) {
+            // Upstream: `let resolvedCallPath = resolved.path.get('init');`
+            // followed by `if (Array.isArray(resolvedCallPath))
+            // resolvedCallPath = resolvedCallPath[0]`. The Rust port's
+            // `PartialBindingWithMeta::node` is the init-side `Expr`
+            // already (the call expression itself). No path navigation
+            // needed.
+            if let Expr::Call(call) = boxed_node {
+                let visit_result = crate::css_map::visit_css_map_path(
+                    call,
+                    name.as_str(),
+                    meta,
+                    recorder,
+                    scope_index,
+                    parent_scope,
+                    own_scope,
+                );
+                // Upstream silently skips this branch on cssMap-shape
+                // failures (visitCssMapPath panics on shape errors,
+                // matching our port). A success populates
+                // state.cssMap[name].
+                if let Err(e) = visit_result {
+                    panic!("{}", e.message);
+                }
+            }
+        }
+    }
+
+    // Upstream: `if (!meta.state.cssMap[node.name]) {
+    //              meta.state.ignoreMemberExpressions[node.name] = true; }`
+    if !meta.state.css_map().contains_key(&name) {
+        recorder.apply(
+            crate::mutation_recorder::StateDiff::IgnoreMemberExprMark { name: name.clone() },
+            meta.state,
+        );
+    }
 }
 
 /// `extractMemberExpression` upstream lines 728–752. Two-arg shape
@@ -949,8 +1010,9 @@ pub fn extract_member_expression(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<CSSOutput, CssBuildError> {
-    extract_member_expression_optional(node, meta, true, scope_index, parent_scope, own_scope)?
+    extract_member_expression_optional(node, meta, true, scope_index, parent_scope, own_scope, recorder)?
         .ok_or_else(|| build_code_frame_error("MemberExpression yielded no CSS", Some(node.span)))
 }
 
@@ -961,10 +1023,11 @@ fn extract_member_expression_optional(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<Option<CSSOutput>, CssBuildError> {
     let binding_identifier = find_binding_identifier(&Expr::Member(node.clone()));
     if let Some(ident) = &binding_identifier {
-        generate_cache_for_css_map(ident, meta, scope_index, parent_scope, own_scope);
+        generate_cache_for_css_map(ident, meta, scope_index, parent_scope, own_scope, recorder);
         if meta.state.css_map().contains_key(&ident.sym.to_string()) {
             return Ok(Some(CSSOutput {
                 css: vec![CssItem::Map(CssMapItem {
@@ -1000,6 +1063,7 @@ pub fn extract_template_literal(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<CSSOutput, CssBuildError> {
     let mut css: Vec<CssItem> = Vec::new();
     let mut variables: Vec<Variable> = Vec::new();
@@ -1064,6 +1128,7 @@ pub fn extract_template_literal(
             scope_index,
             parent_scope,
             own_scope,
+            recorder,
         )? {
             continue;
         }
@@ -1150,13 +1215,14 @@ fn try_keyframes_branch(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<bool, CssBuildError> {
     if !is_compiled_keyframes_call_expression(expr, meta.state)
         && !is_compiled_keyframes_tagged_template_expression(expr, meta.state)
     {
         return Ok(false);
     }
-    let result = extract_keyframes(expr, meta, raw, "", scope_index, parent_scope, own_scope)?;
+    let result = extract_keyframes(expr, meta, raw, "", scope_index, parent_scope, own_scope, recorder)?;
     let mut iter = result.css.into_iter();
     let sheet = iter.next().expect("extract_keyframes returns ≥1 item");
     let unconditional = iter.next().expect("extract_keyframes returns ≥2 items");
@@ -1173,14 +1239,15 @@ pub fn extract_array(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<CSSOutput, CssBuildError> {
     let mut css: Vec<CssItem> = Vec::new();
     let mut variables: Vec<Variable> = Vec::new();
     for element in elements {
         let result = if let Expr::Cond(c) = element {
-            extract_conditional_expression(c, meta, scope_index, parent_scope, own_scope)?
+            extract_conditional_expression(c, meta, scope_index, parent_scope, own_scope, recorder)?
         } else {
-            build_css_inner(element, meta, scope_index, parent_scope, own_scope)?
+            build_css_inner(element, meta, scope_index, parent_scope, own_scope, recorder)?
         };
         css.extend(result.css);
         variables.extend(result.variables);
@@ -1195,8 +1262,9 @@ pub fn build_css(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<CSSOutput, CssBuildError> {
-    build_css_inner(node, meta, scope_index, parent_scope, own_scope)
+    build_css_inner(node, meta, scope_index, parent_scope, own_scope, recorder)
 }
 
 /// Internal entry — exists so the top-level extractArray path can
@@ -1207,6 +1275,7 @@ fn build_css_inner(
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
+    recorder: &mut MutationRecorder,
 ) -> Result<CSSOutput, CssBuildError> {
     if let Expr::Lit(Lit::Str(s)) = node {
         return Ok(CSSOutput {
@@ -1218,26 +1287,26 @@ fn build_css_inner(
     }
 
     if let Expr::TsAs(ts_as) = node {
-        return build_css_inner(&ts_as.expr, meta, scope_index, parent_scope, own_scope);
+        return build_css_inner(&ts_as.expr, meta, scope_index, parent_scope, own_scope, recorder);
     }
 
     if let Expr::Tpl(tpl) = node {
-        return extract_template_literal(tpl, meta, scope_index, parent_scope, own_scope);
+        return extract_template_literal(tpl, meta, scope_index, parent_scope, own_scope, recorder);
     }
 
     if let Expr::Object(obj) = node {
-        return extract_object_expression(obj, meta, scope_index, parent_scope, own_scope);
+        return extract_object_expression(obj, meta, scope_index, parent_scope, own_scope, recorder);
     }
 
     if let Expr::Member(m) = node {
-        return extract_member_expression(m, meta, scope_index, parent_scope, own_scope);
+        return extract_member_expression(m, meta, scope_index, parent_scope, own_scope, recorder);
     }
 
     if let Expr::Arrow(arrow) = node {
         if let BlockStmtOrExpr::Expr(body_expr) = &*arrow.body {
             match &**body_expr {
                 Expr::Object(obj) => {
-                    return extract_object_expression(obj, meta, scope_index, parent_scope, own_scope)
+                    return extract_object_expression(obj, meta, scope_index, parent_scope, own_scope, recorder)
                 }
                 Expr::Bin(b)
                     if matches!(
@@ -1245,13 +1314,13 @@ fn build_css_inner(
                         BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing
                     ) =>
                 {
-                    return extract_logical_expression(arrow, meta, scope_index, parent_scope, own_scope);
+                    return extract_logical_expression(arrow, meta, scope_index, parent_scope, own_scope, recorder);
                 }
                 Expr::Cond(c) => {
-                    return extract_conditional_expression(c, meta, scope_index, parent_scope, own_scope)
+                    return extract_conditional_expression(c, meta, scope_index, parent_scope, own_scope, recorder)
                 }
                 Expr::Member(m) => {
-                    return extract_member_expression(m, meta, scope_index, parent_scope, own_scope)
+                    return extract_member_expression(m, meta, scope_index, parent_scope, own_scope, recorder)
                 }
                 _ => {}
             }
@@ -1276,7 +1345,7 @@ fn build_css_inner(
             .iter()
             .filter_map(|opt| opt.as_ref().map(|e| (*e.expr).clone()))
             .collect();
-        return extract_array(&exprs, meta, scope_index, parent_scope, own_scope);
+        return extract_array(&exprs, meta, scope_index, parent_scope, own_scope, recorder);
     }
 
     if let Expr::Bin(BinExpr {
@@ -1290,7 +1359,7 @@ fn build_css_inner(
             op,
             BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing
         ) {
-            let result = build_css_inner(right, meta, scope_index, parent_scope, own_scope)?;
+            let result = build_css_inner(right, meta, scope_index, parent_scope, own_scope, recorder)?;
             let css: Vec<CssItem> = result
                 .css
                 .into_iter()
@@ -1345,6 +1414,7 @@ fn build_css_inner(
                 scope_index,
                 parent_scope,
                 own_scope,
+                recorder,
             );
         }
     }
@@ -1359,6 +1429,7 @@ fn build_css_inner(
                         scope_index,
                         parent_scope,
                         own_scope,
+                        recorder,
                     );
                 }
             }
@@ -1528,7 +1599,8 @@ mod tests {
 
         let mut meta = fresh_meta(&mut state);
         let (mut idx, prog) = empty_scope();
-        let result = extract_keyframes(&call, &mut meta, "", "", &mut idx, prog, None)
+        let mut recorder = MutationRecorder::new();
+        let result = extract_keyframes(&call, &mut meta, "", "", &mut idx, prog, None, &mut recorder)
             .expect("extracts");
         // The emitted Unconditional item is `{ css: format!("{prefix}{name}{suffix}") }`
         // with prefix/suffix empty — should equal the expected name.
@@ -1578,7 +1650,8 @@ mod tests {
         let expected_var_name = format!("--_{}", hash(&generate(&unary)));
         let mut meta = fresh_meta(&mut state);
         let (mut idx, prog) = empty_scope();
-        let result = extract_object_expression(&obj, &mut meta, &mut idx, prog, None)
+        let mut recorder = MutationRecorder::new();
+        let result = extract_object_expression(&obj, &mut meta, &mut idx, prog, None, &mut recorder)
             .expect("extracts");
         let var = result
             .variables
@@ -1622,7 +1695,8 @@ mod tests {
         let expected_var_name = format!("--_{}", hash(&generate(&interp)));
         let mut meta = fresh_meta(&mut state);
         let (mut idx, prog) = empty_scope();
-        let result = extract_template_literal(&tpl, &mut meta, &mut idx, prog, None)
+        let mut recorder = MutationRecorder::new();
+        let result = extract_template_literal(&tpl, &mut meta, &mut idx, prog, None, &mut recorder)
             .expect("extracts");
         let var = result
             .variables

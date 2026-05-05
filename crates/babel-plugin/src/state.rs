@@ -283,6 +283,17 @@ impl State {
         self.pragma.jsx_import_source = Some(true);
     }
 
+    /// `state.usesXcss = true;` — set when the xcss-prop handler emits
+    /// the wrapping `<CC>...</CC>` element. Read at `Program::exit` by
+    /// the runtime-import emitter (Phase 7) to gate the
+    /// `@compiled/react/runtime` import even when no css/styled call
+    /// was found in the file. STATE_MUTATIONS.md classifies this as
+    /// out-of-capture (per-file scaffolding, not part of the
+    /// cross-file caching contract).
+    pub(crate) fn set_uses_xcss(&mut self) {
+        self.uses_xcss = Some(true);
+    }
+
     /// Append to `paths_to_cleanup`. The §2.3(b) follow-up uses this
     /// to queue specifier removals (`{ action: Remove, id }`) and
     /// path replacements (`{ action: Replace, id }`). The `id` is a

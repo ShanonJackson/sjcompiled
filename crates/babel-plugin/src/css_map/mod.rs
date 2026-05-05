@@ -168,6 +168,7 @@ pub fn visit_css_map_path(
             scope_index,
             parent_scope,
             own_scope,
+            recorder,
         )?;
 
         // Upstream lines 90–96: variables MUST be empty for static
@@ -263,7 +264,8 @@ mod tests {
     use super::*;
     use swc_core::common::{BytePos, Span, SyntaxContext, DUMMY_SP};
     use swc_core::ecma::ast::{
-        BindingIdent, Callee, ExprOrSpread, Ident, KeyValueProp, ObjectLit, Prop, PropOrSpread,
+        BindingIdent, Callee, ExprOrSpread, Ident, KeyValueProp, ObjectLit, Prop, PropName,
+        PropOrSpread,
     };
 
     use crate::mutation_recorder::ApiKind;

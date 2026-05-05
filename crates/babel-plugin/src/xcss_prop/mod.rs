@@ -304,6 +304,7 @@ pub fn try_handle_jsx_element(
             scope_index,
             parent_scope,
             None,
+            recorder,
         ) {
             Ok(o) => o,
             Err(e) => panic!("{}", e.message),

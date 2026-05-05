@@ -631,6 +631,20 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         n.visit_mut_children_with(self);
     }
 
+    /// Phase 6 §6.4 — `xcss-prop` dispatch. Runs the children walk
+    /// FIRST so the original element's children are processed before
+    /// we wrap, then calls `xcss_prop::try_handle_jsx_element`. On
+    /// success the handler returns a `<CC>...</CC>` JSXElement; we
+    /// swap it into place via assignment. The wrapper's children are
+    /// NOT re-walked because the children walk has already run on
+    /// the pre-replacement element — this mirrors Babel's
+    /// `transformCache` short-circuit (see upstream
+    /// `xcss-prop/index.ts:59-64`).
+    ///
+    /// Dispatch precondition: `self.scope_index` and
+    /// `self.program_scope` must be initialised — they are at
+    /// `visit_mut_program` time. We assert via `expect()` so a
+    /// regression in the bridge fires loud.
     fn visit_mut_jsx_element(&mut self, n: &mut swc_core::ecma::ast::JSXElement) {
         #[cfg(debug_assertions)]
         if self
@@ -642,6 +656,65 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
             self.stub_log.push("jsx_element_visited".to_string());
         }
         n.visit_mut_children_with(self);
+
+        // §6.4 dispatch — needs scope_index + program_scope initialised
+        // by the §4.6 bridge at `visit_mut_program`. Script programs
+        // (no Module body) leave both as None; we treat that as a
+        // no-op for xcss-prop because Compiled doesn't operate on
+        // classic scripts in practice.
+        let (Some(scope_index), Some(parent_scope)) =
+            (self.scope_index.as_mut(), self.program_scope)
+        else {
+            return;
+        };
+
+        // §6.6 dispatch — `<ClassNames>` element handler runs at the
+        // JSXElement level (upstream `babel-plugin.ts:351-357`),
+        // BEFORE the JSXOpeningElement-level xcss/css-prop dispatch.
+        // We dispatch first because ClassNames REPLACES the entire
+        // JSXElement with a `<CC>...</CC>` wrapper whose inner is the
+        // function body; subsequent xcss/css-prop dispatch runs on
+        // the wrapper, not the original element, and finds no
+        // matching attribute → no-op. Matches upstream's path
+        // staleness semantics.
+        if let Some(replacement) = crate::class_names::try_handle_jsx_element(
+            n,
+            &mut self.state,
+            &mut self.recorder,
+            scope_index,
+            parent_scope,
+        ) {
+            *n = replacement.new_element;
+            return;
+        }
+
+        if let Some(replacement) = crate::xcss_prop::try_handle_jsx_element(
+            n,
+            &mut self.state,
+            &mut self.recorder,
+            scope_index,
+            parent_scope,
+        ) {
+            *n = replacement.new_element;
+            // After xcss wraps the element with `<CC>...</CC>`, the
+            // css-prop dispatch below runs on the WRAPPER which has
+            // no css attribute — no-op. Mirrors upstream's `path`
+            // staleness semantics (xcss-prop's parentPath.replaceWith
+            // changes what subsequent visitors see).
+        }
+
+        // §6.5 dispatch — runs AFTER xcss-prop per upstream's
+        // JSXOpeningElement visitor registration order
+        // (`babel-plugin.ts:358-367`).
+        if let Some(replacement) = crate::css_prop::try_handle_jsx_element(
+            n,
+            &mut self.state,
+            &mut self.recorder,
+            scope_index,
+            parent_scope,
+        ) {
+            *n = replacement.new_element;
+        }
     }
 
     fn visit_mut_jsx_opening_element(&mut self, n: &mut swc_core::ecma::ast::JSXOpeningElement) {

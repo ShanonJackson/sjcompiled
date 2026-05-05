@@ -25,16 +25,19 @@
 
 pub mod babel_plugin;
 pub mod cache_schema;
+pub mod class_names;
 pub mod compat;
 pub mod constants;
 pub mod css;
 pub mod css_map;
+pub mod css_prop;
 pub mod keyframes;
 pub mod mutation_recorder;
 pub mod resolver;
 pub mod state;
 pub mod types;
 pub mod utils;
+pub mod xcss_prop;
 
 use std::sync::Arc;
 

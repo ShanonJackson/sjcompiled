@@ -146,10 +146,102 @@ gates clean: compat_scope 3/3, compat_evaluation 3/3,
 compat_generator 4/4, resolver_matrix 8/8, transform_css 3/3,
 hash_parity 4/4. WASI cdylib build clean.
 
-**Next checkpoint: Phase 6 §6.4 — `xcss-prop` handler.** First
-handler that consumes `state.css_map` published by §6.3, and the
-checkpoint that ports `generate_cache_for_css_map` properly via
-MutationRecorder threading through the build_css call graph.
+**Phase 6 §6.4 ☑ (this session, 2026-05-05) — `xcss-prop` handler.**
+First handler that consumes `state.css_map` published by §6.3.
+New module `crates/babel-plugin/src/xcss_prop/mod.rs` (~470 LOC +
+13 unit tests) plus a `visit_mut_jsx_element` post-order extension
+in `babel_plugin.rs`. Two branches per upstream `visitXcssPropPath`:
+(1) inline ObjectExpression — `staticObjectInvariant` via
+`compat::evaluation::evaluate`, then `build_css` +
+`transform_css_items`, switch on classNames count (1 → replace; 0
+→ `undefined` Ident; else → error); (2) member expression — walks
+the JSXAttribute value collecting `MemberExpression.object.Ident.sym`
+names, aggregates `state.css_map[name]` sheets, bails on empty
+(legacy runtime xcss). Both branches set `state.uses_xcss = true`
+and wrap the parent JSXElement with `compiled_template`'s
+`<CC>...</CC>` output. Post-order dispatch mirrors Babel's
+`transformCache` short-circuit (the wrapper's synthesised children
+are NOT re-walked because `n.visit_mut_children_with(self)` already
+ran on the pre-replacement element).
+
+**Late-resolve panic kept (now §6.5 reachability gate):** xcss-prop's
+actual call sites do NOT reach `extract_member_expression` — the
+inline-object branch's `build_css` runs against a static-confirmed
+ObjectExpression with no MemberExpression children, and the
+member-expression branch reads `state.cssMap` directly. The
+`generate_cache_for_css_map` `unimplemented!()` panic in
+`utils/css_builders.rs` is repurposed as the §6.5 (css-prop)
+reachability gate. css-prop / styled run `build_css` against
+user-supplied expressions that may contain member expressions
+referencing cssMap-bound identifiers — that's the first real
+reach. The MutationRecorder-threading work originally scoped to
+§6.4 moves to §6.5.
+
+**Drift detected in §6.3 (fixed in §6.4):**
+`crates/babel-plugin/src/css_map/mod.rs` `tests` module was missing
+`PropName` from its `swc_core::ecma::ast` import list. STATUS.md
+claimed 359/359 lib tests pass but the test module did not compile
+at HEAD without the fix. One-line import addition included in §6.4.
+The §6.3 closure summary's lib-test count was correct in spirit
+(the tests would have passed if they compiled); the missed import
+was the gap.
+
+Lib tests: **372/372** (was 359 post-§6.3; +13 xcss_prop unit). All
+sibling gates clean: compat_evaluation 3/3, compat_scope 3/3,
+compat_generator 3/3, resolver_matrix 8/8, transform_css 3/3,
+hash_parity 4/4. WASI cdylib build clean.
+
+**Phase 6 §6.5 ☑ (this session, 2026-05-05) — `css-prop` handler.**
+1:1 port of `css-prop/index.ts` plus the **MutationRecorder
+threading** through the entire `build_css` call graph
+(`utils/css_builders.rs`: 12 fn signatures + 30 internal call
+sites + 3 hash-site tests + 2 external callers). Real
+`generate_cache_for_css_map` body landed — the §6.4 `unimplemented!()`
+panic is gone. css-prop's member-expression case (e.g. `<div
+css={styles.primary} />`) routes through `extract_member_expression`
+→ `generate_cache_for_css_map` → `visit_css_map_path` cleanly.
+
+**Comment-disable directive — §6.5 incomplete branch.**
+`is_css_prop_disabled` upstream walks
+`meta.state.file.ast.comments` filtered by line number; SWC's
+plugin runtime exposes line lookup via a `SourceMap` proxy that
+the visitor doesn't thread today. Stub returns `false` (transform
+always runs). Fixtures with `@compiled-disable-line transform-css-prop`
+WILL produce divergent output until the SourceMap-thread
+follow-up. Documented in `crates/babel-plugin/src/utils/comments.rs`.
+
+**Phase 6 §6.6 ☑ (this session, 2026-05-05) — `<ClassNames>`
+handler.** 1:1 port of `class-names/index.ts` (~195 LOC upstream).
+Render-prop pattern with two-pass sub-traversal via SWC `VisitMut`
+impls (`CssCallReplacer`, `StyleRefReplacer`):
+1. Replace `css({...})` / renamed `c({...})` / `props.css({...})` /
+   tagged-template with `ax([classNames])`, accumulating sheets +
+   variables.
+2. Replace `style` Identifier and `<x>.style` MemberExpression
+   references with the variables-built ObjectExpression (or
+   `undefined` when no variables collected).
+
+Final step: `pick_function_body(children)` → wrap with
+`compiled_template`. Rename detection covers the common
+`({ css, style })` and `({ css: c, style: s })` shapes via the
+`RenameMap` built from the children-fn's first parameter.
+
+Dispatch order in `visit_mut_jsx_element`: `<ClassNames>` runs
+FIRST (replaces the entire element with the wrapper); xcss/css-prop
+dispatch runs AFTER (no-op on the wrapper).
+
+Lib tests: **387/387** (was 372 post-§6.4; +8 css_prop + 7
+class_names unit tests). All sibling gates clean: compat_evaluation
+3/3, compat_scope 3/3, compat_generator 3/3, resolver_matrix 8/8,
+transform_css 3/3, hash_parity 4/4. WASI cdylib build clean.
+
+**Next checkpoint: Phase 6 §6.7 — `styled` handler.** Largest
+single fixture set per §6.8 exit gate. Includes `forwardRef`
+wiring + `@emotion/is-prop-valid` table verbatim port
+(`crates/babel-plugin/src/compat/is_prop_valid.rs` per upstream's
+verbatim-table source). The styled handler is the last gating
+piece before §4.8 (Phase 4 exit gate fixtures byte-clean) and
+§6.8 (Phase 6 exit gate full harness green).
 
 **§4.7 (Parcel wrapper) — out of scope.** Treated as a
 downstream-host use case the bridge supports (single
@@ -162,8 +254,9 @@ requires the 6a/6b/6c handler bodies. §4.8 closure date =
 Phase 6c ship. Phase 6 handlers (`keyframes`, `css`, `cssMap`,
 `styled`) are now structurally unblocked — every primitive they
 need ships at a real path, no stub remains in their critical
-path beyond the inline `visitCssMapPath` `unimplemented!()` that
-Phase 6 §6.3 itself replaces.
+path beyond the `generate_cache_for_css_map` `unimplemented!()`
+that Phase 6 §6.5 (css-prop) — first handler whose corpus reaches
+the late-resolve path through `build_css` — will replace.
 
 **§5.4 / §5.5 / §5.6 unblock plan: see §5.0 entry-gate below.**
 The (a)/(b) decision from the prior session is RESOLVED: option
@@ -3708,9 +3801,9 @@ done before declaring Phase 0 fully signed off across the platform set.
 | §6.1 | ☑ (this session, 2026-05-05) | `keyframes` cleanup-only handler — 1:1 port of `babel-plugin.ts:331-340` (keyframes half of `isCompiledUtil`) + `:222-238` (`Program::exit` `pathsToCleanup` drain, replace-only branch). Two-step pattern: `visit_mut_expr` post-order detects `is_compiled_keyframes_call_expression` / `is_compiled_keyframes_tagged_template_expression` and queues a `CleanupAction { Replace, id: span.lo.0 }` via `state.queue_cleanup`; `visit_mut_program` after the children walk drains the queue's `Replace` ids and runs a second `VisitMut` pass that swaps each matching `Expr::Call` / `Expr::TaggedTpl` for `Expr::Lit(Lit::Null { span })`, preserving the original span so codegen + comment attachment stay anchored. The deferred queue (vs. inline replace) mirrors upstream's architecture and is reusable for §6.2 (css cleanup) and §6.3 (cssMap). The existing `extract_keyframes` (Phase 4 §4.4 in `utils/css_builders.rs`) already handles inner extraction when a keyframes binding is referenced from a styled / css call — §6.1 owns the OTHER half: replacing the standalone reference at the top-level visitor. | claude-2026-05-05 | `crates/babel-plugin/src/keyframes/mod.rs` (~330 LOC + 12 unit tests covering matcher / queueing / drain pass / nested replace / CleanupKind filtering); `crates/babel-plugin/src/lib.rs` (`pub mod keyframes;`); `crates/babel-plugin/src/babel_plugin.rs` (added `visit_mut_expr` override calling `keyframes::try_queue_cleanup`; `visit_mut_program` exit drains via `keyframes::paths_to_cleanup_replace_ids` + `run_cleanup_replace`; +4 phase6a end-to-end visitor tests covering standalone call / tagged-tpl / unrelated-call-not-replaced / VarDeclarator-init shape). | Lib: `cargo test -p babel-plugin --lib` → **325/325** (was 311 post-§5.6; +10 keyframes unit + 4 phase6a end-to-end). Integration: `compat_evaluation_integration` 3/3, `compat_scope_integration` 3/3, `resolver_matrix_integration` 8/8 — all sibling gates unchanged. **Drift watch points (logged in `keyframes/mod.rs` module docs):** (1) `CleanupAction::id` is encoded as `span.lo.0`; today no §6.1 path emits synthetic `DUMMY_SP` keyframes calls so the encoding is sound. §6.3 (cssMap) may emit synthesised CallExprs — if so, the id encoding migrates to a monotonic recorder-issued handle. (2) `Replace` and `Remove` actions share `paths_to_cleanup`; the drain pass filters for `Replace` only (§2.3(b) ImportSpecifier `Remove` work isn't wired yet). (3) Nested keyframes-in-keyframes (pathological but reachable) replace inner-first then outer-second, both ending up `null` — matches Babel's stale-path no-op behaviour. **Phase 6a/b/c handler-body work for `extract_keyframes` reachability (the styled/css consumer side) is NOT in §6.1 scope** — those bindings already shipped in Phase 4 §4.4; §6.1 is purely the standalone-call cleanup. |
 | §6.2 | ☑ (this session, 2026-05-05) | `css` (utility) cleanup-only handler — 1:1 port of `babel-plugin.ts:331-340` (css half of `isCompiledUtil`). Same two-step pattern as §6.1: `visit_mut_expr` post-order detects `is_compiled_css_call_expression` / `is_compiled_css_tagged_template_expression` and queues a `CleanupAction { Replace, id: span.lo.0 }` via `state.queue_cleanup`; the §6.1 `Program::exit` drain (`keyframes::paths_to_cleanup_replace_ids` + `run_cleanup_replace`) handles both kinds in a single pass — §6.2 contributes ONLY the new matcher. Existing `build_css` / css extraction in `utils/css_builders.rs` (Phase 4 §4.4) handles inner extraction when a css binding is referenced from a styled / css call; §6.2 owns the OTHER half: replacing the standalone reference at the top-level visitor. The drain module's name (`keyframes`) is a historical artifact of §6.1 owning the infrastructure first; functionally the drain is shared across §6.1/§6.2/§6.3. | claude-2026-05-05 | `crates/babel-plugin/src/css/mod.rs` (~95 LOC + 6 unit tests covering matcher / queueing / non-css filter / renamed-binding / tagged-tpl / empty-imports gate); `crates/babel-plugin/src/lib.rs` (`pub mod css;`); `crates/babel-plugin/src/babel_plugin.rs` (added `use crate::css;` + 6-line `visit_mut_expr` extension after the §6.1 keyframes matcher; +4 phase6b end-to-end visitor tests covering standalone call / tagged-tpl / unrelated-call-not-replaced / renamed-import). One §6.1 test (`phase6a_does_not_replace_unrelated_calls`) was reworked to use a non-Compiled callee since its `css()`-stays-intact invariant is exactly what §6.2 invalidates — this is expected behaviour change, not regression. | Lib: `cargo test -p babel-plugin --lib` → **335/335** (was 327 post-§6.1; +6 css unit + 4 phase6b end-to-end, with the §6.1 test reworked rather than duplicated). Integration: `compat_evaluation_integration` 3/3, `compat_scope_integration` 3/3, `compat_generator_integration` 4/4, `resolver_matrix_integration` 8/8, `transform_css_integration` 3/3 — all sibling gates unchanged. WASM: `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean. **Drift watch points carry over from §6.1:** (1) span.lo.0 id encoding is sound today (no synthetic css calls); (2) Replace/Remove queue filtering is unchanged; (3) §6.1 vs §6.2 dispatch order in `visit_mut_expr` is not observable because the matchers are mutually exclusive on a given node. css() fixtures byte-clean DEFERRED to §4.8 exit gate (still tail-ends on §6.3 cssMap). |
 | §6.3 | ☑ (this session, 2026-05-05) | `cssMap` handler (`process_selectors.rs`) — first handler that emits real CSS and writes back into the AST. 1:1 port of `css-map/index.ts` (`visitCssMapPath`) + `process-selectors.ts` (`mergeExtendedSelectorsIntoProperties`) + `utils/css-map.ts` (the helper module shared between them). Validates shape (1 ObjectExpression argument, parent is a `VariableDeclarator` with `Ident` id), runs `merge_extended_selectors_into_properties` + `build_css` + `transform_css_items` for each variant, rejects classNames count > 1 and any `variables` (variants must be statically defined), emits the `(variantKey: className)` ObjectExpression, publishes `state.css_map[binding] = total_sheets` via the MutationRecorder (`StateDiff::CssMapInsert`, site 5). Dispatch via `visit_mut_var_declarator` (pre-descent so the rewritten ObjectExpression is what children see, not the cssMap CallExpr). Tagged-template form panics with `NO_TAGGED_TEMPLATE`. Destructuring-pattern parent panics with `DEFINE_MAP`. **SWC vs Babel divergence:** SWC `Ident` can't hold spaces/parens, so upstream `t.identifier('@media screen and (min-width: 500px)')` becomes a string-literal key (`PropName::Str`) — bytes through `build_css` are equal because consumers read the key via `get_key_value`. **Late-resolve panic kept (§6.4 reachability gate):** `utils/css_builders.rs::generate_cache_for_css_map` retains its `unimplemented!()` panic, repurposed — porting that path properly requires threading `&mut MutationRecorder` through the entire `build_css` call graph; the §6.3 corpus (cssMap as VarDeclarator init, consumers in source order AFTER the declaration) doesn't reach it. The threading lands with §6.4 (xcss-prop), the first handler whose corpus exercises the late-resolve scenario. | claude-2026-05-05 | `crates/babel-plugin/src/utils/css_map.rs` (~270 LOC + 8 unit tests covering literal-key classification, at-rule recognition, plain-selector detection, extended-selectors-key matching, error_if_not_valid_object_property accept/reject, create_error_message format); `crates/babel-plugin/src/css_map/process_selectors.rs` (~370 LOC + 8 unit tests covering empty variant, flat property, extended-selectors lift, at-rule expansion, duplicate at-rule, duplicate selector, duplicate selectors-block, plain-selector-without-ampersand); `crates/babel-plugin/src/css_map/mod.rs` (~430 LOC + 8 unit tests covering happy path single + two variants, rejects zero/two/non-object args, rejects non-object variant value, extract_var_decl_target on Ident vs ObjectPat); `crates/babel-plugin/src/utils/mod.rs` (`pub mod css_map;`); `crates/babel-plugin/src/lib.rs` (`pub mod css_map;`); `crates/babel-plugin/src/babel_plugin.rs` (added `visit_mut_var_declarator` hook + use imports for `is_compiled_css_map_call_expression` / `Metadata` / `MetadataContext`); `crates/babel-plugin/src/utils/css_builders.rs` (panic message at `generate_cache_for_css_map` updated to cite §6.4 reachability gate). | Lib: `cargo test -p babel-plugin --lib` → **359/359** (was 335 post-§6.2; +24 unit tests across the three new modules). Integration: `compat_evaluation_integration` 3/3, `compat_scope_integration` 3/3, `compat_generator_integration` 4/4, `resolver_matrix_integration` 8/8, `transform_css_integration` 3/3, `hash_parity` 4/4 — all sibling gates unchanged. WASM: `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean. End-to-end cssMap fixtures byte-clean DEFERRED to §4.8 exit gate (parity-harness/babel-plugin needs the §6.4 + §6.5 + §6.6 + §6.7 handlers shipped before the corpus runs through SWC end-to-end). |
-| §6.4 | ☐ | `xcss-prop` handler | — | `crates/babel-plugin/src/xcss_prop/mod.rs` | xcss fixtures byte-clean |
-| §6.5 | ☐ | `css-prop` handler (comment-placement-sensitive) | — | `crates/babel-plugin/src/css_prop/mod.rs` | css-prop fixtures byte-clean |
-| §6.6 | ☐ | `ClassNames` handler | — | `crates/babel-plugin/src/class_names/mod.rs` | ClassNames fixtures byte-clean |
+| §6.4 | ☑ (this session, 2026-05-05) | `xcss-prop` handler — 1:1 port of `xcss-prop/index.ts`. First handler that consumes `state.css_map` published by §6.3, and the first per-API handler that exercises the JSXOpeningElement → JSXElement walk pattern. Two branches per upstream `visitXcssPropPath`: (1) **inline ObjectExpression** — `staticObjectInvariant` runs `path.evaluate().confident` via `compat::evaluation::evaluate`; on confident, runs `build_css` + `transform_css_items`; switch on classNames count (1 → replace expression with classNames[0]; 0 → `undefined` Ident; else → error); (2) **member expression** — walks the JSXAttribute value collecting `MemberExpression.object.Ident.sym` names, aggregates `state.css_map[name]` sheets, bails on empty (legacy runtime xcss path). Both branches set `state.uses_xcss = true` and replace the parent JSXElement with the `<CC><CS>{[sheets]}</CS>{originalJsx}</CC>` wrapper from `compiled_template`. **Dispatch site:** `babel_plugin.rs::visit_mut_jsx_element` post-order (children walk FIRST so the original element's children are processed before the wrap; the wrapper's synthesised children are NOT re-walked, which mirrors Babel's `transformCache` short-circuit). **Late-resolve panic UNCHANGED:** xcss-prop's actual call sites do NOT reach `extract_member_expression` — the inline-object branch's `build_css` runs against a static-confirmed ObjectExpression with no MemberExpression children, and the member-expression branch reads `state.cssMap` directly. The `generate_cache_for_css_map` `unimplemented!()` panic stays in `utils/css_builders.rs` and is now repurposed as a §6.5 (css-prop) reachability gate. **Drift detected in §6.3:** `crates/babel-plugin/src/css_map/mod.rs` `tests` module was missing `PropName` from its `swc_core::ecma::ast` import list; STATUS claimed 359/359 lib tests pass but the test module did not compile at HEAD. Added one-line import as part of §6.4 unblock. | claude-2026-05-05 | `crates/babel-plugin/src/xcss_prop/mod.rs` (~470 LOC + 13 unit tests covering xcss-attr matcher case-insensitive / namespaced filter / find_xcss_attr / collect_member_object_idents on simple member + call-with-logical-args / collect_pass_styles aggregation / inline-static-object end-to-end / empty-inline-object → undefined / member-branch end-to-end / member-branch state-css-map miss → bail / processXcss=false bypass / no-xcss-attr returns None); `crates/babel-plugin/src/lib.rs` (`pub mod xcss_prop;`); `crates/babel-plugin/src/babel_plugin.rs` (`visit_mut_jsx_element` extension after the children walk: dispatches `xcss_prop::try_handle_jsx_element` and replaces `*n` on `Some(replacement)`); `crates/babel-plugin/src/state.rs` (added `set_uses_xcss` non-captured init-time mutator per STATE_MUTATIONS.md classification); `crates/babel-plugin/src/css_map/mod.rs` (one-line `PropName` import added to `tests` module — drift fix from §6.3). | Lib: `cargo test -p babel-plugin --lib` → **372/372** (was 359 post-§6.3; +13 xcss_prop unit tests). Integration: `compat_evaluation_integration` 3/3, `compat_scope_integration` 3/3, `compat_generator_integration` 3/3, `resolver_matrix_integration` 8/8, `transform_css_integration` 3/3, `hash_parity` 4/4 — all sibling gates unchanged. WASM: `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean. End-to-end xcss-prop fixtures byte-clean DEFERRED to §4.8 exit gate (parity harness still tail-ends on §6.5/§6.6/§6.7 per the §6.3 plan). |
+| §6.5 | ☑ (this session, 2026-05-05) | `css-prop` handler — 1:1 port of `css-prop/index.ts` (~88 LOC upstream). Find `css` JSXAttribute (exact-match, `cssMap`/`xcss`/`cssText` skipped), check disable directives, run `build_css(cssValueExpr, meta)`, splice the css attribute, then either return early on empty cssOutput or wrap the JSXElement with `build_compiled_component`. **MutationRecorder threading landed in this session:** every `extract_*` / `build_css*` fn in `utils/css_builders.rs` gained `recorder: &mut MutationRecorder` (~30 internal call sites + 3 hash-site tests + 2 external callers — `css_map`/`xcss_prop`); `generate_cache_for_css_map` is now a real 1:1 port that calls `resolve_binding` + `visit_css_map_path`, replacing the §6.4 `unimplemented!()` panic. css-prop's `<div css={styles.primary} />` member-expression case now reaches `extract_member_expression` → `generate_cache_for_css_map` cleanly. **Comment-disable directive: §6.5 incomplete branch (documented divergence).** `is_css_prop_disabled` upstream walks `meta.state.file.ast.comments` filtered by line number; SWC's plugin runtime exposes line lookup via a `SourceMap` proxy that the visitor doesn't thread today. The Rust `comments::is_css_prop_disabled_via_comment_store` returns `false` (transform always runs) — biases TOWARD upstream's "no directive present" fast path. Fixtures with `@compiled-disable-line transform-css-prop` directives WILL produce divergent output until the SourceMap-thread follow-up lands. Documented in `crates/babel-plugin/src/utils/comments.rs` module doc. | claude-2026-05-05 | `crates/babel-plugin/src/css_prop/mod.rs` (~250 LOC + 8 unit tests covering exact-match attr lookup / xcss-cssMap-cssText skip / namespaced-attr skip / no-compiled-imports gate / inline-object end-to-end / empty-object splice / missing-value bail / member-expression late-resolve happy path); `crates/babel-plugin/src/utils/comments.rs` (stub returning false with module-doc divergence note); `crates/babel-plugin/src/utils/mod.rs` (added `pub mod comments;`); `crates/babel-plugin/src/lib.rs` (added `pub mod css_prop;`); `crates/babel-plugin/src/babel_plugin.rs` (added `crate::css_prop::try_handle_jsx_element` dispatch in `visit_mut_jsx_element` AFTER xcss-prop, mirrors upstream JSXOpeningElement registration order). MutationRecorder threading: `crates/babel-plugin/src/utils/css_builders.rs` (12 fn signatures + 30 internal call sites + 3 test recorder constructions + real `generate_cache_for_css_map` body); `crates/babel-plugin/src/css_map/mod.rs` (1 build_css call); `crates/babel-plugin/src/xcss_prop/mod.rs` (1 build_css call). | Lib: `cargo test -p babel-plugin --lib` → **380/380** (was 372 post-§6.4; +8 css_prop unit tests). Integration: `compat_evaluation_integration` 3/3, `compat_scope_integration` 3/3, `compat_generator_integration` 3/3, `resolver_matrix_integration` 8/8, `transform_css_integration` 3/3, `hash_parity` 4/4 — all sibling gates unchanged. WASM: `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean. css-prop fixtures byte-clean DEFERRED to §4.8 exit gate (parity-harness tail-ends on §6.7 styled). |
+| §6.6 | ☑ (this session, 2026-05-05) | `<ClassNames>` handler — 1:1 port of `class-names/index.ts` (~195 LOC upstream). Render-prop pattern with two-pass sub-traversal: (1) replace every `css({...})` / renamed `c({...})` / `props.css({...})` / tagged-template inside the children-as-function with `ax([classNames])`, accumulating sheets + variables; (2) replace `style` Identifier and `<x>.style` MemberExpression references with the variables-built ObjectExpression (or `undefined` when no variables collected). Final step: `pickFunctionBody(children)` → wrap with `compiled_template`. **Sub-traversal model:** SWC `VisitMut` impls (`CssCallReplacer`, `StyleRefReplacer`) own the mutation; the dispatch site runs `el.visit_mut_with(&mut pass)` for each pass. Rename detection covers the common `({ css, style })` and `({ css: c, style: s })` destructured-param shapes via the `RenameMap` built from the children-fn's first parameter. Dispatch order in `visit_mut_jsx_element`: `<ClassNames>` runs FIRST (replaces the entire JSXElement with the wrapper); subsequent xcss/css-prop dispatch runs on the wrapper (no-op because the wrapper has no xcss/css attribute). | claude-2026-05-05 | `crates/babel-plugin/src/class_names/mod.rs` (~510 LOC + 7 unit tests covering rename-map simple-destructured / rename-map keyvalue-renames / extract_styles bare-css / extract_styles props.css / extract_styles unrelated-call no-match / dispatch skip when not class-names import / dispatch happy path); `crates/babel-plugin/src/lib.rs` (added `pub mod class_names;`); `crates/babel-plugin/src/babel_plugin.rs` (added `crate::class_names::try_handle_jsx_element` dispatch in `visit_mut_jsx_element` BEFORE xcss/css-prop, with early-return on success). | Lib: `cargo test -p babel-plugin --lib` → **387/387** (was 380 post-§6.5; +7 class_names unit tests). Integration: `compat_evaluation_integration` 3/3, `compat_scope_integration` 3/3, `compat_generator_integration` 3/3, `resolver_matrix_integration` 8/8, `transform_css_integration` 3/3, `hash_parity` 4/4 — all sibling gates unchanged. WASM: `cargo build -p babel-plugin --target wasm32-wasip1 --release` clean. ClassNames fixtures byte-clean DEFERRED to §4.8 exit gate. **Drift watch points:** (1) Rename detection covers `ObjectPatProp::KeyValue` and `ObjectPatProp::Assign` shapes; the rest fall through (no rename recorded). The corpus shape is destructured-param render-prop, so this covers the reach. (2) `style` reference replacement skips ObjectExpression KeyValue keys via `visit_mut_key_value_prop` override (matches upstream's `path.parentPath.isProperty()` skip). (3) Tagged-template form passes the `Tpl` directly to `build_css`; the dispatcher's `Expr::Tpl` branch fires `extract_template_literal`. (4) Multi-arg `css(a, b)` wraps args into an ArrayLit before passing to `build_css` (the `Expr::Array` branch dispatches to `extract_array`). |
 | §6.7 | ☐ | `styled` handler (largest; forwardRef + `@emotion/is-prop-valid` table verbatim port) | — | `crates/babel-plugin/src/styled/mod.rs`, `crates/babel-plugin/src/utils/build_styled_component.rs`, `crates/babel-plugin/src/compat/is_prop_valid.rs` (verbatim emotion table) | styled fixtures byte-clean (the largest single fixture set) |
 | §6.8 | ☐ | **Phase 6 exit gate:** all ~50 babel-plugin tests + cross-handler tests + JSX automatic-runtime fixtures + custom-import-source fixtures byte-clean | — | STATUS.md updated | Full harness green |
 
