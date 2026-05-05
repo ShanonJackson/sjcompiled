@@ -719,7 +719,7 @@ pub fn extract_object_expression(
                     // matches only KeyValue. Fall through (no-op).
                     continue;
                 };
-                let key = object_property_to_string(&kv.key, meta)?;
+                let key = object_property_to_string(&kv.key, meta, scope_index, parent_scope, own_scope)?;
                 // §6.8a-vi: 1:1 port of upstream `evaluateExpression(prop.value, meta)`.
                 // Resolves Ident / Member / Call / etc. through `resolve_binding`
                 // → recursive evaluator, returning either a literal-folded
@@ -1153,6 +1153,61 @@ pub fn extract_template_literal(
         .value
         .unwrap_or_else(|| Box::new(node_expression.clone()));
 
+        // §6.8b: 1:1 port of upstream `canBuildExpressionAsCss`
+        // branch (build-css.ts:803-838). When the evaluated
+        // interpolation is an ObjectExpression (or a Compiled CSS
+        // tagged-template / call-expression), recurse buildCss into
+        // it and emit its CSS items. Without this, e.g.
+        // `` css`${color}` `` where `color = { color: 'blue' }`
+        // panics inside the catch-all CSS-variable path that
+        // expects scalar interpolations only.
+        let does_expression_contain_css_block = matches!(&*evaluated_interp, Expr::Object(_))
+            || is_compiled_css_tagged_template_expression(&evaluated_interp, meta.state)
+            || is_compiled_css_call_expression(&evaluated_interp, meta.state);
+
+        let does_expression_have_conditional_css = matches!(
+            &node_expression,
+            Expr::Arrow(arrow) if matches!(&*arrow.body, BlockStmtOrExpr::Expr(e) if matches!(&**e, Expr::Cond(_)))
+        );
+
+        let can_build_expression_as_css = (!_is_mid_statement && does_expression_contain_css_block)
+            || does_expression_have_conditional_css
+            || matches!(&node_expression, Expr::Tpl(_));
+
+        if can_build_expression_as_css {
+            // Upstream nests a `fragment`-context Metadata for the
+            // template-literal recursion case. For the common
+            // ObjectExpression / css-call shapes we keep the existing
+            // meta context (matches upstream's `updatedMeta` branch).
+            let saved_ctx = meta.context.clone();
+            if matches!(&node_expression, Expr::Tpl(_)) {
+                meta.context = MetadataContext::Fragment;
+            }
+            let result = build_css_inner(
+                &evaluated_interp,
+                meta,
+                scope_index,
+                parent_scope,
+                own_scope,
+                recorder,
+            )?;
+            meta.context = saved_ctx;
+
+            if !result.css.is_empty() {
+                // Upstream lines 832-836:
+                //   css.push({ type: 'unconditional', css: acc + quasi.value.raw }, ...result.css);
+                //   variables.push(...result.variables);
+                //   return '';
+                let prefix = std::mem::take(&mut acc);
+                css.push(CssItem::Unconditional(UnconditionalCssItem {
+                    css: format!("{}{}", prefix, raw),
+                }));
+                css.extend(result.css);
+                variables.extend(result.variables);
+                continue;
+            }
+        }
+
         // Reaching ANY of the below dispatch arms requires the evaluator.
         if try_keyframes_branch(
             &evaluated_interp,
@@ -1364,16 +1419,78 @@ fn build_css_inner(
     }
 
     if let Expr::Ident(i) = node {
-        // §4.6 bridge: real resolver dispatch. Surrounding JS branch
-        // (cssMap-collision check + recurse on resolved init expr) is
-        // Phase 6 work; bridge discards the PartialBindingWithMeta.
-        let _ = resolve_binding(
+        // §6.8b: 1:1 port of upstream `buildCss` Identifier branch
+        // (build-css.ts:992-1024). Replaces the §4.6 stub that
+        // discarded the resolved binding. Without this, references
+        // like `styled.div([styles, ...])` where `styles = {...}` fall
+        // through to the catch-all "unable to extract" error.
+        let resolved = resolve_binding(
             i.sym.as_str(),
             &*meta,
             &*scope_index,
             parent_scope,
             own_scope,
         );
+        let Some(resolved) = resolved else {
+            return Err(build_code_frame_error(
+                "Variable could not be found".to_string(),
+                Some(i.span),
+            ));
+        };
+        let Some(node_expr) = resolved.node.as_ref() else {
+            // Upstream throws `${node.type} isn't a supported CSS
+            // type` — the only non-Expression resolvedBinding.node
+            // shape that surfaces is when the binding has no init
+            // (e.g. `let x; ... <div css={x} />`). Use a generic
+            // node-type label since `binding.node` is `Option<Box<Expr>>`
+            // and we don't carry the original AST node kind.
+            return Err(build_code_frame_error(
+                "Identifier isn't a supported CSS type - try using an object or string".to_string(),
+                Some(i.span),
+            ));
+        };
+        // cssMap-collision check — upstream's `meta.state.cssMap[node.name]`
+        // throw. The cssMap registry is populated by §6.3's cssMap handler.
+        if meta.state.css_map().contains_key(i.sym.as_str()) {
+            return Err(build_code_frame_error(
+                crate::utils::css_map::create_error_message(
+                    "You must use the variant of a CSS Map object (eg. `styles.root`), not the root object itself, eg. `styles`."
+                ),
+                Some(i.span),
+            ));
+        };
+
+        // Recurse with the appropriate scope. For same-file, keep the
+        // current scope chain; for cross-file imports, build a fresh
+        // ScopeIndex from the imported module's AST and route through
+        // its program scope (mirrors §5.6's cross-file dispatch).
+        let result = if resolved.source == BindingSource::Import {
+            if let Some(imported_module) = resolved.imported_module.as_ref() {
+                let mut imp_idx = ScopeIndex::build(&**imported_module);
+                let imp_prog = imp_idx.program_scope();
+                let cloned = node_expr.clone();
+                build_css_inner(&cloned, meta, &mut imp_idx, imp_prog, None, recorder)?
+            } else {
+                let cloned = node_expr.clone();
+                build_css_inner(&cloned, meta, scope_index, parent_scope, own_scope, recorder)?
+            }
+        } else {
+            let cloned = node_expr.clone();
+            build_css_inner(&cloned, meta, scope_index, parent_scope, own_scope, recorder)?
+        };
+
+        // assertNoImportedCssVariables — upstream lines 333-346:
+        // imported binding that produced CSS variables means we'd
+        // need to ensure all identifiers are added to the owning
+        // file. Throws to deopt.
+        if resolved.source == BindingSource::Import && !result.variables.is_empty() {
+            return Err(build_code_frame_error(
+                "Identifier contains values that can't be statically evaluated".to_string(),
+                Some(i.span),
+            ));
+        }
+
+        return Ok(result);
     }
 
     if let Expr::Array(ArrayLit { elems, .. }) = node {
