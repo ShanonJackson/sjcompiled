@@ -235,6 +235,17 @@ pub struct Binding {
     /// the imported AST. Same shape-extension precedent §5.0c used
     /// for `init_expr` (gated population, single-purpose surface).
     pub import_info: Option<ImportInfo>,
+    /// **§6.8n addition** — for `const { ... } = <init>` /
+    /// `const [ ... ] = <init>` destructuring bindings only: the LHS
+    /// pattern (so `getDestructuredObjectPatternKey` can recover the
+    /// source key for this binding's reference name) and the RHS
+    /// init expression. Mirrors `resolve-binding.ts:263-269` which
+    /// reads `binding.path.node.id` (the pattern) and
+    /// `binding.path.node.init` (the source) at resolve time.
+    /// Populated only when LHS is `Pat::Object` AND `init` is
+    /// `Some(_)`. `None` everywhere else.
+    pub destructured_pat: Option<Box<ObjectPat>>,
+    pub destructured_init: Option<Box<Expr>>,
 }
 
 /// Cross-file import metadata attached to import-specifier
@@ -714,6 +725,8 @@ impl ScopeIndex {
             scope,
             span,
             import_info: None,
+            destructured_pat: None,
+            destructured_init: None,
         };
         self.register_synthetic_binding(scope, name, binding);
     }
@@ -937,24 +950,40 @@ impl Builder {
 
         let init_string = init_string_value(declarator);
 
-        // §5.0c — populate `init_expr` for `const x = <expr>` where
+        // §5.0c — populate `init_expr` for `<kind> x = <expr>` where
         // LHS is a simple `Pat::Ident`. evaluation.js:162-168
         // recurses on `binding.path.get('init')`; the §5.0c port
-        // needs the cloned expression. Gate on `kind == Const`
-        // because evaluation.js:122 deopts on
-        // `binding.constantViolations.length > 0` BEFORE reaching the
-        // init recursion — a `let`/`var` binding never folds via
-        // this branch even if its init looks pure. Finding 1
-        // stored-bool reasoning: gate decided once at index-build
-        // time. Destructuring bindings deopt (no single
+        // needs the cloned expression. Babel does NOT gate the init
+        // recursion on `kind` — `evaluation.js:120-123` deopts only
+        // when `binding.constantViolations.length > 0` (i.e. the
+        // binding has been observed to be reassigned). A
+        // `let notMutatedAgain = 20;` fixture with no reassignment
+        // has `binding.constant === true` and folds via the init
+        // recursion the same as a `const`. The runtime gate is
+        // `binding.constant`, checked at use-site
+        // (`evaluation.rs:445`, `traverse_identifier`'s `if binding.constant`).
+        // `var` deopts unconditionally at `evaluation.rs:457`, so a
+        // populated `init_expr` for `var` is harmless but never read
+        // through that path. Destructuring bindings deopt (no single
         // `binding.path.init` to recurse on).
         let init_expr_for_const_ident: Option<Box<Expr>> =
-            if matches!(declarator.name, Pat::Ident(_))
-                && matches!(kind, BindingKind::Const)
-            {
+            if matches!(declarator.name, Pat::Ident(_)) {
                 declarator.init.clone()
             } else {
                 None
+            };
+
+        // §6.8n — capture the LHS ObjectPat + RHS init for
+        // destructured bindings so `resolve_binding` can route
+        // through `resolve_object_pattern_value_node` (mirrors
+        // resolve-binding.ts:263-269). Only `Pat::Object` is wired —
+        // `Pat::Array` deopts cleanly (corpus reach is empty).
+        let (destructured_pat, destructured_init): (Option<Box<ObjectPat>>, Option<Box<Expr>>) =
+            match (&declarator.name, declarator.init.as_ref()) {
+                (Pat::Object(obj), Some(init)) => {
+                    (Some(Box::new(obj.clone())), Some(init.clone()))
+                }
+                _ => (None, None),
             };
 
         for (name, span) in collect_pat_idents(&declarator.name) {
@@ -981,6 +1010,8 @@ impl Builder {
                 scope: target_scope,
                 span,
                 import_info: None,
+                destructured_pat: destructured_pat.clone(),
+                destructured_init: destructured_init.clone(),
             };
 
             // Finding 4: isInitInLoop auto-reassigns var/hoisted bindings
@@ -1034,6 +1065,8 @@ impl Builder {
             scope: target_scope,
             span,
             import_info: None,
+            destructured_pat: None,
+            destructured_init: None,
         };
         self.bindings_by_scope[target_scope as usize]
             .insert(fn_decl.ident.sym.to_string(), binding);
@@ -1058,6 +1091,8 @@ impl Builder {
             scope: target_scope,
             span,
             import_info: None,
+            destructured_pat: None,
+            destructured_init: None,
         };
         self.bindings_by_scope[target_scope as usize]
             .insert(class_decl.ident.sym.to_string(), binding);
@@ -1157,6 +1192,8 @@ impl Builder {
                     pat_span
                 },
                 import_info: None,
+                destructured_pat: None,
+                destructured_init: None,
             };
             self.bindings_by_scope[scope as usize].insert(name, binding);
         }
@@ -1346,6 +1383,8 @@ impl Builder {
                         pat_span
                     },
                     import_info: None,
+                    destructured_pat: None,
+                    destructured_init: None,
                 };
                 self.bindings_by_scope[scope as usize].insert(name, binding);
             }
@@ -1616,6 +1655,8 @@ impl Builder {
                 scope: scope_id,
                 span: ident.span,
                 import_info: None,
+                destructured_pat: None,
+                destructured_init: None,
             };
             self.bindings_by_scope[scope_id as usize]
                 .insert(ident.sym.to_string(), binding);
@@ -1649,6 +1690,8 @@ impl Builder {
                 scope: scope_id,
                 span: ident.span,
                 import_info: None,
+                destructured_pat: None,
+                destructured_init: None,
             };
             self.bindings_by_scope[scope_id as usize]
                 .insert(ident.sym.to_string(), binding);
@@ -1862,6 +1905,8 @@ impl Builder {
                     kind,
                     imported_name,
                 }),
+                destructured_pat: None,
+                destructured_init: None,
             };
             self.bindings_by_scope[scope as usize].insert(name, binding);
         }
@@ -2034,7 +2079,7 @@ fn init_string_value(declarator: &VarDeclarator) -> Option<String> {
 
 /// Babel's `getOuterBindingIdentifiers(true)` analog — collects all
 /// Identifiers bound by a Pattern, with their spans.
-fn collect_pat_idents(pat: &Pat) -> Vec<(String, Span)> {
+pub fn collect_pat_idents(pat: &Pat) -> Vec<(String, Span)> {
     let mut out = Vec::new();
     collect_pat_idents_into(pat, &mut out);
     out

@@ -34,31 +34,37 @@ pub fn get_object_property_value(
         let PropOrSpread::Prop(boxed) = prop else {
             continue;
         };
-        let Prop::KeyValue(kv) = &**boxed else {
-            // Method / getter / setter / shorthand etc. The upstream
-            // `t.isObjectProperty(path.node)` predicate is true only
-            // for KeyValue (`{ key: value }`) shape; shorthand
-            // (`{ key }`) is a different upstream variant that
-            // happens to also be ObjectProperty in Babel but
-            // SWC splits it into Prop::Shorthand. Mirror upstream
-            // by considering ONLY KeyValue.
-            continue;
-        };
-        let key_matches = match &kv.key {
-            PropName::Ident(id) => id.sym == *property_name,
-            // Upstream's `t.isIdentifier(path.node.key, { name })`
-            // check is FALSE for string-literal keys, so we mirror
-            // that by NOT matching here. (The JS `noScope: true`
-            // visitor would walk into the StringLiteral but the
-            // ObjectProperty handler's `isIdentifier` predicate
-            // would be false.) Documented inline so future agents
-            // don't "fix" it to also match string keys.
-            _ => false,
-        };
-        if key_matches {
-            return Some(ExportResult {
-                node: Some(kv.value.clone()),
-            });
+        // §6.8n — normalise Prop::Shorthand into a synthetic
+        // KeyValue. Babel parses `{ color }` as ObjectProperty
+        // `{ key: Ident("color"), value: Ident("color"), shorthand: true }`
+        // so upstream's `t.isObjectProperty(prop)` predicate matches
+        // shorthand AND longhand identically. SWC splits the same
+        // source into `Prop::Shorthand(Ident)` vs `Prop::KeyValue` —
+        // dropping shorthand here was a pre-existing port miss
+        // (same root cause as §6.8m's `extract_object_expression`
+        // fix). Method / Setter / Getter / Assign are NOT
+        // ObjectProperty in Babel and are correctly skipped.
+        let key_sym: &swc_core::ecma::atoms::Atom;
+        let value: Box<swc_core::ecma::ast::Expr>;
+        match &**boxed {
+            Prop::KeyValue(kv) => {
+                let PropName::Ident(id) = &kv.key else {
+                    // Upstream's `t.isIdentifier(path.node.key, { name })`
+                    // check is FALSE for string-literal keys, so we
+                    // mirror that by NOT matching here.
+                    continue;
+                };
+                key_sym = &id.sym;
+                value = kv.value.clone();
+            }
+            Prop::Shorthand(id) => {
+                key_sym = &id.sym;
+                value = Box::new(swc_core::ecma::ast::Expr::Ident(id.clone()));
+            }
+            _ => continue,
+        }
+        if *key_sym == *property_name {
+            return Some(ExportResult { node: Some(value) });
         }
     }
     None

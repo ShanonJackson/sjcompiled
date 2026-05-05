@@ -146,6 +146,8 @@ pub fn evaluate_namespace_import_path<'a>(
                     scope: imported_scope_index.program_scope(),
                     span: swc_core::common::DUMMY_SP,
                     import_info: None,
+                    destructured_pat: None,
+                    destructured_init: None,
                 };
                 let prog = imported_scope_index.program_scope();
                 imported_scope_index.register_synthetic_binding(prog, "default", synthetic);

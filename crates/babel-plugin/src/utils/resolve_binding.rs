@@ -494,11 +494,47 @@ where
 
     // Same-file VariableDeclarator branch.
     if let Some(init) = binding.init_expr.as_ref() {
-        // The `binding.init_expr` is populated only for
-        // `const x = <expr>` with `Pat::Ident` LHS per §5.0c lock.
-        // Object-pattern LHS isn't tracked — we deopt above.
+        // The `binding.init_expr` is populated for
+        // `<kind> x = <expr>` with `Pat::Ident` LHS (§6.8n widened
+        // the §5.0c gate from Const-only to all kinds). Destructured
+        // LHS is handled by the §6.8n branch below.
         return Some(PartialBindingWithMeta {
             node: Some(init.clone()),
+            constant: binding.constant,
+            source: BindingSource::Module,
+            imported_filename: None,
+            imported_module: None,
+        });
+    }
+
+    // §6.8n — destructured `Pat::Object` LHS branch. Mirrors
+    // `resolve-binding.ts:263-269`: when `binding.path.node.id` is
+    // `t.isObjectPattern` AND `binding.path.node.init` is an
+    // expression, recover the source key for `reference_name` via
+    // `getDestructuredObjectPatternKey`, then walk
+    // `resolveObjectPatternValueNode(init, ..., key, evaluateExpression)`
+    // to extract the matching value node.
+    if let (Some(pat), Some(init)) = (
+        binding.destructured_pat.as_ref(),
+        binding.destructured_init.as_ref(),
+    ) {
+        let key = get_destructured_object_pattern_key(pat, reference_name);
+        // Pass `None` for the evaluator: the §5.4e parity-corpus
+        // reach for `resolveObjectPatternValueNode` is the
+        // direct-object + identifier-recursion paths, both of which
+        // operate without it. The MemberExpression-on-MemberExpression
+        // path is gated on the evaluator and stays deopt-clean here.
+        let resolved = resolve_object_pattern_value_node::<fn(&Expr) -> Option<Box<Expr>>>(
+            init,
+            &key,
+            meta,
+            scope_index,
+            parent_scope,
+            own_scope,
+            None,
+        );
+        return Some(PartialBindingWithMeta {
+            node: resolved,
             constant: binding.constant,
             source: BindingSource::Module,
             imported_filename: None,

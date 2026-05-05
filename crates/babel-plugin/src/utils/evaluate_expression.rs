@@ -781,8 +781,12 @@ mod tests {
     }
 
     #[test]
-    fn deopts_when_identifier_is_non_const() {
-        // `let x = 1; x;` — let binding → not constant → deopt to fallback.
+    fn folds_let_when_not_reassigned() {
+        // `let x = 1; x;` — let binding with no reassignment is
+        // `binding.constant === true` per Babel (constantViolations
+        // is empty), so the init folds same as a `const`. Mirrors
+        // upstream `expression-evaluation.test.ts` "should inline
+        // mutable identifier that is not mutated".
         let module = parse_module("let x = 1; x;");
         let mut idx = ScopeIndex::build(&module);
         let prog = idx.program_scope();
@@ -792,7 +796,25 @@ mod tests {
         let target = first_expr(&expr_ast);
         let pair = evaluate_expression(&*target, &mut meta, &mut idx, prog, None);
         let v = pair.value.expect("value");
-        // Mutated reference deopt → fallback to identifier (input).
+        match *v {
+            Expr::Lit(Lit::Num(n)) => assert_eq!(n.value, 1.0),
+            other => panic!("expected number 1, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn deopts_when_let_is_reassigned() {
+        // `let x = 1; x = 2; x;` — reassignment marks
+        // `binding.constant = false`; identifier deopts to fallback.
+        let module = parse_module("let x = 1; x = 2; x;");
+        let mut idx = ScopeIndex::build(&module);
+        let prog = idx.program_scope();
+        let mut state = State::default();
+        let mut meta = meta_for_test(&mut state);
+        let expr_ast = parse_module("x;");
+        let target = first_expr(&expr_ast);
+        let pair = evaluate_expression(&*target, &mut meta, &mut idx, prog, None);
+        let v = pair.value.expect("value");
         match *v {
             Expr::Ident(id) => assert_eq!(id.sym.as_str(), "x"),
             other => panic!("expected identifier deopt, got {other:?}"),

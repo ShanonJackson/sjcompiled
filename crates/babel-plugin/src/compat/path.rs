@@ -768,6 +768,8 @@ pub fn scope_push(
         scope: arrow_scope,
         span: id_span,
         import_info: None,
+        destructured_pat: None,
+        destructured_init: None,
     };
     index.register_synthetic_binding(arrow_scope, &opts.id, binding);
 }

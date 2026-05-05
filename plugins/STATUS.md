@@ -20,8 +20,8 @@
 **Phase status:** 0 ☑ (modulo §0.10–§0.12 — Phase 5 gates, not Phase 4
 blockers) · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ (modulo §4.7 OUT OF SCOPE and §4.8
 gated on Phase 6) · 5 ☑ · **Phase 6 §6.1–§6.7 ☑ (all 7 per-API
-handlers shipped) · §6.8 ▶ (active triage; post-§6.8m baseline
-422/54/0/0/1)** · Phase 7+ ☐.
+handlers shipped) · §6.8 ▶ (active triage; post-§6.8n baseline
+441/35/0/0/1)** · Phase 7+ ☐.
 
 **Active checkpoint: Phase 6 §6.8** — full-corpus parity exit gate.
 See "§6.8 active state" below for the current divergence baseline,
@@ -38,10 +38,10 @@ Earlier "954/954 bun parity" cited in §5.6 was a pass-through oracle
 (assert babel ≠ swc); §6.8 inverts it (assert babel == swc) and
 surfaces real divergence.
 
-**Current baseline (post-§6.8m, 2026-05-06):** parity **422 / 477**
-(88.5%), divergence **54**, swc-throws **0**, babel-throws **0**,
+**Current baseline (post-§6.8n, 2026-05-06):** parity **441 / 477**
+(92.5%), divergence **35**, swc-throws **0**, babel-throws **0**,
 both-throw **1**. Cumulative session delta from the original
-7/407/62/1 baseline: parity +415, divergence −353, swc-throws −62
+7/407/62/1 baseline: parity +434, divergence −372, swc-throws −62
 (cluster cleared), babel-throws −1. §6.8i closed the React→React1
 hygiene-rename cluster (parity +28); §6.8j ported the spread-element
 recursive build_css_inner (parity +21); §6.8k ported `jsesc@2.5.2`
@@ -49,7 +49,9 @@ default-string mode for synthesised sheet-const StringLiterals
 (parity +1); §6.8l ported the logical-expression sub-pass and
 `extract_logical_expression` body (parity +10); §6.8m normalised
 SWC `Prop::Shorthand` into a synthetic KeyValue inside
-`extract_object_expression` (parity +16).
+`extract_object_expression` (parity +16); §6.8n bundled the
+destructured-binding resolution + IIFE-scope propagation fixes
+(parity +19, six sub-fixes).
 
 **Triage tooling at `parity-harness/babel-plugin/`:**
 - `triage.mjs` runs every fixture, emits categorised JSON
@@ -992,11 +994,89 @@ remaining divergences are now CONTAINED to:
   4 → 3, `class-names/call-expression` 5 → 3, plus collateral wins
   across `__tests__/css-builder` and `__tests__/expression-evaluation`.
 
+- **§6.8n ☑ — Destructured-binding resolution + IIFE-scope
+  propagation bundle** (this session, 2026-05-06). Six sub-fixes
+  landed together because they share a single root cause: Compiled's
+  `resolveBinding` path handles destructured LHS by walking the
+  pattern + source object pair, but the §5.0a/§5.0c port narrowed
+  this to const-with-Pat::Ident only.
+
+  **Sub-fixes:**
+
+  - **§6.8n-i — `init_expr` gate widened from `Const + Pat::Ident`
+    to `Pat::Ident` (any kind).** `compat/scope.rs::register_var_declarator`
+    now populates `init_expr` for `let x = 20` / `var x = 20`
+    bindings whose LHS is a plain Identifier. Babel's
+    `evaluation.js:120-123` deopts only on
+    `binding.constantViolations.length > 0` (i.e. observed
+    reassignment), NOT on `kind`. The runtime `binding.constant`
+    gate is checked at use sites
+    (`evaluation.rs:445`, `traverse_identifier`); `var` deopts
+    unconditionally at `evaluation.rs:457` so a populated
+    `init_expr` for `var` is harmless.
+
+  - **§6.8n-ii — Added `destructured_pat` / `destructured_init`
+    fields to `Binding`.** Populated for `Pat::Object` LHS by
+    `register_var_declarator`. Mirrors `resolve-binding.ts:263-269`
+    which reads `binding.path.node.id` (the pattern) and
+    `binding.path.node.init` (the source) at resolve time.
+
+  - **§6.8n-iii — `Prop::Shorthand` normalisation in
+    `get_object_property_value`.** Same root cause as §6.8m — the
+    `Prop::KeyValue` guard silently dropped shorthand properties.
+    Now `({ color })` accessed via `.color` correctly returns the
+    Ident("color") value (which then folds via the recursive
+    evaluator).
+
+  - **§6.8n-iv — IIFE site registers `Pat::Object` params with
+    `destructured_pat` / `destructured_init`.** `traverse_call_expression`
+    previously skipped ObjectPattern params with a `documented as a
+    follow-up` comment; now mirrors
+    `arrowFunctionExpressionPath.scope.push({ id: <ObjectPattern>,
+    init, kind: 'const' })` — registers each leaf name with the
+    whole pattern + evaluated arg.
+
+  - **§6.8n-v — `compat::evaluation::evaluate`'s Ident branch handles
+    destructured bindings inline.** When the recursive evaluator
+    descends into a folded ObjectExpression (e.g. an arrow body
+    being walked by `babelEvaluateExpression`), it bypasses
+    Compiled's resolve-binding wrapper. The Ident branch now walks
+    `destructured_pat` via `getDestructuredObjectPatternKey` to
+    recover the source key, then walks `destructured_init` (an
+    ObjectLit at IIFE-call time — chained Ident/Member sources are
+    handled by the higher-level resolve path) for the matching
+    KeyValue or Shorthand, and recurses on the value with the same
+    scope.
+
+  - **§6.8n-vi — Stop restoring `meta.own_scope_override` after
+    the IIFE call.** Mirrors JS upstream's
+    `({ value, meta: updatedMeta } = evaluateExpression(callee, updatedMeta))`
+    shape: the meta with `ownPath = arrowFunctionExpressionPath`
+    propagates to the caller, so the spread branch in
+    `css_builders.rs` processes the folded ObjectLit with the
+    IIFE scope active. The pre-§6.8n eager restore was the
+    last-mile blocker for `<div css={{ ...mixin({ color1: ... }, ...) }} />`
+    shapes — without it, the outer scope's `color1` (a homonym
+    of the destructured param) shadowed the IIFE binding. Leak
+    bound: per-visit `Metadata` constructed at the plugin entry
+    (css_prop / styled / class_names) ensures no cross-visit
+    leakage. Updated the
+    `iife_site_registers_param_binding_and_swaps_own_scope_override`
+    unit test to assert propagation instead of restoration.
+
+  **Triage delta: parity 422 → 441 (+19), divergence 54 → 35 (−19),
+  swc-throws / babel-throws / both-throw all unchanged.** Lib tests
+  464 → 465. Cluster knock-on broad — every `argument-arrow-function-variable`
+  fixture across css-prop / styled / class-names cleared, plus the
+  expression-evaluation destructuring cluster (5 → 1) and the
+  member-expression-of-arrow-call shapes (`mixin().color`,
+  `mixin.foo()` patterns).
+
 ### Verifying the current state from a cold pickup
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 464/464 (post-§6.8k)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 465/465 (post-§6.8n)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact)
@@ -1013,7 +1093,7 @@ BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1 \
   bun test parity-harness/babel-plugin/harness.test.ts                  # 954/954 (pass-through oracle)
 
 # §6.8 inverted oracle (where the real work is):
-bun parity-harness/babel-plugin/triage.mjs                              # 422/54/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8m
+bun parity-harness/babel-plugin/triage.mjs                              # 441/35/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8n
 
 # CSS-port producer-side gate.
 bun run packages/equality-harness/scripts/verify.mjs                    # 336/336 (run under bun, NOT node)

@@ -50,7 +50,8 @@
 use std::collections::HashSet;
 
 use swc_core::ecma::ast::{
-    BinExpr, BinaryOp, CondExpr, Expr, Lit, Number, Tpl, UnaryExpr, UnaryOp,
+    BinExpr, BinaryOp, CondExpr, Expr, Lit, Number, Prop, PropName, PropOrSpread, Tpl, UnaryExpr,
+    UnaryOp,
 };
 
 // `crate::compat::globals` and `crate::compat::path::NodeKind` are
@@ -536,11 +537,75 @@ fn _evaluate(
             }
             return value;
         }
-        // No `init_expr` populated — the §5.0c gate (Pat::Ident +
-        // Const) didn't apply. Babel would still reach this code with
-        // `bindingPath.get('init')` returning an empty NodePath; that
-        // case folds to `undefined` per Babel (no init = uninitialised
-        // = undefined). Match Babel.
+        // §6.8n — destructured `Pat::Object` LHS branch. Babel's
+        // `path.evaluate()` itself doesn't extract destructured slices
+        // (it returns the whole source object), but Compiled's
+        // resolve-binding wrapper DOES at the upstream
+        // `traverse-identifier` dispatch site. The compat-evaluate
+        // path is reached here when the recursive evaluator descends
+        // into an ObjectExpression value (e.g. `{ color: color1 }`
+        // body of an arrow being folded by `babelEvaluateExpression`)
+        // — that bypass means we'd never reach Compiled's resolve
+        // wrapper unless we handle destructuring inline. Mirror the
+        // resolve-binding shape: walk the LHS pattern via
+        // `getDestructuredObjectPatternKey`, then walk the source
+        // ObjectExpression for a matching key, and recurse.
+        if let (Some(pat), Some(init)) = (
+            binding.destructured_pat.as_ref(),
+            binding.destructured_init.as_ref(),
+        ) {
+            let key = crate::utils::resolve_binding::get_destructured_object_pattern_key(
+                pat, name,
+            );
+            // Direct ObjectLit init: walk for matching key. This
+            // covers the IIFE-destructured-arg case where `init` is
+            // the evaluated call argument (an ObjectLit). Identifier-
+            // / Member-source cases (e.g. `const { foo } = obj`) are
+            // resolved via the higher-level `resolve_binding` path
+            // that traverse_identifier uses; the compat-evaluate
+            // bypass below only fires for the direct-ObjectLit
+            // shape because chained resolution requires `Metadata`
+            // we don't carry into this evaluator.
+            if let Expr::Object(obj) = &**init {
+                for prop in &obj.props {
+                    let PropOrSpread::Prop(boxed) = prop else {
+                        continue;
+                    };
+                    let (matches, value_expr): (bool, Expr) = match &**boxed {
+                        Prop::KeyValue(kv) => {
+                            let PropName::Ident(id) = &kv.key else {
+                                continue;
+                            };
+                            (id.sym == *key, (*kv.value).clone())
+                        }
+                        Prop::Shorthand(id) => (id.sym == *key, Expr::Ident(id.clone())),
+                        _ => continue,
+                    };
+                    if matches {
+                        // Recurse into the property value with the
+                        // same scope. The source ObjectLit was
+                        // captured at IIFE-call time with the
+                        // caller scope's bindings already in lexical
+                        // chain.
+                        return evaluate_cached(&value_expr, state, index, scope);
+                    }
+                }
+                // Key not found in source object → undefined per JS.
+                return Some(Value::Undefined);
+            }
+            // Non-ObjectLit init (Ident / Member chain): deopt
+            // through the standard path. The traverse_identifier
+            // dispatcher handles these via resolve_binding's §6.8n
+            // wiring; reaching here means we descended past the
+            // top-level dispatch. Conservative deopt matches Babel's
+            // path.evaluate() behaviour for non-foldable inits.
+            deopt(state);
+            return None;
+        }
+        // No `init_expr` populated and no destructured-pattern hint —
+        // Babel would reach this code with `bindingPath.get('init')`
+        // returning an empty NodePath; that case folds to `undefined`
+        // per Babel (no init = uninitialised = undefined). Match Babel.
         return Some(Value::Undefined);
     }
 

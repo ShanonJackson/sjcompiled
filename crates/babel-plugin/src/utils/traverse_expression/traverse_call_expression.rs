@@ -132,7 +132,7 @@
 use swc_core::ecma::ast::{CallExpr, Callee, Expr, ExprOrSpread, Pat};
 
 use crate::compat::scope::{
-    Binding, BindingKind, ScopeId, ScopeIndex, ScopeKind,
+    collect_pat_idents, Binding, BindingKind, ScopeId, ScopeIndex, ScopeKind,
 };
 use crate::types::Metadata;
 use crate::utils::create_result_pair::{create_result_pair, ResultPair};
@@ -257,6 +257,8 @@ where
                             scope: iife_scope,
                             span: swc_core::common::DUMMY_SP,
                             import_info: None,
+                            destructured_pat: None,
+                            destructured_init: None,
                         };
                         scope_index.register_synthetic_binding(
                             iife_scope,
@@ -264,29 +266,47 @@ where
                             binding,
                         );
                     }
-                    Pat::Object(_) => {
-                        // ObjectPattern params: JS pushes the WHOLE
-                        // pattern as the binding `id` and the evaluated
-                        // arg as `init`. Subsequent destructuring
-                        // resolution is handled by `resolve_binding.rs`'s
-                        // destructuring helpers, which scan the
-                        // pattern's properties at lookup time.
-                        //
-                        // For the §5.5-closure surface, ObjectPattern
-                        // params on user functions are rare in CSS
-                        // fixtures. Skip the pattern's binding-table
-                        // registration (no single name to bind) — if a
-                        // fixture surfaces a fold-through-destructured-
-                        // arg shape, escalate. Documented as a
-                        // follow-up in `plugins/STATUS.md` §5.5 row.
-                        //
-                        // Babel's `arrowFunctionExpressionPath.scope.push({
+                    Pat::Object(obj_pat) => {
+                        // §6.8n — ObjectPattern params: mirror
+                        // `arrowFunctionExpressionPath.scope.push({
                         //   id: <ObjectPattern>, init, kind: 'const'
-                        // })` is functionally a `const { ... } = init;`
-                        // — registers the pattern's leaf names into the
-                        // scope. The Rust port would need a pattern-walk
-                        // here that mirrors `register_var_declarator`'s
-                        // `Pat::Object` branch.
+                        // })` — functionally a `const { ... } = init;`
+                        // declaration in the IIFE's scope. Register
+                        // each leaf name with `destructured_pat` +
+                        // `destructured_init` so that
+                        // `resolve_binding`'s §6.8n destructuring
+                        // branch can route through
+                        // `resolve_object_pattern_value_node` at
+                        // lookup time.
+                        let init = evaluated_arguments
+                            .get(index)
+                            .cloned()
+                            .unwrap_or(None);
+                        let pat_clone = Box::new(obj_pat.clone());
+                        for (name, _ident_span) in collect_pat_idents(param) {
+                            let binding = Binding {
+                                kind: BindingKind::Const,
+                                identifier_name: name.clone(),
+                                constant: true,
+                                constant_violations: Vec::new(),
+                                reference_paths: Vec::new(),
+                                binding_node_type: "VariableDeclarator",
+                                parent_node_type: "VariableDeclaration",
+                                binding_init_string: None,
+                                init_expr: None,
+                                binding_id_type: Some("ObjectPattern"),
+                                scope: iife_scope,
+                                span: swc_core::common::DUMMY_SP,
+                                import_info: None,
+                                destructured_pat: Some(pat_clone.clone()),
+                                destructured_init: init.clone(),
+                            };
+                            scope_index.register_synthetic_binding(
+                                iife_scope,
+                                &name,
+                                binding,
+                            );
+                        }
                     }
                     _ => {
                         // `RestElement`, `AssignmentPattern`, `ArrayPattern`
@@ -298,11 +318,30 @@ where
             // Recursive evaluator call with `own_scope` swapped to the
             // IIFE arrow. Mirrors JS `updatedMeta.ownPath = arrowFunctionExpressionPath;
             // ({ value, meta: updatedMeta } = evaluateExpression(callee, updatedMeta));`.
-            let prior_override = meta.own_scope_override;
+            //
+            // §6.8n — DO NOT restore `meta.own_scope_override` after
+            // the call. JS upstream returns the mutated meta to the
+            // caller, who continues processing the folded value with
+            // `ownPath = arrowFunctionExpressionPath` — so identifier
+            // lookups inside the returned arrow body resolve against
+            // the IIFE scope (which carries the destructured-param
+            // bindings registered above). Restoring eagerly was the
+            // pre-§6.8n behaviour and broke spread-of-arrow-call
+            // shapes like `<div css={{ ...mixin({ color1: ... }, ...) }} />`
+            // because the spread branch in `css_builders.rs` then
+            // processed the returned ObjectLit at the OUTER scope and
+            // missed the IIFE bindings.
+            //
+            // Leak bound: the override persists until either (a) a
+            // sibling call expression overwrites it (also fine — its
+            // own iife_scope walks up to the program scope) or (b)
+            // the css-builder's per-call `extract_object_expression`
+            // / `extract_template_literal` driver completes. The
+            // outer plugin entry points (css_prop / styled /
+            // class_names / etc.) construct fresh `Metadata` per
+            // visit, so there is no cross-visit leak.
             meta.own_scope_override = Some(iife_scope);
-            let pair = evaluate_expression(callee_box, meta);
-            meta.own_scope_override = prior_override;
-            return pair;
+            return evaluate_expression(callee_box, meta);
         }
     }
 
@@ -567,10 +606,15 @@ mod tests {
             "own_scope_override must equal IIFE scope during recursive eval"
         );
 
-        // After the call, override is restored to None.
+        // §6.8n — override propagates to caller, mirroring JS
+        // upstream's `({ value, meta: updatedMeta } = evaluateExpression(...))`
+        // shape. The caller continues processing the folded value
+        // with `ownPath = arrowFunctionExpressionPath` (the IIFE
+        // scope here).
         assert_eq!(
-            meta.own_scope_override, None,
-            "own_scope_override must be restored after the recursive call"
+            meta.own_scope_override,
+            Some(iife_scope),
+            "own_scope_override must propagate the IIFE scope to the caller"
         );
 
         // The synthetic param binding was registered in the new scope.
