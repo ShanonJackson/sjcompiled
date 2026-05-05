@@ -156,7 +156,14 @@ pub fn emit_hoisted_sheets(module: &mut Module, state: &State) {
                 init: Some(Box::new(Expr::Lit(Lit::Str(Str {
                     span: DUMMY_SP,
                     value: sheet_text.as_str().into(),
-                    raw: None,
+                    // Pre-compute Babel's `_jsesc(value, jsescOption)`
+                    // shape so SWC's emitter prints raw verbatim. Without
+                    // this, non-ASCII CSS bytes (e.g., emoji in
+                    // `content: '😎'` per `styled/__tests__/call-expression.test.ts:91`)
+                    // emit raw on our side while Babel's StringLiteral
+                    // printer escapes to `\uD83D\uDE0E` form.
+                    // See `compat/jsesc.rs`.
+                    raw: Some(crate::compat::jsesc::babel_default_string(sheet_text).into()),
                 })))),
                 definite: false,
             }],

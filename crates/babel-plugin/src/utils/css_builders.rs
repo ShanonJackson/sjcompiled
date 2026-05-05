@@ -55,7 +55,7 @@ use css::{add_unit_if_needed, css_affix_interpolation, AddUnitValue};
 use swc_core::common::DUMMY_SP;
 use swc_core::ecma::ast::{
     ArrayLit, ArrowExpr, BinExpr, BinaryOp, BlockStmtOrExpr, Bool, CallExpr, Callee, CondExpr,
-    Expr, Ident, Lit, MemberExpr, Number, ObjectLit, Prop, PropOrSpread,
+    Expr, Ident, KeyValueProp, Lit, MemberExpr, Number, ObjectLit, Prop, PropName, PropOrSpread,
     SpreadElement, Str, TaggedTpl, Tpl, TplElement, UnaryExpr, UnaryOp,
 };
 
@@ -623,32 +623,50 @@ fn path_is_compiled_css_shape(expr: &Expr, meta: &mut Metadata<'_>) -> bool {
         || is_compiled_css_call_expression(expr, meta.state)
 }
 
-/// `extractLogicalExpression` upstream lines 433–448. Currently
-/// stubs the body — every reachable path goes through
-/// `evaluateExpression`.
+/// 1:1 port of `extractLogicalExpression` upstream lines 433–448.
+/// Evaluates the arrow body (a LogicalExpression), recurses
+/// `buildCss` on the resulting value, and returns the merged
+/// CSSOutput. Hit by `styled.div(props => props.x && ({...}))` and
+/// the inline-object-styles conditional shape.
 pub fn extract_logical_expression(
     node: &ArrowExpr,
     meta: &mut Metadata<'_>,
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
     own_scope: Option<ScopeId>,
-    _recorder: &mut MutationRecorder,
+    recorder: &mut MutationRecorder,
 ) -> Result<CSSOutput, CssBuildError> {
-    // Mirrors upstream `if (t.isExpression(node.body))`. The body
-    // walk would be `evaluateExpression(node.body, meta)`.
-    if let BlockStmtOrExpr::Expr(_) = &*node.body {
-        // §4.6 bridge: real evaluator dispatch. Surrounding JS branch
-        // (LogicalCssItem emission keyed on the folded value) is
-        // Phase 6 work; bridge discards the ResultPair.
-        let _ = evaluate_expression(
-            &node.body_as_expr().clone(),
+    let mut variables: Vec<Variable> = Vec::new();
+    let mut css: Vec<CssItem> = Vec::new();
+
+    if let BlockStmtOrExpr::Expr(body) = &*node.body {
+        // SWC keeps `Paren`; Babel's parser strips it.
+        let body_inner = crate::compat::paren::unwrap_paren(body);
+        let prop_value = evaluate_expression(
+            body_inner,
             meta,
             scope_index,
             parent_scope,
             own_scope,
-        );
+        )
+        .value
+        .unwrap_or_else(|| Box::new(body_inner.clone()));
+        let result = build_css_inner(
+            &prop_value,
+            meta,
+            scope_index,
+            parent_scope,
+            own_scope,
+            recorder,
+        )?;
+        css.extend(result.css);
+        variables.extend(result.variables);
     }
-    Ok(CSSOutput::default())
+
+    Ok(CSSOutput {
+        css: merge_subsequent_unconditional_css_items(css),
+        variables,
+    })
 }
 
 trait ArrowBodyAsExpr {
@@ -807,11 +825,27 @@ pub fn extract_object_expression(
     for prop in &node.props {
         match prop {
             PropOrSpread::Prop(boxed_prop) => {
-                let Prop::KeyValue(kv) = &**boxed_prop else {
-                    // Shorthand / Method / Setter / Getter / Assign
-                    // — upstream's `t.isObjectProperty(prop)` filter
-                    // matches only KeyValue. Fall through (no-op).
-                    continue;
+                // Babel parses `{ color }` shorthand as
+                // `ObjectProperty { key:Ident, value:Ident, shorthand:true }`,
+                // so upstream's `t.isObjectProperty(prop)` filter
+                // matches it. SWC splits the same source into
+                // `Prop::Shorthand(Ident)` vs `Prop::KeyValue`. Normalise
+                // shorthand into a synthetic KeyValue here so the rest
+                // of the prop walk is identical (the key name and value
+                // both come from the same `Ident`). Method / Setter /
+                // Getter / Assign are not ObjectProperty in Babel and
+                // are correctly skipped.
+                let kv_owned: KeyValueProp;
+                let kv: &KeyValueProp = match &**boxed_prop {
+                    Prop::KeyValue(kv) => kv,
+                    Prop::Shorthand(id) => {
+                        kv_owned = KeyValueProp {
+                            key: PropName::Ident(id.clone().into()),
+                            value: Box::new(Expr::Ident(id.clone())),
+                        };
+                        &kv_owned
+                    }
+                    _ => continue,
                 };
                 let key = object_property_to_string(&kv.key, meta, scope_index, parent_scope, own_scope)?;
                 // §6.8a-vi: 1:1 port of upstream `evaluateExpression(prop.value, meta)`.
@@ -1574,31 +1608,59 @@ pub fn extract_template_literal(
 
     css.push(CssItem::Unconditional(UnconditionalCssItem { css: acc }));
 
-    // Logical-expression sub-pass — upstream lines 889–901.
+    // Logical-expression sub-pass — 1:1 port of upstream
+    // build-css.ts:889-901. For every `${arrow}` whose body is a
+    // LogicalExpression (e.g. `${props => props.isPrimary && ({ color:
+    // 'blue' })}` in styled tagged templates), evaluate the body, then
+    // recurse `build_css_inner` on the evaluated value and append the
+    // resulting CSS items + variables. Without this pass the
+    // conditional CSS branch is silently dropped — the first pass at
+    // line 1280 short-circuits via `is_terminal_or_logical` to skip
+    // inline emission, leaving the logical interpolation to be emitted
+    // here. Surfaced by `styled/__tests__/behaviour.test.ts` "should
+    // apply conditional CSS with template literal" cluster.
     for prop in &node.exprs {
-        if let Expr::Arrow(arrow) = &**prop {
-            if matches!(
-                &*arrow.body,
-                BlockStmtOrExpr::Expr(e) if matches!(
-                    crate::compat::paren::unwrap_paren(e),
-                    Expr::Bin(b) if matches!(
-                        b.op,
-                        BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing
-                    )
-                )
-            ) {
-                // §4.6 bridge: real evaluator dispatch. Surrounding JS
-                // branch (LogicalCssItem emission keyed on the folded
-                // value) is Phase 6 work; bridge discards the ResultPair.
-                let _ = evaluate_expression(
-                    &Expr::Arrow(arrow.clone()),
-                    meta,
-                    scope_index,
-                    parent_scope,
-                    own_scope,
-                );
-            }
+        let Expr::Arrow(arrow) = &**prop else { continue };
+        let BlockStmtOrExpr::Expr(body) = &*arrow.body else {
+            continue;
+        };
+        // SWC keeps `Paren` that Babel strips — peek through.
+        let body_inner = crate::compat::paren::unwrap_paren(body);
+        let Expr::Bin(bin) = body_inner else {
+            continue;
+        };
+        if !matches!(
+            bin.op,
+            BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing
+        ) {
+            continue;
         }
+        // Upstream: `evaluateExpression(prop.body, meta)` then
+        // `buildCss(propValue, updatedMeta)`. The babel evaluator
+        // returns the original LogicalExpression as deopted value when
+        // `left` is an unresolved binding (the typical
+        // `props.isPrimary` case); `build_css_inner`'s LogicalExpression
+        // branch (this file ~line 1823) then recurses `right` and
+        // wraps each item as a `LogicalCssItem` keyed on `left`.
+        let evaluated = evaluate_expression(
+            &Expr::Bin(bin.clone()),
+            meta,
+            scope_index,
+            parent_scope,
+            own_scope,
+        )
+        .value
+        .unwrap_or_else(|| Box::new(Expr::Bin(bin.clone())));
+        let result = build_css_inner(
+            &evaluated,
+            meta,
+            scope_index,
+            parent_scope,
+            own_scope,
+            recorder,
+        )?;
+        css.extend(result.css);
+        variables.extend(result.variables);
     }
 
     Ok(CSSOutput {
@@ -1831,7 +1893,13 @@ fn build_css_inner(
             op,
             BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing
         ) {
-            let result = build_css_inner(right, meta, scope_index, parent_scope, own_scope, recorder)?;
+            // Babel parser strips ParenthesizedExpression; SWC keeps it.
+            // `${props => props.x && ({ color: 'blue' })}` parses
+            // `right` as `Paren(Object)` on our side, so peel before
+            // recursing so the recursion's `Expr::Object` branch fires.
+            // See `crates/babel-plugin/src/compat/paren.rs`.
+            let right_inner = crate::compat::paren::unwrap_paren(right);
+            let result = build_css_inner(right_inner, meta, scope_index, parent_scope, own_scope, recorder)?;
             let css: Vec<CssItem> = result
                 .css
                 .into_iter()

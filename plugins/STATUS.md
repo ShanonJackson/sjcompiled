@@ -20,8 +20,8 @@
 **Phase status:** 0 ☑ (modulo §0.10–§0.12 — Phase 5 gates, not Phase 4
 blockers) · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ (modulo §4.7 OUT OF SCOPE and §4.8
 gated on Phase 6) · 5 ☑ · **Phase 6 §6.1–§6.7 ☑ (all 7 per-API
-handlers shipped) · §6.8 ▶ (active triage; post-§6.8j baseline
-395/81/0/0/1)** · Phase 7+ ☐.
+handlers shipped) · §6.8 ▶ (active triage; post-§6.8m baseline
+422/54/0/0/1)** · Phase 7+ ☐.
 
 **Active checkpoint: Phase 6 §6.8** — full-corpus parity exit gate.
 See "§6.8 active state" below for the current divergence baseline,
@@ -38,13 +38,18 @@ Earlier "954/954 bun parity" cited in §5.6 was a pass-through oracle
 (assert babel ≠ swc); §6.8 inverts it (assert babel == swc) and
 surfaces real divergence.
 
-**Current baseline (post-§6.8j, 2026-05-06):** parity **395 / 477**
-(82.8%), divergence **81**, swc-throws **0**, babel-throws **0**,
+**Current baseline (post-§6.8m, 2026-05-06):** parity **422 / 477**
+(88.5%), divergence **54**, swc-throws **0**, babel-throws **0**,
 both-throw **1**. Cumulative session delta from the original
-7/407/62/1 baseline: parity +388, divergence −326, swc-throws −62
+7/407/62/1 baseline: parity +415, divergence −353, swc-throws −62
 (cluster cleared), babel-throws −1. §6.8i closed the React→React1
 hygiene-rename cluster (parity +28); §6.8j ported the spread-element
-recursive build_css_inner (parity +21).
+recursive build_css_inner (parity +21); §6.8k ported `jsesc@2.5.2`
+default-string mode for synthesised sheet-const StringLiterals
+(parity +1); §6.8l ported the logical-expression sub-pass and
+`extract_logical_expression` body (parity +10); §6.8m normalised
+SWC `Prop::Shorthand` into a synthetic KeyValue inside
+`extract_object_expression` (parity +16).
 
 **Triage tooling at `parity-harness/babel-plugin/`:**
 - `triage.mjs` runs every fixture, emits categorised JSON
@@ -867,11 +872,131 @@ remaining divergences are now CONTAINED to:
   (mixin-as-spread shapes), plus collateral wins across
   `expression-evaluation`.
 
+- **§6.8k ☑ — `jsesc@2.5.2` default-string port for synthesised
+  sheet-const StringLiterals** (this session, 2026-05-06). One 1:1
+  port closing the lone emoji-escape divergence
+  (`styled/__tests__/call-expression.test.ts:91 should respect the
+  definition of pseudo element content ala styled components with
+  content`).
+
+  **Root cause** (drift detection per CLAUDE.md): Babel's
+  `@babel/generator/lib/generators/types.js::StringLiteral` falls
+  through to `_jsesc(node.value, this.format.jsescOption)` whenever
+  `getPossibleRaw(node)` returns `undefined` — i.e., for synthetic
+  Str nodes with no `extra.raw`. Babel's `index.js:38-42` defaults
+  `jsescOption` to `{ quotes: 'double', wrap: true, minimal: false }`,
+  which escapes every code unit outside the printable-ASCII whitelist
+  to `\xXX` / `\uXXXX` form (astral chars naturally split into UTF-16
+  surrogate pairs since `es6:false` iterates code units). Our
+  `utils/hoist_sheet.rs::emit_hoisted_sheets` synthesised
+  `Str { value, raw: None }`, so SWC's emitter (`lit.rs:97-116`,
+  `ascii_only:false` default) emitted non-ASCII bytes raw. For
+  `content: '😎'` the upstream test asserts the output contains
+  `content:"\uD83D\uDE0E"`; we emitted `content:"😎"`.
+
+  **Fix.** New `compat/jsesc.rs` (~120 LOC + 12 unit tests) — 1:1
+  port of `node_modules/.bun/jsesc@2.5.2/jsesc.js` lines 237-313 with
+  the four pinned options baked in. `babel_default_string(value)`
+  returns the quoted string literal (including surrounding `"..."`).
+  Wired at `utils/hoist_sheet.rs::emit_hoisted_sheets`'s synthesised
+  `Str` — `raw: Some(jsesc::babel_default_string(sheet_text).into())`.
+  SWC's `lit.rs:91` short-circuit then writes `raw` verbatim. Test
+  table covers every escape-table boundary (whitelist pass-through,
+  quote/backtick/apostrophe handling, `\v`-omission quirk, `\0` +
+  digit edge case, `\xXX` for 0x80-0xFF, `\uXXXX` for BMP > 0xFF,
+  surrogate pairs for U+10000..U+10FFFF, plus the exact target
+  fixture's CSS bytes).
+
+  **Triage delta: parity 395 → 396 (+1), divergence 81 → 80 (−1),
+  swc-throws / babel-throws / both-throw all unchanged.** Lib tests
+  452 → 464 (+12 from `compat::jsesc::tests`). Single-fixture impact
+  but eliminates an entire class of latent divergences any time a
+  user's CSS contains non-ASCII content.
+
+- **§6.8l ☑ — Logical-expression port-completion in
+  `extract_template_literal` + `extract_logical_expression`** (this
+  session, 2026-05-06). Two coordinated 1:1 ports closing the
+  styled-conditional-CSS cluster.
+
+  **Root cause** (drift detection per CLAUDE.md): two §4.6 stubs
+  silently dropped CSS for `props => props.x && ({...})` shapes.
+
+  1. `utils/css_builders.rs::extract_template_literal`'s
+     logical-expression sub-pass (this file, ~line 1577) called
+     `evaluate_expression` and `let _ = ...`-discarded the result.
+     Upstream `build-css.ts:889-901` calls `evaluateExpression(prop.body, meta)`
+     followed by `buildCss(propValue, updatedMeta)` and pushes the
+     resulting `css` and `variables` into the accumulators. The
+     first-pass at line 1280 short-circuits via `is_terminal_or_logical`
+     to skip inline emission, leaving the logical interpolation to be
+     emitted by this second pass — without it, every
+     `${props => props.isPrimary && ({ color: 'blue' })}` in a styled
+     tagged template was silently dropped.
+  2. `utils/css_builders.rs::extract_logical_expression` (~line 626)
+     was the analogous §4.6 stub for the `styled.div(arg, props =>
+     props.x && ({...}))` shape (object-styles arg passed via
+     `extractArray` → `buildCss(ArrowFn)` → upstream
+     `extractLogicalExpression`). Replaced the stub body with the
+     full upstream lines 433-448 port: evaluate the arrow body
+     (unwrap_paren first since SWC keeps Paren that Babel strips),
+     recurse `build_css_inner` on the folded value, return the
+     merged `CSSOutput`.
+
+  **Knock-on fix: `build_css_inner` Logical branch unwrap_paren on
+  `right`.** The recursion at this file's existing Logical-branch
+  (the `BinExpr { LogicalAnd | LogicalOr | NullishCoalescing }` arm)
+  was passing `right` directly to `build_css_inner`. For `right =
+  Paren(Object)` (the SWC-shape of `({color:'blue'})` due to the
+  source-level parentheses), the recursion fell through every
+  pattern and tripped the catch-all "ParenthesizedExpression was
+  unable to have its styles extracted" panic. Added an
+  `unwrap_paren(right)` call before the recurse to mirror Babel's
+  parser stripping ParenthesizedExpression.
+
+  **Triage delta: parity 396 → 406 (+10), divergence 80 → 70 (−10),
+  swc-throws / babel-throws / both-throw all unchanged.** Lib tests
+  stay 464/464. Cluster knock-on: `styled/__tests__/behaviour`
+  cluster dropped from 14 → 4 divergences in one swing. Remaining
+  styled/behaviour fixtures are independent shapes (atomic-hash
+  divergence, font-vs-color routing, control-prop destructure
+  shape) that surface as their own §6.8 sub-clusters.
+
+- **§6.8m ☑ — SWC `Prop::Shorthand` normalised into a synthetic
+  KeyValue inside `extract_object_expression`** (this session,
+  2026-05-06). One Babel↔SWC parser-shape shim closing the
+  shorthand-property cluster.
+
+  **Root cause** (drift detection per CLAUDE.md): Babel's parser
+  produces `ObjectProperty { key:Ident, value:Ident, shorthand:true }`
+  for `{ color }`, so upstream's `t.isObjectProperty(prop)` filter
+  matches both shorthand and longhand identically. SWC splits the
+  same source into `Prop::Shorthand(Ident)` vs `Prop::KeyValue` —
+  the Rust port's `let Prop::KeyValue(kv) = ... else { continue; }`
+  guard at the top of `extract_object_expression`'s prop loop
+  silently DROPPED every shorthand property. The pre-existing
+  doc-comment ("Shorthand / Method / Setter / Getter / Assign —
+  upstream's `t.isObjectProperty(prop)` filter matches only
+  KeyValue") was wrong: shorthand IS ObjectProperty in Babel.
+
+  **Fix.** The match arm now normalises `Prop::Shorthand(id)` into
+  a synthetic `KeyValue { key: PropName::Ident(id), value:
+  Box::new(Expr::Ident(id)) }` and proceeds with the rest of the
+  prop walk unchanged. `Prop::Method`, `Setter`, `Getter`, `Assign`
+  remain skipped (none are ObjectProperty in Babel).
+
+  **Triage delta: parity 406 → 422 (+16), divergence 70 → 54 (−16),
+  swc-throws / babel-throws / both-throw all unchanged.** Lib tests
+  stay 464/464. Cluster knock-on broad: `css-prop/object-literal`
+  9 → 5, `css-prop/string-literal` 5 → 5 (mixed), `css-prop/behaviour`
+  7 → 3, `keyframes/call-expression` 3 → 2, `class-names/behaviour`
+  4 → 3, `class-names/call-expression` 5 → 3, plus collateral wins
+  across `__tests__/css-builder` and `__tests__/expression-evaluation`.
+
 ### Verifying the current state from a cold pickup
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 452/452 (post-§6.8e)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 464/464 (post-§6.8k)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact)
@@ -888,7 +1013,7 @@ BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1 \
   bun test parity-harness/babel-plugin/harness.test.ts                  # 954/954 (pass-through oracle)
 
 # §6.8 inverted oracle (where the real work is):
-bun parity-harness/babel-plugin/triage.mjs                              # 395/81/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8j
+bun parity-harness/babel-plugin/triage.mjs                              # 422/54/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8m
 
 # CSS-port producer-side gate.
 bun run packages/equality-harness/scripts/verify.mjs                    # 336/336 (run under bun, NOT node)
