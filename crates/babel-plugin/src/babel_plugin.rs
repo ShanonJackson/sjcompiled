@@ -54,10 +54,12 @@ use swc_core::ecma::visit::{VisitMut, VisitMutWith};
 
 use crate::compat::scope::{ScopeId, ScopeIndex};
 use crate::css;
+use crate::css_map::{extract_var_decl_target, visit_css_map_path};
 use crate::keyframes;
 use crate::mutation_recorder::{ApiKind, MutationRecorder, StateDiff};
 use crate::state::State;
-use crate::types::PluginOptions;
+use crate::types::{Metadata, MetadataContext, PluginOptions};
+use crate::utils::is_compiled::is_compiled_css_map_call_expression;
 
 /// Resolve the effective import-sources set: `DEFAULT_IMPORT_SOURCES`
 /// ∪ user `opts.import_sources`. Mirrors upstream `pre()`'s
@@ -421,6 +423,143 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         if let ModuleDecl::Import(import) = decl {
             self.record_compiled_import(import);
         }
+        decl.visit_mut_children_with(self);
+    }
+
+    /// Phase 6 §6.3 — `cssMap` dispatch. Upstream
+    /// `babel-plugin.ts:316-319` matches a `cssMap(...)` CallExpr at
+    /// the `'TaggedTemplateExpression|CallExpression'` visitor and
+    /// requires the parent to be a `VariableDeclarator` with an
+    /// Identifier id (line 47-53 of `css-map/index.ts`). Without
+    /// Babel's NodePath parent traversal, the SWC port intercepts at
+    /// `visit_mut_var_declarator`: we own the parent context here, so
+    /// we can validate the shape and run the handler before the
+    /// children walk descends into the init.
+    ///
+    /// Order: BEFORE `visit_mut_children_with`. Running the handler
+    /// pre-descent means the cssMap CallExpr is replaced with the
+    /// emitted `ObjectExpression` BEFORE `visit_mut_expr` /
+    /// `visit_mut_call_expr` see it — which keeps the §6.1/§6.2
+    /// cleanup matchers from firing on the cssMap call (cssMap is
+    /// not a cleanup-only API; the call is rewritten in place).
+    ///
+    /// Errors propagate via `panic!()` for now (matches §6.1's
+    /// approach of letting unrecoverable parse-shape errors abort
+    /// the WASI invocation; SWC HANDLER integration ships with the
+    /// Phase 7 error-channel work). The error message is the
+    /// upstream-verbatim `createErrorMessage(...)` output, including
+    /// the documentation-link suffix.
+    fn visit_mut_var_declarator(&mut self, decl: &mut swc_core::ecma::ast::VarDeclarator) {
+        // Walk children first into init? No — we need to inspect
+        // init BEFORE the children walk so we can intercept. The
+        // children walk fires after the handler runs, descending
+        // into the (already-rewritten) ObjectExpression.
+
+        // Detect `init = cssMap({...})`.
+        let is_css_map_call = decl
+            .init
+            .as_deref()
+            .map(|e| match e {
+                Expr::Call(c) => is_compiled_css_map_call_expression(e, &self.state)
+                    .then(|| c.span)
+                    .is_some(),
+                Expr::TaggedTpl(_) => {
+                    // Upstream throws NO_TAGGED_TEMPLATE for the
+                    // tagged-template form of cssMap. Detect the
+                    // tag-binding match via the call-expression
+                    // matcher's local-name lookup; if the tag is a
+                    // cssMap binding, we'd error.
+                    matches!(
+                        crate::utils::is_compiled::is_compiled_css_map_call_expression(e, &self.state),
+                        true
+                    )
+                }
+                _ => false,
+            })
+            .unwrap_or(false);
+
+        if is_css_map_call {
+            // Upstream lines 38–44: tagged-template form is rejected.
+            // The matcher above already routes both shapes here; we
+            // disambiguate now and emit the matching error.
+            if let Some(Expr::TaggedTpl(_)) = decl.init.as_deref() {
+                panic!(
+                    "{}",
+                    crate::utils::css_map::create_error_message(
+                        crate::utils::css_map::ErrorMessages::NoTaggedTemplate.text()
+                    )
+                );
+            }
+
+            // Upstream lines 47–53: parent must be VariableDeclarator
+            // with Identifier id. We're already in a VarDeclarator;
+            // the destructuring-pattern case is the failure shape.
+            let Some(binding_name) = extract_var_decl_target(decl) else {
+                panic!(
+                    "{}",
+                    crate::utils::css_map::create_error_message(
+                        crate::utils::css_map::ErrorMessages::DefineMap.text()
+                    )
+                );
+            };
+            let binding_name = binding_name.to_string();
+
+            // Run the handler — replaces the init with the emitted
+            // ObjectExpression and publishes state.css_map.
+            let Some(init_expr) = decl.init.as_deref() else {
+                unreachable!("is_css_map_call ensured Some(_)")
+            };
+            let Expr::Call(call) = init_expr else {
+                unreachable!("matcher ensured CallExpr")
+            };
+
+            // Build the Metadata + ScopeIndex thread-through. The
+            // §4.6 bridge cached `program_scope` + `scope_index` on
+            // `Program::enter`; we consume them here.
+            let Some(scope_index) = self.scope_index.as_mut() else {
+                // No ScopeIndex means we're processing a Script
+                // program — Compiled doesn't operate on classic
+                // scripts in practice. Treat as a hard parse-shape
+                // error.
+                panic!(
+                    "{}",
+                    crate::utils::css_map::create_error_message(
+                        crate::utils::css_map::ErrorMessages::DefineMap.text()
+                    )
+                );
+            };
+            let parent_scope = self.program_scope.expect("set alongside scope_index");
+
+            let mut meta = Metadata {
+                state: &mut self.state,
+                parent_id: 0,
+                own_id: None,
+                context: MetadataContext::Root,
+                own_scope_override: None,
+            };
+
+            let replacement = match visit_css_map_path(
+                call,
+                &binding_name,
+                &mut meta,
+                &mut self.recorder,
+                scope_index,
+                parent_scope,
+                None,
+            ) {
+                Ok(r) => r,
+                Err(e) => panic!("{}", e.message),
+            };
+
+            // Replace the cssMap CallExpr with the emitted
+            // ObjectExpression.
+            decl.init = Some(Box::new(replacement));
+        }
+
+        // Children walk runs AFTER the handler so it descends into
+        // the rewritten init (an ObjectExpression at this point if
+        // the handler fired). The §6.1/§6.2 matchers in
+        // `visit_mut_expr` won't see a cssMap call now.
         decl.visit_mut_children_with(self);
     }
 

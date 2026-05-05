@@ -28,6 +28,7 @@ pub mod cache_schema;
 pub mod compat;
 pub mod constants;
 pub mod css;
+pub mod css_map;
 pub mod keyframes;
 pub mod mutation_recorder;
 pub mod resolver;

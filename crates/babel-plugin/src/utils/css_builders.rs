@@ -915,13 +915,28 @@ fn generate_cache_for_css_map(
     {
         return;
     }
-    // §4.6 bridge: visitCssMapPath has no real fn yet (Phase 6 §6.3
-    // owns it). Inline the panic — same shape as the deleted
-    // `visit_css_map_path_stub` carried.
+    // Phase 6 §6.3 SHIP — the primary cssMap dispatch site is
+    // `babel_plugin.rs::visit_mut_var_declarator` (which owns the
+    // parent-binding context the upstream `getPathOfNode` call needs).
+    // This LATE-RESOLVE path mirrors upstream `generateCacheForCSSMap`
+    // (`utils/css-builders.ts:683-709`) and only fires when a
+    // member-expression consumer (e.g. `css({ color: styles.red })`,
+    // `<div xcss={styles.danger} />`, `styled.div(styles.root)`)
+    // resolves a cssMap-bound identifier BEFORE the visitor reaches
+    // the cssMap declaration. Porting this path properly requires
+    // threading `&mut MutationRecorder` through the entire `build_css`
+    // call graph (currently it terminates at the `visit_mut_*`
+    // dispatchers) — bundled with Phase 6 §6.4 (xcss-prop), the first
+    // handler whose corpus exercises this late-resolve scenario.
+    //
+    // Until §6.4 lands the threading: panic remains. The §6.3 corpus
+    // (cssMap declared as VarDeclarator init, consumers in source
+    // order AFTER the declaration) does not reach this site.
     unimplemented!(
-        "visitCssMapPath is Phase 6 §6.3 (css-map/index.ts). The §4.6 \
-         bridge keeps this dispatch site as a panic marker until the \
-         css-map handler ports the real fn."
+        "generateCacheForCSSMap late-resolve path — Phase 6 §6.4 \
+         reachability gate (requires MutationRecorder threading \
+         through build_css). The §6.3 primary dispatch at \
+         `visit_mut_var_declarator` handles the source-order case."
     );
 }
 

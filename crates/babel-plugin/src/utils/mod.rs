@@ -35,6 +35,7 @@ pub mod compress_class_names_for_runtime;
 pub mod constants;
 pub mod create_result_pair;
 pub mod css_builders;
+pub mod css_map;
 pub mod evaluate_expression;
 pub mod get_jsx_attribute;
 pub mod get_runtime_class_name_library;
