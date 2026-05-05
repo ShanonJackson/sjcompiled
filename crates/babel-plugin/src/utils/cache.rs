@@ -33,10 +33,12 @@
 //! The Layer 2 postcard cache lives behind `Layer2`, defined later in
 //! this file. It's the persistence cousin of `Cache<T>` — the on-disk
 //! shape is locked in `crate::cache_schema` (`SIDECAR_SCHEMA.md` §3 /
-//! `PLAN.md` §3.9.10). Today, no live writers (the §5.6 evaluator
-//! that populates it is deferred); the on-disk shape is locked early
-//! so follow-up work can wire reads/writes without the wire format
-//! shifting under it.
+//! `PLAN.md` §3.9.10). Phase 5 §5.6 ☑ ships the evaluator at
+//! `utils::evaluate_expression::evaluate_expression`; cache→State
+//! wiring (the writer that populates Layer 2 from evaluator
+//! outputs) is deferred to a follow-up Phase 5 §5.3-tail
+//! checkpoint. The on-disk shape is locked early so that wire-up
+//! lands without the wire format shifting under it.
 //!
 //! Layer 2 enforces:
 //!  * `MAX_ENTRIES` (500) — LRU evict on count overflow.
@@ -88,7 +90,8 @@ impl Default for CacheOptions {
 /// * `read-file` namespace → `T = String` (file content)
 /// * `parse-module` namespace → `T = Arc<swc_ecma_ast::Module>`
 /// * `find-default-export-module-node` →
-///   `T = Option<ExportLookup>` (Phase 5 §5.5/§5.6 builds this type)
+///   `T = Option<ExportLookup>` (Phase 5 §5.4e bundles
+///   `traversers/get_export.rs` with the `ExportResult` type)
 /// * `find-named-export-module-node` → same as above
 ///
 /// Upstream collapses these into one `Cache<any>` instance on
@@ -229,12 +232,13 @@ impl<T> Cache<T> {
 /// against `env::current_dir()`.
 ///
 /// **Today's wiring caveat:** `Layer2` is not yet plumbed into
-/// `State::cache`. The §5.4 (resolve_binding) and §5.6
-/// (evaluate_expression) ports are gated on a Babel `NodePath` /
-/// scope-tree port that doesn't exist yet — see `plugins/STATUS.md`'s
-/// Phase 5 drift escalation. The schema and the open/load/flush
-/// machinery here lock the file shape so the next agent can wire
-/// reads/writes without touching the wire format.
+/// `State::cache`. Phase 5 §5.4 (resolve_binding) and §5.6
+/// (evaluate_expression) ports are now CLOSED — the gating reason
+/// has shifted from "ports unavailable" to "cache→State wiring
+/// pending". A follow-up Phase 5 §5.3-tail checkpoint wires
+/// `State::cache` reads/writes through the shipped evaluator. The
+/// schema and the open/load/flush machinery here lock the file
+/// shape so that wire-up lands without touching the wire format.
 pub struct Layer2 {
     /// Absolute path to the worker's `cache.bin` file.
     file_path: String,

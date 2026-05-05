@@ -39,10 +39,13 @@
 //!      that says "this resolved expr is from a namespace import,
 //!      route via `evaluate_namespace_import_path`".
 //!
-//!   The §5.5-closure agent left option 2 unimplemented — it pairs
-//!   with the [`namespace_import`] panic-stub. Today the namespace
-//!   branch is unreachable from this dispatcher; cross-file
-//!   namespace dispatch is a §5.6 deliverable.
+//!   Phase 5 §5.6 ☑ chose option 3: route the namespace-import
+//!   dispatch AT THE MEMBER-EXPRESSION ENTRY of
+//!   `utils::evaluate_expression::dispatch_evaluate` (preflight via
+//!   `try_namespace_import_dispatch`), so this dispatcher's
+//!   `t.isImportNamespaceSpecifier`-equivalent branch stays
+//!   unreachable by design. The [`namespace_import`] leaf body is
+//!   real and reachable through the §5.6 preflight route.
 
 pub mod namespace_import;
 pub mod object;

@@ -26,35 +26,30 @@
 //!     return createResultPair(node as t.Expression, updatedMeta);
 //! ```
 //!
-//! ## Status (post-§5.4e drift-fix + §5.5 closure)
+//! ## Status (post-§5.6 wiring)
 //!
-//! **Body landed.** Uses [`PartialBindingWithMeta::imported_module`]
-//! (post-§5.4e drift-fix) to dispatch into
-//! [`crate::utils::traversers::get_default_export`] /
-//! [`crate::utils::traversers::get_named_export`] and synthesise the
-//! 'default' binding via
+//! **Body landed and reachable.** Uses
+//! [`PartialBindingWithMeta::imported_module`] (post-§5.4e drift-fix)
+//! to dispatch into [`crate::utils::traversers::get_default_export`]
+//! / [`crate::utils::traversers::get_named_export`] and synthesise
+//! the 'default' binding via
 //! [`crate::compat::scope::ScopeIndex::register_synthetic_binding`]
-//! against a fresh
-//! [`crate::compat::scope::ScopeIndex::build`] over the imported
-//! module.
+//! against a fresh [`crate::compat::scope::ScopeIndex::build`] over
+//! the imported module.
 //!
-//! **Caller wiring is §5.6 territory.** Today's §5.5 access-path
-//! dispatch (`evaluate_path::evaluate_path`) routes by `Expr`
-//! variant. ImportNamespaceSpecifier isn't an `Expr` in SWC, so the
-//! standard dispatch can't reach this leaf. The §5.4e
-//! `resolve_binding` returns `node: None` for namespace imports
-//! (instead of the JS plugin's `node: ImportNamespaceSpecifier`-as-
-//! Expression sneak), which short-circuits before the path
-//! dispatcher would route here.
-//!
-//! The §5.6 evaluator's `evaluate_identifier` will need to detect a
-//! namespace-import resolution (`binding.source == Import &&
-//! binding.imported_module.is_some() && binding.node.is_none()`)
-//! and route directly to this function with the upcoming `pathName`
-//! (`exportName` parameter) from the access-path chain. Until §5.6
-//! restructures that dispatch, this body is *unreachable from the
-//! standard dispatch* — but the body is real, unit-tested, and
-//! ready to be called.
+//! **Caller wired at §5.6.** The §5.6 evaluator
+//! (`utils::evaluate_expression::dispatch_evaluate`) handles the
+//! MemberExpression branch with a namespace-import preflight.
+//! When the bottom binding identifier of a member chain resolves to
+//! a namespace import (`source == Import &&
+//! imported_module.is_some() && node.is_none()`) AND the chain has
+//! a non-empty access path, the dispatcher routes the FIRST
+//! access-path element through this function and continues the
+//! remaining chain against the imported scope. The standard
+//! `evaluate_path::evaluate_path` dispatch's
+//! "ImportNamespaceSpecifier unreachable" caveat is therefore
+//! sidestepped by routing AT THE MEMBER-EXPRESSION ENTRY rather
+//! than mid-chain.
 //!
 //! ## SWC mapping
 //!

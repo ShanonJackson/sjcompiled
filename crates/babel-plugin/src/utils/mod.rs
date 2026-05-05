@@ -13,21 +13,19 @@
 //! `transform_css_items` depends on. Each module MUST be a 1:1 port
 //! of its `.ts` sibling — see `plugins/PLAN.md` constraint 4.
 //!
-//! Phase 5 §5.5 PARTIAL (this checkpoint, parallel to §5.4): adds the
-//! three §5.5 leaf traversers that DO NOT call into the resolver/scope
-//! index — `traverse_binary_expression`, `traverse_unary_expression`,
-//! `traverse_function` — plus their pure-data dependencies
-//! `create_result_pair` and `has_numeric_value`. The remaining 11 files
-//! in `traverse-expression/` (the resolve-binding-dependent half) wait
-//! on §5.4. See `traverse_expression/mod.rs` module docs.
+//! Phase 5 §5.4–§5.6 closed: the entire `traverse-expression/`
+//! subtree (§5.5), `traversers/` (bundled into §5.4e),
+//! `resolve_binding.rs` (§5.4e), and `evaluate_expression.rs`
+//! (§5.6) are real 1:1 ports of their JS siblings.
 //!
-//! Still pending (Phase 5/6):
-//! * `resolve_binding.rs` (§5.4) — in progress, sequential
-//! * `traverse_expression/` subtree (§5.5) — partial here; remaining
-//!   leaves (`traverse-identifier`, `traverse-call-expression`,
-//!   `traverse-member-expression/**`) gated on §5.4
-//! * `traversers/` subtree (§5.6)
-//! * `evaluate_expression.rs` (§5.6)
+//! Phase 4 §4.6 bridge closed: the three `css_builders.rs` SHELL
+//! stubs (`evaluate_expression_stub`, `resolve_binding_stub`,
+//! `visit_css_map_path_stub`) are deleted; six dispatch sites flip
+//! to real [`evaluate_expression::evaluate_expression`] /
+//! [`resolve_binding::resolve_binding`] calls (params threaded per
+//! the §5.5 explicit-param lock); the seventh — the
+//! `visitCssMapPath` site — remains a phase-citing inline
+//! `unimplemented!()` until Phase 6 §6.3 lands the real fn.
 
 pub mod ast;
 pub mod build_compiled_component;
@@ -37,6 +35,7 @@ pub mod compress_class_names_for_runtime;
 pub mod constants;
 pub mod create_result_pair;
 pub mod css_builders;
+pub mod evaluate_expression;
 pub mod get_jsx_attribute;
 pub mod get_runtime_class_name_library;
 pub mod has_numeric_value;

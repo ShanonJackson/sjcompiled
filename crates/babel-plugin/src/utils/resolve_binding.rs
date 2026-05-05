@@ -52,16 +52,19 @@
 //!   `get_own_binding` call site per §5.0c Finding 7 is honoured —
 //!   each call carries the lazy-crawl reference comment.
 //!
-//! ## What §5.6 will plug in
+//! ## §5.6 wiring (post-§5.6 closure)
 //!
 //! `resolveObjectPatternValueNode`'s `evaluateExpression` callback
-//! — the JS plugin threads its evaluator through here. The Rust
-//! port wires `crate::compat::evaluation::evaluate` directly today,
-//! which covers the literal / identifier-fold / member-on-literal
-//! branches the §5.0c port shipped. When the §5.6 evaluator wraps
-//! more shapes (member-on-Compiled-traverser, Math.* sub-shapes,
-//! etc.), this site picks them up automatically — `compat::evaluation`
-//! is the entry point.
+//! — the JS plugin threads its evaluator through here. Phase 5 §5.6
+//! ☑ shipped the real evaluator at
+//! `crate::utils::evaluate_expression::evaluate_expression`, but
+//! THIS site still wires `crate::compat::evaluation::evaluate`
+//! directly because the destructuring-resolution path doesn't yet
+//! surface in any unit-tested fixture. When Phase 6 surfaces a
+//! fold-through-destructured-arg shape, the
+//! `_evaluate_expression: Option<&EvalFn>` parameter on
+//! [`resolve_binding_with_evaluator`] becomes the wire-in point
+//! (drop the `_` prefix; thread the real fn through).
 
 use std::fs;
 use std::path::PathBuf;

@@ -22,49 +22,28 @@
 //! };
 //! ```
 //!
-//! ## Cross-file scope swap — §5.4e divergence
+//! ## Cross-file scope swap — §5.6 wires the consumer
 //!
 //! The JS port returns `resolved.meta` from `resolveBinding` for
 //! cross-file resolutions: a fresh `Metadata` whose `parentPath`
-//! points into the imported module's AST and whose `state.file` /
-//! `state.filename` are the imported module's. The §5.5 recursive
+//! points into the imported module's AST. The §5.5 recursive
 //! `evaluateExpression(node, resolved.meta)` re-enters with that
 //! imported-file context, so any `getBinding` lookups inside the
 //! recursion target the imported file's scope.
 //!
-//! The §5.4e Rust port intentionally drops this cross-file `meta`
-//! synthesis (documented at `utils/types.rs:115-145`):
-//! `PartialBindingWithMeta` no longer carries a `meta` field — only
-//! `imported_filename: Option<String>` — because `Metadata<'a>`
-//! holds `&mut State` and a different file's `State` can't alias
-//! the caller's. The §5.6 evaluator is expected to look at
-//! `imported_filename`, build a fresh `ScopeIndex` for the imported
-//! file, and re-enter with that file's context.
+//! The §5.4e Rust port drops this cross-file `meta` synthesis
+//! (documented at `utils/types.rs:115-145`); cross-file scope
+//! routing happens at the §5.6 evaluator boundary instead. The
+//! §5.6 dispatcher (`utils::evaluate_expression::dispatch_evaluate`)
+//! detects `binding.source == Import &&
+//! binding.imported_module.is_some() && binding.node.is_some()` AT
+//! THE IDENTIFIER ENTRY and recurses with a fresh `ScopeIndex`
+//! built over the imported module BEFORE delegating to this leaf.
+//! The leaf's same-file path therefore always sees same-file scope
+//! info — no cross-file misroute.
 //!
-//! ## Drift potential — flagged not patched
-//!
-//! For this §5.5-closure port, the recursive `evaluate_expression`
-//! call on a cross-file resolution passes the CALLER's scope info
-//! (scope_index / parent_scope / own_scope), NOT the imported
-//! file's. Effects:
-//!
-//! - **Imported literal value (`export const color = '#fff';`)**:
-//!   correct. `evaluate_expression` on a literal doesn't dispatch
-//!   into a binding-lookup branch, so scope info is unused.
-//! - **Imported deep chain (`export const a = b;` where `b` is
-//!   another binding in the imported file)**: divergence. JS would
-//!   recurse into `b`'s definition in the imported file's scope.
-//!   Rust would look up `b` in the CALLER's scope, which has no
-//!   `b` binding, so `resolve_binding` returns None and `b` stays
-//!   as an unresolved identifier. The JS plugin folds further;
-//!   the Rust port deopts.
-//!
-//! This is documented drift gated on §5.6's cross-file scope
-//! management. Per CLAUDE.md DRIFT DETECTION, escalation
-//! has been raised with the §5.4e owner / coordinator. Do NOT
-//! patch around this in `traverse_identifier.rs` — the proper
-//! fix lives in §5.6 (cross-file ScopeIndex synthesis at the
-//! `evaluate_expression` boundary).
+//! For this leaf's recursive `evaluate_expression` call on a
+//! same-file binding, scope info is the caller's by design.
 
 use swc_core::ecma::ast::{Expr, Ident};
 
@@ -101,8 +80,10 @@ where
         if binding.constant {
             if let Some(node) = binding.node {
                 // JS: `evaluateExpression(resolvedBinding.node, resolvedBinding.meta)`.
-                // Rust: pass the same `meta` (cross-file scope swap is §5.6 work —
-                // see module docs).
+                // Rust: pass the same `meta` — the §5.6 dispatcher detects
+                // cross-file resolutions BEFORE delegating here and recurses
+                // with a fresh imported `ScopeIndex`, so this leaf only ever
+                // sees same-file folds. See module docs.
                 let result = evaluate_expression(&node, meta);
                 return create_result_pair(result.value, meta);
             }

@@ -3,8 +3,12 @@
 //! Returns the string form of an `ObjectProperty.key`. The simple
 //! `Identifier`-without-`computed` path is the most common (every
 //! `{ color: 'blue' }` shape) and is fully portable. Other branches
-//! ultimately reach `evaluateExpression` (Phase 5 §5.6) — those are
-//! stubbed with `unimplemented!()` carrying the gating-row citation.
+//! ultimately reach `evaluateExpression` — Phase 5 §5.6 ☑ shipped
+//! the real fn at `utils::evaluate_expression::evaluate_expression`;
+//! Phase 4 §4.6 bridge closed the visitor-side wiring (scope params
+//! threaded through `css_builders.rs`); the panics below are retained
+//! as SHELL markers until the per-API Phase 6 handler that surfaces
+//! the computed-key path threads `evaluate_expression` in here.
 //!
 //! ### Babel→SWC divergence
 //!
@@ -31,9 +35,10 @@ use crate::utils::ast::{build_code_frame_error_no_node, CssBuildError};
 
 /// Internal helper carrying the "did this evaluate?" return shape.
 /// Mirrors the JS `{ value: t.Expression, meta: Metadata }` tuple
-/// from `EvaluateExpression`. Phase 5 §5.6 lands the concrete
-/// evaluator; today this lives at the call boundary as
-/// `unimplemented!()`.
+/// from `EvaluateExpression`. Phase 5 §5.6 ☑ ships the concrete
+/// evaluator at `utils::evaluate_expression::evaluate_expression`;
+/// today this stub lives at the call boundary as `unimplemented!()`
+/// pending Phase 4 Phase 6 wiring.
 pub type EvaluateExpressionFn<'a, 'b> = &'a dyn Fn(&Expr, &Metadata<'b>) -> EvaluatedExpression;
 
 #[derive(Debug)]
@@ -41,8 +46,10 @@ pub struct EvaluatedExpression {
     pub value: Box<Expr>,
     // The JS variant returns a fresh `meta`; the Rust port returns
     // the change applied to the metadata as a separate value the
-    // caller threads through (Phase 5 §5.6 specifies the exact
-    // shape — included_files diff, etc).
+    // caller threads through. Phase 5 §5.6 ☑ — the shipped
+    // evaluator at `utils::evaluate_expression::evaluate_expression`
+    // returns `ResultPair { value }` and threads `&mut Metadata`
+    // through; this stub shape is retained for Phase 6 wiring.
 }
 
 fn template_literal_to_string(
@@ -52,8 +59,9 @@ fn template_literal_to_string(
 ) -> Result<String, CssBuildError> {
     // Mirrors upstream lines 9–32. Walks `quasis[i].value.raw`
     // interleaved with `expressionToString(expressions[i])`. The
-    // expression-side dispatch hits `evaluateExpression`
-    // unconditionally — Phase 5 §5.6 work.
+    // expression-side dispatch hits `evaluateExpression` —
+    // Phase 5 §5.6 ☑ at `utils::evaluate_expression::evaluate_expression`;
+    // wire-up gated on Phase 6.
     if template.exprs.is_empty() {
         // Static template literal — no interpolation to evaluate.
         // This sub-case IS reachable from §4.4 paths; supported now.
@@ -65,7 +73,9 @@ fn template_literal_to_string(
     }
     unimplemented!(
         "templateLiteralToString with interpolations requires evaluateExpression — \
-         Phase 5 §5.6 (utils/evaluate-expression.ts)"
+         Phase 5 §5.6 ☑ ships the real fn at \
+         `utils::evaluate_expression::evaluate_expression`; this SHELL panic is \
+         retained until Phase 4 Phase 6 rewires this call site."
     )
 }
 
@@ -146,7 +156,9 @@ pub fn expression_to_string(expression: &Expr, meta: &mut Metadata<'_>) -> Resul
     if matches!(expression, Expr::Ident(_) | Expr::Member(_)) {
         unimplemented!(
             "expressionToString for Identifier / MemberExpression requires evaluateExpression — \
-             Phase 5 §5.6 (utils/evaluate-expression.ts)"
+             Phase 5 §5.6 ☑ ships the real fn at \
+             `utils::evaluate_expression::evaluate_expression`; this SHELL panic is \
+             retained until Phase 4 Phase 6 rewires this call site."
         );
     }
 

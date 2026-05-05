@@ -5,22 +5,21 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="46baedc5-8956-4da5-8e73-63c433c62642" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/OUTSTANDING_SHANON.md" beforeDir="false" afterPath="$PROJECT_DIR$/OUTSTANDING_SHANON.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/scope.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/scope.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/types.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_compiled_component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_compiled_component.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/babel_plugin.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/babel_plugin.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/cache_schema.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/cache_schema.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/cache.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/create_result_pair.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/create_result_pair.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/css_builders.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/css_builders.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/get_runtime_class_name_library.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/get_runtime_class_name_library.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/hoist_sheet.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/hoist_sheet.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/object_property_to_string.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/object_property_to_string.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/resolve_binding.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/resolve_binding.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/transform_css_items.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/transform_css_items.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_binary_expression.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_binary_expression.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_function.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_function.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_unary_expression.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_unary_expression.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/types.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_identifier.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_identifier.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/namespace_import.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/namespace_import.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/resolve_expression/identifier.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/resolve_expression/identifier.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plugins/STATUS.md" beforeDir="false" afterPath="$PROJECT_DIR$/plugins/STATUS.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

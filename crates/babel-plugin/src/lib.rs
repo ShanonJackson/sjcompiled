@@ -27,20 +27,26 @@ pub mod babel_plugin;
 pub mod cache_schema;
 pub mod compat;
 pub mod constants;
+pub mod css;
+pub mod keyframes;
 pub mod mutation_recorder;
 pub mod resolver;
 pub mod state;
 pub mod types;
 pub mod utils;
 
+use std::sync::Arc;
+
 use serde::Deserialize;
 use swc_core::common::comments::Comments;
 use swc_core::ecma::ast::Program;
 use swc_core::ecma::visit::VisitMutWith;
+use swc_core::plugin::metadata::TransformPluginMetadataContextKind;
 use swc_core::plugin::plugin_transform;
 use swc_core::plugin::proxies::{PluginCommentsProxy, TransformPluginProgramMetadata};
 
 use crate::babel_plugin::BabelPluginVisitor;
+use crate::resolver::build_default;
 use crate::types::PluginOptions;
 
 #[plugin_transform]
@@ -57,7 +63,28 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
     // plugins.
     let comments: PluginCommentsProxy = meta.comments.clone().unwrap_or(PluginCommentsProxy);
 
+    // §4.6 bridge: SWC exposes the absolute source filename via the
+    // metadata context. `resolve_binding.rs` reads
+    // `meta.state.filename()` to anchor cross-file resolution; without
+    // injection the cross-file branch silently no-ops. Empty string
+    // when the host omits the context — `resolve_binding` treats
+    // `Some("")` the same as `None` because the upstream JS plugin
+    // also bails on missing filename.
+    let filename: String = meta
+        .get_context(&TransformPluginMetadataContextKind::Filename)
+        .unwrap_or_default();
+
+    // §4.6 bridge: build the default Compiled resolver and stash it
+    // on `state` so `resolve_binding::resolve_request` can reach it.
+    // `opts.extensions` honours `DEFAULT_CODE_EXTENSIONS` when unset
+    // (per `build_default` contract).
+    let resolver = Arc::new(build_default(opts.extensions.as_deref()));
+
     let mut visitor = BabelPluginVisitor::new(opts, comments);
+    if !filename.is_empty() {
+        visitor.state.set_filename(filename);
+    }
+    visitor.state.set_resolver(resolver);
     let mut p = program;
     p.visit_mut_with(&mut visitor);
     p

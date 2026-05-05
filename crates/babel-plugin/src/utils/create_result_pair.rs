@@ -1,7 +1,7 @@
 //! 1:1 port of `packages/babel-plugin/src/utils/create-result-pair.ts`.
 //!
-//! Tiny shape-builder used by the traverse-expression leaves and (when
-//! it lands in §5.6) `evaluate-expression.rs`. Mirrors upstream:
+//! Tiny shape-builder used by the traverse-expression leaves and
+//! (post-§5.6) `utils::evaluate_expression`. Mirrors upstream:
 //!
 //! ```ts
 //! export const createResultPair = (

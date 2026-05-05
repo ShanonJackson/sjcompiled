@@ -19,11 +19,11 @@
 //! `cache.bin`. Today the upstream Babel plugin carries no Layer 2
 //! analog — this is a Rust-only addition motivated by the SWC WASI
 //! teardown model (the in-memory Layer 1 dies between transforms).
-//! The §5.6 evaluator is what eventually populates entries; until
-//! that's wired (§5.4–§5.6 are Phase 5 work), the schema is
-//! **defined but unused** so the file shape is locked early and
-//! follow-up work can add reads/writes without touching the wire
-//! format.
+//! The §5.6 evaluator is what eventually populates entries.
+//! Phase 5 §5.4–§5.6 are now CLOSED, but the cache→State wiring is
+//! still deferred (the schema is **defined but unused** until a
+//! follow-up checkpoint wires reads/writes through the State
+//! cache slot — see `plugins/STATUS.md` Phase 5 §5.3 row).
 //!
 //! ### Hard caps
 //!
@@ -98,9 +98,10 @@ pub const MAX_STATE_DIFFS: usize = 64;
 /// Layer 2 cache entry. The evaluator builds these from the live
 /// AST; the cache stores them; replay reconstructs back to Expr.
 ///
-/// Today `evaluate_expression` is unported (Phase 5 §5.6 deferral —
-/// see plugins/STATUS.md drift escalation) so the variants below
-/// are the **target shape** the next agent's evaluator will produce.
+/// Phase 5 §5.6 ☑ ships `evaluate_expression` at
+/// `utils::evaluate_expression::evaluate_expression`; the cache
+/// wire-up to consume its `ResultPair { value }` shape into these
+/// variants is deferred (cache→State wiring — see Phase 5 §5.3 row).
 /// Defined here so the wire format is locked.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SerializedExpr {

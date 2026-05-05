@@ -1,33 +1,36 @@
 //! 1:1 port of `packages/babel-plugin/src/utils/css-builders.ts`
 //! (1084 LOC upstream).
 //!
-//! ### §4.4 SHELL port — what's wired vs. what's stubbed
+//! ### §4.6 bridge — current state
 //!
-//! This is the §4.4 SHELL port (per the user / previous-agent contract
-//! confirmed in plugins/STATUS.md). The file structure mirrors upstream
-//! 1:1; the four hash-call-shape sites
-//! (css-builders.ts:464, :639, :869) are wired end-to-end through
-//! `compat::generator::generate` + `compiled_utils::hash` so the §4.4
-//! close-out unit test exercises the real Rust path.
+//! Phase 4 §4.6 closed: the per-Compiled-API handlers in this file
+//! are wired against the real evaluator + resolver. Each fn that
+//! reaches into `evaluateExpression` / `resolveBinding` carries the
+//! §5.5 explicit-param trio (`scope_index`, `parent_scope`,
+//! `own_scope`). Callers thread those from the visitor's
+//! `Program::enter` ScopeIndex bootstrap.
 //!
-//! Call sites that depend on Phase 5 / 6 work are STUBBED with
-//! `unimplemented!()` carrying the gating-row citation in the panic
-//! message:
+//! * `evaluateExpression` →
+//!   [`crate::utils::evaluate_expression::evaluate_expression`]
+//!   (Phase 5 §5.6).
+//! * `resolveBinding` →
+//!   [`crate::utils::resolve_binding::resolve_binding`]
+//!   (Phase 5 §5.4e).
+//! * `visitCssMapPath` — Phase 6 §6.3 (css-map handler). The single
+//!   call site here panics with a phase-citing `unimplemented!()`
+//!   message; deleted when Phase 6 §6.3 lands the real fn.
 //!
-//! * `evaluateExpression` — Phase 5 §5.6 (utils/evaluate-expression.ts)
-//! * `resolveBinding` — Phase 5 §5.4 (utils/resolve-binding.ts)
-//! * `visitCssMapPath` — Phase 6 §6.3 (css-map handler)
+//! Surrounding-logic ports for branches that consume evaluator output
+//! (e.g. recursive re-dispatch on a folded Identifier branch) live in
+//! the per-API Phase 6 handlers — this file ships the dispatch shape
+//! and discards the ResultPair where the surrounding port is gated on
+//! Phase 6.
 //!
 //! `addUnitIfNeeded` and `cssAffixInterpolation` were initially flagged
 //! as missing from `crates/css`. The CSS-port agent shipped both as
 //! re-exports per `crates/babel-plugin/CSS_BUILDERS_DEPS.md` (RESOLVED
 //! 2026-05-04); this file uses them directly via `css::` — same import
 //! shape as the JS source.
-//!
-//! The §4.8 phase-exit gate (full byte-clean for keyframes / css /
-//! cssMap fixtures) is what will eventually require the stubbed paths
-//! to be real; §4.4 is the structural milestone that makes those
-//! handlers possible to land.
 //!
 //! ### Babel→SWC field-name divergences
 //!
@@ -59,9 +62,11 @@ use swc_core::ecma::ast::{
 use compiled_utils::{hash, kebab_case};
 
 use crate::compat::generator::generate;
+use crate::compat::scope::{ScopeId, ScopeIndex};
 use crate::state::State;
 use crate::types::{Metadata, MetadataContext};
 use crate::utils::ast::{build_code_frame_error, CssBuildError};
+use crate::utils::evaluate_expression::evaluate_expression;
 use crate::utils::is_compiled::{
     is_compiled_css_call_expression, is_compiled_css_tagged_template_expression,
     is_compiled_keyframes_call_expression, is_compiled_keyframes_tagged_template_expression,
@@ -72,47 +77,11 @@ use crate::utils::manipulate_template_literal::{
     optimize_conditional_statement, recompose_template_literal,
 };
 use crate::utils::object_property_to_string::object_property_to_string;
+use crate::utils::resolve_binding::resolve_binding;
 use crate::utils::types::{
     BindingSource, CSSOutput, ConditionalCssItem, CssItem, CssMapItem, LogicalCssItem,
     PartialBindingWithMeta, SheetCssItem, UnconditionalCssItem, Variable,
 };
-
-// ───────── Stub markers for Phase 5/6 dispatch ─────────
-//
-// These two synthesise an evaluateExpression / resolveBinding return
-// value at the type level — used by upstream call shapes that the
-// shell can't yet execute. Centralising the panic message means
-// future-agent grep `evaluate_expression_stub` finds every reach.
-
-#[doc(hidden)]
-fn evaluate_expression_stub(_expr: &Expr, _meta: &mut Metadata<'_>) -> ! {
-    unimplemented!(
-        "evaluateExpression is Phase 5 §5.6 (utils/evaluate-expression.ts). \
-         The §4.4 css_builders.rs shell stubs every dispatch into it; \
-         reach this panic only via fixtures that the SHELL port can't yet handle."
-    )
-}
-
-#[doc(hidden)]
-#[allow(dead_code)] // §5.4e ships the real `utils::resolve_binding::resolve_binding`;
-// this stub is retained as a SHELL marker until §4.6 / Phase 6
-// rewires the callers (the lone in-tree caller below is in a
-// dead-code branch already).
-fn resolve_binding_stub(_name: &str, _meta: &Metadata<'_>) -> Option<PartialBindingWithMeta> {
-    unimplemented!(
-        "resolveBinding is Phase 5 §5.4 (utils/resolve-binding.ts). \
-         §5.4e shipped the real port at `utils::resolve_binding::resolve_binding`; \
-         this SHELL stub is retained until Phase 6 rewires call sites."
-    )
-}
-
-#[doc(hidden)]
-fn visit_css_map_path_stub() -> ! {
-    unimplemented!(
-        "visitCssMapPath is Phase 6 §6.3 (css-map/index.ts). \
-         The §4.4 css_builders.rs shell stubs every dispatch into it."
-    )
-}
 
 // ───────── Top-of-file helpers ─────────
 
@@ -411,9 +380,11 @@ fn callback_if_file_included(_meta_state: &State, _next_state: &State) {
 /// — Compiled doesn't auto-thread imported identifier values into the
 /// emitting file. Returns Err carrying the upstream error message.
 ///
-/// `dead_code` allow: unreachable from the §4.4 SHELL because every
-/// caller goes through `resolveBinding` (Phase 5 §5.4 stub). Kept in
-/// place so Phase 5 lands the wiring without re-porting the helper.
+/// `dead_code` allow: §4.6 bridge flips `resolveBinding` to the real
+/// fn but discards the `PartialBindingWithMeta` (surrounding logic
+/// is Phase 6 work); this helper is the upstream consumer of that
+/// resolved-binding shape and ports alongside the first Phase 6
+/// handler that consumes the result.
 #[allow(dead_code)]
 fn assert_no_imported_css_variables(
     reference_node_span: Option<swc_core::common::Span>,
@@ -440,12 +411,15 @@ fn assert_no_imported_css_variables(
 pub fn extract_conditional_expression(
     node: &CondExpr,
     meta: &mut Metadata<'_>,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
 ) -> Result<CSSOutput, CssBuildError> {
     let mut css: Vec<CssItem> = Vec::new();
     let mut variables: Vec<Variable> = Vec::new();
 
-    let consequent_css = extract_branch(&node.cons, meta, node)?;
-    let alternate_css = extract_branch(&node.alt, meta, node)?;
+    let consequent_css = extract_branch(&node.cons, meta, node, scope_index, parent_scope, own_scope)?;
+    let alternate_css = extract_branch(&node.alt, meta, node, scope_index, parent_scope, own_scope)?;
 
     match (consequent_css, alternate_css) {
         (Some(c), Some(a)) => {
@@ -485,6 +459,9 @@ fn extract_branch(
     path_node: &Expr,
     meta: &mut Metadata<'_>,
     parent_node: &CondExpr,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
 ) -> Result<Option<CssItem>, CssBuildError> {
     let css_output: Option<CSSOutput> = match path_node {
         Expr::Object(_)
@@ -504,7 +481,7 @@ fn extract_branch(
                     _ => false,
                 };
                 if is_css_shape {
-                    Some(build_css_inner(path_node, meta)?)
+                    Some(build_css_inner(path_node, meta, scope_index, parent_scope, own_scope)?)
                 } else {
                     None
                 }
@@ -512,14 +489,18 @@ fn extract_branch(
         Expr::TaggedTpl(_) | Expr::Call(_)
             if path_is_compiled_css_shape(path_node, meta) =>
         {
-            Some(build_css_inner(path_node, meta)?)
+            Some(build_css_inner(path_node, meta, scope_index, parent_scope, own_scope)?)
         }
         Expr::Ident(_) => {
-            // resolveBinding path — Phase 5 §5.4 stubbed.
-            evaluate_expression_stub(path_node, meta);
+            // §4.6 bridge: real evaluator dispatch. The surrounding
+            // JS branch (re-dispatch on the folded value) is Phase 6
+            // handler work; the bridge ships the call shape and
+            // discards the ResultPair until that surrounding port lands.
+            let _ = evaluate_expression(path_node, meta, scope_index, parent_scope, own_scope);
+            None
         }
-        Expr::Cond(c) => Some(extract_conditional_expression(c, meta)?),
-        Expr::Member(m) => extract_member_expression_optional(m, meta, false)?,
+        Expr::Cond(c) => Some(extract_conditional_expression(c, meta, scope_index, parent_scope, own_scope)?),
+        Expr::Member(m) => extract_member_expression_optional(m, meta, false, scope_index, parent_scope, own_scope)?,
         _ => None,
     };
 
@@ -549,12 +530,24 @@ fn path_is_compiled_css_shape(expr: &Expr, meta: &mut Metadata<'_>) -> bool {
 /// `evaluateExpression`.
 pub fn extract_logical_expression(
     node: &ArrowExpr,
-    _meta: &mut Metadata<'_>,
+    meta: &mut Metadata<'_>,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
 ) -> Result<CSSOutput, CssBuildError> {
     // Mirrors upstream `if (t.isExpression(node.body))`. The body
     // walk would be `evaluateExpression(node.body, meta)`.
     if let BlockStmtOrExpr::Expr(_) = &*node.body {
-        evaluate_expression_stub(&node.body_as_expr().clone(), _meta);
+        // §4.6 bridge: real evaluator dispatch. Surrounding JS branch
+        // (LogicalCssItem emission keyed on the folded value) is
+        // Phase 6 work; bridge discards the ResultPair.
+        let _ = evaluate_expression(
+            &node.body_as_expr().clone(),
+            meta,
+            scope_index,
+            parent_scope,
+            own_scope,
+        );
     }
     Ok(CSSOutput::default())
 }
@@ -582,6 +575,9 @@ pub fn extract_keyframes(
     meta: &mut Metadata<'_>,
     prefix: &str,
     suffix: &str,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
 ) -> Result<CSSOutput, CssBuildError> {
     // §4.4 hash-call-shape #1: line 464 — keyframes name from full
     // expression source.
@@ -610,11 +606,17 @@ pub fn extract_keyframes(
             // upstream: `t.isCallExpression(expression) ? (expression.arguments as t.Expression[]) : expression.quasi`
             // For an arguments-array we need extractArray semantics.
             let mut child = meta.reborrow_with_context(kf_context.clone());
-            extract_array(&arg_exprs, &mut child)?
+            extract_array(&arg_exprs, &mut child, scope_index, parent_scope, own_scope)?
         }
         Expr::TaggedTpl(tpl) => {
             let mut child = meta.reborrow_with_context(kf_context.clone());
-            build_css_inner(&Expr::Tpl((*tpl.tpl).clone()), &mut child)?
+            build_css_inner(
+                &Expr::Tpl((*tpl.tpl).clone()),
+                &mut child,
+                scope_index,
+                parent_scope,
+                own_scope,
+            )?
         }
         _ => {
             return Err(build_code_frame_error(
@@ -693,6 +695,9 @@ fn is_custom_property_name(value: &str) -> bool {
 pub fn extract_object_expression(
     node: &ObjectLit,
     meta: &mut Metadata<'_>,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
 ) -> Result<CSSOutput, CssBuildError> {
     let mut css: Vec<CssItem> = Vec::new();
     let mut variables: Vec<Variable> = Vec::new();
@@ -755,7 +760,10 @@ pub fn extract_object_expression(
 
                 if matches!(prop_value, Expr::Object(_) | Expr::Bin(BinExpr { op: BinaryOp::LogicalOr | BinaryOp::LogicalAnd | BinaryOp::NullishCoalescing, .. }))
                 {
-                    let result = to_css_rule(&key, build_css_inner(prop_value, meta)?);
+                    let result = to_css_rule(
+                        &key,
+                        build_css_inner(prop_value, meta, scope_index, parent_scope, own_scope)?,
+                    );
                     css.extend(result.css);
                     variables.extend(result.variables);
                     continue;
@@ -768,9 +776,9 @@ pub fn extract_object_expression(
                         && matches!(&first_expr, Some(Expr::Arrow(arrow)) if matches!(&*arrow.body, BlockStmtOrExpr::Expr(e) if matches!(&**e, Expr::Cond(_))))
                     {
                         recompose_template_literal(&mut tpl_clone, &format!("{}:", kebab_case(&key)), ";");
-                        extract_template_literal(&tpl_clone, meta)?
+                        extract_template_literal(&tpl_clone, meta, scope_index, parent_scope, own_scope)?
                     } else {
-                        let inner = extract_template_literal(&tpl_clone, meta)?;
+                        let inner = extract_template_literal(&tpl_clone, meta, scope_index, parent_scope, own_scope)?;
                         to_css_declaration(&key, inner)
                     };
                     css.extend(result.css);
@@ -814,17 +822,20 @@ pub fn extract_object_expression(
                                 // The arrow.body mutation requires the
                                 // `prop_value` to be borrowed mutably —
                                 // structural mismatch with the &-only
-                                // walker. Phase 5 §5.6 will land the
-                                // proper mutable-walk shape; until then
-                                // the optimised wrap stands without
-                                // the body swap. The §4.4 corpus does
-                                // not exercise this path — stub-safe.
+                                // walker. Phase 5 §5.6 ☑ shipped the
+                                // evaluator but kept this site's &-only
+                                // walker shape; the proper mutable-walk
+                                // wire-up is Phase 4 §4.6 / Phase 6
+                                // territory. Until then the optimised
+                                // wrap stands without the body swap.
+                                // The §4.4 corpus does not exercise
+                                // this path — stub-safe.
                             }
                         }
                     }
                     if let Some(mut opt) = optimised {
                         recompose_template_literal(&mut opt, &format!("{}:", kebab_case(&key)), ";");
-                        let result = extract_template_literal(&opt, meta)?;
+                        let result = extract_template_literal(&opt, meta, scope_index, parent_scope, own_scope)?;
                         css.extend(result.css);
                         variables.extend(result.variables);
                         continue;
@@ -835,7 +846,15 @@ pub fn extract_object_expression(
                     || is_compiled_keyframes_tagged_template_expression(prop_value, meta.state)
                 {
                     let kf_prefix = format!("{}: ", kebab_case(&key));
-                    let result = extract_keyframes(prop_value, meta, &kf_prefix, ";")?;
+                    let result = extract_keyframes(
+                        prop_value,
+                        meta,
+                        &kf_prefix,
+                        ";",
+                        scope_index,
+                        parent_scope,
+                        own_scope,
+                    )?;
                     css.extend(result.css);
                     variables.extend(result.variables);
                     continue;
@@ -858,19 +877,20 @@ pub fn extract_object_expression(
                 }));
             }
             PropOrSpread::Spread(SpreadElement { expr, .. }) => {
-                // upstream: resolveBinding + evaluateExpression. Both
-                // are Phase 5 stubs.
-                if matches!(&**expr, Expr::Ident(_)) {
-                    let _ = resolve_binding_stub(
-                        if let Expr::Ident(i) = &**expr {
-                            &i.sym
-                        } else {
-                            ""
-                        },
-                        meta,
+                // §4.6 bridge: real resolver + evaluator dispatch. The
+                // surrounding JS branch (consume the resolved Variable
+                // shape into the CSS emit) is Phase 6 handler work;
+                // bridge discards both results.
+                if let Expr::Ident(i) = &**expr {
+                    let _ = resolve_binding(
+                        i.sym.as_str(),
+                        &*meta,
+                        &*scope_index,
+                        parent_scope,
+                        own_scope,
                     );
                 }
-                evaluate_expression_stub(expr, meta);
+                let _ = evaluate_expression(expr, meta, scope_index, parent_scope, own_scope);
             }
         }
     }
@@ -882,15 +902,27 @@ pub fn extract_object_expression(
 }
 
 /// `generateCacheForCSSMap` upstream lines 683–709. Resolve-binding
-/// + visitCssMapPath path — wholly Phase 5 / 6.
-fn generate_cache_for_css_map(_node: &Ident, meta: &mut Metadata<'_>) {
-    if meta.state.css_map().contains_key(&_node.sym.to_string())
-        || meta.state.ignore_member_expressions().contains_key(&_node.sym.to_string())
+/// + visitCssMapPath path — Phase 6 §6.3.
+fn generate_cache_for_css_map(
+    node: &Ident,
+    meta: &mut Metadata<'_>,
+    _scope_index: &mut ScopeIndex,
+    _parent_scope: ScopeId,
+    _own_scope: Option<ScopeId>,
+) {
+    if meta.state.css_map().contains_key(&node.sym.to_string())
+        || meta.state.ignore_member_expressions().contains_key(&node.sym.to_string())
     {
         return;
     }
-    // Reaching here means we'd need resolveBinding + visitCssMapPath.
-    visit_css_map_path_stub();
+    // §4.6 bridge: visitCssMapPath has no real fn yet (Phase 6 §6.3
+    // owns it). Inline the panic — same shape as the deleted
+    // `visit_css_map_path_stub` carried.
+    unimplemented!(
+        "visitCssMapPath is Phase 6 §6.3 (css-map/index.ts). The §4.6 \
+         bridge keeps this dispatch site as a panic marker until the \
+         css-map handler ports the real fn."
+    );
 }
 
 /// `extractMemberExpression` upstream lines 728–752. Two-arg shape
@@ -899,8 +931,11 @@ fn generate_cache_for_css_map(_node: &Ident, meta: &mut Metadata<'_>) {
 pub fn extract_member_expression(
     node: &MemberExpr,
     meta: &mut Metadata<'_>,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
 ) -> Result<CSSOutput, CssBuildError> {
-    extract_member_expression_optional(node, meta, true)?
+    extract_member_expression_optional(node, meta, true, scope_index, parent_scope, own_scope)?
         .ok_or_else(|| build_code_frame_error("MemberExpression yielded no CSS", Some(node.span)))
 }
 
@@ -908,10 +943,13 @@ fn extract_member_expression_optional(
     node: &MemberExpr,
     meta: &mut Metadata<'_>,
     fallback_to_evaluate: bool,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
 ) -> Result<Option<CSSOutput>, CssBuildError> {
     let binding_identifier = find_binding_identifier(&Expr::Member(node.clone()));
     if let Some(ident) = &binding_identifier {
-        generate_cache_for_css_map(ident, meta);
+        generate_cache_for_css_map(ident, meta, scope_index, parent_scope, own_scope);
         if meta.state.css_map().contains_key(&ident.sym.to_string()) {
             return Ok(Some(CSSOutput {
                 css: vec![CssItem::Map(CssMapItem {
@@ -924,7 +962,16 @@ fn extract_member_expression_optional(
         }
     }
     if fallback_to_evaluate {
-        evaluate_expression_stub(&Expr::Member(node.clone()), meta);
+        // §4.6 bridge: real evaluator dispatch. The surrounding JS
+        // branch (re-dispatch on the folded value into build_css_inner)
+        // is Phase 6 work; bridge discards the ResultPair.
+        let _ = evaluate_expression(
+            &Expr::Member(node.clone()),
+            meta,
+            scope_index,
+            parent_scope,
+            own_scope,
+        );
     }
     Ok(None)
 }
@@ -935,6 +982,9 @@ fn extract_member_expression_optional(
 pub fn extract_template_literal(
     node: &Tpl,
     meta: &mut Metadata<'_>,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
 ) -> Result<CSSOutput, CssBuildError> {
     let mut css: Vec<CssItem> = Vec::new();
     let mut variables: Vec<Variable> = Vec::new();
@@ -989,7 +1039,17 @@ pub fn extract_template_literal(
         let _ = node_expression; // routed through stub below
 
         // Reaching ANY of the below dispatch arms requires the evaluator.
-        if try_keyframes_branch(&node.exprs[index], meta, &raw, &mut css, &mut variables, &mut acc)? {
+        if try_keyframes_branch(
+            &node.exprs[index],
+            meta,
+            &raw,
+            &mut css,
+            &mut variables,
+            &mut acc,
+            scope_index,
+            parent_scope,
+            own_scope,
+        )? {
             continue;
         }
 
@@ -1043,7 +1103,16 @@ pub fn extract_template_literal(
                 &*arrow.body,
                 BlockStmtOrExpr::Expr(e) if matches!(&**e, Expr::Bin(b) if matches!(b.op, BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing))
             ) {
-                evaluate_expression_stub(&Expr::Arrow(arrow.clone()), meta);
+                // §4.6 bridge: real evaluator dispatch. Surrounding JS
+                // branch (LogicalCssItem emission keyed on the folded
+                // value) is Phase 6 work; bridge discards the ResultPair.
+                let _ = evaluate_expression(
+                    &Expr::Arrow(arrow.clone()),
+                    meta,
+                    scope_index,
+                    parent_scope,
+                    own_scope,
+                );
             }
         }
     }
@@ -1063,13 +1132,16 @@ fn try_keyframes_branch(
     css: &mut Vec<CssItem>,
     variables: &mut Vec<Variable>,
     acc: &mut String,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
 ) -> Result<bool, CssBuildError> {
     if !is_compiled_keyframes_call_expression(expr, meta.state)
         && !is_compiled_keyframes_tagged_template_expression(expr, meta.state)
     {
         return Ok(false);
     }
-    let result = extract_keyframes(expr, meta, raw, "")?;
+    let result = extract_keyframes(expr, meta, raw, "", scope_index, parent_scope, own_scope)?;
     let mut iter = result.css.into_iter();
     let sheet = iter.next().expect("extract_keyframes returns ≥1 item");
     let unconditional = iter.next().expect("extract_keyframes returns ≥2 items");
@@ -1080,14 +1152,20 @@ fn try_keyframes_branch(
 }
 
 /// `extractArray` upstream lines 915–941.
-pub fn extract_array(elements: &[Expr], meta: &mut Metadata<'_>) -> Result<CSSOutput, CssBuildError> {
+pub fn extract_array(
+    elements: &[Expr],
+    meta: &mut Metadata<'_>,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
+) -> Result<CSSOutput, CssBuildError> {
     let mut css: Vec<CssItem> = Vec::new();
     let mut variables: Vec<Variable> = Vec::new();
     for element in elements {
         let result = if let Expr::Cond(c) = element {
-            extract_conditional_expression(c, meta)?
+            extract_conditional_expression(c, meta, scope_index, parent_scope, own_scope)?
         } else {
-            build_css_inner(element, meta)?
+            build_css_inner(element, meta, scope_index, parent_scope, own_scope)?
         };
         css.extend(result.css);
         variables.extend(result.variables);
@@ -1096,13 +1174,25 @@ pub fn extract_array(elements: &[Expr], meta: &mut Metadata<'_>) -> Result<CSSOu
 }
 
 /// `buildCss` upstream lines 949–1084 — the public dispatcher.
-pub fn build_css(node: &Expr, meta: &mut Metadata<'_>) -> Result<CSSOutput, CssBuildError> {
-    build_css_inner(node, meta)
+pub fn build_css(
+    node: &Expr,
+    meta: &mut Metadata<'_>,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
+) -> Result<CSSOutput, CssBuildError> {
+    build_css_inner(node, meta, scope_index, parent_scope, own_scope)
 }
 
 /// Internal entry — exists so the top-level extractArray path can
 /// reach it without re-routing through the public API name.
-fn build_css_inner(node: &Expr, meta: &mut Metadata<'_>) -> Result<CSSOutput, CssBuildError> {
+fn build_css_inner(
+    node: &Expr,
+    meta: &mut Metadata<'_>,
+    scope_index: &mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
+) -> Result<CSSOutput, CssBuildError> {
     if let Expr::Lit(Lit::Str(s)) = node {
         return Ok(CSSOutput {
             css: vec![CssItem::Unconditional(UnconditionalCssItem {
@@ -1113,50 +1203,56 @@ fn build_css_inner(node: &Expr, meta: &mut Metadata<'_>) -> Result<CSSOutput, Cs
     }
 
     if let Expr::TsAs(ts_as) = node {
-        return build_css_inner(&ts_as.expr, meta);
+        return build_css_inner(&ts_as.expr, meta, scope_index, parent_scope, own_scope);
     }
 
     if let Expr::Tpl(tpl) = node {
-        return extract_template_literal(tpl, meta);
+        return extract_template_literal(tpl, meta, scope_index, parent_scope, own_scope);
     }
 
     if let Expr::Object(obj) = node {
-        return extract_object_expression(obj, meta);
+        return extract_object_expression(obj, meta, scope_index, parent_scope, own_scope);
     }
 
     if let Expr::Member(m) = node {
-        return extract_member_expression(m, meta);
+        return extract_member_expression(m, meta, scope_index, parent_scope, own_scope);
     }
 
     if let Expr::Arrow(arrow) = node {
         if let BlockStmtOrExpr::Expr(body_expr) = &*arrow.body {
             match &**body_expr {
-                Expr::Object(obj) => return extract_object_expression(obj, meta),
+                Expr::Object(obj) => {
+                    return extract_object_expression(obj, meta, scope_index, parent_scope, own_scope)
+                }
                 Expr::Bin(b)
                     if matches!(
                         b.op,
                         BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing
                     ) =>
                 {
-                    return extract_logical_expression(arrow, meta);
+                    return extract_logical_expression(arrow, meta, scope_index, parent_scope, own_scope);
                 }
-                Expr::Cond(c) => return extract_conditional_expression(c, meta),
-                Expr::Member(m) => return extract_member_expression(m, meta),
+                Expr::Cond(c) => {
+                    return extract_conditional_expression(c, meta, scope_index, parent_scope, own_scope)
+                }
+                Expr::Member(m) => {
+                    return extract_member_expression(m, meta, scope_index, parent_scope, own_scope)
+                }
                 _ => {}
             }
         }
     }
 
-    if matches!(node, Expr::Ident(_)) {
-        // upstream: resolveBinding + cssMap-collision check + recurse.
-        // Phase 5 §5.4 stubbed.
-        let _ = resolve_binding_stub(
-            if let Expr::Ident(i) = node {
-                &i.sym
-            } else {
-                ""
-            },
-            meta,
+    if let Expr::Ident(i) = node {
+        // §4.6 bridge: real resolver dispatch. Surrounding JS branch
+        // (cssMap-collision check + recurse on resolved init expr) is
+        // Phase 6 work; bridge discards the PartialBindingWithMeta.
+        let _ = resolve_binding(
+            i.sym.as_str(),
+            &*meta,
+            &*scope_index,
+            parent_scope,
+            own_scope,
         );
     }
 
@@ -1165,7 +1261,7 @@ fn build_css_inner(node: &Expr, meta: &mut Metadata<'_>) -> Result<CSSOutput, Cs
             .iter()
             .filter_map(|opt| opt.as_ref().map(|e| (*e.expr).clone()))
             .collect();
-        return extract_array(&exprs, meta);
+        return extract_array(&exprs, meta, scope_index, parent_scope, own_scope);
     }
 
     if let Expr::Bin(BinExpr {
@@ -1179,7 +1275,7 @@ fn build_css_inner(node: &Expr, meta: &mut Metadata<'_>) -> Result<CSSOutput, Cs
             op,
             BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing
         ) {
-            let result = build_css_inner(right, meta)?;
+            let result = build_css_inner(right, meta, scope_index, parent_scope, own_scope)?;
             let css: Vec<CssItem> = result
                 .css
                 .into_iter()
@@ -1228,7 +1324,13 @@ fn build_css_inner(node: &Expr, meta: &mut Metadata<'_>) -> Result<CSSOutput, Cs
 
     if is_compiled_css_tagged_template_expression(node, meta.state) {
         if let Expr::TaggedTpl(TaggedTpl { tpl, .. }) = node {
-            return build_css_inner(&Expr::Tpl((**tpl).clone()), meta);
+            return build_css_inner(
+                &Expr::Tpl((**tpl).clone()),
+                meta,
+                scope_index,
+                parent_scope,
+                own_scope,
+            );
         }
     }
 
@@ -1236,7 +1338,13 @@ fn build_css_inner(node: &Expr, meta: &mut Metadata<'_>) -> Result<CSSOutput, Cs
         if let Expr::Call(CallExpr { args, .. }) = node {
             if let Some(first) = args.first() {
                 if let Expr::Object(obj) = &*first.expr {
-                    return build_css_inner(&Expr::Object(obj.clone()), meta);
+                    return build_css_inner(
+                        &Expr::Object(obj.clone()),
+                        meta,
+                        scope_index,
+                        parent_scope,
+                        own_scope,
+                    );
                 }
             }
         }
@@ -1333,11 +1441,12 @@ mod tests {
     //! same generated string that the §3 hash-parity oracle covers.
 
     use super::*;
+    use crate::compat::scope::ScopeIndex;
     use crate::state::State;
     use crate::types::{Metadata, MetadataContext};
     use compiled_utils::hash;
     use swc_core::common::DUMMY_SP;
-    use swc_core::ecma::ast::{ExprOrSpread, Ident, Number, PropName, Str};
+    use swc_core::ecma::ast::{ExprOrSpread, Ident, Module, Number, PropName, Str};
 
     fn fresh_meta(state: &mut State) -> Metadata<'_> {
         Metadata {
@@ -1347,6 +1456,21 @@ mod tests {
             context: MetadataContext::Root,
             own_scope_override: None,
         }
+    }
+
+    /// Build a `(ScopeIndex, ScopeId)` pair from an empty Module —
+    /// the §4.4 hash-site tests don't exercise binding lookup, so an
+    /// empty scope is sufficient. Phase 6 handler tests will build
+    /// from a real Module containing the test expression.
+    fn empty_scope() -> (ScopeIndex, crate::compat::scope::ScopeId) {
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![],
+            shebang: None,
+        };
+        let idx = ScopeIndex::build(&module);
+        let prog = idx.program_scope();
+        (idx, prog)
     }
 
     #[test]
@@ -1388,7 +1512,9 @@ mod tests {
         let expected_name = format!("k{}", hash(&generate(&call)));
 
         let mut meta = fresh_meta(&mut state);
-        let result = extract_keyframes(&call, &mut meta, "", "").expect("extracts");
+        let (mut idx, prog) = empty_scope();
+        let result = extract_keyframes(&call, &mut meta, "", "", &mut idx, prog, None)
+            .expect("extracts");
         // The emitted Unconditional item is `{ css: format!("{prefix}{name}{suffix}") }`
         // with prefix/suffix empty — should equal the expected name.
         let unconditional_css: String = result
@@ -1436,7 +1562,9 @@ mod tests {
 
         let expected_var_name = format!("--_{}", hash(&generate(&unary)));
         let mut meta = fresh_meta(&mut state);
-        let result = extract_object_expression(&obj, &mut meta).expect("extracts");
+        let (mut idx, prog) = empty_scope();
+        let result = extract_object_expression(&obj, &mut meta, &mut idx, prog, None)
+            .expect("extracts");
         let var = result
             .variables
             .into_iter()
@@ -1478,7 +1606,9 @@ mod tests {
 
         let expected_var_name = format!("--_{}", hash(&generate(&interp)));
         let mut meta = fresh_meta(&mut state);
-        let result = extract_template_literal(&tpl, &mut meta).expect("extracts");
+        let (mut idx, prog) = empty_scope();
+        let result = extract_template_literal(&tpl, &mut meta, &mut idx, prog, None)
+            .expect("extracts");
         let var = result
             .variables
             .into_iter()

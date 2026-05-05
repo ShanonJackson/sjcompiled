@@ -28,34 +28,60 @@
 //!    `(expr, meta)`-shaped — consistent with JS's circularity-break
 //!    contract.
 //!
-//! ## Phase 5 §5.5 status
+//! ## Phase 5 §5.5 status — ☑ CLOSURE COMPLETE (claude-2026-05-05)
 //!
-//! - **PARTIAL leaves (claude-2026-05-05, parallel with §5.4):** the
-//!   three resolve-binding-INDEPENDENT files —
+//! All 14 leaves are real 1:1 ports landed across three passes:
+//!
+//! - **Pass 1 (parallel with §5.4a–e):** the three
+//!   resolve-binding-INDEPENDENT files —
 //!   `traverse_binary_expression`, `traverse_unary_expression`,
 //!   `traverse_function`.
-//! - **Closure leaves (claude-2026-05-05 + §5.4e closure):** the
-//!   eight resolve-binding-DEPENDENT files —
-//!   `traverse_identifier`, plus the entire
+//! - **Pass 2 (post-§5.4e):** eight resolve-binding-DEPENDENT
+//!   files — `traverse_identifier`, plus the entire
 //!   `traverse_member_expression/**` subtree (8 files including
 //!   `traverse_access_path/{evaluate_path,resolve_expression}/**`).
-//! - **STUBS pending compat-layer work:**
-//!   `traverse_call_expression` (IIFE wrap + new-scope registration,
-//!   gated on §5.0d compat extension or §5.6 owner) and
+//! - **Pass 3 (closure complete; §5.0d absorbed):** the two
+//!   previously-stubbed leaves landed real bodies —
+//!   `traverse_call_expression` (using
+//!   [`crate::compat::scope::ScopeIndex::register_new_scope`] for
+//!   the IIFE arrow's transient `ScopeId`,
+//!   `register_synthetic_binding` for `(param := evaluatedArg)`
+//!   pairs, and the
+//!   [`crate::types::Metadata::own_scope_override`] channel for
+//!   the recursive evaluator call) and
 //!   `traverse_access_path::evaluate_path::namespace_import`
-//!   (cross-file ScopeIndex synthesis, gated on §5.6 cross-file
-//!   scope management). Both files quote upstream verbatim and
-//!   `unimplemented!()` in their bodies — see their module docs
-//!   for the unblock checklist.
+//!   (using `PartialBindingWithMeta::imported_module: Arc<Module>`
+//!   from the §5.4e drift-fix +
+//!   `register_synthetic_binding` for the 'default' synthesis on a
+//!   fresh imported `ScopeIndex`).
 //!
-//! ## Drift discipline
+//! ## §5.6 wiring contract
 //!
-//! Per CLAUDE.md DRIFT DETECTION, the two SHELL stubs above were
-//! ESCALATED to the §5.4e owner / coordinator before landing — the
-//! missing compat infra (IIFE CallExpr wrap, runtime scope
-//! registration, cross-file ScopeIndex synthesis) is recorded in
-//! both files' module docs so a future agent finds the unblock
-//! checklist by greping `unimplemented!()` in the subtree.
+//! The §5.6 evaluator (`evaluate_expression.rs`) inherits two
+//! channels installed by §5.5 closure:
+//!
+//! 1. `Metadata::own_scope_override` — the dispatcher reads it
+//!    per-call to honour `traverse_call_expression`'s IIFE-recursion
+//!    own_scope swap. `traverse_call_expression` sets it before
+//!    the recursive call and restores afterward; the evaluator's
+//!    closure consumes it on each invocation.
+//! 2. The namespace-import dispatch route — `evaluate_identifier`
+//!    detects `source == Import && imported_module.is_some() &&
+//!    node.is_none()` and calls `evaluate_namespace_import_path`
+//!    directly with the upcoming `pathName` from the access-path
+//!    chain. The body is real and unit-tested but unreachable from
+//!    the standard `evaluate_path` dispatcher (SWC's
+//!    `ImportNamespaceSpecifier` isn't an `Expr` variant).
+//!
+//! ## Bug-parity flag (documented; not patched)
+//!
+//! `traverse_call_expression` does NOT persist the IIFE wrap into
+//! the AST (Babel uses `replaceWith`; Rust uses transient
+//! `ScopeId`). May affect runtime-CSS-fallback emission on the
+//! deopt path. If a fixture surfaces byte-divergence there, the
+//! fix is at §5.6's evaluator boundary (decide which expression
+//! flows to the runtime fallback), NOT in
+//! `traverse_call_expression`. See that file's module docs.
 
 pub mod traverse_binary_expression;
 pub mod traverse_call_expression;

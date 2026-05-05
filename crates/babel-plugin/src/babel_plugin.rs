@@ -48,10 +48,13 @@ use compiled_utils::DEFAULT_IMPORT_SOURCES;
 use swc_core::common::comments::Comments;
 use swc_core::common::Spanned;
 use swc_core::ecma::ast::{
-    ImportDecl, ImportSpecifier, ModuleDecl, ModuleExportName, ModuleItem, Program,
+    Expr, ImportDecl, ImportSpecifier, ModuleDecl, ModuleExportName, ModuleItem, Program,
 };
 use swc_core::ecma::visit::{VisitMut, VisitMutWith};
 
+use crate::compat::scope::{ScopeId, ScopeIndex};
+use crate::css;
+use crate::keyframes;
 use crate::mutation_recorder::{ApiKind, MutationRecorder, StateDiff};
 use crate::state::State;
 use crate::types::PluginOptions;
@@ -150,6 +153,17 @@ pub struct BabelPluginVisitor<C: Comments> {
     /// emitted in release builds — the production plugin is silent.
     #[cfg(debug_assertions)]
     pub stub_log: Vec<String>,
+    /// §4.6 bridge: scope index built lazily at `visit_mut_program`
+    /// entry from the Module AST. `None` until `Program::enter`
+    /// fires (or when the program is a Script — Compiled doesn't
+    /// operate on classic scripts in practice). Phase 6 handler
+    /// dispatch sites pass `&mut self.scope_index` into
+    /// `evaluate_expression` / `resolve_binding`.
+    pub scope_index: Option<ScopeIndex>,
+    /// §4.6 bridge: cached `program_scope()` snapshot taken at the
+    /// same point `scope_index` is built. Avoids an extra method
+    /// dispatch on the hot path.
+    pub program_scope: Option<ScopeId>,
 }
 
 impl<C: Comments> BabelPluginVisitor<C> {
@@ -173,6 +187,8 @@ impl<C: Comments> BabelPluginVisitor<C> {
             comments,
             #[cfg(debug_assertions)]
             stub_log: Vec::new(),
+            scope_index: None,
+            program_scope: None,
         }
     }
 
@@ -365,14 +381,36 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         self.scan_classic_jsx_pragma_import(program);
         self.scan_jsx_pragma_comments(program);
 
+        // §4.6 bridge: build the scope index over the Module AST
+        // before the children walk. Phase 6 handler dispatch sites
+        // read `self.scope_index` / `self.program_scope` to feed
+        // `evaluate_expression` / `resolve_binding`. Script programs
+        // are not produced by Compiled call sites in practice
+        // (consumer monorepo is ESM/JSX); the field stays `None`.
+        if let Program::Module(module) = &*program {
+            let idx = ScopeIndex::build(module);
+            self.program_scope = Some(idx.program_scope());
+            self.scope_index = Some(idx);
+        }
+
         // Children walk — ImportDeclaration / TaggedTemplateExpression /
         // CallExpression / JSXElement / JSXOpeningElement visitors fire here.
         program.visit_mut_children_with(self);
 
-        // Upstream `Program::exit`: appendRuntimeImports, banner
-        // comment, React/forwardRef injection, `pathsToCleanup`.
-        // Deferred — needs §2.3(b) AST-mutation channel + first
-        // Phase 6 handler.
+        // Phase 6 §6.1 — `pathsToCleanup` drain (keyframes half).
+        // Mirrors upstream `babel-plugin.ts:222-238`. Today only the
+        // keyframes branch (§6.1) populates `Replace` entries; §6.2
+        // (`css` cleanup) and §6.3 (`cssMap`) reuse the same drain.
+        // The remaining upstream `Program::exit` work
+        // (`appendRuntimeImports`, banner comment, React/forwardRef
+        // injection) is Phase 7 territory — this drain is the
+        // smallest deferred-AST-mutation slice.
+        let replace_ids = keyframes::paths_to_cleanup_replace_ids(&self.state);
+        if !replace_ids.is_empty() {
+            if let Program::Module(m) = program {
+                keyframes::run_cleanup_replace(m, &replace_ids);
+            }
+        }
     }
 
     /// `ImportDeclaration` upstream visitor (lines 241–294).
@@ -384,6 +422,52 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
             self.record_compiled_import(import);
         }
         decl.visit_mut_children_with(self);
+    }
+
+    /// Post-order Expr hook. `visit_mut_call_expr` /
+    /// `visit_mut_tagged_tpl` see `&mut CallExpr` / `&mut TaggedTpl`
+    /// — they cannot replace themselves with a different `Expr`
+    /// variant. The dispatch sites whose action is "replace this
+    /// node with a different Expr kind" (Phase 6 §6.1's keyframes
+    /// cleanup → `null`, §6.2's css cleanup → `null`) need the
+    /// enclosing `Expr` reference. This override is the
+    /// post-order detection hook for those.
+    ///
+    /// Children walk runs FIRST (so nested matches are recognised)
+    /// and existing `visit_mut_call_expr` / `visit_mut_tagged_tpl`
+    /// stubs still fire as part of the descent. After the descent
+    /// returns we run the per-API matchers in upstream's dispatch
+    /// order:
+    ///   * §6.1 keyframes — queue `Replace` entry (this checkpoint).
+    ///   * §6.2 css cleanup — queue `Replace` entry (next).
+    ///   * §6.3 cssMap, §6.7 styled — early-return paths that
+    ///     mutate the Expr directly (their work happens in their
+    ///     own modules; this hook is the call site).
+    ///
+    /// The actual `null` substitution does NOT happen here — it's
+    /// deferred to `Program::exit`'s drain pass via
+    /// `keyframes::run_cleanup_replace`. Mirrors upstream
+    /// `pathsToCleanup` semantics.
+    fn visit_mut_expr(&mut self, n: &mut Expr) {
+        n.visit_mut_children_with(self);
+
+        // §6.1 — keyframes cleanup-only. Returns `true` if the node
+        // matched and was queued; the caller short-circuits further
+        // dispatch on the same node (matches upstream's `return`
+        // after `pathsToCleanup.push`).
+        if keyframes::try_queue_cleanup(n, &mut self.state) {
+            return;
+        }
+
+        // §6.2 — css cleanup-only. Mirrors the css half of upstream's
+        // `isCompiledUtil` short-circuit (lines 331–340). Queues into
+        // the SAME `paths_to_cleanup` channel keyframes uses; the
+        // shared drain at `Program::exit` swaps both for `null`. The
+        // matchers are mutually exclusive on a given node, so order
+        // between §6.1 and §6.2 here is not observable.
+        if css::try_queue_cleanup(n, &mut self.state) {
+            return;
+        }
     }
 
     /// `'TaggedTemplateExpression|CallExpression'` upstream. The
@@ -940,5 +1024,495 @@ mod tests {
         assert!(imports.css.is_none());
         // Recorder captured exactly one CompiledImportsAppend (for styled).
         assert_eq!(v.recorder.diff_log().len(), 1);
+    }
+
+    // ───────── Phase 6 §6.1 — keyframes cleanup-only end-to-end ─────────
+
+    #[test]
+    fn phase6a_standalone_keyframes_call_replaced_with_null() {
+        // Module:
+        //   import { keyframes } from '@compiled/react';
+        //   keyframes();
+        //
+        // Expectation after visit_mut_program:
+        //   import { keyframes } from '@compiled/react';
+        //   null;
+        use swc_core::common::{Span, SyntaxContext};
+        use swc_core::ecma::ast::{
+            CallExpr, Callee, Expr as AstExpr, ExprStmt, Ident, Lit, Stmt,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![named_specifier("keyframes", None)],
+        )));
+        let call_span = Span::new(BytePos(500), BytePos(510));
+        let kf_call = AstExpr::Call(CallExpr {
+            span: call_span,
+            ctxt: SyntaxContext::empty(),
+            callee: Callee::Expr(Box::new(AstExpr::Ident(Ident::new(
+                "keyframes".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )))),
+            args: vec![],
+            type_args: None,
+        });
+        let stmt = ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(kf_call),
+        }));
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, stmt],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!("expected Module")
+        };
+        let body = &m.body;
+        // Import preserved (specifier removal is §2.3(b), not 6a).
+        assert!(matches!(
+            &body[0],
+            ModuleItem::ModuleDecl(ModuleDecl::Import(_))
+        ));
+        // The standalone keyframes call was replaced with `null`,
+        // span anchored at the original call span.
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &body[1] else {
+            panic!("expected ExprStmt at body[1]");
+        };
+        match &*es.expr {
+            AstExpr::Lit(Lit::Null(n)) => {
+                assert_eq!(n.span.lo.0, 500);
+            }
+            other => panic!("expected null literal, got {:?}", other),
+        }
+        // Cleanup queue captured the replace action.
+        assert_eq!(v.state.paths_to_cleanup().len(), 1);
+    }
+
+    #[test]
+    fn phase6a_standalone_keyframes_tagged_tpl_replaced_with_null() {
+        use swc_core::common::{Span, SyntaxContext};
+        use swc_core::ecma::ast::{
+            Expr as AstExpr, ExprStmt, Ident, Lit, Stmt, TaggedTpl, Tpl,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![named_specifier("keyframes", None)],
+        )));
+        let tpl_span = Span::new(BytePos(700), BytePos(720));
+        let kf_tpl = AstExpr::TaggedTpl(TaggedTpl {
+            span: tpl_span,
+            ctxt: SyntaxContext::empty(),
+            tag: Box::new(AstExpr::Ident(Ident::new(
+                "keyframes".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            ))),
+            type_params: None,
+            tpl: Box::new(Tpl {
+                span: DUMMY_SP,
+                exprs: vec![],
+                quasis: vec![],
+            }),
+        });
+        let stmt = ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(kf_tpl),
+        }));
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, stmt],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!("expected Module")
+        };
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[1] else {
+            panic!("expected ExprStmt at body[1]");
+        };
+        match &*es.expr {
+            AstExpr::Lit(Lit::Null(n)) => {
+                assert_eq!(n.span.lo.0, 700);
+            }
+            other => panic!("expected null literal, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn phase6a_does_not_replace_unrelated_calls() {
+        // `import { keyframes } from '@compiled/react'; unrelated();`
+        // — `unrelated()` is not a Compiled API, so neither §6.1 nor
+        // §6.2's matchers should fire. (Originally this asserted that
+        // a `css()` call stays intact under §6.1-only wiring; with
+        // §6.2 active the css call is now legitimately replaced, so
+        // we use a truly unrelated callee here to preserve the
+        // "non-Compiled call left alone" invariant.)
+        use swc_core::common::{Span, SyntaxContext};
+        use swc_core::ecma::ast::{
+            CallExpr, Callee, Expr as AstExpr, ExprStmt, Ident, Stmt,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![
+                named_specifier("keyframes", None),
+                named_specifier("css", None),
+            ],
+        )));
+        let unrelated_call = AstExpr::Call(CallExpr {
+            span: Span::new(BytePos(900), BytePos(910)),
+            ctxt: SyntaxContext::empty(),
+            callee: Callee::Expr(Box::new(AstExpr::Ident(Ident::new(
+                "unrelated".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )))),
+            args: vec![],
+            type_args: None,
+        });
+        let stmt = ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(unrelated_call),
+        }));
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, stmt],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!("expected Module")
+        };
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[1] else {
+            panic!("expected ExprStmt");
+        };
+        // Still a call expression — §6.1 left it alone.
+        assert!(matches!(&*es.expr, AstExpr::Call(_)));
+        assert!(v.state.paths_to_cleanup().is_empty());
+    }
+
+    // ───────── Phase 6 §6.2 — css cleanup-only end-to-end ─────────
+
+    #[test]
+    fn phase6b_standalone_css_call_replaced_with_null() {
+        // Module:
+        //   import { css } from '@compiled/react';
+        //   css();
+        //
+        // Expectation after visit_mut_program:
+        //   import { css } from '@compiled/react';
+        //   null;
+        use swc_core::common::{Span, SyntaxContext};
+        use swc_core::ecma::ast::{
+            CallExpr, Callee, Expr as AstExpr, ExprStmt, Ident, Lit, Stmt,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![named_specifier("css", None)],
+        )));
+        let call_span = Span::new(BytePos(1500), BytePos(1510));
+        let css_call = AstExpr::Call(CallExpr {
+            span: call_span,
+            ctxt: SyntaxContext::empty(),
+            callee: Callee::Expr(Box::new(AstExpr::Ident(Ident::new(
+                "css".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )))),
+            args: vec![],
+            type_args: None,
+        });
+        let stmt = ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(css_call),
+        }));
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, stmt],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!("expected Module")
+        };
+        let body = &m.body;
+        assert!(matches!(
+            &body[0],
+            ModuleItem::ModuleDecl(ModuleDecl::Import(_))
+        ));
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &body[1] else {
+            panic!("expected ExprStmt at body[1]");
+        };
+        match &*es.expr {
+            AstExpr::Lit(Lit::Null(n)) => {
+                assert_eq!(n.span.lo.0, 1500);
+            }
+            other => panic!("expected null literal, got {:?}", other),
+        }
+        assert_eq!(v.state.paths_to_cleanup().len(), 1);
+    }
+
+    #[test]
+    fn phase6b_standalone_css_tagged_tpl_replaced_with_null() {
+        use swc_core::common::{Span, SyntaxContext};
+        use swc_core::ecma::ast::{
+            Expr as AstExpr, ExprStmt, Ident, Lit, Stmt, TaggedTpl, Tpl,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![named_specifier("css", None)],
+        )));
+        let tpl_span = Span::new(BytePos(1700), BytePos(1720));
+        let css_tpl = AstExpr::TaggedTpl(TaggedTpl {
+            span: tpl_span,
+            ctxt: SyntaxContext::empty(),
+            tag: Box::new(AstExpr::Ident(Ident::new(
+                "css".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            ))),
+            type_params: None,
+            tpl: Box::new(Tpl {
+                span: DUMMY_SP,
+                exprs: vec![],
+                quasis: vec![],
+            }),
+        });
+        let stmt = ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(css_tpl),
+        }));
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, stmt],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!("expected Module")
+        };
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[1] else {
+            panic!("expected ExprStmt at body[1]");
+        };
+        match &*es.expr {
+            AstExpr::Lit(Lit::Null(n)) => {
+                assert_eq!(n.span.lo.0, 1700);
+            }
+            other => panic!("expected null literal, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn phase6b_does_not_replace_unrelated_calls() {
+        // `import { css, styled } from '@compiled/react'; styled.div();`
+        // — `styled.div()` is §6.7's target, not §6.2's. After §6.2
+        // alone, the styled call must stay intact.
+        use swc_core::common::{Span, SyntaxContext};
+        use swc_core::ecma::ast::{
+            CallExpr, Callee, Expr as AstExpr, ExprStmt, Ident, MemberExpr, MemberProp, Stmt,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![
+                named_specifier("css", None),
+                named_specifier("styled", None),
+            ],
+        )));
+        let styled_call = AstExpr::Call(CallExpr {
+            span: Span::new(BytePos(1900), BytePos(1910)),
+            ctxt: SyntaxContext::empty(),
+            callee: Callee::Expr(Box::new(AstExpr::Member(MemberExpr {
+                span: DUMMY_SP,
+                obj: Box::new(AstExpr::Ident(Ident::new(
+                    "styled".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                ))),
+                prop: MemberProp::Ident(
+                    Ident::new("div".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+                ),
+            }))),
+            args: vec![],
+            type_args: None,
+        });
+        let stmt = ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(styled_call),
+        }));
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, stmt],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!("expected Module")
+        };
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[1] else {
+            panic!("expected ExprStmt");
+        };
+        assert!(matches!(&*es.expr, AstExpr::Call(_)));
+        assert!(v.state.paths_to_cleanup().is_empty());
+    }
+
+    #[test]
+    fn phase6b_renamed_css_call_replaced() {
+        // `import { css as c } from '@compiled/react'; c();`
+        use swc_core::common::{Span, SyntaxContext};
+        use swc_core::ecma::ast::{
+            CallExpr, Callee, Expr as AstExpr, ExprStmt, Ident, Lit, Stmt,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![named_specifier("c", Some("css"))],
+        )));
+        let call_span = Span::new(BytePos(2100), BytePos(2110));
+        let css_call = AstExpr::Call(CallExpr {
+            span: call_span,
+            ctxt: SyntaxContext::empty(),
+            callee: Callee::Expr(Box::new(AstExpr::Ident(Ident::new(
+                "c".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )))),
+            args: vec![],
+            type_args: None,
+        });
+        let stmt = ModuleItem::Stmt(Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(css_call),
+        }));
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, stmt],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!("expected Module")
+        };
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[1] else {
+            panic!("expected ExprStmt at body[1]");
+        };
+        match &*es.expr {
+            AstExpr::Lit(Lit::Null(n)) => {
+                assert_eq!(n.span.lo.0, 2100);
+            }
+            other => panic!("expected null literal, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn phase6a_keyframes_call_inside_var_declarator_init_replaced() {
+        // Mirrors the realistic shape:
+        //   import { keyframes } from '@compiled/react';
+        //   const fade = keyframes({ from: { opacity: 1 }, to: { opacity: 0 } });
+        // After §6.1: `const fade = null;` (the binding stays but the
+        // RHS is null'd — exactly what upstream's
+        // `pathsToCleanup` replaces).
+        use swc_core::common::{Span, SyntaxContext};
+        use swc_core::ecma::ast::{
+            BindingIdent, CallExpr, Callee, Decl, Expr as AstExpr, Ident, Lit, ObjectLit, Pat,
+            Stmt, VarDecl, VarDeclKind, VarDeclarator,
+        };
+
+        let import = ModuleItem::ModuleDecl(ModuleDecl::Import(import_decl(
+            "@compiled/react",
+            vec![named_specifier("keyframes", None)],
+        )));
+
+        let kf_span = Span::new(BytePos(1100), BytePos(1200));
+        let kf_call = AstExpr::Call(CallExpr {
+            span: kf_span,
+            ctxt: SyntaxContext::empty(),
+            callee: Callee::Expr(Box::new(AstExpr::Ident(Ident::new(
+                "keyframes".into(),
+                DUMMY_SP,
+                SyntaxContext::empty(),
+            )))),
+            args: vec![swc_core::ecma::ast::ExprOrSpread {
+                spread: None,
+                expr: Box::new(AstExpr::Object(ObjectLit {
+                    span: DUMMY_SP,
+                    props: vec![],
+                })),
+            }],
+            type_args: None,
+        });
+        let decl = ModuleItem::Stmt(Stmt::Decl(Decl::Var(Box::new(VarDecl {
+            span: DUMMY_SP,
+            ctxt: SyntaxContext::empty(),
+            kind: VarDeclKind::Const,
+            declare: false,
+            decls: vec![VarDeclarator {
+                span: DUMMY_SP,
+                name: Pat::Ident(BindingIdent {
+                    id: Ident::new("fade".into(), DUMMY_SP, SyntaxContext::empty()),
+                    type_ann: None,
+                }),
+                init: Some(Box::new(kf_call)),
+                definite: false,
+            }],
+        }))));
+        let module = Module {
+            span: DUMMY_SP,
+            body: vec![import, decl],
+            shebang: None,
+        };
+
+        let mut v = fresh();
+        let mut program = Program::Module(module);
+        v.visit_mut_program(&mut program);
+
+        let Program::Module(m) = &program else {
+            panic!("expected Module")
+        };
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[1] else {
+            panic!("expected VarDecl");
+        };
+        let init = vd.decls[0].init.as_deref().expect("init");
+        match init {
+            AstExpr::Lit(Lit::Null(n)) => {
+                assert_eq!(n.span.lo.0, 1100);
+            }
+            other => panic!("expected null literal init, got {:?}", other),
+        }
     }
 }

@@ -21,11 +21,14 @@
 //! };
 //! ```
 //!
-//! Cross-file scope swap: same divergence as
-//! `traverse_identifier.rs` — see that module's docs. The
-//! `resolved.meta` in JS is dropped on the §5.4e `PartialBindingWithMeta`
-//! shape; we forward the caller's `meta` instead. Documented drift
-//! gated on §5.6.
+//! Cross-file scope swap: §5.6 wires the consumer at the dispatch
+//! entry (`utils::evaluate_expression::dispatch_evaluate`). When the
+//! input identifier resolves to a foldable cross-file import, the
+//! §5.6 evaluator builds a fresh `ScopeIndex` from the imported
+//! module's AST and recurses with that index BEFORE delegating into
+//! the access-path chain that reaches this leaf. So this leaf's
+//! same-file path always sees same-file scope info — see
+//! `traverse_identifier.rs` module docs for the full design.
 
 use swc_core::ecma::ast::{Expr, Ident};
 
