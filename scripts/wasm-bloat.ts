@@ -253,3 +253,119 @@ for (const [tag, { bytes: b, count }] of sorted) {
     `  ${tag.padEnd(30)} ${b.toString().padStart(12)}  ${((b / totalCode) * 100).toFixed(1).padStart(5)}%  ${count.toString().padStart(6)}`
   );
 }
+
+// Sub-bucket the "other (mangled)" entries by extracting their first
+// rust path component. Rust legacy mangling: `_ZN<len><name>...`. Rust
+// v0 mangling: `_R[NCM]<...>` with crate names embedded after some
+// numeric/hash prefixes. Try both — extract the first identifier-like
+// substring of length >= 3 that isn't a generic short token.
+function extractFirstIdent(name: string): string {
+  // Strip leading `_ZN` or `_R` then any digits/punct/short noise.
+  let s = name.replace(/^_ZN/, '').replace(/^_R[NCMVI]?/, '');
+  // Skip a leading number (length prefix in legacy mangling).
+  s = s.replace(/^[0-9]+/, '');
+  const m = s.match(/[a-z][a-z0-9_]{2,}/);
+  return m ? m[0] : '<no-ident>';
+}
+
+const unattributedNames: { name: string; size: number }[] = [];
+for (let i = 0; i < funcSizes.length; i++) {
+  const absIdx = i + importedFuncCount;
+  const name = funcNames.get(absIdx);
+  if (!name) continue;
+  const tag = classify(name);
+  if (tag === 'other (mangled)' || tag === 'other') {
+    unattributedNames.push({ name, size: funcSizes[i] });
+  }
+}
+
+// Re-bucket unattributed by first identifier.
+const subBuckets = new Map<string, { bytes: number; count: number; sample: string }>();
+for (const { name, size } of unattributedNames) {
+  const id = extractFirstIdent(name);
+  const b = subBuckets.get(id) ?? { bytes: 0, count: 0, sample: name };
+  b.bytes += size;
+  b.count += 1;
+  if (size > 0 && b.sample.length > 200) b.sample = name;
+  subBuckets.set(id, b);
+}
+
+console.log('\nUnattributed bucket sub-breakdown (top 30 by first ident):');
+console.log(
+  `  ${'ident'.padEnd(30)} ${'bytes'.padStart(12)}  ${'%code'.padStart(6)}  ${'fns'.padStart(6)}`
+);
+const subSorted = [...subBuckets.entries()].sort((a, b) => b[1].bytes - a[1].bytes).slice(0, 30);
+for (const [id, { bytes: b, count }] of subSorted) {
+  console.log(
+    `  ${id.padEnd(30)} ${b.toString().padStart(12)}  ${((b / totalCode) * 100).toFixed(1).padStart(5)}%  ${count.toString().padStart(6)}`
+  );
+}
+
+console.log('\nLargest 20 unattributed individual functions:');
+unattributedNames
+  .sort((a, b) => b.size - a.size)
+  .slice(0, 20)
+  .forEach(({ name, size }) => {
+    const trimmed = name.length > 110 ? name.slice(0, 107) + '...' : name;
+    console.log(`  ${size.toString().padStart(8)}  ${trimmed}`);
+  });
+
+// ---- Data section breakdown ----
+const dataSection = sections.find((s) => s.id === 11);
+if (dataSection) {
+  let p = dataSection.payloadOffset;
+  const end = dataSection.payloadOffset + dataSection.payloadLen;
+  const { value: count, next } = readULEB(bytes, p);
+  p = next;
+  const segments: { mode: number; size: number; activeOffset?: number }[] = [];
+  for (let i = 0; i < count; i++) {
+    const flags = bytes[p++];
+    let activeOffset: number | undefined;
+    if ((flags & 0x01) === 0) {
+      // active segment with memidx 0 (or specified)
+      if (flags & 0x02) {
+        // memidx
+        const m = readULEB(bytes, p);
+        p = m.next;
+      }
+      // const expr (i32.const N end)
+      if (bytes[p] === 0x41) {
+        // i32.const, signed LEB
+        p++;
+        let value = 0;
+        let shift = 0;
+        let byte: number;
+        do {
+          byte = bytes[p++];
+          value |= (byte & 0x7f) << shift;
+          shift += 7;
+        } while (byte & 0x80);
+        if (shift < 32 && (byte & 0x40) !== 0) value |= -(1 << shift);
+        activeOffset = value >>> 0;
+      }
+      // skip until 0x0b (end opcode)
+      while (bytes[p] !== 0x0b) p++;
+      p++; // past end
+    }
+    const sizeRead = readULEB(bytes, p);
+    p = sizeRead.next;
+    segments.push({ mode: flags, size: sizeRead.value, activeOffset });
+    p += sizeRead.value;
+  }
+  if (p !== end) console.warn(`Data section parse: ${p} != ${end}`);
+
+  console.log(
+    `\nData section: ${segments.length} segments, total ${segments.reduce((a, s) => a + s.size, 0)} bytes`
+  );
+  console.log(`Top 15 segments by size:`);
+  segments
+    .map((s, i) => ({ ...s, idx: i }))
+    .sort((a, b) => b.size - a.size)
+    .slice(0, 15)
+    .forEach((s) => {
+      const offStr = s.activeOffset !== undefined ? `@0x${s.activeOffset.toString(16)}` : 'passive';
+      console.log(
+        `  seg ${s.idx.toString().padStart(4)}  ${s.size.toString().padStart(10)} bytes  ${offStr}`
+      );
+    });
+}

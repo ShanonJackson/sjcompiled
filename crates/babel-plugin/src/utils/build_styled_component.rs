@@ -429,9 +429,9 @@ fn styled_template(
     // ───── arrow function body ─────
     let mut body_stmts: Vec<Stmt> = Vec::new();
 
-    // `if (process.env.NODE_ENV !== 'production') {
-    //    if (__cmplp.innerRef) { throw new Error("Please use 'ref' instead of 'innerRef'."); }
-    //  }`
+    // `if (__cmplp.innerRef) { throw new Error("Please use 'ref' instead of 'innerRef'."); }`
+    // — emitted bare (no NODE_ENV runtime wrapper); gated at build time by
+    // `is_development_env()` per upstream build-styled-component.ts:150-168.
     if is_development_env() {
         body_stmts.push(build_inner_ref_guard());
     }
@@ -673,27 +673,15 @@ fn is_development_env() -> bool {
 
 // ───────── Hand-built statements ─────────
 
-/// `if (process.env.NODE_ENV !== 'production') {
-///    if (__cmplp.innerRef) { throw new Error("Please use 'ref' instead of 'innerRef'."); }
-///  }`
+/// `if (__cmplp.innerRef) { throw new Error("Please use 'ref' instead of 'innerRef'."); }`
+///
+/// Upstream `build-styled-component.ts:162-168` emits this bare `if` with no
+/// outer `process.env.NODE_ENV !== 'production'` wrapper — the dev/test gate
+/// is applied at BUILD TIME via `isDevelopmentEnv` (mirrored here by
+/// `is_development_env()` at the call site), and the emitted statement is
+/// the bare inner check. Earlier port wrapped this in an extra
+/// NODE_ENV-runtime check, double-gating; corrected per §6.8 drift detection.
 fn build_inner_ref_guard() -> Stmt {
-    let process_env_node_env = Expr::Member(MemberExpr {
-        span: DUMMY_SP,
-        obj: Box::new(Expr::Member(MemberExpr {
-            span: DUMMY_SP,
-            obj: ident_expr("process"),
-            prop: MemberProp::Ident(ident_name("env")),
-        })),
-        prop: MemberProp::Ident(ident_name("NODE_ENV")),
-    });
-    let outer_test = Expr::Bin(BinExpr {
-        span: DUMMY_SP,
-        op: BinaryOp::NotEqEq,
-        left: Box::new(process_env_node_env),
-        right: str_lit("production"),
-    });
-
-    // inner: `if (__cmplp.innerRef) { throw new Error("..."); }`
     let inner_test = Expr::Member(MemberExpr {
         span: DUMMY_SP,
         obj: ident_expr(PROPS_IDENTIFIER_NAME),
@@ -712,23 +700,12 @@ fn build_inner_ref_guard() -> Stmt {
             ctxt: Default::default(),
         })),
     });
-    let inner_if = Stmt::If(IfStmt {
+    Stmt::If(IfStmt {
         span: DUMMY_SP,
         test: Box::new(inner_test),
         cons: Box::new(Stmt::Block(BlockStmt {
             span: DUMMY_SP,
             stmts: vec![throw_stmt],
-            ctxt: Default::default(),
-        })),
-        alt: None,
-    });
-
-    Stmt::If(IfStmt {
-        span: DUMMY_SP,
-        test: Box::new(outer_test),
-        cons: Box::new(Stmt::Block(BlockStmt {
-            span: DUMMY_SP,
-            stmts: vec![inner_if],
             ctxt: Default::default(),
         })),
         alt: None,

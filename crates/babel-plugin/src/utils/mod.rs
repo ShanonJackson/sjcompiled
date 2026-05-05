@@ -27,6 +27,7 @@
 //! `visitCssMapPath` site — remains a phase-citing inline
 //! `unimplemented!()` until Phase 6 §6.3 lands the real fn.
 
+pub mod append_runtime_imports;
 pub mod ast;
 pub mod build_compiled_component;
 pub mod build_css_variables;

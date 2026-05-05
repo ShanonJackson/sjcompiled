@@ -41,12 +41,38 @@ export type BabelPluginFixtureOpts = {
   [key: string]: unknown;
 };
 
+/**
+ * Phase 6 §6.8 normalisation: strip every comment from the engine output
+ * before prettier. Phase 7 owns comment-placement parity; §6.8 only cares
+ * about transform correctness. Stripping comments here keeps the §6.8 gate
+ * focused on substantive port divergences instead of `/*#__PURE__*​/`-style
+ * annotation mismatches between Babel (`comments: false` default) and SWC
+ * (`preserveAllComments: true`).
+ */
+function stripComments(code: string): string {
+  // Single-line `// ...` comments
+  let out = code.replace(/\/\/[^\n\r]*/g, '');
+  // Block `/* ... */` comments (non-greedy, dotall via [\s\S])
+  out = out.replace(/\/\*[\s\S]*?\*\//g, '');
+  return out;
+}
+
+/**
+ * Phase 6 §6.8 normalisation: every fixture is re-formatted via prettier
+ * regardless of its `pretty: false` flag. The flag was an upstream-test
+ * affordance for inline snapshots; the parity oracle is byte-equality of
+ * the formatted output of both engines, so we always normalise.
+ */
+function normalise(code: string): string {
+  const stripped = stripComments(code);
+  return format(stripped, { parser: 'babel-ts' });
+}
+
 export function babelEngine(source: string, opts: BabelPluginFixtureOpts = {}): string {
   const {
     comments = false,
     filename,
     highlightCode,
-    pretty = true,
     snippet,
     optimizeCss = false,
     importReact,
@@ -54,15 +80,52 @@ export function babelEngine(source: string, opts: BabelPluginFixtureOpts = {}): 
     ...pluginOptions
   } = opts;
 
+  // Harness divergence vs upstream `packages/babel-plugin/src/test-utils.ts`:
+  // upstream defaults to NO react preset (raw JSX in output), but SWC's
+  // pipeline ALWAYS transforms JSX (no `preserve` option in @swc/core).
+  // For apples-to-apples bytes we apply the same JSX transform on both
+  // sides — classic runtime by default (matches SWC's default), automatic
+  // when the fixture opts into `importReact === false` OR a `@jsxImportSource`
+  // pragma is present in the source (Babel preset-react rejects classic +
+  // importSource, and SWC silently honours the pragma).
+  const hasJsxImportSourcePragma = /@jsxImportSource\b/.test(source);
+  const reactRuntime =
+    importReact === false || hasJsxImportSourcePragma ? 'automatic' : 'classic';
   const fileResult = babelTransformSync(source, {
     babelrc: false,
     comments,
-    compact: !pretty,
+    compact: false,
     configFile: false,
     filename,
     highlightCode,
     plugins: [[compiledBabelPlugin, { optimizeCss, importReact, ...pluginOptions }]],
-    presets: importReact === false ? [['@babel/preset-react', { runtime: 'automatic' }]] : [],
+    // preset-typescript strips TS annotations to match SWC's default
+    // (SWC's TypeScript parser auto-strips). Without this Babel preserves
+    // `as const` / `<{generic}>` while SWC strips them, producing spurious
+    // divergences unrelated to the plugin port.
+    presets: [
+      [
+        '@babel/preset-typescript',
+        {
+          isTSX: true,
+          allExtensions: true,
+          // Keep value imports verbatim — SWC's `verbatimModuleSyntax: true`
+          // does the same. Without this, Babel strips unused value imports
+          // while SWC keeps them and we get spurious divergences.
+          onlyRemoveTypeImports: true,
+        },
+      ],
+      // useSpread + useBuiltIns together emit native `Object.assign({}, p)`
+      // for prop spread instead of the `_extends` polyfill, matching
+      // SWC's es2022 output.
+      [
+        '@babel/preset-react',
+        {
+          runtime: reactRuntime,
+          useSpread: reactRuntime === 'classic' ? true : undefined,
+        },
+      ],
+    ],
     parserOpts: {
       plugins: parserBabelPlugins ?? DEFAULT_PARSER_BABEL_PLUGINS,
     },
@@ -83,7 +146,7 @@ export function babelEngine(source: string, opts: BabelPluginFixtureOpts = {}): 
     codeSnippet = babelCode;
   }
 
-  return pretty ? format(codeSnippet, { parser: 'babel-ts' }) : codeSnippet;
+  return normalise(codeSnippet);
 }
 
 /**
@@ -105,15 +168,29 @@ export function babelEngine(source: string, opts: BabelPluginFixtureOpts = {}): 
  *    handler in Phase 6.
  */
 export function swcEngine(source: string, opts: BabelPluginFixtureOpts = {}): string {
-  const { pretty = true, snippet, filename } = opts;
+  const { snippet, filename, importReact } = opts;
+
+  // Mirror babelEngine's JSX runtime selection so both pipelines emit
+  // the same JSX shape (classic = `React.createElement`; automatic =
+  // `_jsx`). See babelEngine for the rationale.
+  const hasJsxImportSourcePragma = /@jsxImportSource\b/.test(source);
+  const reactRuntime =
+    importReact === false || hasJsxImportSourcePragma ? 'automatic' : 'classic';
 
   const result = swcTransformSync(source, {
     filename,
     jsc: {
       target: 'es2022',
       parser: { syntax: 'typescript', tsx: true },
-      transform: { verbatimModuleSyntax: true },
-      preserveAllComments: true,
+      transform: {
+        verbatimModuleSyntax: true,
+        react: { runtime: reactRuntime },
+      },
+      // Drop comments at the parser stage. The §6.8 gate is transform
+      // correctness; Phase 7 owns comment-placement parity. With
+      // `preserveAllComments: false`, neither engine emits comments,
+      // and prettier does not see blank lines where comments used to be.
+      preserveAllComments: false,
       experimental: {
         plugins: [[BABEL_PLUGIN_WASM, {}]],
       },
@@ -132,7 +209,7 @@ export function swcEngine(source: string, opts: BabelPluginFixtureOpts = {}): st
   } else {
     codeSnippet = code;
   }
-  return pretty ? format(codeSnippet, { parser: 'babel-ts' }) : codeSnippet;
+  return normalise(codeSnippet);
 }
 
 export function diffSummary(a: string, b: string, context = 80): string {

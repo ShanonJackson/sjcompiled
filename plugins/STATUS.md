@@ -299,13 +299,267 @@ end-to-end). Sibling integration gates clean: compat_scope 3/3,
 compat_evaluation 3/3, compat_generator 3/3, resolver_matrix 8/8,
 transform_css 3/3, hash_parity 4/4. WASI cdylib build clean.
 
-**Next checkpoint: Phase 6 §6.8 — Phase 6 exit gate.** Full
-harness green: all ~50 babel-plugin fixtures + cross-handler
-fixtures + JSX automatic-runtime fixtures + custom-import-source
-fixtures byte-clean against the parity oracle. With §6.7 closed,
-the §4.8 (Phase 4 exit gate — keyframes/css/cssMap/styled
-fixtures byte-clean) AND §6.8 (Phase 6 exit gate full harness)
-are unblocked and ship together.
+**Phase 6 §6.8 ▶ (this session, 2026-05-05) — exit-gate harness
+opened, partial progress logged.** Full corpus run against the
+re-built wasm produced a true baseline of **7 parity / 407
+divergence / 62 swc-throw / 1 babel-throw** across 477 fixtures.
+The earlier "954/954 bun parity" cited in §5.6 was a pass-through
+oracle (assert babel ≠ swc); the §6.8 inversion (assert babel ==
+swc) is what surfaces real divergence. Three concrete deliverables
+landed this session:
+
+- **`parity-harness/babel-plugin/` triage tooling** — `triage.mjs`
+  runs every fixture and emits a categorised JSON report
+  (`triage-report.json`); `categorize.mjs` groups divergences by
+  upstream test-file source; `dump-divergences.mjs` prints a
+  flat divergence + diff dump for grep/inspection. None of these
+  are test runners; they're investigation aids that bypass the
+  expect-divergence assertion in `harness.test.ts`.
+
+- **Fixture re-extraction (CRITICAL — STALE FIXTURES CAUGHT).**
+  The 477 extracted fixtures contained `@sjcompiled/react` import
+  strings — frozen from BEFORE the 2026-05-04 fork-prefix revert
+  (CLAUDE.md "One-time exception" entry). Our Rust handlers match
+  on `@compiled/react`; neither engine transformed any of those
+  fixtures, so the harness was producing trivial passthrough-vs-
+  passthrough "parity". A fresh `bun parity-harness/babel-plugin/extract-fixtures.mjs`
+  run regenerated the corpus with the correct prefix; the
+  triage-report counts above are from the regenerated corpus.
+
+- **`parity-harness/babel-plugin/engines.ts` post-processing
+  alignment.** Phase 6 §6.8's gate is transform correctness, not
+  comment placement (Phase 7) or per-fixture pretty/snippet
+  preferences. The harness now (a) always applies
+  `@babel/preset-typescript` (`onlyRemoveTypeImports: true`) +
+  `@babel/preset-react` (classic by default; automatic when the
+  source has `@jsxImportSource` or `importReact === false`), so
+  Babel and SWC run the same JSX + TS transforms; (b) uses
+  `useSpread: true` on preset-react classic to match SWC's native
+  spread vs Babel's `_extends` polyfill; (c) strips ALL comments
+  from both outputs before prettier; (d) always re-runs prettier
+  regardless of the fixture's `pretty: false` flag; (e) sets SWC
+  `preserveAllComments: false` so blank-line residue from
+  comment-stripping doesn't leak into prettier. The pre-alignment
+  baseline at 351 divergence dropped to 17 BEFORE the stale-fixture
+  fix surfaced; the corrected post-alignment baseline (with real
+  fixtures) is the 407 above.
+
+- **§6.7 styled handler — innerRef double-gate drift detected
+  + fixed.** `crates/babel-plugin/src/utils/build_styled_component.rs::build_inner_ref_guard`
+  was wrapping the inner `if (__cmplp.innerRef) throw` in an outer
+  `if (process.env.NODE_ENV !== 'production')` runtime check.
+  Upstream `build-styled-component.ts:162-168` emits ONLY the bare
+  inner `if`; the dev/test gate is applied at BUILD time via
+  `isDevelopmentEnv` (mirrored in Rust by the existing
+  `is_development_env()` call at the use site, line 435). The
+  double-gate caused 81 fixtures to throw `Unexpected token (2:95)`
+  at prettier time because the snippet-slicing in
+  `engines.ts::babelEngine` cuts on the FIRST
+  `if (process.env.NODE_ENV` substring match — which the SWC
+  output put INSIDE the arrow body (mid-statement), producing
+  syntactically broken slices. Removing the outer wrapper aligned
+  emit shape with upstream and dropped throws from 143 to 62.
+
+**Remaining for §6.8 exit gate (next agent picks this up):**
+
+The 407 divergences + 62 throws + 1 babel-throw are real port
+defects across the handlers. The dominant clusters (counts from
+the post-fix `triage-report.json`):
+
+| Cluster | Count | Likely root cause |
+|---|---|---|
+| `styled/behaviour` divergences | 56 | Multiple emit-shape diffs in `build_styled_component.rs` (forwardRef body construction, sheet declarations, runtime-imports injection) |
+| `css-prop/object-literal` | 41 | css-prop wrapper emit-shape differences |
+| `css-prop/behaviour` | 39 | same family as above |
+| `keyframes/call-expression` | 39 | keyframes ref + dynamic-value handling |
+| `styled/call-expression` + `styled/tagged-template-expression` | 63 | sibling clusters of styled/behaviour |
+| `expression-evaluation` | 22 | identifier resolution / partial-eval edges |
+| `class-names/tagged-template-expression` THROWS | 6 of 62 | panic in `class_names::CssCallReplacer` on tagged-template form with `${...}` interpolation (e.g. `<div className={css\`${color}\`}>`) — root cause unknown, plugin returns "failed to invoke plugin on 'None'" |
+| Other class-names panics | 56 | most likely the same CssCallReplacer panic on similar template shapes |
+| `__tests__/custom-import-source` | 4 div + 1 throw | `importSources` plugin option not parsed; `./foo/index.js` filename triggers a panic |
+| `xcss-prop/transformation` | 12 | runtime-imports not injected when `state.uses_xcss = true` (no css-prop sibling); `processXcss: false` opt not honoured |
+| `__tests__/jsx-automatic` | 4 | import-statement order differences |
+| `css-map/at-rules-and-selectors` | 6 | object-property emit-shape (Ident vs Str key fan-out from §6.3 SWC-divergence note) |
+
+The **biggest single missing piece is `appendRuntimeImports`** —
+`crates/babel-plugin/src/babel_plugin.rs:494` and `lib.rs:20` both
+deliberately defer "Program::exit appendRuntimeImports + banner +
+React/forwardRef injection" to Phase 7, but those WERE NOT comment
+placement — they're transform correctness. Without them, output
+referencing `CC`, `CS`, `ax`, `ix`, `forwardRef`, or `React` lacks
+the matching `import` statements, which is divergent from upstream.
+Wiring `appendRuntimeImports` is likely the highest-leverage
+single fix.
+
+**Concrete next steps for the §6.8 owner:**
+
+1. **Run `bun parity-harness/babel-plugin/triage.mjs`** to confirm
+   the baseline still holds (7/407/62/1 at this session's HEAD).
+2. **Wire `appendRuntimeImports`** in `babel_plugin.rs::Program::exit`
+   per upstream `babel-plugin.ts`. Re-run triage; expected impact
+   is large (probably brings parity into the hundreds).
+3. **Investigate the class-names tagged-template panic** —
+   `class_names::CssCallReplacer` is panicking on `<div className={css\`${X}\`}>`-shaped templates. Add a unit test for this
+   shape, find where the panic fires, fix it 1:1 against upstream.
+4. **Cluster-by-cluster**: pick the top remaining group, look at
+   3-5 sample diffs, identify the shared root cause, fix in
+   Rust, re-triage. Each fix is a §6.8a/b/... sub-checkpoint.
+5. **`importSources` plugin option** — parse it from
+   `PluginOptions`, thread to the `is_compiled_*_call_expression`
+   matchers in each handler so they recognise renamed imports.
+6. **Once parity is at full corpus minus the documented carve-outs**
+   (comment-disable directive — §6.5; styled-in-arrow displayName
+   — §6.7), flip `harness.test.ts:143-155` from expect-divergence
+   to expect-parity, allowlist the carve-outs, and close §6.8.
+
+The triage tooling is gitignored-output-friendly: `triage-report.json`
+regenerates cleanly each run. Each cluster fix should re-run
+`triage.mjs` and check the cluster count drops to zero before
+moving on.
+
+**§6.8 status remains ☐.** This session's deliverables are
+infrastructure (triage + harness alignment) and one drift fix
+(§6.7 innerRef). The exit-gate condition (full corpus byte-clean)
+is NOT met. The next agent picks up at step 2 above with a clean
+baseline to measure against.
+
+**Lib tests after the innerRef fix:** **421/421 pass**
+(unchanged from §6.7 closure baseline). The fix removes ~45 LOC
+of stale code in `build_inner_ref_guard()` and updates one
+doc-comment; no test asserted the wrapped shape.
+
+**Phase 6 §6.8a ☑ (this session, 2026-05-05) — `appendRuntimeImports`
++ React + forwardRef wired in `Program::exit`.** The §6.8 punch
+list's step 2. New deliverables:
+
+- `crates/babel-plugin/src/utils/append_runtime_imports.rs`
+  (~125 LOC + 6 unit tests) — VERBATIM port of
+  `utils/append-runtime-imports.ts`. Two const arrays
+  (`WITH_COMPRESSION = ax→ac, ix, CC, CS` /
+  `WITHOUT_COMPRESSION = ax, ix, CC, CS`) + the
+  `find existing | merge | unshift fresh` shape from upstream.
+  Handles the `import { CC as CompiledRoot, CC, CS }` aliasing
+  case via local-name lookup (mirrors upstream lines 49–55).
+- `babel_plugin.rs::Program::exit` extended: gate is
+  `state.compiled_imports().is_some() || state.uses_xcss() == Some(true)`.
+  Order matches upstream `babel-plugin.ts:183-216`:
+  (a) `appendRuntimeImports`,
+  (b) `import * as React from 'react'` when
+  `!pragma.jsx_import_source && (pragma.jsx || opts.import_react ?? true)`
+  AND `ScopeIndex::has_binding('React', no_globals=true)` is false,
+  (c) `import { forwardRef } from 'react'` when styled was imported
+  AND `has_binding('forwardRef')` is false.
+- Two private helpers in `babel_plugin.rs`:
+  `build_react_namespace_import()` and `build_forward_ref_import()`
+  emit the `template.ast(...)` analog directly as `ModuleItem`.
+- 13 existing `phase6X` end-to-end tests updated for the new
+  body-index offsets (forwardRef + React + runtime prepended);
+  no semantic changes, just `m.body[N]` index shifts.
+
+**SWC vs Babel divergences (documented inline):**
+- Upstream calls `path.unshiftContainer('body', t.noop())` after the
+  banner comment to insert a blank line — that's Phase 7 (comment
+  placement). NOT done here.
+- Upstream's `preserveLeadingComments(path)` and
+  `path.addComment('leading', ...)` for the file-banner are also
+  Phase 7. NOT done here.
+- `state.opts.onIncludedFiles` callback — replaced by the
+  `included-files.json` sidecar contract per SIDECAR_SCHEMA.md §1.
+  Sidecar emit is §5.7. NOT done here.
+
+Lib tests: **427/427 pass** (was 421 post-§6.7; +6 new for
+`append_runtime_imports::tests`). WASI cdylib build clean.
+
+**§6.8a — re-run triage delta = ZERO at cluster level.** Before:
+7 parity / 407 div / 62 swc-throw / 1 babel-throw. After: same.
+The expected "large impact" flagged in the §6.8 punch list did
+NOT materialise as cluster-count movement, because:
+
+1. **~163 of 477 fixtures use `snippet: true`**, which slices the
+   harness output between the first `const` and the first
+   `if (process.env.NODE_ENV` substring — completely stripping
+   `import` statements. The runtime-import injection is invisible
+   to those fixtures' parity oracle.
+2. **For the remaining ~314 non-snippet fixtures**, the React
+   import shows up correctly in the SWC output but gets RENAMED
+   to `React1` by SWC's resolver pass after the plugin runs.
+   Babel emits `import * as React from "react"`; SWC emits
+   `import * as React1 from "react"`. The `React.createElement(...)`
+   references in the body keep the unrenamed `React` symbol —
+   which is the canonical SWC react-classic transform's output.
+   So each non-snippet fixture has the React rename diff PLUS
+   the underlying handler-defect diffs (sheet hoisting, value
+   evaluation, UID naming, etc.).
+
+Sample diff (`__tests__/expression-evaluation.test.ts ::
+import-specifiers--should-evaluate-simple-expressions`) post-fix:
+
+```
+--- BABEL                              +++ SWC
+import * as React from "react";        import * as React1 from "react";
+import { ax, ix, CC, CS } from         import { ax, ix, CC, CS } from
+  "@compiled/react/runtime";             "@compiled/react/runtime";
+const _ = "._1wybexct{font-size:16px}";import "@compiled/react";
+React.createElement(CC, null,          React.createElement(CC, null,
+  React.createElement(CS, null, [_]),    React.createElement(CS, null, [_0]),
+  React.createElement("div", {           React.createElement("div", {
+    className: ax(["_1wybexct"]),          className: ax(["_1wyb17el"]),
+  }, "hello world")                      style: { "--_139u961": ix(8 * 2) }
+);                                       }, "hello world")
+                                       );
+```
+
+Five distinct divergences in this one fixture:
+1. `React` vs `React1` (SWC resolver hygiene rename).
+2. Original `import "@compiled/react"` not removed (specifier
+   removal is §2.3(b), not yet done).
+3. Sheet hoist `const _ = "..."` missing in SWC.
+4. UID `_` vs `_0` (mint counter starts at 0 in Rust; Babel's
+   `generateUidIdentifier('')` starts at the first available
+   underscore name and strips trailing digits — needs §5.4
+   scope-aware UID parity).
+5. Constant-folding `8 * 2 → 16` not evaluated → SWC keeps
+   `ix(8 * 2)` and emits a `style:` prop with a CSS variable;
+   Babel folded to `16` and emitted `font-size:16px` directly.
+
+The §6.8a wiring is correct (verified by the React import line
+appearing in the SWC output where it was missing pre-fix); the
+cluster-count is dominated by handler-level defects. Next agent
+picks up at:
+
+1. **Investigate React→React1 rename.** Hypothesis: SWC's
+   plugin runtime re-runs the resolver pass on plugin-inserted
+   `Ident`s; our `Ident::new("React".into(), DUMMY_SP,
+   SyntaxContext::empty())` lands in the program scope with a
+   fresh hygienic context that conflicts with SWC's react
+   classic transform's internal pragma identifier (which has a
+   different `SyntaxContext`). Possible fixes (in priority order):
+   (a) post-process the SWC output in `engines.ts` to normalise
+   `import * as ReactN from "react"` → `import * as React`;
+   (b) thread the SWC plugin-runtime's known program-scope
+   `SyntaxContext` into our inserted Ident (requires reading the
+   existing context off `program.body[*]` Idents);
+   (c) emit `import React from 'react'` (default) instead of
+   namespace and update the harness Babel side to match — would
+   change emit shape and IS a drift from upstream, NOT recommended.
+   The harness-level fix (a) is the lowest-risk; (b) is the
+   correct port-level fix.
+2. **Cluster-by-cluster handler fixes** per §6.8 punch list step
+   4. The biggest clusters now (post-§6.8a — diff CONTENT shifted
+   even though counts didn't):
+   * `styled/behaviour` 56 — emit-shape diffs.
+   * `css-prop/object-literal` 41 — wrapper emit-shape.
+   * `css-prop/behaviour` 39 — same family.
+   * `keyframes/call-expression` 39 — keyframes ref + dynamic-value.
+   * `styled/call-expression` 34 + `tagged-template-expression` 29.
+   * `expression-evaluation` 22 — identifier resolution / partial-eval.
+   * `class-names/behaviour` 18 — same React rename + handler tail.
+3. **Specifier removal (§2.3(b))** — close the "original
+   `import { ClassNames } from '@compiled/react'` not removed"
+   subset of every fixture by wiring the deferred mutation queue
+   per PLAN.md §3.9.8. Lower-leverage than the handler clusters
+   but unblocks parity for many fixtures whose handler logic is
+   already correct.
 
 **§4.7 (Parcel wrapper) — out of scope.** Treated as a
 downstream-host use case the bridge supports (single

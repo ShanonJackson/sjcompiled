@@ -36,3 +36,7 @@ One-time exception (2026-05-04): a historic fork-prefix rename was reverted to `
 # WASI/WASM Compilation
 - Please don't add like 10MB Rust library or anything like that. We will eventually 'build' the whole thing to WASM/WASI and we don't want a like 50MB binary.
 - PLEASE KEEP IN MIND SWC Tears down the WASI instance between CALLS. ANY Cross-transform caching will be destroyed; If you feel like you need cross-transform caching COMMUNICATE with me.
+
+## Final bit of important info.
+- CSS being byte-equal is non-negotaible; However is surrounding JS has byte-equal differnces that are PURELY cosmetic but the 'cure is worse than the disease' I.E to fix the issue it could be extremely complex/sacrifice perf goals. Then let's DISCUSS IT
+- 

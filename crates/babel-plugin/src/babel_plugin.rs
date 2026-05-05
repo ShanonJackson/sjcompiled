@@ -158,6 +158,63 @@ fn build_display_name_stmt(name: &str) -> swc_core::ecma::ast::Stmt {
     })
 }
 
+/// `import * as React from 'react'` — the namespace-import shape
+/// upstream's `Program::exit` injects when `shouldImportReact` and no
+/// React binding is in scope. Mirrors
+/// `template.ast(\`import * as React from 'react'\`)` in
+/// `babel-plugin.ts:201`.
+fn build_react_namespace_import() -> ModuleItem {
+    use swc_core::common::{SyntaxContext, DUMMY_SP};
+    use swc_core::ecma::ast::{
+        Ident, ImportDecl, ImportPhase, ImportSpecifier, ImportStarAsSpecifier, Str,
+    };
+    let import = ImportDecl {
+        span: DUMMY_SP,
+        specifiers: vec![ImportSpecifier::Namespace(ImportStarAsSpecifier {
+            span: DUMMY_SP,
+            local: Ident::new("React".into(), DUMMY_SP, SyntaxContext::empty()),
+        })],
+        src: Box::new(Str {
+            span: DUMMY_SP,
+            value: "react".into(),
+            raw: None,
+        }),
+        type_only: false,
+        with: None,
+        phase: ImportPhase::Evaluation,
+    };
+    ModuleItem::ModuleDecl(ModuleDecl::Import(import))
+}
+
+/// `import { forwardRef } from 'react'` — the named-import shape the
+/// styled handler's `forwardRef(...)` calls reference. Mirrors
+/// `template.ast(\`import { forwardRef } from 'react'\`)` in
+/// `babel-plugin.ts:206`.
+fn build_forward_ref_import() -> ModuleItem {
+    use swc_core::common::{SyntaxContext, DUMMY_SP};
+    use swc_core::ecma::ast::{
+        Ident, ImportDecl, ImportNamedSpecifier, ImportPhase, ImportSpecifier, Str,
+    };
+    let import = ImportDecl {
+        span: DUMMY_SP,
+        specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+            span: DUMMY_SP,
+            local: Ident::new("forwardRef".into(), DUMMY_SP, SyntaxContext::empty()),
+            imported: None,
+            is_type_only: false,
+        })],
+        src: Box::new(Str {
+            span: DUMMY_SP,
+            value: "react".into(),
+            raw: None,
+        }),
+        type_only: false,
+        with: None,
+        phase: ImportPhase::Evaluation,
+    };
+    ModuleItem::ModuleDecl(ModuleDecl::Import(import))
+}
+
 /// Match `userland_module_specifier` against `import_sources`.
 /// Mirrors upstream lines 242–259 — exact match wins; fallback is a
 /// relative-path comparison that resolves the user's `./foo` against
@@ -486,14 +543,77 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         // CallExpression / JSXElement / JSXOpeningElement visitors fire here.
         program.visit_mut_children_with(self);
 
+        // Phase 6 §6.8 — `Program::exit` runtime-import injection.
+        // Mirrors upstream `babel-plugin.ts:183-216`. Order:
+        //   1. Early-out gate: skip when no Compiled imports were
+        //      found AND xcss is not used.
+        //   2. `appendRuntimeImports` — push/merge `ax|ac, ix, CC, CS`
+        //      onto `@compiled/react/runtime`.
+        //   3. `import * as React from 'react'` — when neither
+        //      `@jsxImportSource` is set nor an existing React binding
+        //      is in scope, AND `shouldImportReact` (pragma.jsx ||
+        //      opts.importReact ?? true).
+        //   4. `import { forwardRef } from 'react'` — when styled was
+        //      imported AND no existing `forwardRef` binding is in scope.
+        //
+        // Phase 7 territory (NOT done here): banner comment +
+        // `t.noop()` line break, `preserveLeadingComments` traversal,
+        // `onIncludedFiles` callback (see `included-files.json`
+        // sidecar plan in §5.7).
+        if let Program::Module(m) = program {
+            let has_compiled_imports = self.state.compiled_imports().is_some();
+            let uses_xcss = self.state.uses_xcss() == Some(true);
+            if has_compiled_imports || uses_xcss {
+                let pragma = self.state.pragma();
+                let pragma_jsx = pragma.jsx.unwrap_or(false);
+                let pragma_jsx_import_source = pragma.jsx_import_source.unwrap_or(false);
+                // upstream: `shouldImportReact = pragma.jsx ||
+                // (opts.importReact ?? true)`.
+                let should_import_react =
+                    pragma_jsx || self.state.opts().import_react.unwrap_or(true);
+                let has_styled = self
+                    .state
+                    .compiled_imports()
+                    .and_then(|i| i.styled.as_ref())
+                    .is_some();
+
+                // (2) appendRuntimeImports.
+                crate::utils::append_runtime_imports::append_runtime_imports(m, &self.state);
+
+                // (3) `import * as React from 'react'` — gated on
+                //     no-jsxImportSource + shouldImportReact + binding
+                //     not already in scope.
+                if !pragma_jsx_import_source && should_import_react {
+                    let has_react_binding = match (self.scope_index.as_ref(), self.program_scope) {
+                        (Some(idx), Some(scope)) => idx.has_binding(scope, "React", true),
+                        _ => false,
+                    };
+                    if !has_react_binding {
+                        m.body.insert(0, build_react_namespace_import());
+                    }
+                }
+
+                // (4) `import { forwardRef } from 'react'` — gated on
+                //     styled imported + binding not already in scope.
+                if has_styled {
+                    let has_forward_ref_binding =
+                        match (self.scope_index.as_ref(), self.program_scope) {
+                            (Some(idx), Some(scope)) => {
+                                idx.has_binding(scope, "forwardRef", true)
+                            }
+                            _ => false,
+                        };
+                    if !has_forward_ref_binding {
+                        m.body.insert(0, build_forward_ref_import());
+                    }
+                }
+            }
+        }
+
         // Phase 6 §6.1 — `pathsToCleanup` drain (keyframes half).
         // Mirrors upstream `babel-plugin.ts:222-238`. Today only the
         // keyframes branch (§6.1) populates `Replace` entries; §6.2
         // (`css` cleanup) and §6.3 (`cssMap`) reuse the same drain.
-        // The remaining upstream `Program::exit` work
-        // (`appendRuntimeImports`, banner comment, React/forwardRef
-        // injection) is Phase 7 territory — this drain is the
-        // smallest deferred-AST-mutation slice.
         let replace_ids = keyframes::paths_to_cleanup_replace_ids(&self.state);
         if !replace_ids.is_empty() {
             if let Program::Module(m) = program {
@@ -1089,12 +1209,15 @@ mod tests {
             imports.class_names.as_deref(),
             Some(&["ClassNames".to_string()][..])
         );
-        // Verify NO mutation: original module body length preserved.
+        // §6.8 — Program::exit injects runtime imports + React +
+        // forwardRef (styled was imported, so all three fire). Body
+        // grows by 3 prepended items: forwardRef, React, runtime.
+        // The two original imports stay intact at indices 3 and 4.
         if let Program::Module(m) = &program {
-            assert_eq!(m.body.len(), 2);
-            // Specifier counts unchanged — confirms we didn't drop
-            // any import.
-            if let ModuleItem::ModuleDecl(ModuleDecl::Import(im)) = &m.body[0] {
+            assert_eq!(m.body.len(), 5);
+            // Specifier counts unchanged on the ORIGINAL @compiled/react
+            // import — confirms we didn't drop any import.
+            if let ModuleItem::ModuleDecl(ModuleDecl::Import(im)) = &m.body[3] {
                 assert_eq!(im.specifiers.len(), 2);
             }
         }
@@ -1476,15 +1599,18 @@ mod tests {
             panic!("expected Module")
         };
         let body = &m.body;
-        // Import preserved (specifier removal is §2.3(b), not 6a).
+        // §6.8 — Program::exit prepends `import * as React` + the
+        // runtime import. Original [import, expr_stmt] becomes
+        // [React, runtime, import, expr_stmt]. Original import
+        // preserved (specifier removal is §2.3(b), not 6a).
         assert!(matches!(
-            &body[0],
+            &body[2],
             ModuleItem::ModuleDecl(ModuleDecl::Import(_))
         ));
         // The standalone keyframes call was replaced with `null`,
         // span anchored at the original call span.
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &body[1] else {
-            panic!("expected ExprStmt at body[1]");
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &body[3] else {
+            panic!("expected ExprStmt at body[3]");
         };
         match &*es.expr {
             AstExpr::Lit(Lit::Null(n)) => {
@@ -1540,8 +1666,9 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!("expected Module")
         };
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[1] else {
-            panic!("expected ExprStmt at body[1]");
+        // §6.8 — body shifted by 2 (React + runtime prepended).
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[3] else {
+            panic!("expected ExprStmt at body[3]");
         };
         match &*es.expr {
             AstExpr::Lit(Lit::Null(n)) => {
@@ -1600,7 +1727,9 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!("expected Module")
         };
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[1] else {
+        // §6.8 — body shifted by 2 (React + runtime prepended;
+        // styled was NOT imported here so forwardRef is skipped).
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[3] else {
             panic!("expected ExprStmt");
         };
         // Still a call expression — §6.1 left it alone.
@@ -1658,12 +1787,13 @@ mod tests {
             panic!("expected Module")
         };
         let body = &m.body;
+        // §6.8 — body shifted by 2 (React + runtime prepended).
         assert!(matches!(
-            &body[0],
+            &body[2],
             ModuleItem::ModuleDecl(ModuleDecl::Import(_))
         ));
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &body[1] else {
-            panic!("expected ExprStmt at body[1]");
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &body[3] else {
+            panic!("expected ExprStmt at body[3]");
         };
         match &*es.expr {
             AstExpr::Lit(Lit::Null(n)) => {
@@ -1718,8 +1848,9 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!("expected Module")
         };
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[1] else {
-            panic!("expected ExprStmt at body[1]");
+        // §6.8 — body shifted by 2 (React + runtime prepended).
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[3] else {
+            panic!("expected ExprStmt at body[3]");
         };
         match &*es.expr {
             AstExpr::Lit(Lit::Null(n)) => {
@@ -1780,7 +1911,10 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!("expected Module")
         };
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[1] else {
+        // §6.8 — `styled` was imported alongside `css`, so the
+        // forwardRef + React + runtime imports all prepend (3 items).
+        // Original [import, expr_stmt] → body[3] = import, body[4] = stmt.
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[4] else {
             panic!("expected ExprStmt");
         };
         assert!(matches!(&*es.expr, AstExpr::Call(_)));
@@ -1828,8 +1962,10 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!("expected Module")
         };
-        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[1] else {
-            panic!("expected ExprStmt at body[1]");
+        // §6.8 — body shifted by 2 (React + runtime prepended;
+        // styled NOT imported here).
+        let ModuleItem::Stmt(Stmt::Expr(es)) = &m.body[3] else {
+            panic!("expected ExprStmt at body[3]");
         };
         match &*es.expr {
             AstExpr::Lit(Lit::Null(n)) => {
@@ -1904,7 +2040,9 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!("expected Module")
         };
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[1] else {
+        // §6.8 — body shifted by 2 (React + runtime prepended;
+        // styled NOT imported here).
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[3] else {
             panic!("expected VarDecl");
         };
         let init = vd.decls[0].init.as_deref().expect("init");
@@ -1994,13 +2132,19 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!("expected Module")
         };
-        // Module body now has: import, var decl (with forwardRef
-        // init), AND the displayName if-stmt inserted after.
-        assert_eq!(m.body.len(), 3, "expected import + var + displayName");
+        // §6.8 — Program::exit prepends forwardRef + React + runtime
+        // imports (3 items) because styled was imported.
+        // Pre-prepend body: [import, var, displayName] (3 items).
+        // Post-prepend body: [forwardRef, React, runtime, import, var, displayName] (6 items).
+        assert_eq!(
+            m.body.len(),
+            6,
+            "expected forwardRef + React + runtime + import + var + displayName"
+        );
 
-        // Item 1: VarDecl with forwardRef init.
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[1] else {
-            panic!("expected VarDecl at body[1]");
+        // Item 4 (was 1): VarDecl with forwardRef init.
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[4] else {
+            panic!("expected VarDecl at body[4]");
         };
         let init = vd.decls[0].init.as_deref().expect("init present");
         let AstExpr::Call(call) = init else {
@@ -2014,9 +2158,9 @@ mod tests {
         };
         assert_eq!(callee_ident.sym.as_ref(), "forwardRef");
 
-        // Item 2: displayName if-stmt.
-        let ModuleItem::Stmt(Stmt::If(if_stmt)) = &m.body[2] else {
-            panic!("expected If at body[2]");
+        // Item 5 (was 2): displayName if-stmt.
+        let ModuleItem::Stmt(Stmt::If(if_stmt)) = &m.body[5] else {
+            panic!("expected If at body[5]");
         };
         // Inner body has the assignment.
         let Stmt::Block(block) = &*if_stmt.cons else {
@@ -2097,8 +2241,10 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!()
         };
-        // Body unchanged length — no displayName inserted.
-        assert_eq!(m.body.len(), 2);
+        // §6.8 — body grew by 3 (forwardRef + React + runtime
+        // prepended). No displayName inserted (export-default styled
+        // call has no var-binding name). Original length 2 → 5.
+        assert_eq!(m.body.len(), 5);
     }
 
     #[test]
@@ -2170,9 +2316,10 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!()
         };
-        // Should now have import + var (rewritten) + displayName.
-        assert_eq!(m.body.len(), 3);
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[1] else {
+        // §6.8 — Body now: [forwardRef, React, runtime, import, var, displayName]
+        // (3 prepended + original 3) = 6 items.
+        assert_eq!(m.body.len(), 6);
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[4] else {
             panic!()
         };
         let AstExpr::Call(call) = vd.decls[0].init.as_deref().expect("init") else {
@@ -2274,7 +2421,8 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!()
         };
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[1] else {
+        // §6.8 — body shifted by 3 (forwardRef + React + runtime).
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[4] else {
             panic!()
         };
         let AstExpr::Call(call) = vd.decls[0].init.as_deref().expect("init") else {
