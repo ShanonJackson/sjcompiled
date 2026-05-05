@@ -79,7 +79,7 @@ Snippet-slicing in `engines.ts::babelEngine` cuts on the FIRST
 | `css-prop/behaviour` | TBD | same family as above |
 | `keyframes/call-expression` | TBD | keyframes ref + dynamic-value handling |
 | `styled/call-expression` + `tagged-template-expression` | TBD | sibling clusters of styled/behaviour |
-| Color-name minification (`black` → `#000`, `white` → `#fff`) | many | lightningcss vs babel-postcss-css-syntax minifier divergence; cosmetic only |
+| Color-name minification (`black` → `#000`, `white` → `#fff`) | many | cssnano `colormin`-style minification firing on SWC side but not Babel side; both pipelines use postcss + cssnano-preset-default, so this is a port defect in `crates/compiled-css/src/plugins/normalize_css.rs`'s preset filter or plugin ordering — NOT a different minifier |
 
 NOTE: post-§6.8c the swc-throws column is empty (0 throws across 477).
 Run `bun parity-harness/babel-plugin/triage.mjs` and re-categorise the

@@ -168,7 +168,17 @@ export function babelEngine(source: string, opts: BabelPluginFixtureOpts = {}): 
  *    handler in Phase 6.
  */
 export function swcEngine(source: string, opts: BabelPluginFixtureOpts = {}): string {
-  const { snippet, filename, importReact } = opts;
+  const {
+    comments: _comments,
+    filename,
+    highlightCode: _highlightCode,
+    snippet,
+    optimizeCss = false,
+    importReact,
+    parserBabelPlugins: _parserBabelPlugins,
+    pretty: _pretty,
+    ...pluginOptions
+  } = opts;
 
   // Mirror babelEngine's JSX runtime selection so both pipelines emit
   // the same JSX shape (classic = `React.createElement`; automatic =
@@ -192,7 +202,7 @@ export function swcEngine(source: string, opts: BabelPluginFixtureOpts = {}): st
       // and prettier does not see blank lines where comments used to be.
       preserveAllComments: false,
       experimental: {
-        plugins: [[BABEL_PLUGIN_WASM, {}]],
+        plugins: [[BABEL_PLUGIN_WASM, { optimizeCss, importReact, ...pluginOptions }]],
       },
     },
   });

@@ -38,5 +38,5 @@ One-time exception (2026-05-04): a historic fork-prefix rename was reverted to `
 - PLEASE KEEP IN MIND SWC Tears down the WASI instance between CALLS. ANY Cross-transform caching will be destroyed; If you feel like you need cross-transform caching COMMUNICATE with me.
 
 ## Final bit of important info.
-- CSS being byte-equal is non-negotaible; However is surrounding JS has byte-equal differnces that are PURELY cosmetic but the 'cure is worse than the disease' I.E to fix the issue it could be extremely complex/sacrifice perf goals. Then let's DISCUSS IT
-- 
+- crates/css is a FAITHFUL 1:1 port of packages/css; It's MUTABLE not IMMUTABLE but when editing it it's important you run all the parity tests AND fix issues 1:1 with where it DIVERGES in BEHAVIOUR from the ORIGINAL. Preferably in same folder/file location as original.
+Preferably use parity tests to find it where it diverges very quickly using the js oracle.
