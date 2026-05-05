@@ -1,4 +1,6 @@
 ## Goal
+We're porting packages/babel-plugin and packages/babel-plugin-strip-runtime, packages/css identically to SWC/Rust; We've scaffholded/built everything now we're fixing behavioura divergences.
+
 We've implemented packages/css IDENTICALLY in Rust exposed via packages/css-native/index.js; Performance is a lot slower, but we're investigating that in parallel.
 Output through transformCss is CONFIRMED byte-equal via fixtures/* running babel with/without Rust and confirming byte-equality (See: packages/equality-harness/scripts/verify.mjs)
 Now that we've confirmed packages/css has been rebuilt and packages/babel-plugin works IDENTICALLY using the new one. It's time to start working towards migrating

@@ -100,6 +100,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let id = Ident::new("x".into(), DUMMY_SP, Default::default());
         let pair = evaluate_identifier(
@@ -127,6 +128,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let id = Ident::new("nope".into(), DUMMY_SP, Default::default());
         let pair = evaluate_identifier(

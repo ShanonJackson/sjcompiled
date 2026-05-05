@@ -296,6 +296,7 @@ pub fn try_handle_jsx_element(
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
 
         let css_output = match build_css(
@@ -369,6 +370,7 @@ pub fn try_handle_jsx_element(
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let wrapper = compiled_template(
             Box::new(Expr::JSXElement(Box::new(original_jsx))),
@@ -406,6 +408,7 @@ pub fn try_handle_jsx_element(
         own_id: None,
         context: MetadataContext::Root,
         own_scope_override: None,
+            in_conditional_branch: false,
     };
     // Take ownership of the original via mem::replace — SWC requires
     // an owned JSXElement to feed compiled_template's `Expr::JSXElement`

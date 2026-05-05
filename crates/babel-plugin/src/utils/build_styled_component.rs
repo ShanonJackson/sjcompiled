@@ -317,6 +317,17 @@ fn styled_template(
                 names.insert(n);
             }
         }
+        // §6.8g — upstream walks `meta.parentPath` (the entire styled
+        // call subtree), which covers conditional/logical class-name
+        // expressions too. Conditional className shapes like
+        // `(p) => p.isRounded ? 'a' : 'b'` carry `__cmplp.isRounded`
+        // MemberExprs that the variables-only walk misses, leaving the
+        // consumed prop spread onto the underlying DOM tag.
+        for cn in &opts.class_names {
+            for n in get_invalid_dom_props(cn) {
+                names.insert(n);
+            }
+        }
         names.into_iter().collect()
     } else {
         Vec::new()
@@ -858,6 +869,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         }
     }
 

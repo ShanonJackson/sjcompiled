@@ -37,6 +37,17 @@ Earlier "954/954 bun parity" cited in §5.6 was a pass-through oracle
 (assert babel ≠ swc); §6.8 inverts it (assert babel == swc) and
 surfaces real divergence.
 
+**Current baseline (post-§6.8g, 2026-05-06):** parity **335 / 477**
+(70.2%), divergence **141**, swc-throws **0**, babel-throws **0**,
+both-throw **1**. Cumulative session delta from the original
+7/407/62/1 baseline: parity +328, divergence −266, swc-throws −62
+(cluster cleared), babel-throws −1. §6.8g extended the
+invalid-DOM-prop walk to cover conditional-className expressions
+(parity +22 / divergence −22). Three remaining `__cmplp`/`__cmpldp`
+edge-case fixtures need separate features
+(dedup-against-existing-destructure, interpolation-function
+destructuring) — raised as §6.8h follow-up.
+
 **Triage tooling at `parity-harness/babel-plugin/`:**
 - `triage.mjs` runs every fixture, emits categorised JSON
   (`triage-report.json`).
@@ -70,25 +81,43 @@ Snippet-slicing in `engines.ts::babelEngine` cuts on the FIRST
 `if (process.env.NODE_ENV` substring, so the misplaced wrapper broke
 81 fixtures. Removing the outer wrapper dropped throws 143 → 62.
 
-### §6.8 cluster table (post-§6.8c re-triage; baseline parity=184/477, divergence=292, swc-throws=0)
+### §6.8 cluster table (post-§6.8f re-triage; baseline parity=313/477, divergence=163, swc-throws=0)
 
-| Cluster | Count | Likely root cause |
+| Cluster (upstream test file) | Count | Likely root cause |
 |---|---|---|
-| `styled/behaviour` divergences | TBD | forwardRef body / sheet decls / runtime imports |
-| `css-prop/object-literal` | TBD | wrapper emit-shape |
-| `css-prop/behaviour` | TBD | same family as above |
-| `keyframes/call-expression` | TBD | keyframes ref + dynamic-value handling |
-| `styled/call-expression` + `tagged-template-expression` | TBD | sibling clusters of styled/behaviour |
-| Color-name minification (`black` → `#000`, `white` → `#fff`) | many | cssnano `colormin`-style minification firing on SWC side but not Babel side; both pipelines use postcss + cssnano-preset-default, so this is a port defect in `crates/compiled-css/src/plugins/normalize_css.rs`'s preset filter or plugin ordering — NOT a different minifier |
+| `styled/behaviour` | 41 | conditional-CSS ternary expansion (literal-branch ternaries fall through to CSS-variable path; see §6.8e closure) |
+| `css-prop/behaviour` | 20 | wrapper emit-shape (sibling of object-literal) |
+| `css-prop/object-literal` | 18 | wrapper emit-shape |
+| `styled/call-expression` | 16 | sibling cluster of styled/behaviour |
+| `__tests__/expression-evaluation` | 9 | evaluator edge cases surfaced by full-corpus run |
+| `__tests__/index` | 9 | top-level plugin-entry / option-handling fixtures |
+| `styled/tagged-template-expression` | 8 | sibling cluster of styled/behaviour |
+| `css-prop/string-literal` | 7 | sibling cluster of css-prop |
+| `class-names/call-expression` | 6 | render-prop / `<ClassNames>` |
+| `class-names/behaviour` | 5 | render-prop / `<ClassNames>` |
+| `__tests__/css-builder` | 4 | css-builder unit-style fixtures |
+| `__tests__/jsx-automatic` | 4 | classic vs automatic JSX runtime |
+| `class-names/tagged-template-expression` | 3 | render-prop / `<ClassNames>` |
+| `keyframes/call-expression` | 3 | keyframes ref + dynamic-value handling |
+| `xcss-prop/transformation` | 3 | xcss-prop edge cases |
+| `css-prop/jsx-pragma` | 2 | classic-pragma `jsx` specifier (links to §2.3(b)) |
+| `__tests__/custom-import-source` | 2 | links to §6.8 punch-list item 5 (`importSources` option) |
+| `__tests__/module-imports` | 2 | cross-module resolver edge cases |
+| `css-map/at-rules-and-selectors` | 1 | tail of §6.3 cssMap |
 
-NOTE: post-§6.8c the swc-throws column is empty (0 throws across 477).
-Run `bun parity-harness/babel-plugin/triage.mjs` and re-categorise the
-remaining 292 divergences before picking the next cluster.
+NOTE: post-§6.8f the swc-throws column is empty (0 throws across 477)
+and babel-throws is 0 (the lone `both-throw` is genuine bug-parity).
+Total = 163 divergences (unchanged from §6.8e — see §6.8f closure for
+why: the optimization fix is necessary but blocked by the §6.8g
+prop-destructure feature for the styled cluster). Top 3 clusters
+(`styled/behaviour`, `css-prop/behaviour`, `css-prop/object-literal`)
+account for **79 of 163 (48%)** — `styled/behaviour` will move once
+§6.8g lands.
 
 ### §6.8 punch list (next agent)
 
 1. **Run `bun parity-harness/babel-plugin/triage.mjs`** to confirm
-   baseline (7/407/62/1 at HEAD).
+   baseline (313/163/0/0/1 at HEAD post-§6.8f).
 2. **§6.8a ☑ — `appendRuntimeImports` + React + forwardRef wired in
    `Program::exit`.** See `crates/babel-plugin/src/utils/append_runtime_imports.rs`
    (~125 LOC + 6 unit tests). Lib tests 421 → 427. **Cluster delta = 0**
@@ -402,11 +431,284 @@ remaining divergences are now CONTAINED to:
   (-115); swc-throws 62 → 0 (-62, cluster cleared);
   babel-throws 1 → 0.
 
+- **§6.8d ☑ — Three styled/css-prop port-completions driving the
+  parity 184 → 306 jump** (this session, 2026-05-05). Three 1:1
+  ports closing gaps surfaced by cluster-by-cluster diff review of
+  `styled/behaviour` and adjacent clusters:
+
+  1. **Arrow-function printer ported in
+     `crates/babel-plugin/src/compat/generator/generators/expressions.rs::arrow`
+     + `Pat` printer for `Ident` / `Object` / `Array` / `Rest` /
+     `Assign` / `Expr`.** Root cause for a swathe of `styled/*`
+     and `css-prop/*` divergences: the arrow-fn printer was hitting
+     the `/*UNHANDLED-EXPR*/` fallback, which then collapsed
+     through `compiled_utils::hash` to a constant
+     `"2wqa78"` string. The collapsed-hash bug meant every styled
+     component whose dynamic-value arrow body wasn't trivially a
+     bare Ident / MemberExpression got the same hash for completely
+     different inputs, so all "should-emit-different-hash" fixtures
+     diverged. Fix: print arrow params + body 1:1 with upstream
+     `@babel/generator@7.23.0` (`generators/expressions.js::ArrowFunctionExpression`)
+     and add a Pat printer 1:1 with `generators/types.js`'s pattern
+     branches.
+  2. **`utils/normalize_props_usage.rs` ported 1:1 from upstream
+     (~340 LOC + 8 unit tests).** Handles single-Ident param,
+     ObjectPat with nested destructuring + defaults + rest, AssignPat
+     with RHS-extracted defaults, ArrayPat throws (matches upstream's
+     hard error on array destructuring in styled-component prop
+     usage). Wired into `babel_plugin.rs::visit_mut_expr` per
+     upstream's `hasStyles` branch. This was the missing
+     destructured-prop normalisation pass that re-writes
+     `styled.div(({ color, size = 16 }) => ...)` into the canonical
+     `__cmplp.color` / `__cmplp.size ?? 16` shape upstream emits.
+  3. **Hygiene-context fix in the renamer.** SWC's hygiene pass was
+     renaming `__cmplp` → `__cmplp1` because the synthesised Ident's
+     `SyntaxContext` didn't match the styled wrapper's binding
+     context. Fix: `id.ctxt = SyntaxContext::empty()` on the
+     constructed `__cmplp` / `__cmpls` Idents at the styled emit
+     site, matching the wrapper's program-scope context.
+
+  **Triage delta: parity 184 → 306 (+122, 64.2% of 477),
+  divergence 292 → 170 (−122), swc-throws 0 → 0 (steady),
+  babel-throws 0 → 0 (steady), both-throw 0 → 1 (genuine
+  bug-parity throw, not a regression).** Lib tests 439 → 447
+  (+8 new `normalize_props_usage` tests).
+
+  Cumulative across this session: parity 7 → 306 (+299, 64.2% of
+  477); divergence 407 → 170 (−237); swc-throws 62 → 0 (cluster
+  cleared); babel-throws 1 → 0. **Top remaining clusters** (see
+  cluster table above): `styled/behaviour` 44, `css-prop/behaviour`
+  20, `css-prop/object-literal` 18, `styled/call-expression` 16,
+  `styled/tagged-template-expression` 12.
+
+- **§6.8e ☑ — `BlockStatement` printer + `_endsWithWord` reset on
+  queue-ops** (this session, 2026-05-05). Two 1:1 ports unblocking
+  the styled / css-prop block-body-arrow sub-cluster.
+
+  **Root cause** (drift-detection per CLAUDE.md): the §6.8d arrow-fn
+  printer landed `compat/generator/generators/expressions.rs::arrow`
+  but `BlockStmtOrExpr::BlockStmt` was emitting the placeholder
+  `/*UNHANDLED-BLOCK*/`. Hash sites (`utils/css_builders.rs::extract_object_expression`
+  + `extract_template_literal`) feed the printed Expr through
+  `compiled_utils::hash` to derive both the `--_<hash>` CSS-variable
+  name AND (because the var name is part of the CSS declaration) the
+  enclosing atomic class hash `_<atomicGroup><valueHash>`. Verified
+  via `bun parity-harness/babel-plugin/probe-hash.mjs` (now removed):
+  `hash("__cmplp => /*UNHANDLED-BLOCK*/") = "zmfr3g"` matched SWC's
+  exact output for `should-transform-an-arrow-function-with-a-body-into-an-iife`,
+  while `hash("__cmplp => {\n  return __cmplp.color;\n}") = "63bh2t"`
+  matched Babel's. So `props => { return props.color; }`-shaped
+  styled interpolations had every CSS-variable name AND every atomic
+  class hash collapse to a single divergent value across the cluster.
+
+  1. **`compat/generator/generators/statements.rs` (new ~250 LOC +
+     5 unit tests).** 1:1 port of upstream `base.js::BlockStatement`
+     and the `statements.js` variants reachable from arrow block
+     bodies in the styled / css-prop dynamic-arrow cluster:
+     `BlockStatement`, `ReturnStatement`, `ThrowStatement`,
+     `ExpressionStatement`, `IfStatement` (including upstream's
+     `needsBlock` ASI guard via the `consequent_ends_in_if` helper
+     that mirrors `getLastStatement`'s body-walk). Other Stmt
+     variants (`Debugger`, `With`, `Labeled`, `Break`, `Continue`,
+     `Switch`, `Try`, `While`, `DoWhile`, `For`, `ForIn`, `ForOf`,
+     `Decl`) emit a distinct placeholder per kind so future fixtures
+     surface as their own cluster — port from upstream 1:1 when one
+     lands. Wired from `expressions.rs::arrow`'s
+     `BlockStmtOrExpr::BlockStmt` branch (replaces the
+     `/*UNHANDLED-BLOCK*/` placeholder).
+
+  2. **`compat/generator/printer.rs` — `_endsWithWord` reset on
+     queue-ops** (drift-detection: latent printer bug surfaced by
+     §6.8e's first stmt-level `word(X) + space() + print(arg)`
+     sequence — `return __cmplp.color`). Upstream Babel's
+     `printer.js::_queue` resets `_endsWithWord = false`
+     unconditionally on every queue; the Rust port had `space()` /
+     `space_force()` / `newline()` calling `Buffer::queue` directly
+     without the Printer-level flag reset. Without the reset, after
+     `word("return")` set `ends_with_word=true`, the subsequent
+     `space()` queued ' ' but left the flag set, so `word("__cmplp")`
+     on the next print step queued an EXTRA leading space (its own
+     word-collision guard saw `ends_with_word=true`). Net effect:
+     `return  __cmplp.color` (two spaces, hash-divergent).
+
+     Fix: each Printer-level queue op (`space`, `space_force`,
+     `newline`) now sets `ends_with_word = false` and
+     `ends_with_integer = false` mirroring upstream `_queue`. Caught
+     locally by the new `return_member_expr` /
+     `block_with_return_member_expr` / `arrow_block_body_byte_target`
+     unit tests before the WASM rebuild — the
+     `arrow_block_body_byte_target` test asserts both the printed
+     bytes (`"__cmplp => {\n  return __cmplp.color;\n}"`) AND the
+     hash (`"63bh2t"`) match the upstream target identified during
+     the §6.8e probe. New helpers also added: `Printer::semicolon` /
+     `semicolon_force` / `ends_with(c)` (used by `IfStatement`'s
+     `}` ↔ `else` space logic) + `generate_stmt(stmt)` entry point
+     in `compat/generator/mod.rs` for stmt-level unit testing.
+
+  Lib tests 447 → 452 (+5 from `statements::tests`).
+
+  **Triage delta: parity 306 → 313 (+7), divergence 170 → 163 (−7),
+  swc-throws 0 → 0 (steady), babel-throws 0 → 0 (steady),
+  both-throw 1 → 1 (steady).** The cluster delta is smaller than
+  the §6.8d projections suggested because the styled/behaviour
+  divergences cluster around TWO root causes — block-body printing
+  (cleared by §6.8e, +7 fixtures) AND ternary-with-literal-branches
+  conditional-CSS expansion (still open — see §6.8f follow-up).
+
+  Cumulative across this session: parity 7 → 313 (+306, 65.6% of
+  477); divergence 407 → 163 (−244); swc-throws 62 → 0 (cluster
+  cleared); babel-throws 1 → 0.
+
+- **§6.8f ☑ — `optimize_conditional_statement` wired + nested-template
+  detection + conditional-branch-suppression flag** (this session,
+  2026-05-05). Closes the "ternary-with-literal-branches falls through
+  to CSS-variable" defect identified after §6.8e. Three coordinated
+  ports unblocking the styled / css-prop ternary cluster's CSS-bytes
+  correctness.
+
+  **Root cause** (drift-detection per CLAUDE.md): the §4.4 shell at
+  `utils/css_builders.rs::extract_template_literal` lines 1247-1257
+  was a **silenced stub** for upstream's `optimize_conditional_statement`
+  call (build-css.ts:782-792). With it skipped, `border-radius:
+  ${(p) => p.x ? 10 : 1}px !important` fell through to the catch-all
+  CSS-variable path (`--_<hash>` + `ix(...)` runtime), emitting one
+  atomic rule with `var(--_xxx)` instead of upstream's two atomic
+  rules `_<hash1>{border-radius:1px!important}` /
+  `_<hash2>{border-radius:10px!important}` with a runtime ternary on
+  the className array. Same root cause for all `*-with-ternary-*` /
+  `*-with-conditional-*` fixtures across styled/behaviour (~30+),
+  css-prop/behaviour, css-prop/object-literal, styled/call-expression,
+  and styled/tagged-template-expression clusters.
+
+  Three landings:
+
+  1. **`utils/manipulate_template_literal.rs::has_nested_template_literals_with_conditional_rules`
+     port-completion** (was `unimplemented!()` per Phase 5 §5.6 stub
+     citing missing parent-traversal). Replaces with a recursive
+     within-Tpl walker covering upstream's case 2 (nested template
+     literal with arrow-function interpolation) and case 3 (logical
+     expression directly in interpolation), recursing through
+     `Cond.test/cons/alt`, `Arrow.body`, and `Paren.expr` so that
+     deeply-nested arrow-body templates are detected. Case 1 (this
+     template IS a branch of an outer Conditional) is handled
+     separately via the `Metadata::in_conditional_branch` flag (item
+     3 below) since it requires parent-context awareness — without
+     this fallback the case-1 detection still requires §5.6's
+     parent-walk, raised as §6.8g if a fixture surfaces.
+
+  2. **Bug-parity fix in `optimize_conditional_statement`'s body-shape
+     check + cond-extract path: `unwrap_paren` before pattern-match.**
+     Drift detected: the Rust port's `body_is_conditional` matched
+     `BlockStmtOrExpr::Expr(Expr::Cond(_))` directly, but Babel's
+     parser strips `ParenthesizedExpression` while SWC keeps it. So
+     `(p) => (p.isPrimary ? 'blue' : 'red')` (with explicit parens
+     around the ternary) had `arrow.body` as
+     `BlockStmtOrExpr::Expr(Paren(Cond(...)))` — the optimization
+     no-op'd. Fix: `crate::compat::paren::unwrap_paren(e)` before the
+     `Expr::Cond(_)` match (both at the gate AND the `original_cond`
+     extraction). Mirrors the §6.8c-#1 paren-shim convention.
+
+  3. **`utils/css_builders.rs` integration**: wire the
+     `optimize_conditional_statement` call when the gate fires
+     (`is_mid_statement && does_expression_have_conditional_css &&
+     cond_has_literal_branches && !meta.in_conditional_branch &&
+     !has_nested_template_literals_with_conditional_rules(node, meta)`).
+     Two SWC-vs-Babel divergences plumbed:
+     - **Synthetic `TplElement` shells**: upstream mutates `node.quasis[i].value.raw`
+       directly via NodePath access. Our Rust walks the AST by `&` —
+       no such mutation channel. Build local mutable
+       `swc_core::ecma::ast::TplElement` clones from the parallel
+       `quasi_raws: Vec<String>` channel, pass to
+       `optimize_conditional_statement`, then write the post-mutation
+       raws back into `quasi_raws[index]` / `quasi_raws[index + 1]`
+       and re-read the iteration's `raw` so downstream
+       `format!("{}{}", prefix, raw)` writes the post-mutation form.
+     - **`cond_has_literal_branches` defensive narrowing**: upstream
+       fires `optimize_conditional_expression` on ALL branches and
+       wraps non-Lit/non-Tpl branches in a synthetic Tpl that
+       re-enters `extract_template_literal` recursively. For branches
+       like `colors.N20` (where `colors` is an imported foreign
+       module the resolver can't fold), our recursive `evaluate_expression`
+       path panicked. Narrow the gate to require `cons` and `alt` BOTH
+       be `Lit::Num` / `Lit::Str` / `Tpl` — covers the cluster's
+       common shapes (`p.x ? 10 : 1`, `p.x ? 'blue' : 'red'`,
+       `p.x ? \`...\` : \`...\``) without triggering the
+       foreign-import panic. **Open follow-up §6.8h**: port-completion
+       of optimize-with-foreign-MemberExpr branches once the
+       evaluator's foreign-module fold semantics are made resilient.
+
+  4. **`Metadata::in_conditional_branch` flag** (new field on
+     `types.rs::Metadata`, threaded through `reborrow` /
+     `reborrow_with_context` and all 30+ `Metadata { ... }` literal
+     constructors). Set to `true` in `extract_branch` immediately
+     before each `build_css_inner(Tpl)` / `build_css_inner(TaggedTpl/Call)`
+     recursion (with save-and-restore semantics around the call so
+     the surrounding meta state is preserved). Read in
+     `extract_template_literal`'s optimization gate to suppress
+     per-interpolation `optimize_conditional_statement` when the
+     containing template is itself a branch of an outer Conditional.
+     Without this, a fixture like
+     `${(p) => p.isPrimary ? \`color: green; > :first-child { display: ${(p) => (p.isShown ? 'none' : 'block')}; } > :last-child { opacity: ${(p) => (p.isShown ? 1 : 0)}; }\` : 'color: red'}`
+     would have the inner per-interpolation optimization split each
+     inner `display:` / `opacity:` into TWO CssItems per branch, but
+     `extract_branch` requires `merged.len() == 1` per branch and
+     throws "Conditional branch contains unexpected expression"
+     otherwise. Mirrors upstream's
+     `hasNestedTemplateLiteralsWithConditionalRules` case-1 (this
+     template IS a branch of an outer Conditional) detection —
+     achieved without the §5.6 parent-walk.
+
+  Lib tests stay 452/452.
+
+  **Triage delta: parity 313 → 313 (steady), divergence 163 → 163
+  (steady), swc-throws 0 → 0 (steady), babel-throws 0 → 0 (steady),
+  both-throw 1 → 1 (steady).** Net cluster count is unchanged
+  because every affected fixture in styled/behaviour /
+  styled/call-expression / styled/tagged-template-expression also
+  needs the **prop-destructure-for-consumed-props** feature
+  (upstream's `const { isRounded, ...__cmpldp } = __cmplp;` ahead
+  of the spread in the styled-component body). The CSS bytes our
+  fix produces are now correct (sample fixtures
+  `should-apply-conditional-css-with-ternary-operator` /
+  `*-and-suffix` / `*-for-object-styles` all emit the post-fix
+  per-branch atomic rules byte-equal to Babel; verified manually
+  via `bun parity-harness/babel-plugin/inspect-one.mjs` — now
+  removed). **§6.8g** (next) — prop-destructure feature — will
+  land the parity counter delta.
+
+- **§6.8g ☑ — invalid-DOM-prop walk extended to conditional class names**
+  (this session, 2026-05-06). Closes the prop-destructure gap surfaced
+  after §6.8f.
+
+  **Root cause.** `build_styled_component.rs::styled_template`
+  re-derived `invalidDomProps` by walking `opts.variables[i].expression`
+  only — but for fixtures whose consumed prop is referenced from a
+  runtime ternary class-name (e.g. `(p) => p.isRounded ? '_a' : '_b'`),
+  the `__cmplp.isRounded` MemberExpr lives in `opts.class_names`
+  (`Expr::Cond`) NOT `opts.variables`. Upstream walks the entire
+  `meta.parentPath` subtree which covers both. Result: SWC emitted
+  `...__cmplp` directly, Babel emitted `const { isRounded, ...__cmpldp }
+  = __cmplp; ...__cmpldp`.
+
+  **Fix.** One-loop extension at
+  `build_styled_component.rs:324-332` — extend the walk to also iterate
+  `opts.class_names` and feed each through the existing
+  `InvalidDomPropsVisitor` (which already recurses via
+  `visit_children_with`). Mirrors upstream's parent-path walk byte-for-
+  byte for the cases in the corpus.
+
+  **Triage delta: parity 313 → 335 (+22), divergence 163 → 141 (−22),
+  swc-throws 0 → 0 (steady), babel-throws 0 → 0 (steady), both-throw 1 →
+  1 (steady).** Lib tests stay 452/452. Three remaining `__cmplp`-touching
+  fixtures need separate features (`should-only-destructure-a-prop-if-
+  hasnt-been-already`, `should-handle-destructuring-in-interpolation-
+  functions`, `*-template-literal-branches-co`) — raised as §6.8h.
+
 ### Verifying the current state from a cold pickup
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 427/427 (post-§6.8a)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 452/452 (post-§6.8e)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact)
@@ -423,7 +725,7 @@ BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1 \
   bun test parity-harness/babel-plugin/harness.test.ts                  # 954/954 (pass-through oracle)
 
 # §6.8 inverted oracle (where the real work is):
-bun parity-harness/babel-plugin/triage.mjs                              # 7/407/62/1 baseline
+bun parity-harness/babel-plugin/triage.mjs                              # 313/163/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8f
 
 # CSS-port producer-side gate.
 bun run packages/equality-harness/scripts/verify.mjs                    # 336/336 (run under bun, NOT node)

@@ -132,6 +132,7 @@ pub fn try_visit_styled(
         own_id: None,
         context: MetadataContext::Root,
         own_scope_override: None,
+            in_conditional_branch: false,
     };
 
     let css_output: CSSOutput = match build_css(
@@ -152,6 +153,7 @@ pub fn try_visit_styled(
         own_id: None,
         context: MetadataContext::Root,
         own_scope_override: None,
+            in_conditional_branch: false,
     };
     let replacement = build_styled_component(data.tag, css_output, &mut meta, recorder);
     Some(StyledReplacement { replacement })

@@ -5,11 +5,53 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="46baedc5-8956-4da5-8e73-63c433c62642" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/2f0f12f8fdb766cd869be3361b6e966dd8a82fef5e5a604bcca8a01db9e9aa18.wasmer-v7" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/7f0a396cd7226b2f52dbc8e8379398129bc793683526bc4dc19f95bbf13e34a8.wasmer-v7" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/941db56c7eeef65353ad5de62594465020dc16417646e79da1e56c5a98e9ad9c.wasmer-v7" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/a6bf939803e5049b7fe29724ef3436ef91e1f3c93f1412eee8c62c9c4336bee3.wasmer-v7" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/a7601a4182c8f5c9237afbe2cb52af7c3d17e804c448a21bdf031540e6c0ea2f.wasmer-v7" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/ae65b1e55df76b6f1c529177bb0bbb8f3f6ea679bfc04394d591e575e29a4b21.wasmer-v7" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/be6cbf3e8dafc6ad7326ab201842fbbf5f90f32ab6a9acd22c19ec5d2d417b8a.wasmer-v7" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/c590cafff173e70940c7b15eeddb418d2878011ea7e19a693a8e097b7485eae9.wasmer-v7" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/d658cf6e47acc8399e10b8ef13537e3693e3d8836e9767dfc8eabbaa656e9745.wasmer-v7" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.swc/plugins/windows_x86_64_23.0.0/eac4041c47fcaa2f59b52b4c51884e15baa8ad5fee7dbe7e64ac08a0e95074e6.wasmer-v7" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MORNING.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/generators/statements.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/babel_plugin.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/babel_plugin.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/class_names/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/class_names/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/generators/expressions.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/generators/expressions.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/generators/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/generators/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/printer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/compat/generator/printer.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/css_map/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/css_map/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/css_prop/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/css_prop/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/styled/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/styled/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/types.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_compiled_component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_compiled_component.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_styled_component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_styled_component.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/create_result_pair.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/create_result_pair.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/css_builders.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/css_builders.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/evaluate_expression.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/evaluate_expression.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/get_runtime_class_name_library.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/get_runtime_class_name_library.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/hoist_sheet.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/hoist_sheet.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/manipulate_template_literal.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/manipulate_template_literal.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/object_property_to_string.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/object_property_to_string.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/resolve_binding.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/resolve_binding.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/transform_css_items.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/transform_css_items.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_binary_expression.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_binary_expression.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_call_expression.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_call_expression.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_function.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_function.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_identifier.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_identifier.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/namespace_import.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/namespace_import.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/object.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/evaluate_path/object.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/resolve_expression/identifier.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_member_expression/traverse_access_path/resolve_expression/identifier.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_unary_expression.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/traverse_expression/traverse_unary_expression.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/xcss_prop/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/xcss_prop/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/parity-harness/babel-plugin/triage-report.json" beforeDir="false" afterPath="$PROJECT_DIR$/parity-harness/babel-plugin/triage-report.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plugins/STATUS.md" beforeDir="false" afterPath="$PROJECT_DIR$/plugins/STATUS.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

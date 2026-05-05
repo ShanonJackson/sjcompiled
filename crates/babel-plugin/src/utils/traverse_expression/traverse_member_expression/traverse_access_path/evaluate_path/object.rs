@@ -79,6 +79,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let pair = evaluate_object_path(&obj, &mut meta, "blue");
         let v = pair.value.expect("value");
@@ -100,6 +101,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let pair = evaluate_object_path(&obj, &mut meta, "blue");
         let v = pair.value.expect("value (unchanged)");

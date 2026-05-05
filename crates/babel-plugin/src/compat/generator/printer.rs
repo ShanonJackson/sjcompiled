@@ -132,6 +132,11 @@ impl<'c> Printer<'c> {
         for _ in 0..needed {
             self.buf.queue(b'\n');
         }
+        // Mirror upstream `_queue` — see `space()` for the rationale.
+        // Without this, a `word(X)` immediately after a `newline()` (e.g.
+        // `if (cond)\nelse foo;` shapes) would queue an extra space.
+        self.ends_with_word = false;
+        self.ends_with_integer = false;
     }
 
     // ---------- Output primitives ----------
@@ -143,14 +148,25 @@ impl<'c> Printer<'c> {
             let last = self.buf.get_last_char();
             if last != b' ' && last != b'\n' {
                 self.buf.queue(b' ');
+                // Mirror upstream `_queue`: every queue op resets the
+                // word/integer collision-guard flags. Without this,
+                // `word("return") + space() + word("__cmplp")` would
+                // double-space because `word()` re-queues a space when
+                // `ends_with_word` is still true.
+                self.ends_with_word = false;
+                self.ends_with_integer = false;
             }
         } else {
             self.buf.queue(b' ');
+            self.ends_with_word = false;
+            self.ends_with_integer = false;
         }
     }
 
     pub fn space_force(&mut self) {
         self.buf.queue(b' ');
+        self.ends_with_word = false;
+        self.ends_with_integer = false;
     }
 
     /// `word(str)` — emits an identifier-like word; inserts a leading
@@ -203,6 +219,29 @@ impl<'c> Printer<'c> {
         self.buf.append(s);
         self.ends_with_word = false;
         self.ends_with_integer = false;
+    }
+
+    /// `semicolon(force=false)` — upstream's
+    /// `printer.js::semicolon(force)`. Without `force` Babel queues the
+    /// `;` so a subsequent same-token append collapses; we map both
+    /// modes to a direct char emit because the buffer already de-dupes
+    /// trailing semicolons via `_endsWith`. For our cluster the
+    /// distinction collapses to a plain emit.
+    pub fn semicolon(&mut self) {
+        self.token_char(b';');
+    }
+
+    /// `semicolon(true)` — used by `EmptyStatement`.
+    pub fn semicolon_force(&mut self) {
+        self.token_char(b';');
+    }
+
+    /// `endsWith(charCode)` — upstream's printer state introspection
+    /// used by IfStatement (insert space after `}` before `else`) and
+    /// BlockStatement (suppress trailing newline if one is already at
+    /// the buffer tail).
+    pub fn ends_with(&self, c: u8) -> bool {
+        self.buf.get_last_char() == c
     }
 
     /// `tokenChar(c)` — single-char punctuation.

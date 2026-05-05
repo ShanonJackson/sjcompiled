@@ -114,6 +114,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let pair = evaluate_path(&inner, &mut meta, "red");
         let v = pair.value.expect("value");
@@ -141,6 +142,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let pair = evaluate_path(&inner, &mut meta, "red");
         let v = pair.value.expect("value");
@@ -160,6 +162,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let pair = evaluate_path(&expr, &mut meta, "anyName");
         let v = pair.value.expect("value");

@@ -230,6 +230,21 @@ pub struct Metadata<'a> {
     /// parameter. The override is dispatched-at-the-closure-boundary,
     /// not consumed by leaves.
     pub own_scope_override: Option<u32>,
+    /// **§6.8f addition.** True when the current `extract_template_literal`
+    /// invocation is processing a template literal that sits INSIDE a
+    /// ConditionalExpression branch (i.e. the recursion entered via
+    /// `extract_branch(Tpl)` → `build_css_inner(Tpl)` →
+    /// `extract_template_literal(Tpl)`). Used by the optimization gate
+    /// in `extract_template_literal` to skip per-interpolation
+    /// `optimize_conditional_statement` when we're inside a branch —
+    /// the inner optimization would split the branch into multiple
+    /// CssItems, but `extract_branch::merged.len() > 1` rejects that.
+    /// Mirrors upstream's `hasNestedTemplateLiteralsWithConditionalRules`
+    /// case-1 detection (template-as-ternary-branch) without requiring
+    /// the §5.6 parent-traversal index. See
+    /// `crates/babel-plugin/src/utils/manipulate_template_literal.rs`
+    /// for the corresponding gate documentation.
+    pub in_conditional_branch: bool,
 }
 
 impl<'a> Metadata<'a> {
@@ -251,6 +266,7 @@ impl<'a> Metadata<'a> {
             own_id: self.own_id,
             context,
             own_scope_override: self.own_scope_override,
+            in_conditional_branch: self.in_conditional_branch,
         }
     }
 
@@ -265,6 +281,7 @@ impl<'a> Metadata<'a> {
             own_id: self.own_id,
             context: self.context.clone(),
             own_scope_override: self.own_scope_override,
+            in_conditional_branch: self.in_conditional_branch,
         }
     }
 }

@@ -261,6 +261,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let expr = fn_expr_with_block(vec![return_stmt(Some(num_lit(10.0)))]);
         let mut eval = identity_evaluator;
@@ -281,6 +282,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let expr = arrow_with_expr_body(num_lit(42.0));
         let mut eval = identity_evaluator;
@@ -301,6 +303,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let expr = fn_expr_with_block(vec![]);
         let mut eval = identity_evaluator;
@@ -318,6 +321,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         // `return;` — no argument. JS captures `argument === undefined`,
         // skips the `if (argument)` body, calls `path.stop()`. value
@@ -341,6 +345,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let inner_return = return_stmt(Some(str_lit("inner")));
         let outer_return = return_stmt(Some(str_lit("outer")));
@@ -372,6 +377,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let expr = arrow_with_block(vec![return_stmt(Some(num_lit(7.0)))]);
         let mut eval = identity_evaluator;
@@ -396,6 +402,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let expr = fn_expr_with_block(vec![
             return_stmt(Some(num_lit(1.0))),
@@ -422,6 +429,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let expr = *num_lit(5.0);
         let mut eval = identity_evaluator;

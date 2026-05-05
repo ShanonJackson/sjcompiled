@@ -178,6 +178,7 @@ pub fn try_handle_jsx_element(
         own_id: None,
         context: MetadataContext::Root,
         own_scope_override: None,
+            in_conditional_branch: false,
     };
 
     let css_output: CSSOutput = match build_css(
@@ -221,6 +222,7 @@ pub fn try_handle_jsx_element(
         own_id: None,
         context: MetadataContext::Root,
         own_scope_override: None,
+            in_conditional_branch: false,
     };
     let wrapper = build_compiled_component(
         Box::new(original_jsx),

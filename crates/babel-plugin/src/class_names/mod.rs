@@ -290,6 +290,7 @@ impl<'a> VisitMut for CssCallReplacer<'a> {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
 
         let css_output = match build_css(
@@ -415,6 +416,7 @@ pub fn try_handle_jsx_element(
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         get_runtime_class_name_library(&meta)
     };
@@ -471,6 +473,7 @@ pub fn try_handle_jsx_element(
         own_id: None,
         context: MetadataContext::Root,
         own_scope_override: None,
+            in_conditional_branch: false,
     };
     let wrapper = compiled_template(
         Box::new(body_expr),

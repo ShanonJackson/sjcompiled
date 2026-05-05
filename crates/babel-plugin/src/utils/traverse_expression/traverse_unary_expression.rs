@@ -154,6 +154,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         // `-8` — argument is a numeric literal already, so the
         // operator-minus branch is skipped and the input is returned
@@ -180,6 +181,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         // `-getSpacing()` → `-1 * getSpacing()`.
         let expr = unary(UnaryOp::Minus, ident_call("getSpacing"));
@@ -208,6 +210,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         // `!getSpacing()` — operator isn't `-`, branch skipped.
         let expr = unary(UnaryOp::Bang, ident_call("getSpacing"));
@@ -231,6 +234,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let expr = unary(UnaryOp::Minus, str_lit("8"));
         let mut eval = identity_evaluator;

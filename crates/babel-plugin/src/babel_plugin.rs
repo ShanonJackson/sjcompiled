@@ -928,6 +928,7 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
                 own_id: None,
                 context: MetadataContext::Root,
                 own_scope_override: None,
+            in_conditional_branch: false,
             };
 
             let replacement = match visit_css_map_path(

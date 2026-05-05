@@ -485,7 +485,22 @@ fn extract_branch(
                     _ => false,
                 };
                 if is_css_shape {
-                    Some(build_css_inner(path_node, meta, scope_index, parent_scope, own_scope, recorder)?)
+                    // §6.8f: mark the recursion as "inside a conditional
+                    // branch" so the inner `extract_template_literal`
+                    // suppresses its per-interpolation
+                    // `optimize_conditional_statement` call. Without
+                    // this flag the inner optimisation could split the
+                    // branch into multiple CssItems, but `extract_branch`
+                    // (immediately below) requires a single merged item
+                    // per branch — multi-item branches throw upstream's
+                    // "Conditional branch contains unexpected expression"
+                    // error. Restored after the recursion to preserve
+                    // the surrounding meta state.
+                    let saved = meta.in_conditional_branch;
+                    meta.in_conditional_branch = true;
+                    let result = build_css_inner(path_node, meta, scope_index, parent_scope, own_scope, recorder);
+                    meta.in_conditional_branch = saved;
+                    Some(result?)
                 } else {
                     None
                 }
@@ -493,7 +508,11 @@ fn extract_branch(
         Expr::TaggedTpl(_) | Expr::Call(_)
             if path_is_compiled_css_shape(path_node, meta) =>
         {
-            Some(build_css_inner(path_node, meta, scope_index, parent_scope, own_scope, recorder)?)
+            let saved = meta.in_conditional_branch;
+            meta.in_conditional_branch = true;
+            let result = build_css_inner(path_node, meta, scope_index, parent_scope, own_scope, recorder);
+            meta.in_conditional_branch = saved;
+            Some(result?)
         }
         Expr::Ident(ident) => {
             // 1:1 port of upstream `extractConditionalExpression`
@@ -1200,7 +1219,7 @@ pub fn extract_template_literal(
         .collect();
     for index in 0..node.quasis.len() {
         let quasi = &node.quasis[index];
-        let raw = quasi_raws[index].clone();
+        let mut raw = quasi_raws[index].clone();
         let node_expression = node.exprs.get(index).map(|e| (**e).clone());
 
         // No expression OR arrow-body that is logical → just append.
@@ -1231,9 +1250,9 @@ pub fn extract_template_literal(
             continue;
         }
 
-        let node_expression = node_expression.expect("checked above");
-        let _is_mid_statement = is_quasi_mid_statement(quasi);
-        let _does_expression_have_conditional_css = match &node_expression {
+        let mut node_expression = node_expression.expect("checked above");
+        let is_mid_statement = is_quasi_mid_statement(quasi);
+        let does_expression_have_conditional_css = match &node_expression {
             Expr::Arrow(arrow) => matches!(
                 &*arrow.body,
                 BlockStmtOrExpr::Expr(e) if matches!(
@@ -1244,16 +1263,127 @@ pub fn extract_template_literal(
             _ => false,
         };
 
-        if _is_mid_statement && _does_expression_have_conditional_css {
-            // upstream: hasNestedTemplateLiteralsWithConditionalRules
-            // is ALSO required to gate this. Phase 5 §5.6 stub on
-            // that gate; the optimisation is a §4.4 deferred path.
-            // (Calling has_nested...() would unimplemented!() panic;
-            // we conservatively skip the optimisation, matching the
-            // upstream behaviour when the gate returns true.)
-            let _ = optimize_conditional_statement; // silence unused
-            let _ = recompose_template_literal; // silence unused
-            let _ = has_nested_template_literals_with_conditional_rules;
+        // §6.8f — 1:1 port of upstream's optimization gate
+        // (build-css.ts:782-792). When the quasi sits mid-CSS-statement
+        // and the interpolation is `arrow => ternary`, fold the
+        // surrounding prefix / suffix INTO each ternary branch so each
+        // branch can be hashed to its own atomic class. Without this,
+        // `border-radius: ${(p) => p.x ? 10 : 1}px !important` falls
+        // through to the catch-all CSS-variable path, emitting one
+        // atomic rule with `var(--_<hash>)` instead of upstream's two
+        // atomic rules `_<hash1>{border-radius:1px!important}` /
+        // `_<hash2>{border-radius:10px!important}` with a runtime
+        // ternary on the className array.
+        //
+        // Required input mutations to thread through the rest of the
+        // iteration:
+        //   - `quasi_raws[index]` loses the property prefix (e.g.
+        //     `border-radius: ` → ``) since it's been moved into the
+        //     arrow body's branches.
+        //   - `quasi_raws[index + 1]` loses the suffix up to the next
+        //     `;` (e.g. `px !important;...` → `...`).
+        //   - `node_expression` (the arrow) has its body replaced
+        //     in-place with the optimised ConditionalExpression where
+        //     each branch is now a string literal `<prefix><value><suffix>`.
+        //   - `raw` (this iteration's local copy of `quasi_raws[index]`)
+        //     is re-read so the downstream `format!("{}{}", prefix, raw)`
+        //     writes the post-mutation form.
+        // Conservative §6.8f gate: in addition to upstream's
+        // `!hasNestedTemplateLiteralsWithConditionalRules` check, also
+        // require that BOTH ternary branches are simple literals
+        // (Lit::Num / Lit::Str / Tpl). Upstream's `optimize_conditional_expression`
+        // wraps non-literal branches in a synthetic Tpl, which then
+        // re-enters `extract_template_literal` recursively. For branches
+        // like `colors.N20` (where `colors` is an imported foreign
+        // module that the resolver can't fold), the inner recursion's
+        // `evaluate_expression` path can panic. The simple-literal gate
+        // covers the styled / css-prop cluster's common shapes
+        // (`p.x ? 10 : 1`, `p.x ? 'blue' : 'red'`, `p.x ? \`...\` : \`...\``)
+        // without triggering the foreign-import panic. Open follow-up:
+        // §6.8h port-completion of optimize-with-foreign-MemberExpr
+        // branches once the evaluator's foreign-module fold semantics
+        // are made resilient.
+        let cond_has_literal_branches = match &node_expression {
+            Expr::Arrow(arrow) => match &*arrow.body {
+                BlockStmtOrExpr::Expr(e) => match crate::compat::paren::unwrap_paren(e) {
+                    Expr::Cond(c) => {
+                        let is_simple = |branch: &Expr| {
+                            matches!(
+                                crate::compat::paren::unwrap_paren(branch),
+                                Expr::Lit(Lit::Num(_))
+                                    | Expr::Lit(Lit::Str(_))
+                                    | Expr::Tpl(_)
+                            )
+                        };
+                        is_simple(&c.cons) && is_simple(&c.alt)
+                    }
+                    _ => false,
+                },
+                _ => false,
+            },
+            _ => false,
+        };
+
+        if is_mid_statement
+            && does_expression_have_conditional_css
+            && cond_has_literal_branches
+            && !meta.in_conditional_branch
+            && !has_nested_template_literals_with_conditional_rules(node, meta)
+        {
+            // Build mutable `TplElement` shells around the working raws
+            // so optimize_conditional_statement can mutate them.
+            // Cooked is mirrored from raw — upstream sets BOTH on the
+            // mutated TplElements; the §4.3 generator's TplElement
+            // printer does NOT consult `cooked` for our corpus, but we
+            // mirror upstream's invariant.
+            let mut current_quasi_synth = swc_core::ecma::ast::TplElement {
+                span: swc_core::common::DUMMY_SP,
+                tail: false,
+                cooked: Some(quasi_raws[index].as_str().into()),
+                raw: quasi_raws[index].as_str().into(),
+            };
+            let mut next_quasi_synth = if index + 1 < quasi_raws.len() {
+                swc_core::ecma::ast::TplElement {
+                    span: swc_core::common::DUMMY_SP,
+                    tail: index + 1 == quasi_raws.len() - 1,
+                    cooked: Some(quasi_raws[index + 1].as_str().into()),
+                    raw: quasi_raws[index + 1].as_str().into(),
+                }
+            } else {
+                // No trailing quasi — upstream would index undefined and
+                // skip the optimisation via the `nextQuasiEndsStatement`
+                // gate inside optimize_conditional_statement. We mirror
+                // by passing an empty trailing element.
+                swc_core::ecma::ast::TplElement {
+                    span: swc_core::common::DUMMY_SP,
+                    tail: true,
+                    cooked: Some("".into()),
+                    raw: "".into(),
+                }
+            };
+
+            if let Expr::Arrow(arrow_mut) = &mut node_expression {
+                optimize_conditional_statement(
+                    &mut current_quasi_synth,
+                    &mut next_quasi_synth,
+                    arrow_mut,
+                );
+                // Write back the mutated raws into the working vec so
+                // the next iteration sees them. Upstream mutates
+                // `node.quasis[index].value.raw` directly; we mirror
+                // via the parallel `quasi_raws` channel.
+                quasi_raws[index] = current_quasi_synth.raw.to_string();
+                if index + 1 < quasi_raws.len() {
+                    quasi_raws[index + 1] = next_quasi_synth.raw.to_string();
+                }
+                // Re-read this iteration's `raw` so downstream sees
+                // the post-mutation form.
+                raw = quasi_raws[index].clone();
+            }
+            // recompose_template_literal is referenced from
+            // optimize_conditional_expression's Tpl branch — this
+            // import is NOT dead.
+            let _ = recompose_template_literal;
         }
 
         // §6.8a-vi: 1:1 port of upstream `evaluateExpression(nodeExpression, meta)`.
@@ -1332,7 +1462,7 @@ pub fn extract_template_literal(
             )
         );
 
-        let can_build_expression_as_css = (!_is_mid_statement && does_expression_contain_css_block)
+        let can_build_expression_as_css = (!is_mid_statement && does_expression_contain_css_block)
             || does_expression_have_conditional_css
             || matches!(&node_expression, Expr::Tpl(_));
 
@@ -1871,6 +2001,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         }
     }
 

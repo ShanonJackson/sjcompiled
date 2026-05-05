@@ -18,5 +18,6 @@
 
 pub mod expressions;
 pub mod jsx;
+pub mod statements;
 pub mod template_literals;
 pub mod types;

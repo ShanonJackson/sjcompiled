@@ -86,6 +86,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let value = Box::new(Expr::Lit(Lit::Num(Number {
             span: DUMMY_SP,
@@ -105,6 +106,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         };
         let pair = create_result_pair(None, &meta);
         assert!(pair.value.is_none());

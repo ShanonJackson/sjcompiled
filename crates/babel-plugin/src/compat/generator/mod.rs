@@ -47,7 +47,7 @@ pub mod node;
 pub mod printer;
 
 use swc_core::common::comments::Comments;
-use swc_core::ecma::ast::{Expr, JSXAttr};
+use swc_core::ecma::ast::{Expr, JSXAttr, Stmt};
 
 use printer::Printer;
 
@@ -109,5 +109,16 @@ pub fn generate_jsx_attribute_with_comments(
 ) -> String {
     let mut p = Printer::with_comments(Some(comments));
     generators::jsx::jsx_attribute(&mut p, attr);
+    p.finish()
+}
+
+/// `generate(Stmt)` — surfaced by §6.8e (styled/behaviour cluster). Block-
+/// body arrows (`props => { return X; }`) feed their `BlockStmt` body
+/// through the arrow printer, which recursed into stmt-level printing.
+/// Used directly by the unit tests in
+/// `generators/statements.rs`.
+pub fn generate_stmt(stmt: &Stmt) -> String {
+    let mut p = Printer::new();
+    generators::statements::print_statement(&mut p, stmt);
     p.finish()
 }

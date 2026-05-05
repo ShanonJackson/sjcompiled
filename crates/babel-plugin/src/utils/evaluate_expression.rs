@@ -741,6 +741,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: None,
+            in_conditional_branch: false,
         }
     }
 
@@ -992,6 +993,7 @@ mod tests {
             own_id: None,
             context: MetadataContext::Root,
             own_scope_override: Some(prog),
+            in_conditional_branch: false,
             // ^ override pointing to program scope (always valid).
         };
         let expr_ast = parse_module("1 + 1;");

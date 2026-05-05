@@ -205,13 +205,12 @@ pub fn arrow(p: &mut Printer, node: &ArrowExpr, parent: &Expr) {
     p.space();
     match &*node.body {
         BlockStmtOrExpr::Expr(e) => p.print(e, Some(parent)),
-        BlockStmtOrExpr::BlockStmt(_) => {
-            // Block bodies require a BlockStatement printer (not yet
-            // ported). Emit a deterministic placeholder so hash sites
-            // still produce a stable string — but distinct from the
-            // catch-all so block-body fixtures surface as their own
-            // cluster if they appear.
-            p.buf.append("/*UNHANDLED-BLOCK*/");
+        BlockStmtOrExpr::BlockStmt(b) => {
+            // §6.8e: BlockStatement printer ported in
+            // `generators/statements.rs::block_statement`. Mirrors
+            // upstream `base.js::BlockStatement` byte-for-byte for
+            // the styled / css-prop dynamic-arrow-body cluster.
+            super::statements::block_statement(p, b);
         }
     }
 }

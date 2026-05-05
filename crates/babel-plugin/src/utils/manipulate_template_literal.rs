@@ -14,22 +14,103 @@ use swc_core::ecma::ast::{
 
 use crate::types::Metadata;
 
-/// Returns true when the current template literal sits inside a
-/// nesting shape upstream wants to skip optimising. The walk crosses
-/// the AST boundary between the template's containing node and the
-/// outer ConditionalExpression / LogicalExpression — Babel uses
-/// `getPathOfNode + traverse(parent, …)`. The SWC analog requires
-/// the parent-traversal index from Phase 5 §5.6.
+/// 1:1 port of upstream's `hasNestedTemplateLiteralsWithConditionalRules`
+/// (`packages/babel-plugin/src/utils/manipulate-template-literal.ts:22-52`).
+///
+/// Upstream walks `meta.parentPath` for `ConditionalExpression`s, then
+/// for each match checks if any of `test`/`consequent`/`alternate`:
+/// 1. is a `TaggedTemplateExpression` whose `quasi === node` (the
+///    current template literal is sitting INSIDE a ternary branch), OR
+/// 2. is a `TemplateLiteral` whose expressions include an
+///    `ArrowFunctionExpression` (a nested template with arrow-body
+///    interpolations), OR
+/// 3. is a `LogicalExpression`.
+///
+/// The Rust port lacks the parent-NodePath analog (Phase 5 §5.6 chose
+/// the side-table `ScopeIndex` + `parent_scope` + `own_scope` model
+/// over a NodePath replica). Without parent-walk, we can only check
+/// cases 2 and 3 directly off the input `node` — i.e. detect nested
+/// template literals with arrow-body expressions OR logical expressions
+/// that live INSIDE the current template's `expressions` array.
+///
+/// **Open follow-up.** The case 1 outer-ternary-wrap shape (template
+/// itself is a branch of a parent ConditionalExpression) cannot be
+/// detected without §5.6 parent-walk. For our styled / css-prop / xcss
+/// cluster the template is always the body of a TaggedTemplateExpression
+/// (`styled.div\`...\``) or the value of a JSXAttribute (`css={...}`)
+/// — never directly inside a ternary branch. If a fixture surfaces
+/// `<div css={cond ? css\`...\` : css\`...\`} />` shape, this needs
+/// the parent walk; raise as Drift and add §6.8g.
 pub fn has_nested_template_literals_with_conditional_rules(
-    _node: &Tpl,
+    node: &Tpl,
     _meta: &mut Metadata<'_>,
 ) -> bool {
-    unimplemented!(
-        "hasNestedTemplateLiteralsWithConditionalRules requires parent-traversal — \
-         Phase 5 §5.6 (utils/traverse-expression/) lands the SWC analog of \
-         Babel's `getPathOfNode + traverse(parent, ...)`. Until then, callers \
-         under §4.4 trip this stub."
-    )
+    for expr in &node.exprs {
+        if expr_contains_nested_conditional_rules(expr) {
+            return true;
+        }
+    }
+    // case 1 (outer ternary wrap) — skipped pending §6.8g parent walk.
+    false
+}
+
+/// Recursive walker for `has_nested_template_literals_with_conditional_rules`.
+/// Returns true when:
+/// - The expression IS a nested template literal whose own exprs include
+///   an arrow-function expression (case 2 from upstream), OR
+/// - The expression IS a logical expression (case 3), OR
+/// - The expression CONTAINS one of the above somewhere in its subtree.
+///
+/// Recursion targets cover arrow bodies and ternary branches because
+/// upstream's `traverse(parent, { ConditionalExpression })` walks the
+/// entire subtree below the matched parent. The Rust port's input is
+/// the template literal itself — so we walk DOWN from each interpolation
+/// rather than up from a parent path. The result is a superset of cases
+/// 2 and 3 (we may flag templates upstream wouldn't reach via its
+/// parent walk if the template lives BELOW our `node`); for the styled
+/// / css-prop cluster the branching shapes coincide.
+fn expr_contains_nested_conditional_rules(expr: &swc_core::ecma::ast::Expr) -> bool {
+    use swc_core::ecma::ast::{BinaryOp, BlockStmtOrExpr, Expr as E};
+    match expr {
+        E::Tpl(inner) => {
+            // case 2: nested template with arrow-body interpolation.
+            if inner.exprs.iter().any(|e| matches!(&**e, E::Arrow(_))) {
+                return true;
+            }
+            // Recurse into nested templates' interpolations to catch
+            // deeper conditional/logical/arrow shapes.
+            for e in &inner.exprs {
+                if expr_contains_nested_conditional_rules(e) {
+                    return true;
+                }
+            }
+            false
+        }
+        E::Bin(b) if matches!(b.op, BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing) => {
+            // case 3: logical expression.
+            true
+        }
+        E::Cond(c) => {
+            // Walk both branches AND test for nested templates / arrows /
+            // logicals. Mirrors upstream's `traverse(parent,
+            // { ConditionalExpression })` visiting CONDITIONAL_PATHS
+            // (`test` / `consequent` / `alternate`).
+            expr_contains_nested_conditional_rules(&c.test)
+                || expr_contains_nested_conditional_rules(&c.cons)
+                || expr_contains_nested_conditional_rules(&c.alt)
+        }
+        E::Arrow(arrow) => {
+            // Recurse into arrow body so e.g.
+            // `(p) => (p.x ? \`...${q => q.y}...\` : 'red')` reaches the
+            // nested template inside the consequent.
+            match &*arrow.body {
+                BlockStmtOrExpr::Expr(e) => expr_contains_nested_conditional_rules(e),
+                BlockStmtOrExpr::BlockStmt(_) => false,
+            }
+        }
+        E::Paren(p) => expr_contains_nested_conditional_rules(&p.expr),
+        _ => false,
+    }
 }
 
 /// `recomposeTemplateLiteral` upstream lines 54–72. In-place: prefix
@@ -193,7 +274,16 @@ pub fn optimize_conditional_statement(
     let end_of_statement_index = next_quasi_value.find(';');
     let next_quasi_ends_statement = end_of_statement_index.is_some();
 
-    let body_is_conditional = matches!(&*expression.body, swc_core::ecma::ast::BlockStmtOrExpr::Expr(e) if matches!(&**e, Expr::Cond(_)));
+    // Babel's parser strips `ParenthesizedExpression`; SWC keeps it.
+    // `(props) => (props.isPrimary ? 'blue' : 'red')` arrives as
+    // `arrow.body = Expr::Paren(Expr::Cond(...))` from SWC, but
+    // `Expr::Cond(...)` from Babel. Unwrap before pattern-matching so
+    // both shapes hit the same branch. See `crates/babel-plugin/src/compat/paren.rs`.
+    let body_is_conditional = matches!(
+        &*expression.body,
+        swc_core::ecma::ast::BlockStmtOrExpr::Expr(e)
+            if matches!(crate::compat::paren::unwrap_paren(e), Expr::Cond(_))
+    );
 
     if !(body_is_conditional && !prefix.is_empty() && next_quasi_ends_statement) {
         return;
@@ -202,9 +292,10 @@ pub fn optimize_conditional_statement(
     let end_idx = end_of_statement_index.expect("checked above");
     let suffix = &next_quasi_value[..end_idx];
 
-    // Pull the cond expr out for optimisation.
+    // Pull the cond expr out for optimisation. Same paren-unwrap as the
+    // body-shape gate above.
     let original_cond = match &*expression.body {
-        swc_core::ecma::ast::BlockStmtOrExpr::Expr(e) => match &**e {
+        swc_core::ecma::ast::BlockStmtOrExpr::Expr(e) => match crate::compat::paren::unwrap_paren(e) {
             Expr::Cond(c) => c.clone(),
             _ => return,
         },
