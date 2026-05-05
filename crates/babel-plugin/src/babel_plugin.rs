@@ -46,7 +46,7 @@
 use compiled_utils::jsx::{jsx_annotation_regex, jsx_source_annotation_regex};
 use compiled_utils::DEFAULT_IMPORT_SOURCES;
 use swc_core::common::comments::Comments;
-use swc_core::common::Spanned;
+use swc_core::common::{Spanned, SyntaxContext};
 use swc_core::ecma::ast::{
     Expr, ImportDecl, ImportSpecifier, ModuleDecl, ModuleExportName, ModuleItem, Program,
 };
@@ -158,13 +158,107 @@ fn build_display_name_stmt(name: &str) -> swc_core::ecma::ast::Stmt {
     })
 }
 
+/// Snapshot the program-scope `SyntaxContext` from the existing
+/// module body. We walk the body looking for the FIRST top-level
+/// Ident we can read — typically the local name of an existing
+/// `ImportDeclaration` specifier (e.g. the user's
+/// `import { ClassNames } from '@compiled/react'` → `ClassNames`).
+/// That Ident has been through SWC's resolver pass and carries the
+/// program-scope hygiene context.
+///
+/// Why this works: SWC's `resolver` assigns ALL unresolved
+/// top-level bindings the same `SyntaxContext` (the "unresolved
+/// mark" + program-scope mark combination). Any Ident we find at
+/// the top of `module.body` shares that context with every other
+/// program-scope binding. Reading one of them gives us the context
+/// we need to thread into our React import so it lands in the
+/// same hygiene namespace as the react-classic transform's
+/// internally-allocated `React` Ident.
+///
+/// Returns `SyntaxContext::empty()` if no candidate Ident is
+/// found — e.g. an empty module (no imports, no top-level decls).
+/// In that case there's no react-classic transform target either
+/// (no JSX → no createElement calls), so the rename collision can't
+/// happen, and empty-ctx is safe.
+///
+/// **Scoped to React only.** See `build_react_namespace_import`'s
+/// doc-comment for why other plugin-inserted imports
+/// (`forwardRef`, `ax`/`ix`/`CC`/`CS`) DON'T need this — only
+/// `React` collides with a downstream-transform-synthesised Ident
+/// of the same name.
+fn program_scope_ctxt(module: &swc_core::ecma::ast::Module) -> SyntaxContext {
+    use swc_core::ecma::visit::{Visit, VisitWith};
+
+    /// Walk every Ident in the module looking for the first one with
+    /// a non-empty `SyntaxContext`. SWC's pre-plugin resolver applies
+    /// `top_level_mark` (or the unresolved mark) to ALL Idents in the
+    /// source, so any Ident found here carries that mark. We use it
+    /// to colour our inserted React import so it lands in the same
+    /// hygiene namespace.
+    ///
+    /// We can't just look at module.body[*] specifier locals because
+    /// side-effect imports (`import '@compiled/react'`) have no
+    /// specifiers, and some fixtures have ONLY side-effect imports +
+    /// JSX with no value-reference Idents at the top level. The
+    /// recursive visitor catches Idents nested inside JSX
+    /// expressions, member-expr objects, call-expr callees, etc.
+    struct FirstNonEmpty(Option<SyntaxContext>);
+    impl Visit for FirstNonEmpty {
+        fn visit_ident(&mut self, id: &swc_core::ecma::ast::Ident) {
+            if self.0.is_none() && id.ctxt != SyntaxContext::empty() {
+                self.0 = Some(id.ctxt);
+            }
+        }
+    }
+
+    let mut finder = FirstNonEmpty(None);
+    module.visit_with(&mut finder);
+    finder.0.unwrap_or(SyntaxContext::empty())
+}
+
 /// `import * as React from 'react'` — the namespace-import shape
 /// upstream's `Program::exit` injects when `shouldImportReact` and no
 /// React binding is in scope. Mirrors
 /// `template.ast(\`import * as React from 'react'\`)` in
 /// `babel-plugin.ts:201`.
-fn build_react_namespace_import() -> ModuleItem {
-    use swc_core::common::{SyntaxContext, DUMMY_SP};
+///
+/// **`program_ctxt` parameter — read this before changing anything!**
+///
+/// `React` is the ONLY runtime-import name we emit that is ALSO
+/// independently synthesised by a downstream SWC transform (the
+/// react-classic JSX transform creates `React.createElement(...)`
+/// calls). That transform allocates its own `Mark`/`SyntaxContext`
+/// for its `React` Ident at construction time — NOT from the
+/// resolver pass.
+///
+/// If we emit our `import * as React` with `SyntaxContext::empty()`,
+/// SWC re-runs the resolver after our plugin and assigns OUR Ident a
+/// fresh hygienic context (call it `ctx_A`). The react-classic
+/// transform's `React.createElement(...)` Idents have a DIFFERENT
+/// context (`ctx_B`) baked in at transform-construction time. Two
+/// `React` bindings at the program scope with different contexts =
+/// hygiene collision → SWC's `hygiene` pass at codegen renames OUR
+/// import to `React1` while leaving the createElement-side `React`
+/// untouched. Result: broken JS (`React` referenced but only
+/// `React1` imported).
+///
+/// The fix: pass in the program-scope `SyntaxContext` (snapshotted
+/// at `Program::exit` from any existing top-level Ident — see
+/// `program_scope_ctxt` below) so our `React` Ident lands in the
+/// SAME hygiene namespace SWC's resolver+react-classic pipeline
+/// uses for top-level bindings. No rename, no collision.
+///
+/// **Why only React needs this and NOT `forwardRef`/`ax`/`ix`/`CC`/`CS`:**
+/// `forwardRef` (and the runtime-import names) are emitted by US on
+/// both the import specifier AND every reference site (inside the
+/// styled handler's emit, inside class-names emit, etc.) with the
+/// SAME `SyntaxContext::empty()`. SWC's resolver unifies them into
+/// one hygienic context together — no external transform ever
+/// synthesises a competing `forwardRef`/`ax`/etc. Ident, so there's
+/// no collision to dodge. Keep them on empty-ctx; only React is
+/// special.
+fn build_react_namespace_import(program_ctxt: SyntaxContext) -> ModuleItem {
+    use swc_core::common::DUMMY_SP;
     use swc_core::ecma::ast::{
         Ident, ImportDecl, ImportPhase, ImportSpecifier, ImportStarAsSpecifier, Str,
     };
@@ -172,7 +266,10 @@ fn build_react_namespace_import() -> ModuleItem {
         span: DUMMY_SP,
         specifiers: vec![ImportSpecifier::Namespace(ImportStarAsSpecifier {
             span: DUMMY_SP,
-            local: Ident::new("React".into(), DUMMY_SP, SyntaxContext::empty()),
+            // `program_ctxt` (NOT `SyntaxContext::empty()`) — see
+            // doc-comment above for the React vs forwardRef
+            // asymmetry.
+            local: Ident::new("React".into(), DUMMY_SP, program_ctxt),
         })],
         src: Box::new(Str {
             span: DUMMY_SP,
@@ -589,7 +686,18 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
                         _ => false,
                     };
                     if !has_react_binding {
-                        m.body.insert(0, build_react_namespace_import());
+                        // Snapshot program-scope hygiene context so
+                        // our React Ident lands in the same namespace
+                        // as the downstream react-classic transform's
+                        // synthesised `React.createElement(...)` Idents.
+                        // See `build_react_namespace_import` doc-comment
+                        // for the full rename-collision explanation.
+                        // Done HERE (not earlier) so the snapshot reads
+                        // a context that's already been through the
+                        // resolver pass — earlier in the visit, the
+                        // children walk hadn't run yet.
+                        let ctxt = program_scope_ctxt(m);
+                        m.body.insert(0, build_react_namespace_import(ctxt));
                     }
                 }
 

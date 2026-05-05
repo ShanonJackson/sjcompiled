@@ -5,14 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="46baedc5-8956-4da5-8e73-63c433c62642" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/babel_plugin.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/babel_plugin.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_styled_component.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/build_styled_component.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/babel-plugin/src/utils/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/babel-plugin/src/utils/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/parity-harness/babel-plugin/engines.ts" beforeDir="false" afterPath="$PROJECT_DIR$/parity-harness/babel-plugin/engines.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/parity-harness/babel-plugin/triage-report.json" beforeDir="false" afterPath="$PROJECT_DIR$/parity-harness/babel-plugin/triage-report.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plugins/STATUS.md" beforeDir="false" afterPath="$PROJECT_DIR$/plugins/STATUS.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/wasm-bloat.ts" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/wasm-bloat.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

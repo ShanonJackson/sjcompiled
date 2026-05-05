@@ -522,12 +522,55 @@ Five distinct divergences in this one fixture:
    `ix(8 * 2)` and emits a `style:` prop with a CSS variable;
    Babel folded to `16` and emitted `font-size:16px` directly.
 
+**§6.8a-i ☑ — React→React1 rename fixed at port level (no harness
+hack).** Added `babel_plugin.rs::program_scope_ctxt(&Module)`: a
+`Visit` walker that finds the first non-empty
+`SyntaxContext` on any `Ident` in the module (recursive — covers
+import specifiers, var-decl bindings, JSX values, member-expr
+objects, anywhere). That context is the program-scope hygiene
+mark applied by SWC's pre-plugin resolver. Threaded into
+`build_react_namespace_import(program_ctxt)` so our inserted
+`Ident("React")` lands in the same hygiene namespace as SWC's
+react-classic transform's synthesised `React.createElement(...)`
+Idents — no rename, no collision, valid JS in the SWC output.
+
+**Why React-only:** `forwardRef` and the runtime imports
+(`ax`/`ix`/`CC`/`CS`) are ONLY referenced by us — both the import
+specifier and every reference site come from our plugin with the
+same `SyntaxContext::empty()`. SWC's resolver unifies them. No
+external transform synthesises a competing Ident with those
+names. Only `React` is special because react-classic synthesises
+a `React.createElement(...)` Ident with `top_level_mark` baked in.
+See `build_react_namespace_import`'s long doc-comment for the
+mechanism narrative.
+
+**Edge case — fixtures with NO top-level Idents.** A source like
+`import '@compiled/react'; <div css={...}>x</div>;` has zero
+post-resolver Idents at the program scope (side-effect import has
+no specifiers; JSX `div` is a JSXElementName::Ident but uses the
+unresolved-mark, not top_level_mark; `8 * 2` is two number
+literals, no Idents). `program_scope_ctxt` falls back to
+`SyntaxContext::empty()`, and the React rename still happens for
+those ~32 fixtures. They're rare AND of questionable production
+shape (no user bindings, just orphan JSX); fix coverage is 92%
+(375 / 407 divergences are React1-clean post-fix).
+
+The plugin metadata exposes `unresolved_mark: Mark` but NOT
+`top_level_mark` — a future fix could derive top_level_mark by
+threading the metadata's `unresolved_mark` through the visitor
+and constructing the program context as the resolver would. The
+SWC plugin runtime is the source of truth for both marks; we
+currently only have one half. **Not blocking** for §6.8 — the
+remaining 32 fixtures will need handler-level fixes for the OTHER
+divergences anyway.
+
 The §6.8a wiring is correct (verified by the React import line
-appearing in the SWC output where it was missing pre-fix); the
+appearing in the SWC output where it was missing pre-fix, and the
+React1 rename gone for 92% of affected fixtures); the
 cluster-count is dominated by handler-level defects. Next agent
 picks up at:
 
-1. **Investigate React→React1 rename.** Hypothesis: SWC's
+1. **(historical — now resolved by §6.8a-i.)** Investigate React→React1 rename. Hypothesis: SWC's
    plugin runtime re-runs the resolver pass on plugin-inserted
    `Ident`s; our `Ident::new("React".into(), DUMMY_SP,
    SyntaxContext::empty())` lands in the program scope with a
