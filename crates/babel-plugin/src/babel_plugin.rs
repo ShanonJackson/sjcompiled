@@ -715,6 +715,18 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
                         m.body.insert(0, build_forward_ref_import());
                     }
                 }
+
+                // (5) Phase 6 §6.8a-ii — emit-pass for hoisted sheets.
+                //     Reads `state.sheets()` (populated during the
+                //     children walk by `utils::hoist_sheet::hoist_sheet`)
+                //     and inserts a `const _N = "<sheet>";` for each,
+                //     immediately before the first non-import body item.
+                //     Mirrors upstream `hoist-sheet.ts`'s
+                //     `path.insertBefore(...)` AST insert (deferred to
+                //     this exit-pass per the comment at the top of
+                //     `utils/hoist_sheet.rs`). Order follows
+                //     IndexMap insertion order — same as Babel.
+                crate::utils::hoist_sheet::emit_hoisted_sheets(m, &self.state);
             }
         }
 
@@ -2241,18 +2253,34 @@ mod tests {
             panic!("expected Module")
         };
         // §6.8 — Program::exit prepends forwardRef + React + runtime
-        // imports (3 items) because styled was imported.
+        // imports (3 items) because styled was imported, AND emits
+        // the §6.8a-ii hoisted sheet const (1 item) immediately
+        // before the first non-import body item.
         // Pre-prepend body: [import, var, displayName] (3 items).
-        // Post-prepend body: [forwardRef, React, runtime, import, var, displayName] (6 items).
+        // Post-prepend body:
+        //   [forwardRef, React, runtime, import, sheet, var, displayName]
+        //   (7 items).
         assert_eq!(
             m.body.len(),
-            6,
-            "expected forwardRef + React + runtime + import + var + displayName"
+            7,
+            "expected forwardRef + React + runtime + import + sheet + var + displayName"
         );
 
-        // Item 4 (was 1): VarDecl with forwardRef init.
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[4] else {
-            panic!("expected VarDecl at body[4]");
+        // Item 4: hoisted sheet `const _0 = "._...";` from §6.8a-ii.
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(sheet_vd))) = &m.body[4] else {
+            panic!("expected hoisted-sheet VarDecl at body[4]");
+        };
+        let Pat::Ident(sheet_id) = &sheet_vd.decls[0].name else {
+            panic!()
+        };
+        assert!(
+            sheet_id.id.sym.as_ref().starts_with('_'),
+            "sheet ident should match `_<n>` pattern"
+        );
+
+        // Item 5 (was 1): VarDecl with forwardRef init.
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[5] else {
+            panic!("expected VarDecl at body[5]");
         };
         let init = vd.decls[0].init.as_deref().expect("init present");
         let AstExpr::Call(call) = init else {
@@ -2266,9 +2294,9 @@ mod tests {
         };
         assert_eq!(callee_ident.sym.as_ref(), "forwardRef");
 
-        // Item 5 (was 2): displayName if-stmt.
-        let ModuleItem::Stmt(Stmt::If(if_stmt)) = &m.body[5] else {
-            panic!("expected If at body[5]");
+        // Item 6 (was 2): displayName if-stmt.
+        let ModuleItem::Stmt(Stmt::If(if_stmt)) = &m.body[6] else {
+            panic!("expected If at body[6]");
         };
         // Inner body has the assignment.
         let Stmt::Block(block) = &*if_stmt.cons else {
@@ -2350,9 +2378,10 @@ mod tests {
             panic!()
         };
         // §6.8 — body grew by 3 (forwardRef + React + runtime
-        // prepended). No displayName inserted (export-default styled
-        // call has no var-binding name). Original length 2 → 5.
-        assert_eq!(m.body.len(), 5);
+        // prepended) + 1 (§6.8a-ii hoisted sheet). No displayName
+        // inserted (export-default styled call has no var-binding
+        // name). Original length 2 → 6.
+        assert_eq!(m.body.len(), 6);
     }
 
     #[test]
@@ -2424,10 +2453,10 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!()
         };
-        // §6.8 — Body now: [forwardRef, React, runtime, import, var, displayName]
-        // (3 prepended + original 3) = 6 items.
-        assert_eq!(m.body.len(), 6);
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[4] else {
+        // §6.8 — Body now: [forwardRef, React, runtime, import, sheet, var, displayName]
+        // (3 prepended + sheet hoist + original 3) = 7 items.
+        assert_eq!(m.body.len(), 7);
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[5] else {
             panic!()
         };
         let AstExpr::Call(call) = vd.decls[0].init.as_deref().expect("init") else {
@@ -2529,8 +2558,9 @@ mod tests {
         let Program::Module(m) = &program else {
             panic!()
         };
-        // §6.8 — body shifted by 3 (forwardRef + React + runtime).
-        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[4] else {
+        // §6.8 — body shifted by 4 (forwardRef + React + runtime +
+        // §6.8a-ii hoisted sheet).
+        let ModuleItem::Stmt(Stmt::Decl(Decl::Var(vd))) = &m.body[5] else {
             panic!()
         };
         let AstExpr::Call(call) = vd.decls[0].init.as_deref().expect("init") else {
