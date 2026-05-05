@@ -322,25 +322,103 @@ fn set_item_css(item: CssItem, new_css: String) -> CssItem {
 
 /// `getVariableDeclaratorValueForOwnPath` upstream lines 277–310.
 ///
-/// Returns `(expression, variableName)`. The Babel version traverses
-/// `meta.ownPath` looking for a `VariableDeclarator` whose id matches
-/// the input identifier; if found, replaces the expression with the
-/// declarator's `init`. The §4.4 shell skips that traverse (it needs
-/// Phase 5 §5.6's NodePath analog) and falls through to the
-/// no-ownPath path: variableName is just `generate(node).code`.
+/// Returns `(expression, variableName)`. Upstream traverses
+/// `meta.ownPath` (the IIFE arrow's path) looking for a
+/// `VariableDeclarator` whose id matches the input identifier; if
+/// found, replaces the expression with the declarator's `init` and
+/// sets `variableName = generate(init).code` (or `node.name` if init
+/// is undefined).
 ///
-/// This shape covers EVERY non-Identifier input correctly (the
-/// traverse only mutates on Identifier match). Identifier inputs hit
-/// the fallback shape too — variable_name = the identifier's source
-/// (e.g. `"fontSize"`), expression = the identifier itself.
+/// The Rust analog reads from the IIFE-injected bindings registered
+/// on `own_scope` in the [`ScopeIndex`] (populated by
+/// `traverse_call_expression` and `compat::path::scope_push`). Each
+/// such binding carries its `init_expr`; matching by Identifier name
+/// gives us the same `init` upstream's traverse would have walked
+/// to.
+///
+/// Effective own-scope is `meta.own_scope_override.or(own_scope)` —
+/// mirrors `dispatch_evaluate`'s composition rule so the IIFE scope
+/// set during a recursive `evaluate_expression` call propagates here
+/// (the §6.8n channel).
+///
+/// Non-Identifier inputs (Member, Call, …) hit the no-match fallback
+/// — `variable_name = generate(node)`, `expression = node`. Same as
+/// upstream's `t.isIdentifier(node) && …` gate.
 pub fn get_variable_declarator_value_for_own_path(
     node: Box<Expr>,
-    _meta: &mut Metadata<'_>,
-) -> (Box<Expr>, String) {
-    // Babel-keyframes context: variableName = `${meta.keyframe}:${node.name}`.
-    let variable_name = if matches!(_meta.context, MetadataContext::Keyframes { .. }) {
+    meta: &mut Metadata<'_>,
+    scope_index: &ScopeIndex,
+    own_scope: Option<ScopeId>,
+) -> (Option<Box<Expr>>, String) {
+    let effective_own_scope = meta.own_scope_override.or(own_scope);
+
+    // Upstream `meta.ownPath?.traverse({ VariableDeclarator })` —
+    // matches when input is `Ident` whose name resolves to an
+    // own-scope binding registered by `traverse_call_expression`.
+    //
+    // Two binding shapes need handling:
+    //   * `init_expr = Some(_)` — `const x = <expr>;` — return
+    //     `(Some(init), generate(init))`.
+    //   * `init_expr = None` AND the binding was registered as a
+    //     `Pat::Ident` IIFE param with no matching arg — `const x;`
+    //     declarator. Upstream's `init` is `null`, so:
+    //       `expression = undefined`, `variableName = node.name`.
+    //     The Rust analog is `(None, node.name)` — the consumer
+    //     (`build_css_variables`) drops the first `ix(...)` arg when
+    //     expression is None, producing the bare `ix()` upstream
+    //     emits.
+    if let (Expr::Ident(id), Some(scope)) = (&*node, effective_own_scope) {
+        if let Some(binding) = scope_index.get_own_binding(scope, id.sym.as_str()) {
+            // Distinguishing "no-init scope-pushed param" from "pre-existing
+            // unrelated binding (e.g. a sibling `const`)": only
+            // synthesised IIFE params and `compat::path::scope_push`
+            // entries are registered with `binding_node_type =
+            // "VariableDeclarator"` AND `parent_node_type =
+            // "VariableDeclaration"`. Other Pat::Ident params
+            // (regular function params) carry `Identifier` /
+            // `(Arrow|Fn)Expression`. Gate the match on the upstream
+            // shape so non-VariableDeclarator bindings (function
+            // params with no IIFE wrap) don't hijack the lookup.
+            let is_var_declarator =
+                binding.binding_node_type == "VariableDeclarator"
+                    && binding.parent_node_type == "VariableDeclaration";
+            if is_var_declarator {
+                if let Some(init) = &binding.init_expr {
+                    let init_clone = init.clone();
+                    let variable_name = if matches!(meta.context, MetadataContext::Keyframes { .. }) {
+                        if let MetadataContext::Keyframes { keyframe } = &meta.context {
+                            format!("{}:{}", keyframe, id.sym)
+                        } else {
+                            generate(&init_clone)
+                        }
+                    } else {
+                        generate(&init_clone)
+                    };
+                    return (Some(init_clone), variable_name);
+                }
+                // Match-but-no-init: upstream returns
+                // `expression = undefined`, `variableName = node.name`
+                // (or the keyframes-namespaced form).
+                let variable_name = if matches!(meta.context, MetadataContext::Keyframes { .. }) {
+                    if let MetadataContext::Keyframes { keyframe } = &meta.context {
+                        format!("{}:{}", keyframe, id.sym)
+                    } else {
+                        id.sym.as_str().to_string()
+                    }
+                } else {
+                    id.sym.as_str().to_string()
+                };
+                return (None, variable_name);
+            }
+        }
+    }
+
+    // Fallback: no traverse match. Babel-keyframes context still
+    // overrides variableName to `${keyframe}:${node.name}` for Ident
+    // inputs.
+    let variable_name = if matches!(meta.context, MetadataContext::Keyframes { .. }) {
         if let Expr::Ident(ident) = &*node {
-            if let MetadataContext::Keyframes { keyframe } = &_meta.context {
+            if let MetadataContext::Keyframes { keyframe } = &meta.context {
                 format!("{}:{}", keyframe, ident.sym)
             } else {
                 generate(&node)
@@ -351,7 +429,7 @@ pub fn get_variable_declarator_value_for_own_path(
     } else {
         generate(&node)
     };
-    (node, variable_name)
+    (Some(node), variable_name)
 }
 
 /// `callbackIfFileIncluded` upstream lines 319–323. Compares
@@ -823,7 +901,22 @@ pub fn extract_object_expression(
     let mut variables: Vec<Variable> = Vec::new();
 
     for prop in &node.props {
-        match prop {
+        // Per-property snapshot of `meta.own_scope_override`. Mirrors
+        // upstream's per-iteration `const { value, meta: updatedMeta }
+        // = evaluateExpression(...)` shape — `updatedMeta` is local to
+        // each property, so an IIFE-set override on one prop does NOT
+        // leak to its siblings. The recursive `build_css_inner` inside
+        // a spread iteration still sees the just-set override (the
+        // restore happens AFTER the spread's own work). Without this
+        // snapshot, sibling Idents resolved at the outer scope would
+        // be misrouted into the previous prop's IIFE scope (e.g.
+        // `{ backgroundColor: getBackgroundColor(...), color }` —
+        // `color` would resolve to the IIFE's `color` param instead
+        // of the outer `const color`).
+        let saved_override = meta.own_scope_override;
+        // Labeled block so `continue`-equivalent early exits inside
+        // the match arms still hit the snapshot-restore below.
+        'prop_iter: { match prop {
             PropOrSpread::Prop(boxed_prop) => {
                 // Babel parses `{ color }` shorthand as
                 // `ObjectProperty { key:Ident, value:Ident, shorthand:true }`,
@@ -845,7 +938,7 @@ pub fn extract_object_expression(
                         };
                         &kv_owned
                     }
-                    _ => continue,
+                    _ => break 'prop_iter,
                 };
                 let key = object_property_to_string(&kv.key, meta, scope_index, parent_scope, own_scope)?;
                 // §6.8a-vi: 1:1 port of upstream `evaluateExpression(prop.value, meta)`.
@@ -894,7 +987,7 @@ pub fn extract_object_expression(
                     css.push(CssItem::Unconditional(UnconditionalCssItem {
                         css: format!("{}: {};", kebab_key, value),
                     }));
-                    continue;
+                    break 'prop_iter;
                 }
 
                 if let Expr::Lit(Lit::Num(n)) = prop_value {
@@ -908,11 +1001,11 @@ pub fn extract_object_expression(
                     css.push(CssItem::Unconditional(UnconditionalCssItem {
                         css: format!("{}: {};", kebab_key, unit_value),
                     }));
-                    continue;
+                    break 'prop_iter;
                 }
 
                 if is_empty_value(prop_value) {
-                    continue;
+                    break 'prop_iter;
                 }
 
                 if matches!(prop_value, Expr::Object(_) | Expr::Bin(BinExpr { op: BinaryOp::LogicalOr | BinaryOp::LogicalAnd | BinaryOp::NullishCoalescing, .. }))
@@ -923,7 +1016,7 @@ pub fn extract_object_expression(
                     );
                     css.extend(result.css);
                     variables.extend(result.variables);
-                    continue;
+                    break 'prop_iter;
                 }
 
                 if let Expr::Tpl(tpl) = prop_value {
@@ -950,7 +1043,7 @@ pub fn extract_object_expression(
                     };
                     css.extend(result.css);
                     variables.extend(result.variables);
-                    continue;
+                    break 'prop_iter;
                 }
 
                 if let Expr::Arrow(arrow) = prop_value {
@@ -1005,7 +1098,7 @@ pub fn extract_object_expression(
                         let result = extract_template_literal(&opt, meta, scope_index, parent_scope, own_scope, recorder)?;
                         css.extend(result.css);
                         variables.extend(result.variables);
-                        continue;
+                        break 'prop_iter;
                     }
                 }
 
@@ -1025,14 +1118,19 @@ pub fn extract_object_expression(
                     )?;
                     css.extend(result.css);
                     variables.extend(result.variables);
-                    continue;
+                    break 'prop_iter;
                 }
 
                 // §4.4 hash-call-shape #2 (line 639): catch-all
                 // CSS-variable emit. variable_name flows through
                 // generate() → hash(); reachable end-to-end.
                 let (expression, variable_name) =
-                    get_variable_declarator_value_for_own_path(Box::new(prop_value.clone()), meta);
+                    get_variable_declarator_value_for_own_path(
+                        Box::new(prop_value.clone()),
+                        meta,
+                        scope_index,
+                        own_scope,
+                    );
                 let name = format!("--_{}", hash(&variable_name));
                 variables.push(Variable {
                     name: name.clone(),
@@ -1089,7 +1187,10 @@ pub fn extract_object_expression(
                 css.extend(result.css);
                 variables.extend(result.variables);
             }
-        }
+        } } // close match + 'prop_iter labeled block
+        // Restore the per-iteration `own_scope_override` snapshot —
+        // see comment at the snapshot site above.
+        meta.own_scope_override = saved_override;
     }
 
     Ok(CSSOutput {
@@ -1565,7 +1666,12 @@ pub fn extract_template_literal(
         // §4.4 hash-call-shape #3 (line 869): catch-all CSS-variable
         // emit with cssAffixInterpolation prefix-detection.
         let (expression, variable_name) =
-            get_variable_declarator_value_for_own_path((*node.exprs[index]).clone().into(), meta);
+            get_variable_declarator_value_for_own_path(
+                (*node.exprs[index]).clone().into(),
+                meta,
+                scope_index,
+                own_scope,
+            );
         let next_quasi_raw = quasi_raws.get(index + 1).cloned().unwrap_or_default();
         let (before, after) = css_affix_interpolation(&raw, &next_quasi_raw);
         let suffix_marker = if before.variable_prefix == "-" {

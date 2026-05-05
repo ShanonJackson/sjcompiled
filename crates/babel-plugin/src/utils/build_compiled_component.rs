@@ -590,7 +590,7 @@ mod tests {
             css: vec![],
             variables: vec![Variable {
                 name: "--_a".to_string(),
-                expression: var_expr,
+                expression: Some(var_expr),
                 prefix: None,
                 suffix: None,
             }],

@@ -1,0 +1,452 @@
+# 29 remaining divergences
+
+---
+NAME: class-names-tests-behaviour/class-names-behaviour--should-not-transform-object-property-access-from-invalid-style-prop
+SRC : class-names/__tests__/behaviour.test.ts
+divergence at byte 164 (a.length=223, b.length=217)
+--- a +104..224
+   React.createElement(
+      "div",
+      {
+        style: dontexist.style,
+      },
+      "hello, world!"
+    )
+  );
+
++++ b +104..224
+   React.createElement(
+      "div",
+      {
+        style: undefined,
+      },
+      "hello, world!"
+    )
+  );
+
+
+---
+NAME: class-names-tests-behaviour/class-names-behaviour--should-not-transform-style-identifier-when-its-coming-from-outer-scope
+SRC : class-names/__tests__/behaviour.test.ts
+divergence at byte 340 (a.length=458, b.length=462)
+--- a +280..400
+  React.createElement(
+      "span",
+      {
+        style: style,
+        className: ax(["_syazxdf1 _1p1dangw _k48p1fw0
++++ b +280..400
+  React.createElement(
+      "span",
+      {
+        style: undefined,
+        className: ax(["_syazxdf1 _1p1dangw _k48p
+
+---
+NAME: class-names-tests-behaviour/class-names-behaviour--should-transform-style-and-css-renamed-prop-coming-from-local-variable
+SRC : class-names/__tests__/behaviour.test.ts
+divergence at byte 6 (a.length=433, b.length=388)
+--- a +0..66
+const _2 = "._syaz5scu{color:red}";
+const _ = "._1wyb19bv{font-siz
++++ b +0..66
+const ListItem = () =>
+  React.createElement(
+    CC,
+    null,
+  
+
+---
+NAME: class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--a-call-expression-with-unresolved-arguments
+SRC : class-names/__tests__/call-expression.test.ts
+divergence at byte 739 (a.length=790, b.length=800)
+--- a +679..799
+     "--_zo7lop": ix(props.color1),
+        "--_kre2x8": ix(),
+        "--_u6vle4": ix(),
+      },
+    })
+  );
+
++++ b +679..799
+     "--_zo7lop": ix(props.color1),
+        "--_kre2x8": ix(size),
+        "--_u6vle4": ix(weight),
+      },
+    })
+  );
+
+---
+NAME: class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--a-call-expression-with-unresolved-arguments
+SRC : class-names/__tests__/tagged-template-expression.test.ts
+divergence at byte 875 (a.length=926, b.length=936)
+--- a +815..935
+     "--_zo7lop": ix(props.color1),
+        "--_kre2x8": ix(),
+        "--_u6vle4": ix(),
+      },
+    })
+  );
+
++++ b +815..935
+     "--_zo7lop": ix(props.color1),
+        "--_kre2x8": ix(size),
+        "--_u6vle4": ix(weight),
+      },
+    })
+  );
+
+---
+NAME: css-prop-tests-behaviour/css-prop-behaviour--should-concat-explicit-use-of-style-prop-on-an-element-when-destructured-templat
+SRC : css-prop/__tests__/behaviour.test.ts
+divergence at byte 96 (a.length=383, b.length=335)
+--- a +36..156
+rt { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _ = "._syaz13q2{color:blue}";
+const [color] = ["blue"];
+Reac
++++ b +36..156
+rt { ax, ix, CC, CS } from "@compiled/react/runtime";
+const [color] = ["blue"];
+React.createElement(
+  CC,
+  null,
+  Rea
+
+---
+NAME: css-prop-tests-behaviour/css-prop-behaviour--should-retain-keys-for-mapped-react-components
+SRC : css-prop/__tests__/behaviour.test.ts
+divergence at byte 17 (a.length=399, b.length=400)
+--- a +0..77
+import * as React from "react";
+import { ax, ix, CC, CS } from "@compiled/rea
++++ b +0..77
+import * as React1 from "react";
+import { ax, ix, CC, CS } from "@compiled/re
+
+---
+NAME: css-prop-tests-behaviour/css-prop-behaviour--should-not-transform-css-prop-with-comment-directive
+SRC : css-prop/__tests__/behaviour.test.ts
+divergence at byte 96 (a.length=343, b.length=733)
+--- a +36..156
+rt { ax, ix, CC, CS } from "@compiled/react/runtime";
+const RedDiv = React.createElement("div", {
+  css: {
+    color: "r
++++ b +36..156
+rt { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _3 = "._syaz13q2{color:blue}";
+const _2 = "._syazbf54{color:
+
+---
+NAME: css-prop-tests-jsx-pragma/local-jsx-namespace--should-transform-css-prop-using-jsx-import-source
+SRC : css-prop/__tests__/jsx-pragma.test.ts
+divergence at byte 9 (a.length=323, b.length=333)
+--- a +0..69
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { js
++++ b +0..69
+import { jsx as _jsx, jsxs as _jsxs } from "@compiled/react/jsx-runti
+
+---
+NAME: css-prop-tests-jsx-pragma/local-jsx-namespace--should-transform-css-prop-using-jsx-pragma
+SRC : css-prop/__tests__/jsx-pragma.test.ts
+divergence at byte 90 (a.length=300, b.length=291)
+--- a +30..150
+;
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _ = "._syaz5scu{color:red}";
+React.createElement(
+  CC
++++ b +30..150
+;
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { jsx } from "@compiled/react";
+const _ = "._syaz5scu
+
+---
+NAME: css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-unresolved-argument-arrow-function-variable
+SRC : css-prop/__tests__/object-literal.test.ts
+divergence at byte 739 (a.length=790, b.length=800)
+--- a +679..799
+     "--_zo7lop": ix(props.color1),
+        "--_kre2x8": ix(),
+        "--_u6vle4": ix(),
+      },
+    })
+  );
+
++++ b +679..799
+     "--_zo7lop": ix(props.color1),
+        "--_kre2x8": ix(size),
+        "--_u6vle4": ix(weight),
+      },
+    })
+  );
+
+---
+NAME: css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-unresolved-argument-arrow-function-variabl
+SRC : css-prop/__tests__/string-literal.test.ts
+divergence at byte 873 (a.length=924, b.length=934)
+--- a +813..933
+     "--_zo7lop": ix(props.color1),
+        "--_kre2x8": ix(),
+        "--_u6vle4": ix(),
+      },
+    })
+  );
+
++++ b +813..933
+     "--_zo7lop": ix(props.color1),
+        "--_kre2x8": ix(size),
+        "--_u6vle4": ix(weight),
+      },
+    })
+  );
+
+---
+NAME: keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-a-single-element
+SRC : keyframes/__tests__/call-expression.test.ts
+divergence at byte 296 (a.length=668, b.length=669)
+--- a +236..356
+-_k85g0d);opacity:0}}";
+const generateKeyframes = (fromColor, toColor) => null;
+React.createElement(
+  CC,
+  null,
+  Rea
++++ b +236..356
+-_k85g0d);opacity:0}}";
+const generateKeyframes = (fromColor1, toColor) => null;
+React.createElement(
+  CC,
+  null,
+  Re
+
+---
+NAME: keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-multiple-elements
+SRC : keyframes/__tests__/call-expression.test.ts
+divergence at byte 343 (a.length=1179, b.length=1180)
+--- a +283..403
+-_k85g0d);opacity:0}}";
+const generateKeyframes = (fromColor, toColor) => null;
+React.createElement(
+  React.Fragment,
+ 
++++ b +283..403
+-_k85g0d);opacity:0}}";
+const generateKeyframes = (fromColor1, toColor) => null;
+React.createElement(
+  React.Fragment,
+
+
+---
+NAME: styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operator-for-object-styles
+SRC : styled/__tests__/behaviour.test.ts
+divergence at byte 133 (a.length=1190, b.length=1187)
+--- a +73..193
+t { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _6 = "._2hwx19bv{margin-right:10px}";
+const _5 = "._2hwx14y2{
++++ b +73..193
+t { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _4 = "._18u019bv{margin-left:10px}";
+const _3 = "._18u014y2{m
+
+---
+NAME: styled-tests-behaviour/styled-component-behaviour--should-apply-multi-conditional-logical-expression-with-different-props-lines-and
+SRC : styled/__tests__/behaviour.test.ts
+divergence at byte 133 (a.length=1041, b.length=1047)
+--- a +73..193
+t { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _4 = "._k48p4jg8{font-weight:normal}";
+const _3 = "._k48p8n31
++++ b +73..193
+t { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _3 = "._syaz13q2{color:blue}";
+const _2 = "._k48ptr2p{font-we
+
+---
+NAME: styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-and-boolean-in-the-same-line
+SRC : styled/__tests__/behaviour.test.ts
+divergence at byte 133 (a.length=967, b.length=719)
+--- a +73..193
+t { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _3 = "._syaz5scu{color:red}";
+const _2 = "._syaz13q2{color:bl
++++ b +73..193
+t { ax, ix, CC, CS } from "@compiled/react/runtime";
+const _ = "._1wybgktf{font-size:20px}";
+const Component = forwardRe
+
+---
+NAME: styled-tests-behaviour/styled-component-behaviour--should-apply-no-classes-when-both-conditional-branches-contains-empty-values
+SRC : styled/__tests__/behaviour.test.ts
+divergence at byte 324 (a.length=718, b.length=669)
+--- a +264..384
+Error("Please use 'ref' instead of 'innerRef'.");
+    }
+    const { isPrimary, ...__cmpldp } = __cmplp;
+    return React
++++ b +264..384
+Error("Please use 'ref' instead of 'innerRef'.");
+    }
+    return React.createElement(
+      CC,
+      null,
+      Reac
+
+---
+NAME: styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-unresolved-argument-arrow-function-variable
+SRC : styled/__tests__/call-expression.test.ts
+divergence at byte 808 (a.length=1014, b.length=1024)
+--- a +748..868
+   "--_zo7lop": ix(props.color1),
+          "--_kre2x8": ix(),
+          "--_u6vle4": ix(),
+        },
+        ref: __cm
++++ b +748..868
+   "--_zo7lop": ix(props.color1),
+          "--_kre2x8": ix(size),
+          "--_u6vle4": ix(weight),
+        },
+       
+
+---
+NAME: styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-unresolved-argument-arrow-function-variabl
+SRC : styled/__tests__/tagged-template-expression.test.ts
+divergence at byte 914 (a.length=1140, b.length=1150)
+--- a +854..974
+   "--_zo7lop": ix(props.color1),
+          "--_kre2x8": ix(),
+          "--_u6vle4": ix(),
+        },
+        ref: __cm
++++ b +854..974
+   "--_zo7lop": ix(props.color1),
+          "--_kre2x8": ix(size),
+          "--_u6vle4": ix(weight),
+        },
+       
+
+---
+NAME: tests-custom-import-source/custom-import-source--should-pick-up-custom-relative-import-source
+SRC : __tests__/custom-import-source.test.ts
+divergence at byte 7 (a.length=292, b.length=128)
+--- a +0..67
+import * as React from "react";
+import { ax, ix, CC, CS } from "@co
++++ b +0..67
+import { css } from "../bar/stub-api";
+const styles = css({
+  color
+
+---
+NAME: tests-custom-import-source/custom-import-source--should-pick-up-an-automatic-pragma-from-a-custom-package-import-source
+SRC : __tests__/custom-import-source.test.ts
+divergence at byte 9 (a.length=298, b.length=305)
+--- a +0..69
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { js
++++ b +0..69
+import { jsx as _jsx, jsxs as _jsxs } from "@af/compiled/jsx-runtime"
+
+---
+NAME: tests-expression-evaluation/import-specifiers--statically-evaluates-deconstructed-values-from-deeply-nested-objects
+SRC : __tests__/expression-evaluation.test.ts
+divergence at byte 108 (a.length=914, b.length=1072)
+--- a +48..168
+ CC, CS } from "@compiled/react/runtime";
+const _4 = "._k48p1fw0{font-weight:700}";
+const _3 = "._1wyb1fwx{font-size:12p
++++ b +48..168
+ CC, CS } from "@compiled/react/runtime";
+const _4 = "._k48pdo4x{font-weight:var(--_le9e55)}";
+const _3 = "._1wyb6uie{fo
+
+---
+NAME: tests-index/babel-plugin--should-add-component-name-if-addcomponentname-is-true
+SRC : __tests__/index.test.ts
+divergence at byte 573 (a.length=718, b.length=707)
+--- a +513..633
+yle: __cmpls,
+        ref: __cmplr,
+        className: ax(["c_MyDiv", "_1wyb1fwx", __cmplp.className]),
+      })
+    );
+
++++ b +513..633
+yle: __cmpls,
+        ref: __cmplr,
+        className: ax(["_1wyb1fwx", __cmplp.className]),
+      })
+    );
+  }
+);
+if (
+
+---
+NAME: tests-index/babel-plugin--should-compress-conditional-class-names
+SRC : __tests__/index.test.ts
+divergence at byte 17 (a.length=472, b.length=473)
+--- a +0..77
+import * as React from "react";
+import { ac, ix, CC, CS } from "@compiled/rea
++++ b +0..77
+import * as React1 from "react";
+import { ac, ix, CC, CS } from "@compiled/re
+
+---
+NAME: tests-jsx-automatic/jsx-automatic--should-work-with-css-prop-and-a-custom-import-source
+SRC : __tests__/jsx-automatic.test.ts
+divergence at byte 9 (a.length=340, b.length=340)
+--- a +0..69
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { js
++++ b +0..69
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+impor
+
+---
+NAME: tests-jsx-automatic/jsx-automatic--should-work-with-css-prop
+SRC : __tests__/jsx-automatic.test.ts
+divergence at byte 9 (a.length=299, b.length=299)
+--- a +0..69
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { js
++++ b +0..69
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+impor
+
+---
+NAME: tests-jsx-automatic/jsx-automatic--should-work-with-class-names
+SRC : __tests__/jsx-automatic.test.ts
+divergence at byte 9 (a.length=299, b.length=299)
+--- a +0..69
+import { ax, ix, CC, CS } from "@compiled/react/runtime";
+import { js
++++ b +0..69
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+impor
+
+---
+NAME: tests-jsx-automatic/jsx-automatic--should-work-with-styled
+SRC : __tests__/jsx-automatic.test.ts
+divergence at byte 9 (a.length=614, b.length=614)
+--- a +0..69
+import { forwardRef } from "react";
+import { ax, ix, CC, CS } from "@
++++ b +0..69
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+impor
+
+
+# swc-throws
+
+# babel-throws
+
+# both-throw
+---
+NAME: styled-tests-content-property/handling-of-values-for-css-content-property--should-not-add-quotes-to-content-values-that-shouldn-t-accept-them
+SRC : styled/__tests__/content-property.test.ts

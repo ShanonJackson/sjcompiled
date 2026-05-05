@@ -94,10 +94,22 @@ pub enum LogicalOperator {
 
 /// `Variable` — one entry of `CSSOutput.variables`. Drives the inline
 /// `style={{ '--_x': value }}` emit at the consumer site.
+///
+/// `expression` is `Option<Box<Expr>>` to mirror upstream's
+/// `[transform(variable.expression), …].filter(Boolean)` semantics —
+/// when `getVariableDeclaratorValueForOwnPath` finds an own-scope
+/// `VariableDeclarator` with no init (`const x;`), `init` is `null`
+/// in upstream and JS's `filter(Boolean)` drops the resulting
+/// `transform(undefined)` argument. The Rust analog is a `None` here;
+/// `build_css_variables` skips emitting the first `ix(…)` arg when it
+/// sees `None`, producing the bare `ix()` upstream emits for
+/// no-init IIFE-injected params (e.g. `mixin(a, b)` against
+/// `(a, b, c, d) => …` — `c`, `d` get `init: undefined` declarators
+/// and reference sites emit `ix()` rather than `ix(c)`).
 #[derive(Debug, Clone)]
 pub struct Variable {
     pub name: String,
-    pub expression: Box<Expr>,
+    pub expression: Option<Box<Expr>>,
     /// Optional CSS-syntax prefix (e.g. `-` for negative-value
     /// templates). Populated by `cssAffixInterpolation`.
     pub prefix: Option<String>,

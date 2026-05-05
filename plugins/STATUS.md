@@ -38,10 +38,10 @@ Earlier "954/954 bun parity" cited in §5.6 was a pass-through oracle
 (assert babel ≠ swc); §6.8 inverts it (assert babel == swc) and
 surfaces real divergence.
 
-**Current baseline (post-§6.8n, 2026-05-06):** parity **441 / 477**
-(92.5%), divergence **35**, swc-throws **0**, babel-throws **0**,
+**Current baseline (post-§6.8o, 2026-05-06):** parity **453 / 477**
+(95.0%), divergence **23**, swc-throws **0**, babel-throws **0**,
 both-throw **1**. Cumulative session delta from the original
-7/407/62/1 baseline: parity +434, divergence −372, swc-throws −62
+7/407/62/1 baseline: parity +446, divergence −384, swc-throws −62
 (cluster cleared), babel-throws −1. §6.8i closed the React→React1
 hygiene-rename cluster (parity +28); §6.8j ported the spread-element
 recursive build_css_inner (parity +21); §6.8k ported `jsesc@2.5.2`
@@ -51,7 +51,53 @@ default-string mode for synthesised sheet-const StringLiterals
 SWC `Prop::Shorthand` into a synthetic KeyValue inside
 `extract_object_expression` (parity +16); §6.8n bundled the
 destructured-binding resolution + IIFE-scope propagation fixes
-(parity +19, six sub-fixes).
+(parity +19, six sub-fixes); §6.8o landed the
+`getVariableDeclaratorValueForOwnPath` IIFE-binding lookup +
+per-prop `own_scope_override` snapshot/restore + `Variable.expression`
+no-init Option (parity +12, three sub-fixes).
+
+**§6.8o sub-fixes (this session, 2026-05-06):**
+
+- §6.8o-i — `get_variable_declarator_value_for_own_path` now
+  consults the IIFE arrow's own-scope binding map for `Pat::Ident`
+  inputs. Mirrors upstream's
+  `meta.ownPath?.traverse({ VariableDeclarator })` which finds
+  `scope.push`-injected `const param = init` declarators and sets
+  `variableName = generate(init).code`. Without this, IIFE-resolved
+  identifiers like `color1` (bound to `props.color1` via
+  `mixin(props.color1, …)`) were hashing as `hash("color1")` =
+  `j2chn6` instead of `hash("props.color1")` = `zo7lop`. Cluster
+  hash-divergence removed across 12 fixtures spanning class-names /
+  css-prop / styled / object-literal / string-literal /
+  call-expression / tagged-template-expression. Gate: only matches
+  when `binding_node_type == "VariableDeclarator"` (excludes regular
+  function params and destructure-pat leaves whose
+  `binding_node_type` is `Identifier`/`ObjectPattern`).
+- §6.8o-ii — `extract_object_expression` now snapshot/restores
+  `meta.own_scope_override` per property iteration. Mirrors upstream's
+  per-iter `const { value, meta: updatedMeta } = evaluateExpression(prop.value, meta)`
+  pattern where `updatedMeta` is local to each property. Without this,
+  a sibling property after an IIFE call (e.g.
+  `{ backgroundColor: getBackgroundColor(...), color }` — `color` in
+  shorthand position) inherited the IIFE's `own_scope_override` and
+  resolved against the IIFE's `color` param instead of the outer
+  `const color`. Implementation uses a `'prop_iter` labeled block so
+  early-exit `break 'prop_iter`s still hit the snapshot-restore.
+- §6.8o-iii — `Variable.expression` widened from `Box<Expr>` to
+  `Option<Box<Expr>>`. `build_css_variables` skips the first `ix(…)`
+  arg when expression is `None`, producing the bare `ix()` upstream
+  emits for no-init IIFE-injected params (e.g. `mixin(a, b)` against
+  `(a, b, c, d) => …` gives `c`/`d` as `init: undefined` declarators
+  → `ix()` not `ix(c)`). Mirrors upstream's
+  `[transform(variable.expression), …].filter(Boolean)` truthy
+  semantics. Variable construction sites updated:
+  `extract_object_expression` catch-all, `extract_template_literal`
+  catch-all, plus two unit-test fixture sites in
+  `build_compiled_component` and `build_styled_component`.
+
+§6.8o lib tests 465 → 465 (no test-count delta; the existing tests
+were green against the new Optional shape after the construction-site
+updates).
 
 **Triage tooling at `parity-harness/babel-plugin/`:**
 - `triage.mjs` runs every fixture, emits categorised JSON

@@ -328,8 +328,10 @@ fn styled_template(
             }
         }
         for var in &opts.variables {
-            for n in get_invalid_dom_props(&var.expression) {
-                names.insert(n);
+            if let Some(expr) = &var.expression {
+                for n in get_invalid_dom_props(expr) {
+                    names.insert(n);
+                }
             }
         }
         names.into_iter().collect()
@@ -972,11 +974,11 @@ mod tests {
     fn styled_style_prop_starts_with_spread_of_style_ident() {
         let v = Variable {
             name: "--_a".into(),
-            expression: Box::new(Expr::Lit(Lit::Num(Number {
+            expression: Some(Box::new(Expr::Lit(Lit::Num(Number {
                 span: DUMMY_SP,
                 value: 8.0,
                 raw: None,
-            }))),
+            })))),
             prefix: None,
             suffix: None,
         };

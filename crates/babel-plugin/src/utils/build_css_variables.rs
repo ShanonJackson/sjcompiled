@@ -62,10 +62,16 @@ where
                 .filter(|s| !s.is_empty());
 
             let mut args: Vec<ExprOrSpread> = Vec::with_capacity(3);
-            args.push(ExprOrSpread {
-                spread: None,
-                expr: transform(variable.expression.clone()),
-            });
+            // Mirror upstream's `[transform(variable.expression), …].filter(Boolean)`.
+            // When `expression` is `None` (no-init IIFE-injected
+            // declarator), drop the first arg entirely — produces
+            // `ix()` instead of `ix(<param>)`.
+            if let Some(expr) = variable.expression.clone() {
+                args.push(ExprOrSpread {
+                    spread: None,
+                    expr: transform(expr),
+                });
+            }
             if let Some(suffix) = suffix_truthy {
                 args.push(ExprOrSpread {
                     spread: None,
@@ -137,7 +143,7 @@ mod tests {
     fn make_var(name: &str, expr: Box<Expr>, prefix: Option<&str>, suffix: Option<&str>) -> Variable {
         Variable {
             name: name.to_string(),
-            expression: expr,
+            expression: Some(expr),
             prefix: prefix.map(String::from),
             suffix: suffix.map(String::from),
         }
