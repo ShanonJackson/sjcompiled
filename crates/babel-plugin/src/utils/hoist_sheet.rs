@@ -79,33 +79,43 @@ pub fn hoist_sheet(
     hoisted_name
 }
 
-/// Phase 6 §6.8a-ii — emit-pass for the hoisted sheets recorded
-/// during the children walk. Reads `state.sheets()` in
-/// IndexMap insertion order and inserts a `const <name> = "<sheet>";`
-/// `ModuleItem::Stmt(VarDecl)` for each, immediately BEFORE the first
-/// non-`ImportDeclaration` body item — the same insertion point
-/// upstream's `path.insertBefore(...)` lands on (per
-/// `hoist-sheet.ts`'s `parentBody.filter(p => !p.isImportDeclaration())[0]`).
+/// Phase 6 §6.8a-ii / §6.8a-v — emit-pass for the hoisted sheets
+/// recorded during the children walk. Reads `state.sheets()` and
+/// inserts a `const <name> = "<sheet>";` `ModuleItem::Stmt(VarDecl)`
+/// for each, immediately BEFORE the first non-`ImportDeclaration`
+/// body item — the same insertion point upstream's
+/// `path.insertBefore(...)` lands on (per `hoist-sheet.ts`'s
+/// `parentBody.filter(p => !p.isImportDeclaration())[0]`).
 ///
-/// Insertion happens via repeated `body.insert(idx, ...)` with
-/// monotonically-increasing `idx`, which preserves IndexMap order
-/// (first-recorded sheet ends up first in the body).
+/// **§6.8a-v insertion-order parity.** Each `body.insert(idx, ...)`
+/// is at the SAME `insert_idx` (no per-iteration offset), which
+/// pushes previously-inserted sheets BACKWARD as new ones land.
+/// This produces reverse-of-arrival body order — exactly matching
+/// upstream's `path = parentBody.filter(...)[0]` re-evaluated each
+/// hoist call: after the first hoist lands, the just-inserted
+/// VarDecl IS the new "first non-import", and the next
+/// `insertBefore` targets it, pushing it down. Net effect: the
+/// last-recorded sheet ends up FIRST in the body, the
+/// first-recorded sheet ends up LAST among the hoists.
+///
+/// Concrete example (matching the css-prop/object-literal probe
+/// fixture): arrival order `_ → _2 → _3 → _4 → _5`; body order
+/// `_5, _4, _3, _2, _`. Same as Babel.
 ///
 /// Edge cases:
 /// - `state.sheets()` empty → no-op.
-/// - All-import module (no non-import body item) → insert at end. The
-///   sheets land after every import. Babel's behaviour is identical
-///   in this shape: `parentBody.filter(...)[0]` is `undefined`, so
-///   the `if (path)` guard skips the AST insert — but `state.sheets`
-///   still records the entry. For our parity gate this is observed
-///   nowhere (no real fixture has sheets without a consumer); we
-///   nevertheless emit at end-of-body so a future fixture surfaces
-///   no surprise.
+/// - All-import module (no non-import body item) → all hoists land
+///   at `body.len()` initially, then each subsequent insert at the
+///   SAME `insert_idx` (== original len) pushes earlier ones down
+///   by one. Final order is reverse-of-arrival, matching the
+///   non-edge-case shape. Babel's behaviour in this shape is to
+///   SKIP the AST insert entirely (the `if (path)` guard); our
+///   defensive emit doesn't surface in any real fixture, but
+///   stays internally consistent.
 ///
-/// Called from `babel_plugin.rs::visit_mut_program` AFTER the runtime
-/// import + React + forwardRef injections — those unshift items at
-/// `body[0]`, so the "first non-import" target shifts only by one
-/// `forEach` of imports, which the index recompute here handles.
+/// Called from `babel_plugin.rs::visit_mut_program` AFTER the
+/// runtime / React / forwardRef injections so the "first non-import"
+/// target sees the post-injection import region.
 pub fn emit_hoisted_sheets(module: &mut Module, state: &State) {
     let sheets = state.sheets();
     if sheets.is_empty() {
@@ -124,8 +134,11 @@ pub fn emit_hoisted_sheets(module: &mut Module, state: &State) {
         .unwrap_or(module.body.len());
 
     // Iterate state.sheets() in insertion order, building each
-    // `const <name> = "<sheet>";` and inserting at the running idx.
-    for (offset, (sheet_text, hoisted_name)) in sheets.iter().enumerate() {
+    // `const <name> = "<sheet>";` and inserting at the SAME
+    // `insert_idx`. Every new insert pushes earlier inserts back,
+    // so body order is reverse-of-arrival — matching upstream
+    // (see §6.8a-v rationale in this fn's doc-comment).
+    for (sheet_text, hoisted_name) in sheets.iter() {
         let var_decl = VarDecl {
             span: DUMMY_SP,
             kind: VarDeclKind::Const,
@@ -150,7 +163,7 @@ pub fn emit_hoisted_sheets(module: &mut Module, state: &State) {
             ctxt: SyntaxContext::empty(),
         };
         module.body.insert(
-            insert_idx + offset,
+            insert_idx,
             ModuleItem::Stmt(Stmt::Decl(Decl::Var(Box::new(var_decl)))),
         );
     }
@@ -344,8 +357,10 @@ mod tests {
 
         // Body now: [import, import, sheet0, sheet1, var].
         assert_eq!(module.body.len(), 5);
-        assert_sheet_const(&module.body[2], "_", "._a{color:red}");
-        assert_sheet_const(&module.body[3], "_2", "._b{color:blue}");
+        // §6.8a-v — reverse-of-arrival: arrival order `_ → _2`
+        // produces body order `_2, _` (later-arrived first).
+        assert_sheet_const(&module.body[2], "_2", "._b{color:blue}");
+        assert_sheet_const(&module.body[3], "_", "._a{color:red}");
     }
 
     #[test]
@@ -387,8 +402,10 @@ mod tests {
         emit_hoisted_sheets(&mut module, &state);
         // Insertion order: c, a, b. Var stays last.
         assert_eq!(module.body.len(), 4);
-        assert_sheet_const(&module.body[0], "_", "c");
+        // §6.8a-v — reverse-of-arrival: arrival `c → a → b`
+        // (UIDs `_, _2, _3`) produces body order `_3, _2, _`.
+        assert_sheet_const(&module.body[0], "_3", "b");
         assert_sheet_const(&module.body[1], "_2", "a");
-        assert_sheet_const(&module.body[2], "_3", "b");
+        assert_sheet_const(&module.body[2], "_", "c");
     }
 }

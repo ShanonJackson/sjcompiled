@@ -177,11 +177,34 @@ remaining divergences are now CONTAINED to:
   expectations. Lib tests stay 433/433. **Triage delta: parity
   10 → 58, divergence 404 → 356** (+48 fixtures move from
   divergence to byte-equal parity in one swing).
-- **Multi-sheet UID counter divergence** — Babel's UIDs depend on
-  scope-binding collision-checks, so different test fixtures
-  produce different starting values (e.g. `_4`, `_5` vs `_0`,
-  `_1`). Real fix: 1:1 port of `Scope.generateUid` collision-walk
-  using the §5.0a `ScopeIndex`. Bigger lift than the singleton fix.
+- **§6.8a-v ☑ — hoist insertion-order parity** (this session,
+  2026-05-05). Reframing of the original "multi-sheet UID counter"
+  hypothesis: probing two representative fixtures
+  (`css-prop/object-literal/should-inline-the-variable-when-it-is-a-constant-in-string-css`
+  and `keyframes/call-expression/...longhand-syntax`) confirmed the
+  UID NUMBERS are sequential in both engines (`_, _2, _3, _4, _5`
+  on both sides — no collision-walk divergence). The actual
+  divergence is body ORDER: Babel emits `_5, _4, _3, _2, _`
+  (reverse of arrival) while SWC was emitting `_, _2, _3, _4, _5`.
+  Root cause: upstream `hoistSheet` re-evaluates
+  `parent.get('body').filter(p => !p.isImportDeclaration())[0]`
+  on EVERY call — after the first hoist lands, the just-inserted
+  VarDecl IS the new "first non-import", and the next
+  `path.insertBefore(...)` targets it, pushing the new sheet in
+  front of the old. Net effect: reverse-of-arrival.
+
+  Fix: `emit_hoisted_sheets` now inserts at the SAME `insert_idx`
+  for every sheet (no per-iteration offset), so each new insert
+  pushes the previous ones backward — same body order Babel
+  produces. Two `emit_*` unit tests updated for the new shape.
+  Lib tests stay 433/433. **Triage delta: parity 58 → 87,
+  divergence 356 → 327** (+29 byte-equal fixtures).
+
+  The genuine collision-walk concern (Babel's `Scope.generateUid`
+  loop checking `hasBinding(uid)` / `hasReference(uid)`) is still
+  open as a §6.8a-vi follow-up if any fixture surfaces user-source
+  `_<n>` collisions in practice. None of the 477 corpus fixtures
+  appear to need it.
 - **Residual React→React1 rename** in fixtures with no top-level
   Idents (the `program_scope_ctxt` fallback to
   `SyntaxContext::empty()` from §6.8a-i). Same edge case as flagged

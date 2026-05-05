@@ -1,12 +1,12 @@
 {
   "summary": {
     "total": 477,
-    "parity": 58,
-    "divergence": 356,
+    "parity": 87,
+    "divergence": 327,
     "swc-throws": 62,
     "babel-throws": 0,
     "both-throw": 1,
-    "elapsedSeconds": 37
+    "elapsedSeconds": 44
   },
   "results": {
     "parity": [
@@ -35,6 +35,10 @@
         "sourceFile": "class-names/__tests__/behaviour.test.ts"
       },
       {
+        "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-class-names-multiple-usage",
+        "sourceFile": "class-names/__tests__/behaviour.test.ts"
+      },
+      {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-class-names-renamed-usage",
         "sourceFile": "class-names/__tests__/behaviour.test.ts"
       },
@@ -43,12 +47,48 @@
         "sourceFile": "class-names/__tests__/behaviour.test.ts"
       },
       {
+        "name": "class-names-tests-behaviour/class-names-behaviour--should-apply-array-logical-based-conditional-css",
+        "sourceFile": "class-names/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--inlined-values",
+        "sourceFile": "class-names/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--an-inlined-psuedo-class-object-expression",
+        "sourceFile": "class-names/__tests__/call-expression.test.ts"
+      },
+      {
         "name": "class-names-tests-tagged-template-expression/classnames-used-with-a-css-tagged-template-expression--transforms-a-quasi-that-contains--no-expressions",
         "sourceFile": "class-names/__tests__/tagged-template-expression.test.ts"
       },
       {
         "name": "css-tests-cleanup/css--should-remove-css-node-if-assigned-to-a-variable",
         "sourceFile": "css/__tests__/cleanup.test.ts"
+      },
+      {
+        "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-not-error-if-selector-has-same-name-as-property",
+        "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts"
+      },
+      {
+        "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-parse-an-at-rule-media",
+        "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts"
+      },
+      {
+        "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-parse-an-at-rule-media#2",
+        "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts"
+      },
+      {
+        "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-parse-the-starting-style-at-rule-when-nested",
+        "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts"
+      },
+      {
+        "name": "css-map-tests-index/css-map-basic-functionality--should-transform-css-map",
+        "sourceFile": "css-map/__tests__/index.test.ts"
+      },
+      {
+        "name": "css-map-tests-index/css-map-basic-functionality--should-transform-css-map-even-when-the-styles-are-defined-below-the-component",
+        "sourceFile": "css-map/__tests__/index.test.ts"
       },
       {
         "name": "css-map-tests-index/css-map-basic-functionality--should-transform-css-map-even-with-an-empty-object",
@@ -67,6 +107,10 @@
         "sourceFile": "css-prop/__tests__/behaviour.test.ts"
       },
       {
+        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-allow-inlined-expressions-as-property-values",
+        "sourceFile": "css-prop/__tests__/behaviour.test.ts"
+      },
+      {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-allow-expressions-stored-in-a-variable-as-property-values",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts"
       },
@@ -79,7 +123,27 @@
         "sourceFile": "css-prop/__tests__/behaviour.test.ts"
       },
       {
+        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-apply-conditional-logical-expression-object-styles",
+        "sourceFile": "css-prop/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-apply-array-logical-based-conditional-css",
+        "sourceFile": "css-prop/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "css-prop-tests-css-map/css-map-behaviour--should-evaluate-css-map-with-various-syntactic-patterns",
+        "sourceFile": "css-prop/__tests__/css-map.test.ts"
+      },
+      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-that-has-a-variable-reference",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-parse-an-inline-string-interpolation-delimited-by-spaces",
+        "sourceFile": "css-prop/__tests__/object-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-parse-an-inline-string-interpolation-delimited-by-multiple-spaces",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
@@ -91,11 +155,27 @@
         "sourceFile": "css-prop/__tests__/object-literal.test.ts"
       },
       {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-binary-expression",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
+        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-an-expression",
+        "sourceFile": "css-prop/__tests__/string-literal.test.ts"
+      },
+      {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-generate-styled-object-call-expression-component-code",
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-generate-styled-tagged-template-expression-component-code",
+        "sourceFile": "styled/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-compose-a-component-using-tagged-template-expression",
+        "sourceFile": "styled/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-compose-a-component-using-object-call-expression",
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
       {
@@ -124,6 +204,14 @@
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-reference-property-access-expression",
+        "sourceFile": "styled/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-simple-values",
+        "sourceFile": "styled/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-nested-object-into-a-selector",
         "sourceFile": "styled/__tests__/call-expression.test.ts"
       },
       {
@@ -159,11 +247,23 @@
         "sourceFile": "xcss-prop/__tests__/transformation.test.ts"
       },
       {
+        "name": "xcss-prop-tests-transformation/xcss-prop-transformation--should-allow-ternaries",
+        "sourceFile": "xcss-prop/__tests__/transformation.test.ts"
+      },
+      {
+        "name": "xcss-prop-tests-transformation/xcss-prop-transformation--should-allow-concatenating-styles",
+        "sourceFile": "xcss-prop/__tests__/transformation.test.ts"
+      },
+      {
         "name": "xcss-prop-tests-transformation/xcss-prop-transformation--should-transform-xcss-prop-when-compiled-is-in-scope",
         "sourceFile": "xcss-prop/__tests__/transformation.test.ts"
       },
       {
         "name": "xcss-prop-tests-transformation/xcss-prop-transformation--should-ignore-primitive-components-using-runtime-xcss-prop",
+        "sourceFile": "xcss-prop/__tests__/transformation.test.ts"
+      },
+      {
+        "name": "xcss-prop-tests-transformation/xcss-prop-transformation--should-only-add-styles-to-xcss-call-sites-that-use-them",
         "sourceFile": "xcss-prop/__tests__/transformation.test.ts"
       },
       {
@@ -179,7 +279,23 @@
         "sourceFile": "xcss-prop/__tests__/transformation.test.ts"
       },
       {
+        "name": "xcss-prop-tests-transformation/xcss-prop-interacting-with-other-libraries--xcss-prop-shouldn-t-affect-styled-prop-from-styled-components",
+        "sourceFile": "xcss-prop/__tests__/transformation.test.ts"
+      },
+      {
         "name": "tests-css-builder/css-builder--should-convert-css-properties-to-kebab-case-with-styled-function",
+        "sourceFile": "__tests__/css-builder.test.ts"
+      },
+      {
+        "name": "tests-css-builder/css-builder--should-convert-css-properties-to-kebab-case-with-css-func-and-css-map",
+        "sourceFile": "__tests__/css-builder.test.ts"
+      },
+      {
+        "name": "tests-css-builder/css-builder--should-preserve-custom-property-name-casing-with-styled-function",
+        "sourceFile": "__tests__/css-builder.test.ts"
+      },
+      {
+        "name": "tests-css-builder/css-builder--should-preserve-custom-property-name-casing-with-css-func-and-css-map",
         "sourceFile": "__tests__/css-builder.test.ts"
       },
       {
@@ -247,17 +363,12 @@
       {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-keyframes",
         "sourceFile": "class-names/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 7 (a.length=1161, b.length=1109)\n--- a +0..67\nconst _5 = \"._y44vonb9{animation:k1m8j3od 2s ease-in-out}\";\nconst _\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=1161, b.length=1109)\n--- a +0..67\nconst _5 = \"._y44vonb9{animation:k1m8j3od 2s ease-in-out}\";\nconst _\n+++ b +0..67\nconst _4 = \"._y44vd49b{animation:var(--_129ax8o) 2s ease-in-out}\";\n"
       },
       {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-not-transform-object-property-access-from-invalid-style-prop",
         "sourceFile": "class-names/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 164 (a.length=223, b.length=217)\n--- a +104..224\n   React.createElement(\n      \"div\",\n      {\n        style: dontexist.style,\n      },\n      \"hello, world!\"\n    )\n  );\n\n+++ b +104..224\n   React.createElement(\n      \"div\",\n      {\n        style: undefined,\n      },\n      \"hello, world!\"\n    )\n  );\n"
-      },
-      {
-        "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-class-names-multiple-usage",
-        "sourceFile": "class-names/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 7 (a.length=442, b.length=442)\n--- a +0..67\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._1wybgktf{font-si\n+++ b +0..67\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._1wybgktf{font-size"
       },
       {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-add-an-identifier-nonce-to-the-style-element",
@@ -282,7 +393,7 @@
       {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-not-transform-style-identifier-when-its-coming-from-outer-scope",
         "sourceFile": "class-names/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 7 (a.length=458, b.length=462)\n--- a +0..67\nconst _3 = \"._k48p1fw0{font-weight:700}\";\nconst _2 = \"._1p1dangw{te\n+++ b +0..67\nconst _ = \"._syazxdf1{color:#00b8d9}\";\nconst _2 = \"._1p1dangw{text-"
+        "diff": "divergence at byte 340 (a.length=458, b.length=462)\n--- a +280..400\n  React.createElement(\n      \"span\",\n      {\n        style: style,\n        className: ax([\"_syazxdf1 _1p1dangw _k48p1fw0\n+++ b +280..400\n  React.createElement(\n      \"span\",\n      {\n        style: undefined,\n        className: ax([\"_syazxdf1 _1p1dangw _k48p"
       },
       {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-style-and-css-renamed-prop-coming-from-local-variable",
@@ -295,34 +406,19 @@
         "diff": "divergence at byte 6 (a.length=345, b.length=223)\n--- a +0..66\nconst _2 = \"._1wybgktf{font-size:20px}\";\nconst _ = \"._syaz13q2{col\n+++ b +0..66\nconst ListItem = (props) =>\n  React.createElement(\n    CC,\n    nul"
       },
       {
-        "name": "class-names-tests-behaviour/class-names-behaviour--should-apply-array-logical-based-conditional-css",
-        "sourceFile": "class-names/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 7 (a.length=453, b.length=453)\n--- a +0..67\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 = \"._syaz13q2{col\n+++ b +0..67\nconst _ = \"._1wyb1ylp{font-size:40px}\";\nconst _2 = \"._syaz13q2{colo"
-      },
-      {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-apply-array-prop-ternary-based-inline-conditional-css",
         "sourceFile": "class-names/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 7 (a.length=559, b.length=556)\n--- a +0..67\nconst _5 = \"._1wyb1fwx{font-size:12px}\";\nconst _4 = \"._syaz5scu{col\n+++ b +0..67\nconst _ = \"._bfhku67f{background-color:#fff}\";\nconst _2 = \"._syazr3"
-      },
-      {
-        "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--inlined-values",
-        "sourceFile": "class-names/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 97 (a.length=434, b.length=434)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._19pkidpf{margin-top:0}\";\nconst _ = \"._syaz5scu{color:\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._19pkidpf{margin-to"
-      },
-      {
-        "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--an-inlined-psuedo-class-object-expression",
-        "sourceFile": "class-names/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 97 (a.length=446, b.length=446)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._jbnuidpf:hover{margin-top:0}\";\nconst _ = \"._30l35scu:\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._30l35scu:hover{color:red}\";\nconst _2 = \"._jbnuidpf:hov"
+        "diff": "divergence at byte 19 (a.length=559, b.length=556)\n--- a +0..79\nconst _5 = \"._1wyb1fwx{font-size:12px}\";\nconst _4 = \"._syaz5scu{color:red}\";\nco\n+++ b +0..79\nconst _5 = \"._1wyb1crf{font-size:9pt}\";\nconst _4 = \"._syaz5scu{color:red}\";\ncon"
       },
       {
         "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--a-declared-psuedo-class-object-expression",
         "sourceFile": "class-names/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 97 (a.length=451, b.length=456)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._1wybgktf{fon\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybgktf{font-size:20px}\";\nconst _2 = \"._1qs95u35{hove"
+        "diff": "divergence at byte 104 (a.length=451, b.length=456)\n--- a +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._1wybgktf{font-size:\n+++ b +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1qs95u35{hover:var(--_ad9zy0)}\";\nconst _ = \"._1wybgktf{font-"
       },
       {
         "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--a-declared-string-literal",
         "sourceFile": "class-names/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 97 (a.length=620, b.length=570)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._18u0idpf{margin-l\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19pkidpf{margin-top:0}\";\nconst _2 = \"._2hwxidpf{margin"
+        "diff": "divergence at byte 97 (a.length=620, b.length=570)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._18u0idpf{margin-l\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._18u0idpf{margin-left:0}\";\nconst _3 = \"._otyridpf{marg"
       },
       {
         "name": "class-names-tests-call-expression/classnames-used-with-a-css-call-expression--transforms-an-object-expression-that-contains--a-spread-element-that-references-an-object-expression",
@@ -372,47 +468,17 @@
       {
         "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-parse-a-mix-of-at-rules-and-the-selectors-object",
         "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts",
-        "diff": "divergence at byte 97 (a.length=973, b.length=972)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _0 = \"@media screen and (min-width:500px){._1taki9ra{font-siz\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syazjafr{color:#0b0}\";\nconst _2 = \"._1tjqkbp7 span{col"
+        "diff": "divergence at byte 97 (a.length=973, b.length=972)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _0 = \"@media screen and (min-width:500px){._1taki9ra{font-siz\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _10 = \"@media screen and (min-width:500px){._1taki9ra{font-si"
       },
       {
         "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-parse-selectors-object",
         "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts",
-        "diff": "divergence at byte 97 (a.length=687, b.length=684)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _6 = \"._838lruxl :hover{color:orange}\";\nconst _5 = \"._p685y77\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syazjafr{color:#0b0}\";\nconst _2 = \"._30l3aebp:hover{co"
-      },
-      {
-        "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-not-error-if-selector-has-same-name-as-property",
-        "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts",
-        "diff": "divergence at byte 97 (a.length=548, b.length=548)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._14jq32ev color{color:pink}\";\nconst _3 = \"._1wsc13q2 f\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syazjafr{color:#0b0}\";\nconst _2 = \"._1wyb12am{font-siz"
-      },
-      {
-        "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-parse-an-at-rule-media",
-        "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts",
-        "diff": "divergence at byte 97 (a.length=518, b.length=518)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"@media screen and (min-width:500px){._1qhm13q2{color:bl\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"@media screen{._4347"
-      },
-      {
-        "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-parse-an-at-rule-media#2",
-        "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts",
-        "diff": "divergence at byte 97 (a.length=518, b.length=518)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"@media screen and (min-width:500px){._1qhm13q2{color:bl\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"@media screen{._4347"
-      },
-      {
-        "name": "css-map-tests-at-rules-and-selectors/css-map-advanced-functionality-at-rules-selectors-object--should-parse-the-starting-style-at-rule-when-nested",
-        "sourceFile": "css-map/__tests__/at-rules-and-selectors.test.ts",
-        "diff": "divergence at byte 97 (a.length=481, b.length=481)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 =\n  \"@media (prefers-reduced-motion:no-preference){@starti\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 =\n  \"@media (prefers-re"
-      },
-      {
-        "name": "css-map-tests-index/css-map-basic-functionality--should-transform-css-map",
-        "sourceFile": "css-map/__tests__/index.test.ts",
-        "diff": "divergence at byte 97 (a.length=805, b.length=805)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._bfhkbf54{background-color:green}\";\nconst _3 = \"._syaz\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._bfhk5scu{backgroun"
-      },
-      {
-        "name": "css-map-tests-index/css-map-basic-functionality--should-transform-css-map-even-when-the-styles-are-defined-below-the-component",
-        "sourceFile": "css-map/__tests__/index.test.ts",
-        "diff": "divergence at byte 97 (a.length=805, b.length=805)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._bfhkbf54{background-color:green}\";\nconst _3 = \"._syaz\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._bfhk5scu{backgroun"
+        "diff": "divergence at byte 211 (a.length=687, b.length=684)\n--- a +151..271\n685y77s:first-of-type:hover{color:#090}\";\nconst _4 = \"._pnmb1v9d:first-of-type{color:lightgreen}\";\nconst _3 = \"._syaz5sc\n+++ b +151..271\n685y77s:first-of-type:hover{color:#090}\";\nconst _4 = \"._pnmbkbp7:first-of-type{color:#90ee90}\";\nconst _3 = \"._syaz5scu{c"
       },
       {
         "name": "css-map-tests-index/css-map-basic-functionality--should-transform-ternary-based-conditional-referencing-cssmap-declarations",
         "sourceFile": "css-map/__tests__/index.test.ts",
-        "diff": "divergence at byte 97 (a.length=906, b.length=904)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _7 = \"._k48p4jg8{font-weight:normal}\";\nconst _6 = \"._k48p8n31\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1e0c1ule{display:block}\";\nconst _2 = \"._bfhku67f{backg"
+        "diff": "divergence at byte 281 (a.length=906, b.length=904)\n--- a +221..341\n4 = \"._bfhkbf54{background-color:green}\";\nconst _3 = \"._syaz11x8{color:black}\";\nconst _2 = \"._bfhk1x77{background-color:\n+++ b +221..341\n4 = \"._bfhkbf54{background-color:green}\";\nconst _3 = \"._syazr3uz{color:#000}\";\nconst _2 = \"._bfhku67f{background-color:#"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-not-apply-class-name-when-no-styles-are-present",
@@ -480,11 +546,6 @@
         "diff": "divergence at byte 141 (a.length=443, b.length=439)\n--- a +81..201\nuntime\";\nimport { useState } from \"react\";\nconst _ = \"._1wyb4vkz{font-size:var(--_kre2x8)}\";\nconst size = useState(10);\n\n+++ b +81..201\nuntime\";\nimport { useState } from \"react\";\nconst _ = \"._1wyb1eem{font-size:var(--_kre2x8)px}\";\nconst size = useState(10)"
       },
       {
-        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-allow-inlined-expressions-as-property-values",
-        "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 97 (a.length=480, b.length=480)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1wyb19bv{font-size:10px}\";\nconst _ = \"._syaztczq{colo\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaztczq{color:var(--_15b8wfu)}\";\nconst _2 = \"._1wyb19"
-      },
-      {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-inline-multi-interpolation-constant-variable",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 109 (a.length=529, b.length=628)\n--- a +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itk5441{background-image:linear-gradient(45deg,gray 25%,transpa\n+++ b +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1itkyw91{background-image:linear-gradient(45deg,var(--_1vrvste) "
@@ -525,11 +586,6 @@
         "diff": "divergence at byte 96 (a.length=391, b.length=153)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1wybgktf{font-size:20px}\";\nconst _ = \"._syaz13q2{col\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst Component = (props) => React.createElement(\"div\", null);\n"
       },
       {
-        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-apply-conditional-logical-expression-object-styles",
-        "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 97 (a.length=403, b.length=403)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._e915gktf:hover{font-size:20px}\";\nconst _ = \"._30l313q\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._30l313q2:hover{color:blue}\";\nconst _2 = \"._e915gktf:ho"
-      },
-      {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-combine-conditional-logical-expressions",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 97 (a.length=467, b.length=342)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._79b11fw0:hover{font-weight:700}\";\nconst _ = \"._30l313\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._30l313q2:hover{color:blue}\";\nconst Component = (props)"
@@ -540,14 +596,9 @@
         "diff": "divergence at byte 96 (a.length=427, b.length=153)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1wybgktf{font-size:20px}\";\nconst _ = \"._syaz13q2{col\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst Component = (props) => React.createElement(\"div\", null);\n"
       },
       {
-        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-apply-array-logical-based-conditional-css",
-        "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 97 (a.length=493, b.length=493)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 = \"._syaz13q2{col\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1ylp{font-size:40px}\";\nconst _2 = \"._syaz13q2{colo"
-      },
-      {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-apply-array-prop-ternary-based-inline-conditional-css",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 97 (a.length=601, b.length=598)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._1wyb1fwx{font-size:12px}\";\nconst _4 = \"._syaz5scu{col\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._bfhku67f{background-color:#fff}\";\nconst _2 = \"._syazr3"
+        "diff": "divergence at byte 109 (a.length=601, b.length=598)\n--- a +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._1wyb1fwx{font-size:12px}\";\nconst _4 = \"._syaz5scu{color:red}\";\nco\n+++ b +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._1wyb1crf{font-size:9pt}\";\nconst _4 = \"._syaz5scu{color:red}\";\ncon"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-apply-array-prop-ternary-based-conditional-css-that-reference-css-variabl",
@@ -562,7 +613,7 @@
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-apply-unconditional-before-and-after-a-conditional-css-rule",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 97 (a.length=599, b.length=426)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._19it97hw{border:1px solid black}\";\nconst _3 = \"._1wyb\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19it1ujt{border:1px solid #000}\";\nconst _2 = \"._1wybo7"
+        "diff": "divergence at byte 97 (a.length=599, b.length=426)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._19it97hw{border:1px solid black}\";\nconst _3 = \"._1wyb\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1wybo7ao{font-size:15px}\";\nconst _ = \"._19it1ujt{bord"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-use-destructured-props-in-conditional-css-rule",
@@ -577,12 +628,7 @@
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-not-transform-css-prop-with-comment-directive",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 96 (a.length=343, b.length=733)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst RedDiv = React.createElement(\"div\", {\n  css: {\n    color: \"r\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._syazbf54{color:gr"
-      },
-      {
-        "name": "css-prop-tests-css-map/css-map-behaviour--should-evaluate-css-map-with-various-syntactic-patterns",
-        "sourceFile": "css-prop/__tests__/css-map.test.ts",
-        "diff": "divergence at byte 97 (a.length=824, b.length=824)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz13q2{color:blue}\";\nconst _4 = \"._bfhkbf54{backgro\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._bfhk5scu{backgroun"
+        "diff": "divergence at byte 96 (a.length=343, b.length=733)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst RedDiv = React.createElement(\"div\", {\n  css: {\n    color: \"r\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._syazbf54{color:"
       },
       {
         "name": "css-prop-tests-jsx-pragma/local-jsx-namespace--should-transform-css-prop-using-jsx-import-source",
@@ -597,7 +643,7 @@
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-the-variable-when-it-is-a-constant-in-string-css",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=688, b.length=723)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz7pd2{color:var(--_bo0rwa)}\";\nconst _4 = \"._ajmmnq\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._11q71iim{background:var(--_1d6dlof)}\";\nconst _2 = \"._4"
+        "diff": "divergence at byte 317 (a.length=688, b.length=723)\n--- a +257..377\n4bfu1r31{text-decoration-color:currentColor}\";\nconst _ = \"._bfhk13q2{background-color:blue}\";\nconst bg = \"blue\";\nlet cl \n+++ b +257..377\n4bfu1r31{text-decoration-color:currentColor}\";\nconst _ = \"._11q71iim{background:var(--_1d6dlof)}\";\nconst bg = \"blue\";\nle"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-constant-variable",
@@ -617,12 +663,12 @@
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-persist-suffix-of-dynamic-property-value-from-objects-into-inline-styles",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=490, b.length=486)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._18u018lw{margin-le\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._18u01xoi{margin-left:var(--_5un9uz)rem}\";\nconst _2 = \""
+        "diff": "divergence at byte 144 (a.length=490, b.length=486)\n--- a +84..204\nime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._18u018lw{margin-left:var(--_5un9uz)}\";\nlet heading = {\n  depth: 2\n+++ b +84..204\nime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._18u01xoi{margin-left:var(--_5un9uz)rem}\";\nlet heading = {\n  depth"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-persist-prefix-of-dynamic-property-value-into-inline-styles",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=485, b.length=481)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1jxy{font-size\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb9sxt{font-size:calc(100% - var(--_1j2e0s2)px)}\";\nc"
+        "diff": "divergence at byte 143 (a.length=485, b.length=481)\n--- a +83..203\ntime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1jxy{font-size:calc(100% - var(--_1j2e0s2))}\";\nlet fontSize \n+++ b +83..203\ntime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb9sxt{font-size:calc(100% - var(--_1j2e0s2)px)}\";\nlet fontSiz"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-move-prefix-of-grouped-interpolation-into-inline-styles",
@@ -677,7 +723,7 @@
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-obj-variable",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=508, b.length=571)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._30l35scu:hover{color:red}\";\nconst _3 = \"._syaz13q2{co\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1e0c1txw{display:flex}\";\nconst _2 = \"._1wyb12am{font-s"
+        "diff": "divergence at byte 104 (a.length=508, b.length=571)\n--- a +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._30l35scu:hover{color:red}\";\nconst _3 = \"._syaz13q2{color:blu\n+++ b +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._1qs91uu4{hover:var(--_1779ypj)}\";\nconst _3 = \"._syaz13q2{col"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-arrow-function-variable",
@@ -712,7 +758,7 @@
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-inline-template-literal-with-suffix",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=551, b.length=453)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._19bv1y44{padding-\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1yt4k2my{padding:0 var(--_14wnuwh)px}\";\nconst _2 = \"._"
+        "diff": "divergence at byte 97 (a.length=551, b.length=453)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._19bv1y44{padding-\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1yt4k2my{padding:0"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-spread-with-no-argument-function-variable",
@@ -722,22 +768,22 @@
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-arrow-function",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=406, b.length=469)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._syaz13q2{col\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst _2 = \"._1qs918gj{hover:va"
+        "diff": "divergence at byte 104 (a.length=406, b.length=469)\n--- a +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._syaz13q2{color:blue\n+++ b +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1qs918gj{hover:var(--_3xdusa)}\";\nconst _ = \"._syaz13q2{color"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-functions",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=872, b.length=747)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \".\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst _2 = \"._1qs91jn8{hover:va"
+        "diff": "divergence at byte 97 (a.length=872, b.length=747)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \".\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1qs91jn8{hover:var(--_fx2uzu)}\";\nconst _ = \"._syaz13q"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-function-properties-belonging-to-a-vari",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=750, b.length=704)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19itd27t{border:var(--_lwas8e)}\";\nconst _2 = \"._syaz13"
+        "diff": "divergence at byte 97 (a.length=750, b.length=704)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._19itd27t{border:v"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-with-no-argument-function-variable",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=418, b.length=481)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._syaz13q2{col\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst _2 = \"._1qs918gj{hover:va"
+        "diff": "divergence at byte 104 (a.length=418, b.length=481)\n--- a +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._syaz13q2{color:blue\n+++ b +44..164\n ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1qs918gj{hover:var(--_3xdusa)}\";\nconst _ = \"._syaz13q2{color"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-transform-object-spread-with-no-argument-function-variable#2",
@@ -745,24 +791,14 @@
         "diff": "divergence at byte 107 (a.length=361, b.length=362)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nfunction mixin() {\n  return {\n    color: \"\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nfunction mixin() {\n  return {\n    color: "
       },
       {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-parse-an-inline-string-interpolation-delimited-by-spaces",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=518, b.length=518)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1yt41ysf{padding:0\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1yt41ysf{padding:0 var(--_1xlms2h)}\";\nconst _2 = \"._sy"
-      },
-      {
-        "name": "css-prop-tests-object-literal/css-prop-object-literal--should-parse-an-inline-string-interpolation-delimited-by-multiple-spaces",
-        "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=522, b.length=522)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1yt4z4d3{padding:0\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1yt4z4d3{padding:0 var(--_1xlms2h) 0 0}\";\nconst _2 = \""
-      },
-      {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-parse-an-inline-string-interpolation-delimited-by-multiple-spaces-and-suf",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=595, b.length=513)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._19bvidpf{padding-\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1yt41n0h{padding:0 var(--_1xlms2h)px 0 0}\";\nconst _2 ="
+        "diff": "divergence at byte 97 (a.length=595, b.length=513)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._19bvidpf{padding-\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1yt41n0h{padding:0"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-parse-an-inline-string-interpolation-delimited-by-multiple-spaces-and-mul",
         "sourceFile": "css-prop/__tests__/object-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=601, b.length=563)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._19bvftgi{padding-\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._1yt41gwy{padding:var(--_1xlms2h)px var(--_1xlms2h)px"
+        "diff": "divergence at byte 97 (a.length=601, b.length=563)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._syaz5scu{color:red}\";\nconst _4 = \"._19bvftgi{padding-\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ =\n  \"._1yt41gwy{padding"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-do-nothing-when-content-already-has-single-quotes",
@@ -787,7 +823,7 @@
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-persist-suffix-of-dynamic-value-into-inline-styles",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=472, b.length=468)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb25dk{font-size\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nconst _2 = \"._"
+        "diff": "divergence at byte 143 (a.length=472, b.length=468)\n--- a +83..203\ntime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb25dk{font-size:var(--_1j2e0s2)}\";\nlet fontSize = 20;\nfontSiz\n+++ b +83..203\ntime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1as9{font-size:var(--_1j2e0s2)px}\";\nlet fontSize = 20;\nfontS"
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-persist-suffix-of-constant-value",
@@ -815,11 +851,6 @@
         "diff": "divergence at byte 107 (a.length=429, b.length=516)\n--- a +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syazu67f{color:#fff}\";\nconst theme = {\n  colors: {\n    light: {\n\n+++ b +47..167\n, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1rxo{color:var(--_b7e1h2)}\";\nconst theme = {\n  colors: {\n   "
       },
       {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-binary-expression",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=571, b.length=571)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._k48pni7l{font-weight:600}\";\nconst _2 = \"._1p1dangw{te\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz4rde{color:var(--_kmurgp)}\";\nconst _2 = \"._1p1dang"
-      },
-      {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-no-template-string-literal",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
         "diff": "divergence at byte 17 (a.length=311, b.length=312)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
@@ -830,29 +861,24 @@
         "diff": "divergence at byte 108 (a.length=329, b.length=397)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst color = \"blue\";\nReact.createElement(\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst color = \"blue\";\nReact.cre"
       },
       {
-        "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-an-expression",
-        "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=601, b.length=601)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1lmcjxy1{grid-template-areas:var(--_1o3snts)}\";\nconst\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1e0c11p5{display:grid}\";\nconst _2 = \"._1lmcjxy1{grid-t"
-      },
-      {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-functions",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=703, b.length=853)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._irr313q2:hover{background-color:blue}\";\nconst _3 = \".\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst _2 = \"._zg8l1jn8{font-sty"
+        "diff": "divergence at byte 109 (a.length=703, b.length=853)\n--- a +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._irr313q2:hover{background-color:blue}\";\nconst _3 = \"._ect4lftf{fo\n+++ b +49..169\nCC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._irr31pav:hover{background-color:var(--_ylwyqi)}\";\nconst _3 = \"._e"
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-template-string-with-no-argument-function-properties-belonging-",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=682, b.length=851)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19itd27t{border:var(--_lwas8e)}\";\nconst _2 = \"._syaz13"
+        "diff": "divergence at byte 108 (a.length=682, b.length=851)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{font-size:12p\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pkz1d{font-weight:var(--_zabg57)}\";\nconst _3 = \"._1wyb1nsi{fo"
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-inline-multiple-constant-interpolations",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=409, b.length=517)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._t9ec7ung{transform\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._t9eccqp0{transform:translate3d(var(--_65u76s)px,var("
+        "diff": "divergence at byte 135 (a.length=409, b.length=517)\n--- a +75..195\neact/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._t9ec7ung{transform:translate3d(1px,2px,0)}\";\nconst x = 1\n+++ b +75..195\neact/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ =\n  \"._t9eccqp0{transform:translate3d(var(--_65u76s)px,var(--"
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-reference-multiple-interpolations-in-a-group",
         "sourceFile": "css-prop/__tests__/string-literal.test.ts",
-        "diff": "divergence at byte 97 (a.length=533, b.length=531)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._t9ec9ya9{transform\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ =\n  \"._t9eccqp0{transform:translate3d(var(--_65u76s)px,var("
+        "diff": "divergence at byte 135 (a.length=533, b.length=531)\n--- a +75..195\neact/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._t9ec9ya9{transform:translate3d(var(--_65u76s),var(--_1oh\n+++ b +75..195\neact/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ =\n  \"._t9eccqp0{transform:translate3d(var(--_65u76s)px,var(--"
       },
       {
         "name": "css-prop-tests-string-literal/css-prop-string-literal--should-transform-function-returning-an-object",
@@ -867,27 +893,27 @@
       {
         "name": "keyframes-tests-behaviour/keyframes--places-classes-in-given-order-when-static-styles-precede-keyframes-expression",
         "sourceFile": "keyframes/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=917, b.length=929)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _3 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._2rko1l7b{border-radius:3px}\";\nconst _2 = \"._y44v18m0{a"
+        "diff": "divergence at byte 133 (a.length=917, b.length=929)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _3 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 = \"._y44v18m0{ani"
       },
       {
         "name": "keyframes-tests-behaviour/keyframes--places-classes-in-given-order-when-keyframes-expression-precedes-static-styles",
         "sourceFile": "keyframes/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=917, b.length=929)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"@keyframes kvif0b9{0%{top:0}to{top:100px}}\";\nconst _3 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._y44v18m0{animation:var(--_1cvvuzq)}\";\nconst _2 = \"._2r"
+        "diff": "divergence at byte 133 (a.length=917, b.length=929)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"@keyframes kvif0b9{0%{top:0}to{top:100px}}\";\nconst _3 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._1wybgktf{font-size:20px}\";\nconst _2 = \"._2rko1l7b{bor"
       },
       {
         "name": "keyframes-tests-behaviour/keyframes--evaluates-any-expressions-that-precede-a-keyframes-expression",
         "sourceFile": "keyframes/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=875, b.length=934)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._y44v18m0{animation:var(--_1cvvuzq)}\";\nconst _2 = \"._sy"
+        "diff": "divergence at byte 133 (a.length=875, b.length=934)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst _ = \"._y44v18"
       },
       {
         "name": "keyframes-tests-behaviour/keyframes--evaluates-keyframes-expression-when-it-precedes-another-expression",
         "sourceFile": "keyframes/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=875, b.length=934)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._y44v18m0{animation:var(--_1cvvuzq)}\";\nconst _2 = \"._sy"
+        "diff": "divergence at byte 133 (a.length=875, b.length=934)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"@keyframes kfwl3rt{0%{top:0}to{top:100px}}\";\nconst _2 =\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst _ = \"._y44v18"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -967,17 +993,17 @@
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-a-single-element",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=668, b.length=561)\n--- a +0..67\nconst _4 = \"._syaz115e{color:var(--_nfiion)}\";\nconst _3 = \"._bfhk12\n+++ b +0..67\nconst _ = \"._j7hqjmzt{animation-name:var(--_32hhpw)}\";\nconst _2 = \""
+        "diff": "divergence at byte 7 (a.length=668, b.length=561)\n--- a +0..67\nconst _4 = \"._syaz115e{color:var(--_nfiion)}\";\nconst _3 = \"._bfhk12\n+++ b +0..67\nconst _3 = \"._syaz115e{color:var(--_nfiion)}\";\nconst _2 = \"._bfhk12"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-multiple-elements",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=1179, b.length=1118)\n--- a +0..67\nconst _5 = \"._syazjq9z{color:var(--_we82k3)}\";\nconst _4 = \"._syaz11\n+++ b +0..67\nconst _ = \"._j7hqjmzt{animation-name:var(--_32hhpw)}\";\nconst _2 = \""
+        "diff": "divergence at byte 61 (a.length=1179, b.length=1118)\n--- a +1..121\nonst _5 = \"._syazjq9z{color:var(--_we82k3)}\";\nconst _4 = \"._syaz115e{color:var(--_nfiion)}\";\nconst _3 = \"._bfhk1220{back\n+++ b +1..121\nonst _5 = \"._syazjq9z{color:var(--_we82k3)}\";\nconst _4 = \"._j7hqvoes{animation-name:var(--_1cpb5gv)}\";\nconst _3 = \"._sya"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -992,7 +1018,7 @@
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -1007,7 +1033,7 @@
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1wmcptp{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -1022,7 +1048,7 @@
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=460, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=460, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -1037,7 +1063,7 @@
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=460, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=460, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -1052,7 +1078,7 @@
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=787, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=787, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -1067,7 +1093,7 @@
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=787, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=787, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes khheuil{0%,25%{opacity:1}25%{opacity:0.75}\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-call-expression/keyframes--transforms-a-template-literal-call-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -1082,7 +1108,7 @@
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -1097,7 +1123,7 @@
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=462, b.length=417)\n--- a +0..67\nconst _4 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -1152,7 +1178,7 @@
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-object-call-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -1167,7 +1193,7 @@
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _ = \"._5sagymdr{animation-duration:2s}\";\nconst _2 = \"._j7hq13"
+        "diff": "divergence at byte 7 (a.length=789, b.length=754)\n--- a +0..67\nconst _4 =\n  \"@keyframes k1a3bdtb{0%,25%{opacity:1}25%{opacity:0.75\n+++ b +0..67\nconst _3 = \"._1pgl1ytf{animation-timing-function:ease-in-out}\";\ncon"
       },
       {
         "name": "keyframes-tests-tagged-template-expression/keyframes-transforms-a-tagged-template-expression--referenced-through-a-styled-component-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-shorthand-syntax",
@@ -1192,7 +1218,7 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-destructure-invalid-html-attributes-from-props",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=948, b.length=856)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz1cj8{color:var(--_xexnhp)}\";\nconst _ = \"._1wyb1sq\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1cd5{font-size:var(--_2wqa78)}\";\nconst _2 = \"._sya"
+        "diff": "divergence at byte 146 (a.length=948, b.length=856)\n--- a +86..206\nC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz1cj8{color:var(--_xexnhp)}\";\nconst _ = \"._1wyb1sqb{font-size:v\n+++ b +86..206\nC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz1cd5{color:var(--_2wqa78)}\";\nconst _ = \"._1wyb1cd5{font-size:v"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-shortcircuit-props-with-suffix-to-a-empty-string-to-avoid-undefined-in-cs",
@@ -1207,17 +1233,7 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--creates-a-separate-var-name-for-positive-and-negative-values-of-the-same-interpo",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=966, b.length=953)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._18u01s7m{margin-left:var(--_1hnpmp1)}\";\nconst _ = \"._\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._2hwx1xze{margin-right:var(--_1hnpmp1-)px}\";\nconst _2 ="
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-compose-a-component-using-tagged-template-expression",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1310, b.length=1310)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1wybgktf{font-size:20px}\";\nconst _ = \"._syaz5scu{colo\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._1wybgktf{font-size"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-compose-a-component-using-object-call-expression",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1310, b.length=1310)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1wybgktf{font-size:20px}\";\nconst _ = \"._syaz5scu{colo\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._1wybgktf{font-size"
+        "diff": "divergence at byte 145 (a.length=966, b.length=953)\n--- a +85..205\nCC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._18u01s7m{margin-left:var(--_1hnpmp1)}\";\nconst _ = \"._2hwxjtuq{mar\n+++ b +85..205\nCC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._18u01ct8{margin-left:var(--_1hnpmp1)px}\";\nconst _ = \"._2hwx1xze{m"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-inline-constant-identifier-string-literal",
@@ -1237,17 +1253,17 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-collect-args-as-styles",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=773, b.length=769)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1wyb1fwx{font-size:12px}\";\nconst _ = \"._syaz1paq{colo\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syazfxwy{color:#9932cc}\";\nconst _2 = \"._1wyb1crf{font-"
+        "diff": "divergence at byte 145 (a.length=773, b.length=769)\n--- a +85..205\nCC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1wyb1fwx{font-size:12px}\";\nconst _ = \"._syaz1paq{color:darkorchid\n+++ b +85..205\nCC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1wyb1crf{font-size:9pt}\";\nconst _ = \"._syazfxwy{color:#9932cc}\";\n"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-handle-destructuring-in-interpolation-functions",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 162 (a.length=1863, b.length=1161)\n--- a +102..222\nompiled/react/runtime\";\nimport colors from \"colors\";\nconst _0 = \"._tzy4kb7n{opacity:1}\";\nconst _9 = \"._tzy4idpf{opacity:\n+++ b +102..222\nompiled/react/runtime\";\nimport colors from \"colors\";\nconst _ = \"._1h6d1cd5{border-color:var(--_2wqa78)}\";\nconst _2 = \"._"
+        "diff": "divergence at byte 162 (a.length=1863, b.length=1161)\n--- a +102..222\nompiled/react/runtime\";\nimport colors from \"colors\";\nconst _0 = \"._tzy4kb7n{opacity:1}\";\nconst _9 = \"._tzy4idpf{opacity:\n+++ b +102..222\nompiled/react/runtime\";\nimport colors from \"colors\";\nconst _5 = \"._tzy41cd5{opacity:var(--_2wqa78)}\";\nconst _4 = \"._1e0c"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-handle-an-animation-that-references-an-inline-keyframes",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=815, b.length=814)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"@keyframes fadeOut{0%{opacity:1}50%{opacity:0.5}to{opac\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._y44vk4ag{animation:fadeOut 2s ease-in-out}\";\nconst _2 "
+        "diff": "divergence at byte 182 (a.length=815, b.length=814)\n--- a +122..242\ne\";\nconst _2 = \"@keyframes fadeOut{0%{opacity:1}50%{opacity:0.5}to{opacity:0}}\";\nconst _ = \"._y44vk4ag{animation:fadeOut\n+++ b +122..242\ne\";\nconst _2 = \"@keyframes fadeOut{0%{opacity:1}50%{opacity:.5}to{opacity:0}}\";\nconst _ = \"._y44vk4ag{animation:fadeOut "
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-omit-classes-on-rules-with-no-value-in-string-literal",
@@ -1257,7 +1273,7 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operator",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1691, b.length=1343)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _10 = \"._1yyjkb7n{-webkit-line-clamp:1}\";\nconst _1 = \"._1yyj1\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1cd5{color:var(--_2wqa78)}\";\nconst _2 = \"._19itlf8"
+        "diff": "divergence at byte 133 (a.length=1691, b.length=1343)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _10 = \"._1yyjkb7n{-webkit-line-clamp:1}\";\nconst _1 = \"._1yyj1\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _9 = \"._1wyb1ul9{font-size:30px}\";\nconst _8 = \"._1yyj1cd5{-we"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operators-and-suffix",
@@ -1267,7 +1283,7 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operator-for-object-styles",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1190, b.length=954)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _6 = \"._2hwx19bv{margin-right:10px}\";\nconst _5 = \"._2hwx14y2{\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1cd5{color:var(--_2wqa78)}\";\nconst _2 = \"._18u01di"
+        "diff": "divergence at byte 133 (a.length=1190, b.length=954)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _6 = \"._2hwx19bv{margin-right:10px}\";\nconst _5 = \"._2hwx14y2{\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._2hwx1dim{margin-right:var(--_2wqa78)px}\";\nconst _2 = "
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operator-and-tagged-templates-branches",
@@ -1282,17 +1298,17 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-multiple-ternary-operators",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1100, b.length=932)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._19it107e{border:1px solid red}\";\nconst _4 = \"._19it1n\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19it1cd5{border:var(--_2wqa78)}\";\nconst _2 = \"._syaz1c"
+        "diff": "divergence at byte 133 (a.length=1100, b.length=932)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._19it107e{border:1px solid red}\";\nconst _4 = \"._19it1n\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._1wyb1ul9{font-size:30px}\";\nconst _2 = \"._syaz1cd5{col"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-nested-ternary-operators",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1373, b.length=1248)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _9 = \"._syaz5scu{color:red}\";\nconst _8 = \"._syaz13q2{color:bl\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19itlf8h{border:2px solid blue}\";\nconst _2 = \"._ca0qft"
+        "diff": "divergence at byte 133 (a.length=1373, b.length=1248)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _9 = \"._syaz5scu{color:red}\";\nconst _8 = \"._syaz13q2{color:bl\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _7 = \"._1wyb1ul9{font-size:30px}\";\nconst _6 = \"._syaz1cd5{col"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-template-literal",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1006, b.length=838)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._syaz13q2{color:blue}\";\nconst _3 = \"._syaz5scu{color:r\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._bfhku67f{background-color:#fff}\";\nconst _2 = \"._19it1f"
+        "diff": "divergence at byte 133 (a.length=1006, b.length=838)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._syaz13q2{color:blue}\";\nconst _3 = \"._syaz5scu{color:r\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz5scu{color:red}\";\nconst _2 = \"._19it1fqi{border:3"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-template-literal-and-multiple-props-lines",
@@ -1302,12 +1318,12 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-unconditional-before-and-after-a-conditional-css-rule-with-template",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1006, b.length=838)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._syaz13q2{color:blue}\";\nconst _3 = \"._syaz5scu{color:r\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._bfhku67f{background-color:#fff}\";\nconst _2 = \"._19it1f"
+        "diff": "divergence at byte 133 (a.length=1006, b.length=838)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._syaz13q2{color:blue}\";\nconst _3 = \"._syaz5scu{color:r\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz5scu{color:red}\";\nconst _2 = \"._19it1fqi{border:3"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-unconditional-after-a-conditional-css-rule-with-template-literal",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1006, b.length=838)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._syaz13q2{color:blue}\";\nconst _3 = \"._syaz5scu{color:r\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19it1fqi{border:3px solid #ff0}\";\nconst _2 = \"._bfhku6"
+        "diff": "divergence at byte 133 (a.length=1006, b.length=838)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._syaz13q2{color:blue}\";\nconst _3 = \"._syaz5scu{color:r\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz5scu{color:red}\";\nconst _2 = \"._bfhku67f{backgrou"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-object-styles",
@@ -1322,7 +1338,7 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-unconditional-before-and-after-a-conditional-css-rule-with-object-s",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=942, b.length=776)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._syaz5scu{color:r\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19it1ujt{border:1px solid #000}\";\nconst _2 = \"._syaz5s"
+        "diff": "divergence at byte 133 (a.length=942, b.length=776)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._syaz5scu{color:r\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._19it1ujt{border:1p"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-object-styles-regardless-declaration-order",
@@ -1337,7 +1353,7 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-multi-conditional-logical-expression-with-different-props-lines-and",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1041, b.length=870)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48p4jg8{font-weight:normal}\";\nconst _3 = \"._k48p8n31\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._k48p1cd5{font-weig"
+        "diff": "divergence at byte 133 (a.length=1041, b.length=870)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48p4jg8{font-weight:normal}\";\nconst _3 = \"._k48p8n31\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._k48p1cd5{font-weight:var(--_2wqa78)}\";\nconst _ = \"._s"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-the-same-css-property-with-unconditional-as-default-and-multiple-lo",
@@ -1352,17 +1368,17 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-only-evaluate-the-last-unconditional-css-rule-for-each-property",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=780, b.length=779)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syazruxl{color:orange}\";\nconst _ = \"._bfhk1x77{backgr\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._bfhku67f{background-color:#fff}\";\nconst _2 = \"._syazru"
+        "diff": "divergence at byte 182 (a.length=780, b.length=779)\n--- a +122..242\ne\";\nconst _2 = \"._syazruxl{color:orange}\";\nconst _ = \"._bfhk1x77{background-color:white}\";\nconst Component = forwardRef(\n+++ b +122..242\ne\";\nconst _2 = \"._syazruxl{color:orange}\";\nconst _ = \"._bfhku67f{background-color:#fff}\";\nconst Component = forwardRef(\n"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-only-add-falsy-condition-when-truthy-condition-has-no-value",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=895, b.length=843)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syazbf54{color:green}\";\nconst _ = \"._bfhk11x8{backgro\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._bfhkr3uz{background-color:#000}\";\nconst _2 = \"._syazbf"
+        "diff": "divergence at byte 181 (a.length=895, b.length=843)\n--- a +121..241\nme\";\nconst _2 = \"._syazbf54{color:green}\";\nconst _ = \"._bfhk11x8{background-color:black}\";\nconst Component = forwardRef(\n+++ b +121..241\nme\";\nconst _2 = \"._syazbf54{color:green}\";\nconst _ = \"._bfhkr3uz{background-color:#000}\";\nconst Component = forwardRef(\n"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-only-add-truthy-condition-when-falsy-condition-has-no-value",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=894, b.length=842)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syazbf54{color:green}\";\nconst _ = \"._bfhk11x8{backgro\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._bfhkr3uz{background-color:#000}\";\nconst _2 = \"._syazbf"
+        "diff": "divergence at byte 181 (a.length=894, b.length=842)\n--- a +121..241\nme\";\nconst _2 = \"._syazbf54{color:green}\";\nconst _ = \"._bfhk11x8{background-color:black}\";\nconst Component = forwardRef(\n+++ b +121..241\nme\";\nconst _2 = \"._syazbf54{color:green}\";\nconst _ = \"._bfhkr3uz{background-color:#000}\";\nconst Component = forwardRef(\n"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-logical-test-to-class-when-a-conditional-branch-contains-undefined-",
@@ -1407,32 +1423,32 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-to-related-selector",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1152, b.length=960)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._bfw7l468:hover{border:2px solid black}\";\nconst _4 = \"\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._11q7nf9f{background:url(data:image/svg+xml;\\\\ ...)}\";\n"
+        "diff": "divergence at byte 133 (a.length=1152, b.length=960)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._bfw7l468:hover{border:2px solid black}\";\nconst _4 = \"\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._bfw71cd5:hover{border:var(--_2wqa78)}\";\nconst _2 = \"."
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-to-related-selector-with-object-styles",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1070, b.length=878)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._bfw7l468:hover{border:2px solid black}\";\nconst _3 = \"\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1cd5{color:var(--_2wqa78)}\";\nconst _2 = \"._bfw71cd"
+        "diff": "divergence at byte 133 (a.length=1070, b.length=878)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._bfw7l468:hover{border:2px solid black}\";\nconst _3 = \"\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._bfw71cd5:hover{border:var(--_2wqa78)}\";\nconst _ = \"._"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-to-related-nested-selector",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1414, b.length=1147)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _8 = \"._1jly1nu9:hover:before{display:inline}\";\nconst _7 = \".\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz1cd5{color:var(--_2wqa78)}\";\nconst _2 = \"._bfw71cd"
+        "diff": "divergence at byte 133 (a.length=1414, b.length=1147)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _8 = \"._1jly1nu9:hover:before{display:inline}\";\nconst _7 = \".\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _5 = \"._1jly1cd5:hover:before{display:var(--_2wqa78)}\";\nconst"
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--does-not-conflict-conditional-css-with-above-selectors",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1043, b.length=949)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1oey5scu >span:first-type-of{color:red}\";\nconst _2 = \""
+        "diff": "divergence at byte 133 (a.length=1043, b.length=949)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._irr31i1c:hover{background-color:cyan}\";\nconst _2 = \"."
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--does-not-conflict-conditional-css-with-below-selectors",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1043, b.length=949)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1oey5scu >span:first-type-of{color:red}\";\nconst _2 = \""
+        "diff": "divergence at byte 133 (a.length=1043, b.length=949)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._irr31i1c:hover{background-color:cyan}\";\nconst _2 = \"."
       },
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--does-not-conflict-conditional-css-with-surrounding-selectors",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1043, b.length=949)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1oey5scu >span:first-type-of{color:red}\";\nconst _2 = \""
+        "diff": "divergence at byte 133 (a.length=1043, b.length=949)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._vn89yh40:focus{border-radius:2px}\";\nconst _3 = \"._vn8\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._irr31i1c:hover{background-color:cyan}\";\nconst _2 = \"."
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-respect-the-definition-of-pseudo-element-content-ala-emotion-with-single-",
@@ -1458,16 +1474,6 @@
         "name": "styled-tests-call-expression/styled-object-call-expression--should-not-pass-down-invalid-html-attributes-to-the-node-when-property-has-a-suf",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
         "diff": "divergence at byte 18 (a.length=641, b.length=587)\n--- a +0..78\nconst _ = \"._1wyb1sqb{font-size:var(--_8t6091)}\";\nconst ListItem = forwardRef(\n+++ b +0..78\nconst _ = \"._1wyb1dim{font-size:var(--_2wqa78)px}\";\nconst ListItem = forwardRe"
-      },
-      {
-        "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-simple-values",
-        "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=556, b.length=556)\n--- a +0..67\nconst _2 = \"._18u0idpf{margin-left:0}\";\nconst _ = \"._syaz13q2{color\n+++ b +0..67\nconst _ = \"._syaz13q2{color:blue}\";\nconst _2 = \"._18u0idpf{margin-l"
-      },
-      {
-        "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-nested-object-into-a-selector",
-        "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=568, b.length=568)\n--- a +0..67\nconst _2 = \"._1uwgidpf:hover{margin-left:0}\";\nconst _ = \"._30l313q2\n+++ b +0..67\nconst _ = \"._30l313q2:hover{color:blue}\";\nconst _2 = \"._1uwgidpf:ho"
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-resolve-identifier-pointing-to-a-call-expression-if-it-returns-simple-val",
@@ -1497,7 +1503,7 @@
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-obj-variable",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=597, b.length=662)\n--- a +0..67\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._1wybgktf{fon\n+++ b +0..67\nconst _ = \"._1wybgktf{font-size:20px}\";\nconst _2 = \"._1qs95u35{hove"
+        "diff": "divergence at byte 14 (a.length=597, b.length=662)\n--- a +0..74\nconst _2 = \"._30l35scu:hover{color:red}\";\nconst _ = \"._1wybgktf{font-size:\n+++ b +0..74\nconst _2 = \"._1qs95u35{hover:var(--_ad9zy0)}\";\nconst _ = \"._1wybgktf{font-"
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-no-argument-arrow-function-variable",
@@ -1512,12 +1518,12 @@
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-no-argument-functions",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=1098, b.length=946)\n--- a +0..67\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \".\n+++ b +0..67\nconst _ = \"._syaz13q2{color:blue}\";\nconst _2 = \"._1qs91jn8{hover:va"
+        "diff": "divergence at byte 7 (a.length=1098, b.length=946)\n--- a +0..67\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \".\n+++ b +0..67\nconst _2 = \"._1qs91jn8{hover:var(--_fx2uzu)}\";\nconst _ = \"._syaz13q"
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-no-argument-function-properties-belonging-to-a-vari",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=976, b.length=903)\n--- a +0..67\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +0..67\nconst _ = \"._19itd27t{border:var(--_lwas8e)}\";\nconst _2 = \"._syaz13"
+        "diff": "divergence at byte 7 (a.length=976, b.length=903)\n--- a +0..67\nconst _4 = \"._k48pbfng{font-weight:500}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +0..67\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._19itd27t{border:v"
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-transform-object-with-argument-arrow-function-variable",
@@ -1547,7 +1553,7 @@
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-handle-destructuring-in-interpolation-functions",
         "sourceFile": "styled/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=727, b.length=715)\n--- a +0..67\nconst _3 = \"._p12f1rkg{max-width:var(--_1gljcou)}\";\nconst _2 = \"._1\n+++ b +0..67\nconst _ = \"._1bsb1cd5{width:var(--_2wqa78)}\";\nconst _2 = \"._1ul91cd"
+        "diff": "divergence at byte 19 (a.length=727, b.length=715)\n--- a +0..79\nconst _3 = \"._p12f1rkg{max-width:var(--_1gljcou)}\";\nconst _2 = \"._1ul91rkg{min-\n+++ b +0..79\nconst _3 = \"._p12f1cd5{max-width:var(--_2wqa78)}\";\nconst _2 = \"._1ul91cd5{min-w"
       },
       {
         "name": "styled-tests-call-expression/styled-object-call-expression--should-handle-member-expression-pointing-to-a-css-call-expression",
@@ -1652,12 +1658,12 @@
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-functions",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=929, b.length=1087)\n--- a +0..67\nconst _4 = \"._irr313q2:hover{background-color:blue}\";\nconst _3 = \".\n+++ b +0..67\nconst _ = \"._syaz13q2{color:blue}\";\nconst _2 = \"._zg8l1jn8{font-sty"
+        "diff": "divergence at byte 19 (a.length=929, b.length=1087)\n--- a +0..79\nconst _4 = \"._irr313q2:hover{background-color:blue}\";\nconst _3 = \"._ect4lftf{fo\n+++ b +0..79\nconst _4 = \"._irr31pav:hover{background-color:var(--_ylwyqi)}\";\nconst _3 = \"._e"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-template-string-with-no-argument-function-properties-belonging-",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=1004, b.length=1227)\n--- a +0..67\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \".\n+++ b +0..67\nconst _ = \"._19itd27t{border:var(--_lwas8e)}\";\nconst _2 = \"._syaz13"
+        "diff": "divergence at byte 19 (a.length=1004, b.length=1227)\n--- a +0..79\nconst _5 = \"._irr313q2:hover{background-color:blue}\";\nconst _4 = \"._k48pbfng{fo\n+++ b +0..79\nconst _5 = \"._irr31pav:hover{background-color:var(--_ylwyqi)}\";\nconst _4 = \"._k"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-move-any-suffix-of-a-dynamic-arrow-func-property-into-the-style-property",
@@ -1667,22 +1673,22 @@
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-identifier-referencing-an-expression-with-suffix",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=656, b.length=652)\n--- a +0..67\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rko1qga{border-ra\n+++ b +0..67\nconst _ = \"._2rko8r6c{border-radius:var(--_1hwymmh)px}\";\nconst _2 ="
+        "diff": "divergence at byte 53 (a.length=656, b.length=652)\n--- a +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rko1qga{border-radius:var(--_1hwymmh)}\";\nlet br = 2 + 2;\nbr += \n+++ b +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rko8r6c{border-radius:var(--_1hwymmh)px}\";\nlet br = 2 + 2;\nbr +"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-inline-arrow-function-with-suffix",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=577, b.length=650)\n--- a +0..67\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rko1y44{border-ra\n+++ b +0..67\nconst _ = \"._2rkoep3h{border-radius:var(--_yutjvi)px}\";\nconst _2 = "
+        "diff": "divergence at byte 53 (a.length=577, b.length=650)\n--- a +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rko1y44{border-radius:4px}\";\nconst getBr = () => 4;\nconst Div =\n+++ b +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._2rkoep3h{border-radius:var(--_yutjvi)px}\";\nconst getBr = () => 4"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-arrow-function-call-that-returns-number",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=575, b.length=651)\n--- a +0..67\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1fwx{font-size\n+++ b +0..67\nconst _ = \"._1wyb1gsi{font-size:var(--_1y3et89)px}\";\nconst _2 = \"._"
+        "diff": "divergence at byte 54 (a.length=575, b.length=651)\n--- a +0..114\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst getBr = () => 12;\nconst Div = fo\n+++ b +0..114\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1gsi{font-size:var(--_1y3et89)px}\";\nconst getBr = () => 12;\nc"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-arrow-function-call-that-has-a-complex-body",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=602, b.length=679)\n--- a +0..67\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wybt94y{font-size\n+++ b +0..67\nconst _ = \"._1wyb1gsi{font-size:var(--_1y3et89)px}\";\nconst _2 = \"._"
+        "diff": "divergence at byte 53 (a.length=602, b.length=679)\n--- a +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wybt94y{font-size:1px}\";\nconst getBr = () => {\n  return true ? \n+++ b +0..113\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb1gsi{font-size:var(--_1y3et89)px}\";\nconst getBr = () => {\n  "
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-function-returning-an-object",
@@ -1707,7 +1713,7 @@
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-variables-within-nested-template-literals-in-two-properties",
         "sourceFile": "styled/__tests__/tagged-template-expression.test.ts",
-        "diff": "divergence at byte 7 (a.length=794, b.length=967)\n--- a +0..67\nconst _4 = \"._syazxtzx{color:var(--my-variable,red)}\";\nconst _3 = \"\n+++ b +0..67\nconst _ = \"._19it33q0{border:1px solid var(--ds-border,var(--_7i3yo"
+        "diff": "divergence at byte 18 (a.length=794, b.length=967)\n--- a +0..78\nconst _4 = \"._syazxtzx{color:var(--my-variable,red)}\";\nconst _3 = \"._1xi212am{\n+++ b +0..78\nconst _4 = \"._syazqfit{color:var(--_l8trrq)}\";\nconst _3 = \"._1xi2malo{right:va"
       },
       {
         "name": "styled-tests-tagged-template-expression/styled-tagged-template-expression--should-transform-variables-within-nested-template-literals-within-the-same-prope",
@@ -1740,24 +1746,9 @@
         "diff": "divergence at byte 17 (a.length=269, b.length=270)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
       },
       {
-        "name": "xcss-prop-tests-transformation/xcss-prop-transformation--should-allow-ternaries",
-        "sourceFile": "xcss-prop/__tests__/transformation.test.ts",
-        "diff": "divergence at byte 97 (a.length=409, b.length=409)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._syaz5scu{color:re\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._syaz13q2{color:blu"
-      },
-      {
-        "name": "xcss-prop-tests-transformation/xcss-prop-transformation--should-allow-concatenating-styles",
-        "sourceFile": "xcss-prop/__tests__/transformation.test.ts",
-        "diff": "divergence at byte 134 (a.length=463, b.length=463)\n--- a +74..194\nreact/runtime\";\nimport { j } from \"@compiled/react\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._syaz5scu{color:re\n+++ b +74..194\nreact/runtime\";\nimport { j } from \"@compiled/react\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._syaz13q2{color:blu"
-      },
-      {
         "name": "xcss-prop-tests-transformation/xcss-prop-transformation--should-not-blow-up-transforming-an-empty-xcss-object",
         "sourceFile": "xcss-prop/__tests__/transformation.test.ts",
         "diff": "divergence at byte 17 (a.length=226, b.length=227)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
-      },
-      {
-        "name": "xcss-prop-tests-transformation/xcss-prop-transformation--should-only-add-styles-to-xcss-call-sites-that-use-them",
-        "sourceFile": "xcss-prop/__tests__/transformation.test.ts",
-        "diff": "divergence at byte 136 (a.length=724, b.length=724)\n--- a +76..196\nact/runtime\";\nimport Button from \"@atlaskit/button\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._syaz5scu{color:re\n+++ b +76..196\nact/runtime\";\nimport Button from \"@atlaskit/button\";\nconst _ = \"._syaz5scu{color:red}\";\nconst _2 = \"._syaz13q2{color:blu"
       },
       {
         "name": "xcss-prop-tests-transformation/xcss-prop-transformation--should-not-transform-xcss-if-processxcss-false",
@@ -1765,34 +1756,14 @@
         "diff": "divergence at byte 0 (a.length=70, b.length=265)\n--- a +0..60\nReact.createElement(Component, {\n  xcss: {\n    color: \"red\",\n+++ b +0..60\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } f"
       },
       {
-        "name": "xcss-prop-tests-transformation/xcss-prop-interacting-with-other-libraries--xcss-prop-shouldn-t-affect-styled-prop-from-styled-components",
-        "sourceFile": "xcss-prop/__tests__/transformation.test.ts",
-        "diff": "divergence at byte 176 (a.length=1086, b.length=1086)\n--- a +116..236\n-components\";\nimport Button from \"@atlaskit/button\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._syaz5scu{color:r\n+++ b +116..236\n-components\";\nimport Button from \"@atlaskit/button\";\nconst _ = \"._syaz32ev{color:pink}\";\nconst _2 = \"._syaz5scu{color:re"
-      },
-      {
         "name": "tests-css-builder/css-builder--should-convert-css-properties-to-kebab-case-with-css-prop",
         "sourceFile": "__tests__/css-builder.test.ts",
         "diff": "divergence at byte 17 (a.length=282, b.length=283)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
       },
       {
-        "name": "tests-css-builder/css-builder--should-convert-css-properties-to-kebab-case-with-css-func-and-css-map",
-        "sourceFile": "__tests__/css-builder.test.ts",
-        "diff": "divergence at byte 97 (a.length=629, b.length=629)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._bfhkbf54{background-color:green}\";\nconst _ = \"._bfhk5\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._bfhk5scu{background-color:red}\";\nconst _2 = \"._bfhkbf5"
-      },
-      {
         "name": "tests-css-builder/css-builder--should-preserve-custom-property-name-casing-with-css-prop",
         "sourceFile": "__tests__/css-builder.test.ts",
         "diff": "divergence at byte 17 (a.length=399, b.length=400)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
-      },
-      {
-        "name": "tests-css-builder/css-builder--should-preserve-custom-property-name-casing-with-styled-function",
-        "sourceFile": "__tests__/css-builder.test.ts",
-        "diff": "divergence at byte 133 (a.length=864, b.length=864)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._15em1178{--PANEL_WIDTH:280px}\";\nconst _2 = \"._nyij1og\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1al95scu{--panelColor:red}\";\nconst _2 = \"._nyij1ogm{--"
-      },
-      {
-        "name": "tests-css-builder/css-builder--should-preserve-custom-property-name-casing-with-css-func-and-css-map",
-        "sourceFile": "__tests__/css-builder.test.ts",
-        "diff": "divergence at byte 97 (a.length=694, b.length=694)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._15em1178{--PANEL_WIDTH:280px}\";\nconst _2 = \"._nyij1og\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1al95scu{--panelColor:red}\";\nconst _2 = \"._nyij1ogm{--"
       },
       {
         "name": "tests-css-builder/css-builder--should-keep-nested-unconditional-css-together",
@@ -1837,27 +1808,27 @@
       {
         "name": "tests-expression-evaluation/import-specifiers--handles-object-destructuring",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 97 (a.length=494, b.length=604)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz1\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybhtvp{font-size:var(--_13xj69h)}\";\nconst _2 = \"._sy"
+        "diff": "divergence at byte 157 (a.length=494, b.length=604)\n--- a +97..217\n3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._1wybdlk8{font-size:14px}\";\nco\n+++ b +97..217\n3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst _ = \"._1wybhtvp{font-size"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--statically-evaluates-deconstructed-values-from-deeply-nested-objects",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 97 (a.length=914, b.length=1105)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48p1fw0{font-weight:700}\";\nconst _3 = \"._1wyb1fwx{fo\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._19itj2sg{border:var(--_x5wuz7)}\";\nconst _2 = \"._syaz23"
+        "diff": "divergence at byte 108 (a.length=914, b.length=1105)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48p1fw0{font-weight:700}\";\nconst _3 = \"._1wyb1fwx{font-size:12p\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pdo4x{font-weight:var(--_le9e55)}\";\nconst _3 = \"._1wyb6uie{fo"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--handles-the-destructuring-coming-from-an-identifier",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 97 (a.length=511, b.length=621)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz1\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybhtvp{font-size:var(--_13xj69h)}\";\nconst _2 = \"._sy"
+        "diff": "divergence at byte 157 (a.length=511, b.length=621)\n--- a +97..217\n3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._1wybdlk8{font-size:14px}\";\nco\n+++ b +97..217\n3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst _ = \"._1wybhtvp{font-size"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--handles-the-destructuring-coming-from-a-referenced-identifier",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 97 (a.length=528, b.length=638)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz1\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybhtvp{font-size:var(--_13xj69h)}\";\nconst _2 = \"._sy"
+        "diff": "divergence at byte 157 (a.length=528, b.length=638)\n--- a +97..217\n3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._1wybdlk8{font-size:14px}\";\nco\n+++ b +97..217\n3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst _ = \"._1wybhtvp{font-size"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--handles-the-function-call-destructuring-coming-from-a-referenced-identifier",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 97 (a.length=552, b.length=668)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz1\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1sdr{font-size:var(--_15u4hie)}\";\nconst _2 = \"._sy"
+        "diff": "divergence at byte 157 (a.length=552, b.length=668)\n--- a +97..217\n3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz13q2{color:blue}\";\nconst _ = \"._1wybdlk8{font-size:14px}\";\nco\n+++ b +97..217\n3 = \"._bfhk13q2{background-color:blue}\";\nconst _2 = \"._syaz1aj3{color:var(--_1ylxx6h)}\";\nconst _ = \"._1wyb1sdr{font-size"
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--binary-expresssions--statically-evaluates-calculated-value-with-identifier",
@@ -2017,7 +1988,7 @@
       {
         "name": "tests-rule-hoisting/rule-hoisting--should-hoist-to-the-top-of-the-module",
         "sourceFile": "__tests__/rule-hoisting.test.ts",
-        "diff": "divergence at byte 97 (a.length=711, b.length=710)\n--- a +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _2 = \"._1wyb1tcg{font-size:24px}\";\nconst _ = \"._1wyb1fwx{font\n+++ b +37..157\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wyb1crf{font-size:9pt}\";\nconst _2 = \"._1wyb1tcg{font-"
+        "diff": "divergence at byte 149 (a.length=711, b.length=710)\n--- a +89..209\n\nconst _2 = \"._1wyb1tcg{font-size:24px}\";\nconst _ = \"._1wyb1fwx{font-size:12px}\";\nconst Component = () =>\n  React.create\n+++ b +89..209\n\nconst _2 = \"._1wyb1tcg{font-size:24px}\";\nconst _ = \"._1wyb1crf{font-size:9pt}\";\nconst Component = () =>\n  React.createE"
       },
       {
         "name": "tests-rule-hoisting/rule-hoisting--should-reuse-rules-already-hoisted",
