@@ -17,98 +17,164 @@ use crate::types::Metadata;
 /// 1:1 port of upstream's `hasNestedTemplateLiteralsWithConditionalRules`
 /// (`packages/babel-plugin/src/utils/manipulate-template-literal.ts:22-52`).
 ///
-/// Upstream walks `meta.parentPath` for `ConditionalExpression`s, then
-/// for each match checks if any of `test`/`consequent`/`alternate`:
-/// 1. is a `TaggedTemplateExpression` whose `quasi === node` (the
-///    current template literal is sitting INSIDE a ternary branch), OR
-/// 2. is a `TemplateLiteral` whose expressions include an
-///    `ArrowFunctionExpression` (a nested template with arrow-body
-///    interpolations), OR
-/// 3. is a `LogicalExpression`.
+/// Upstream walks `meta.parentPath` (specifically: the result of
+/// `getPathOfNode(node, meta.parentPath).parent`) for every
+/// `ConditionalExpression` in the subtree, then for each match checks
+/// `path.node[c]` for `c` in `CONDITIONAL_PATHS` — and **upstream's
+/// `CONDITIONAL_PATHS` is `['consequent', 'alternate']` only** (see
+/// `packages/babel-plugin/src/utils/constants.ts:1`). The cond's
+/// `test` is INTENTIONALLY skipped — a `LogicalExpression` in the test
+/// position (e.g. `(a && b) ? X : Y`) does NOT trip the gate.
 ///
-/// The Rust port lacks the parent-NodePath analog (Phase 5 §5.6 chose
-/// the side-table `ScopeIndex` + `parent_scope` + `own_scope` model
-/// over a NodePath replica). Without parent-walk, we can only check
-/// cases 2 and 3 directly off the input `node` — i.e. detect nested
-/// template literals with arrow-body expressions OR logical expressions
-/// that live INSIDE the current template's `expressions` array.
+/// For each Cond's `consequent` / `alternate`, the gate trips iff that
+/// child node is one of:
+/// 1. a `TaggedTemplateExpression` whose `.quasi === node` (the current
+///    template literal sits inside a ternary branch), OR
+/// 2. a `TemplateLiteral` whose `.expressions` include any
+///    `ArrowFunctionExpression`, OR
+/// 3. a `LogicalExpression`.
 ///
-/// **Open follow-up.** The case 1 outer-ternary-wrap shape (template
-/// itself is a branch of a parent ConditionalExpression) cannot be
-/// detected without §5.6 parent-walk. For our styled / css-prop / xcss
-/// cluster the template is always the body of a TaggedTemplateExpression
-/// (`styled.div\`...\``) or the value of a JSXAttribute (`css={...}`)
-/// — never directly inside a ternary branch. If a fixture surfaces
-/// `<div css={cond ? css\`...\` : css\`...\`} />` shape, this needs
-/// the parent walk; raise as Drift and add §6.8g.
+/// The Rust port lacks a NodePath ancestry channel, so we approximate
+/// upstream's `traverse(parent, { ConditionalExpression(...) })` by
+/// walking the synthetic Tpl `node` ourselves. The synthetic Tpl is
+/// always built unattached at the call site (`extract_object_expression`
+/// / `extract_template_literal`), so upstream's
+/// `getPathOfNode(node, meta.parentPath)` returns a path whose `parent`
+/// is the `meta.parentPath`'s container (e.g. the `styled.div(...)`
+/// CallExpression for the `styled` cluster). Walking the Tpl's own
+/// expressions covers every Conditional reachable from that parent
+/// because the synthetic Tpl is wrapping the same arrow upstream
+/// would also reach via parent traversal.
+///
+/// The walk descends through:
+/// - `Tpl.exprs[i]` (the interpolations).
+/// - `Arrow.body` (Expr-form only; BlockStmt bodies are not visited
+///   by upstream's `traverse` either — `noScope: true` doesn't enter
+///   nested Function bodies for ConditionalExpression matching here).
+/// - `Cond.test` / `Cond.cons` / `Cond.alt` (the descent path; matches
+///   upstream's `traverse` walking the entire subtree).
+/// - `Paren.expr` (Babel parser strips parens; SWC keeps them — peek
+///   through so the shape match doesn't drift).
+///
+/// AT each `Cond` node found, the *match* checks ONLY `c.cons` and
+/// `c.alt` (NOT `c.test`) against patterns 1/2/3 directly — exactly
+/// upstream's `CONDITIONAL_PATHS.map(c => path.node[c])` semantics.
+///
+/// **Closed follow-up (this comment block).** The previous Rust port
+/// walked `c.test` AND treated any `LogicalExpression` anywhere in the
+/// subtree as a positive match — both deltas vs upstream. Reproduction:
+/// `fixtures/ct-minheight-calc-fg-stack` —
+/// `({...}) => isFlexible && !isSwimlaneMode ? (fg() ? '100%' :
+/// 'calc(...)') : undefined` would have its outer Cond's
+/// `test = LogicalExpr` flag the gate, suppressing
+/// `optimizeConditionalStatement` and falling through to the catch-all
+/// CSS-variable path. Upstream's gate returns false here because the
+/// outer Cond's cons is a Cond (not Logical) and alt is an Identifier;
+/// the inner Cond's cons/alt are both StringLiterals. See
+/// `packages/babel-plugin/src/utils/constants.ts:1` for upstream's
+/// canonical paths list.
 pub fn has_nested_template_literals_with_conditional_rules(
     node: &Tpl,
     _meta: &mut Metadata<'_>,
 ) -> bool {
+    // Pointer-identity proxy for upstream's `expression.quasi === node`
+    // check inside the per-Cond branch test. Upstream uses JS reference
+    // equality between the matched Cond branch's `.quasi` and the
+    // template literal we were called with. The Rust analog: address
+    // equality of the borrowed `&Tpl`. The walk takes `&Tpl` by
+    // reference, so the address is stable for the duration of the call.
+    let node_ptr: *const Tpl = node;
     for expr in &node.exprs {
-        if expr_contains_nested_conditional_rules(expr) {
+        if walk_for_conditional_match(expr, node_ptr) {
             return true;
         }
     }
-    // case 1 (outer ternary wrap) — skipped pending §6.8g parent walk.
+    // case 1 (outer ternary wrap) — skipped: requires the parent walk.
+    // For our styled / css-prop / xcss cluster the template is never
+    // directly a ternary branch; raise as Drift if a fixture surfaces.
     false
 }
 
-/// Recursive walker for `has_nested_template_literals_with_conditional_rules`.
-/// Returns true when:
-/// - The expression IS a nested template literal whose own exprs include
-///   an arrow-function expression (case 2 from upstream), OR
-/// - The expression IS a logical expression (case 3), OR
-/// - The expression CONTAINS one of the above somewhere in its subtree.
+/// Walks the expression subtree looking for `ConditionalExpression`
+/// nodes. AT each Cond, checks ONLY its `consequent` and `alternate`
+/// (NOT its `test`) against the three patterns. Returns true on first
+/// match (upstream's `path.stop()` behaviour). Otherwise descends
+/// through test/cons/alt and other container nodes.
 ///
-/// Recursion targets cover arrow bodies and ternary branches because
-/// upstream's `traverse(parent, { ConditionalExpression })` walks the
-/// entire subtree below the matched parent. The Rust port's input is
-/// the template literal itself — so we walk DOWN from each interpolation
-/// rather than up from a parent path. The result is a superset of cases
-/// 2 and 3 (we may flag templates upstream wouldn't reach via its
-/// parent walk if the template lives BELOW our `node`); for the styled
-/// / css-prop cluster the branching shapes coincide.
-fn expr_contains_nested_conditional_rules(expr: &swc_core::ecma::ast::Expr) -> bool {
-    use swc_core::ecma::ast::{BinaryOp, BlockStmtOrExpr, Expr as E};
+/// `node_ptr` threads the address of the input `&Tpl` through so the
+/// case-1 test (`TaggedTpl.quasi === node`) can match upstream's
+/// reference-equality semantics via pointer comparison.
+fn walk_for_conditional_match(
+    expr: &swc_core::ecma::ast::Expr,
+    node_ptr: *const Tpl,
+) -> bool {
+    use swc_core::ecma::ast::{BlockStmtOrExpr, Expr as E};
     match expr {
-        E::Tpl(inner) => {
-            // case 2: nested template with arrow-body interpolation.
-            if inner.exprs.iter().any(|e| matches!(&**e, E::Arrow(_))) {
+        E::Cond(c) => {
+            // AT a ConditionalExpression: check cons/alt directly
+            // (mirrors upstream's `CONDITIONAL_PATHS = ['consequent',
+            // 'alternate']`).
+            if branch_matches_conditional_rules(&c.cons, node_ptr)
+                || branch_matches_conditional_rules(&c.alt, node_ptr)
+            {
                 return true;
             }
-            // Recurse into nested templates' interpolations to catch
-            // deeper conditional/logical/arrow shapes.
+            // Otherwise descend into all three children — upstream's
+            // `traverse` walks the whole subtree (test included) for
+            // nested `ConditionalExpression`s, even though the per-match
+            // check skips `test`.
+            walk_for_conditional_match(&c.test, node_ptr)
+                || walk_for_conditional_match(&c.cons, node_ptr)
+                || walk_for_conditional_match(&c.alt, node_ptr)
+        }
+        E::Tpl(inner) => {
             for e in &inner.exprs {
-                if expr_contains_nested_conditional_rules(e) {
+                if walk_for_conditional_match(e, node_ptr) {
                     return true;
                 }
             }
             false
         }
-        E::Bin(b) if matches!(b.op, BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing) => {
-            // case 3: logical expression.
-            true
+        E::Arrow(arrow) => match &*arrow.body {
+            BlockStmtOrExpr::Expr(e) => walk_for_conditional_match(e, node_ptr),
+            BlockStmtOrExpr::BlockStmt(_) => false,
+        },
+        E::Paren(p) => walk_for_conditional_match(&p.expr, node_ptr),
+        E::Bin(b) => {
+            walk_for_conditional_match(&b.left, node_ptr)
+                || walk_for_conditional_match(&b.right, node_ptr)
         }
-        E::Cond(c) => {
-            // Walk both branches AND test for nested templates / arrows /
-            // logicals. Mirrors upstream's `traverse(parent,
-            // { ConditionalExpression })` visiting CONDITIONAL_PATHS
-            // (`test` / `consequent` / `alternate`).
-            expr_contains_nested_conditional_rules(&c.test)
-                || expr_contains_nested_conditional_rules(&c.cons)
-                || expr_contains_nested_conditional_rules(&c.alt)
-        }
-        E::Arrow(arrow) => {
-            // Recurse into arrow body so e.g.
-            // `(p) => (p.x ? \`...${q => q.y}...\` : 'red')` reaches the
-            // nested template inside the consequent.
-            match &*arrow.body {
-                BlockStmtOrExpr::Expr(e) => expr_contains_nested_conditional_rules(e),
-                BlockStmtOrExpr::BlockStmt(_) => false,
-            }
-        }
-        E::Paren(p) => expr_contains_nested_conditional_rules(&p.expr),
+        E::Unary(u) => walk_for_conditional_match(&u.arg, node_ptr),
+        _ => false,
+    }
+}
+
+/// 1:1 port of upstream's per-Cond branch test (manipulate-template-literal.ts:36-46).
+/// Returns true iff `branch` is:
+/// 1. a `TaggedTemplateExpression` whose `.quasi` is the same node
+///    as the input template literal (upstream `expression.quasi ===
+///    node`, JS reference equality — Rust analog: pointer identity), OR
+/// 2. a `TemplateLiteral` with at least one `ArrowFunctionExpression`
+///    in its expressions, OR
+/// 3. a `LogicalExpression`.
+fn branch_matches_conditional_rules(
+    expr: &swc_core::ecma::ast::Expr,
+    node_ptr: *const Tpl,
+) -> bool {
+    use swc_core::ecma::ast::{BinaryOp, Expr as E};
+    match expr {
+        // case 1: TaggedTemplateExpression with identity-matching
+        // `.tpl`. SWC's `TaggedTpl.tpl` is the `Tpl` analog of Babel's
+        // `TaggedTemplateExpression.quasi`. Pointer-equality on `&Tpl`
+        // mirrors JS `===`.
+        E::TaggedTpl(tt) => std::ptr::eq(&*tt.tpl as *const Tpl, node_ptr),
+        // case 2: TemplateLiteral with arrow exprs.
+        E::Tpl(t) => t.exprs.iter().any(|e| matches!(&**e, E::Arrow(_))),
+        // case 3: LogicalExpression.
+        E::Bin(b) => matches!(
+            b.op,
+            BinaryOp::LogicalAnd | BinaryOp::LogicalOr | BinaryOp::NullishCoalescing
+        ),
         _ => false,
     }
 }

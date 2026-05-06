@@ -211,6 +211,31 @@ className compilation is unaffected (the order only matters for
 HMR cache keying / source-map debugging, not for correctness of
 the resulting CSS).
 
+## Closed (continued)
+
+- **[FIXED 2026-05-07] ct-minheight-calc-fg-stack +
+  ct-columns-container-minheight-stack +
+  ct-styled-nth-of-type-container** — `has_nested_template_literals_with_conditional_rules`
+  drift in `crates/babel-plugin/src/utils/manipulate_template_literal.rs`.
+  Upstream's `CONDITIONAL_PATHS` (`packages/babel-plugin/src/utils/constants.ts:1`)
+  is `['consequent', 'alternate']` — the cond's `test` is intentionally
+  excluded. The Rust port was walking `c.test` AND treating ANY
+  `LogicalExpression` anywhere in the subtree as a positive match,
+  causing arrow bodies of shape
+  `({...}) => isFlex && !isSwim ? (fg() ? '100%' : 'calc(...)') : undefined`
+  to flag the gate (the outer Cond's `test` is `LogicalExpr`),
+  suppressing `optimizeConditionalStatement` and falling through to
+  the catch-all CSS-variable path. Upstream verified empirically
+  (instrumented `manipulate-template-literal.ts` to print
+  `expr.type` for each `CONDITIONAL_PATHS.map`): only `consequent`
+  and `alternate` are visited per Cond. Rewrote
+  `walk_for_conditional_match` to walk descend through test/cons/alt
+  but ONLY check `cons` / `alt` against the three patterns at each
+  Cond node. `branch_matches_conditional_rules` now matches the
+  three patterns directly (TaggedTpl / Tpl-with-arrow-exprs /
+  LogicalExpression) without recursive automatic-positive on
+  Logical. +3 parity.
+
 ## Open divergences
 
 Snapshot after this session's fixes (run `bun parity-harness/fixtures-triage.mjs`
@@ -218,8 +243,8 @@ to refresh):
 
 ```
 total                336
-parity               277  (+12 from baseline)
-divergence           12
+parity               280  (+15 from baseline)
+divergence           9
 swc-throws           2
 babel-throws         0
 both-throw           2     ← negative-test fixtures (OK)
@@ -261,16 +286,13 @@ Fix candidates (each with trade-offs):
 
 Status: open, blocked on architectural decision.
 
-### Other ct-* divergences (~6)
+### Other ct-* divergences (3 remaining)
 
 Surface-traced individually as the iteration loop continues:
 
-- `ct-columns-container-minheight-stack`
 - `ct-editor-big`
 - `ct-expression-export`
-- `ct-minheight-calc-fg-stack`
 - `ct-optional-chain-dynamic-style`
-- `ct-styled-nth-of-type-container`
 
 Use `bun parity-harness/fixtures-triage.mjs --only <name> --print-diffs`
 to start triage; the in-process debug-test pattern proven on

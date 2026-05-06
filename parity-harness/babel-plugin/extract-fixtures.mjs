@@ -174,7 +174,16 @@ export const transform = (code, options = {}) => {
 };
 // === end injection ===
 `;
-      return { contents: text, loader: 'ts' };
+      // Bun ≥1.2.x's plugin onLoad path re-parses contents with a
+      // stricter validator than the import-time path; TS-typed
+      // syntax (param annotations, `import type {...}`) trips
+      // "Expected from..." / "Unexpected :" parse errors when we
+      // hand back `loader: 'ts'`. Run the contents through Bun's
+      // own Transpiler first so we can return plain JS via
+      // `loader: 'js'`.
+      const transpiler = new Bun.Transpiler({ loader: 'ts', target: 'bun' });
+      const js = transpiler.transformSync(text);
+      return { contents: js, loader: 'js' };
     });
   },
 });
