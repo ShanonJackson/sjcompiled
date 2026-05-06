@@ -1,0 +1,1 @@
+&:hover { background-color: var(--ds-background-neutral-bold-hovered, #3B3D42); }&:active { background-color: var(--ds-background-neutral-bold-pressed, #505258); }

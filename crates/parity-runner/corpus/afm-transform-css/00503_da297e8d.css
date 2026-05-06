@@ -1,0 +1,1 @@
+&:hover [data-testid="hexagon-focus-container"], &:focus [data-testid="hexagon-focus-container"], &:focus-within [data-testid="hexagon-focus-container"] { filter:; }

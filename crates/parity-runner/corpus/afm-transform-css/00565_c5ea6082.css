@@ -1,0 +1,1 @@
+& { .fc-daygrid-day-frame { &:hover:not(:has(.fc-event-main:hover, .fc-event-resizer.fc-event-resizer-end:hover))::after { display:none } } }

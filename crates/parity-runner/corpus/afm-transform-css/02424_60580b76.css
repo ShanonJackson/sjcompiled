@@ -1,0 +1,1 @@
+border-color: var(--ds-border-input, #8C8F97);border-style: solid;border-top-style: unset;border-width: var(--ds-border-width, 1px);padding-left: var(--ds-space-100, 8px);display: grid;grid-auto-flow: column;grid-template-columns: auto 1fr auto;align-items: center;gap: var(--ds-space-075, 6px);

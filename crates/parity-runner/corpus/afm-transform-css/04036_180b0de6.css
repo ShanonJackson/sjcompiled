@@ -1,0 +1,1 @@
+border-width: var(--ds-border-width-selected, 2px);border-style: solid;border-color: var(--ds-border-inverse, #FFFFFF);border-radius: var(--ds-radius-full, 9999px);display: flex;align-items: center;justify-content: center;width: 32px;height: 32px;color: var(--ds-text, #292A2E);background-color: var(--ds-background-neutral, #0515240F);line-height: 32px;

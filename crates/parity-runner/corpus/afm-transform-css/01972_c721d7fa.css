@@ -1,0 +1,1 @@
+width: 100%;display: flex;align-items: center;justify-content: space-between;& > :nth-child(2) { display: flex;justify-content: end;align-items: center;height: 20px;margin-left: 6px;;&:empty { display: none; } }

@@ -1,0 +1,1 @@
+box-sizing: border-box;block-size: 32px;border-radius: var(--ds-radius-large, 8px);padding-block: var(--ds-space-050, 4px);padding-inline: var(--ds-space-100, 8px);width: 100%;overflow: hidden;display: flex;flex-direction: row;align-items: center;column-gap: var(--ds-space-100, 8px);

@@ -1,0 +1,1 @@
+& span[role='checkbox'], & span[role='menuitemcheckbox'] { color: var(--ds-text, #292A2E);background-color: transparent; }

@@ -1,0 +1,1 @@
+text-decoration: none;color: var(--ds-text, #292A2E);&:hover { color: var(--ds-text, #292A2E); }&:focus { color: var(--ds-text, #292A2E); }&:focus-visible { outline: none;color: var(--ds-text, #292A2E);text-decoration: underline; }

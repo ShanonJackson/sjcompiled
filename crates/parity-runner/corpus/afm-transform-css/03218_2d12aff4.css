@@ -1,0 +1,1 @@
+padding-left: var(--ds-space-200, 16px);&::before { content: "";position: absolute;left: var(--ds-space-negative-150, -12px);top: 0;bottom: 0;border-left-style: solid;border-left-width: var(--ds-border-width, 1px);border-left-color: var(--ds-border, #0B120E24); }

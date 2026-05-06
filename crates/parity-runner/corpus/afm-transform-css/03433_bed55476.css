@@ -1,0 +1,1 @@
+color: var(--ds-text, #292A2E);white-space: nowrap;overflow: hidden;text-overflow: ellipsis;flex: 0 1 auto;margin-right: var(--ds-space-100, 8px);&:last-child { margin-right: var(--ds-space-050, 4px); }

@@ -1,0 +1,1 @@
+display: grid;grid-template-columns: repeat(auto-fill, 320px);gap: var(--ds-space-200, 16px);

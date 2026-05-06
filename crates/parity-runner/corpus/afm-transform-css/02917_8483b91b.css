@@ -1,0 +1,1 @@
+display: flex;align-items: center;margin-bottom: var(--ds-space-025, 2px);& > span:first-of-type { margin-left: var(--ds-space-100, 8px); }

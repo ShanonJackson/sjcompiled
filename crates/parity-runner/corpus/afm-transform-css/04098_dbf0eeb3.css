@@ -1,0 +1,1 @@
+flex-shrink: 0;width: var(--ds-space-300, 24px);& > button { &:hover, &:active { background-color: transparent; } }

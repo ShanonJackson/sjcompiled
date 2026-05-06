@@ -1,0 +1,1 @@
+border: none;background-color: transparent;cursor: pointer;padding: 0;;&:hover { color: var(--ds-text, #292A2E); }&:focus { color: var(--ds-text, #292A2E);box-shadow: 0 0 0 2px var(--ds-border-focused, #4688EC);outline: none;border-radius: var(--ds-radius-small, 3px); }

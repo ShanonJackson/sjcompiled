@@ -1,0 +1,1 @@
+display: inline-flex;align-items: center;gap: var(--ds-space-050, 4px);color: var(--ds-text, #292A2E);text-decoration: none;vertical-align: bottom;&:hover { color: var(--ds-text, #292A2E);text-decoration: underline; }

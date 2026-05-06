@@ -1,0 +1,1 @@
+&:hover { background-color: var(--ds-surface-hovered, #F0F1F2); }&:focus-within { background-color: var(--ds-surface-hovered, #F0F1F2); }

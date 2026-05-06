@@ -1,0 +1,1 @@
+grid-template-columns: repeat(auto-fill, min-content);grid-column: optional-fields / span 1;grid-row: card-detail / span 1;display: flex;box-sizing: border-box;align-items: center;& > * { margin-top: 0;margin-right: var(--ds-space-050, 4px);margin-bottom: 0;margin-left: var(--ds-space-050, 4px); }& > :first-of-type { margin-left: 0; }& > :last-of-type { margin-right: 0; }

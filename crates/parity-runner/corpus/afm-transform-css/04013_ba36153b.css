@@ -1,0 +1,1 @@
+display: flex;overflow: hidden;height: calc(100vh - (var(--topNavigationHeight, 0px) + var(--bannerHeight, 0px)) - 160px - var(--ds-space-200, 16px));;max-height: 1716px;;background-color: var(--ds-background-neutral-subtle, #00000000);margin-bottom: var(--ds-space-200, 16px) !important;

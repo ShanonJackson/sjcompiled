@@ -1,0 +1,1 @@
+&& { &:active { color: var(--sidebar-menu-item-color-active);[data-item-elem-before] { color: var(--sidebar-menu-item-color-active); } } }&[aria-current="page"] { color: var(--sidebar-menu-item-color-active); }&[aria-current="page"]::before { background: var(--sidebar-menu-item-color-active); }

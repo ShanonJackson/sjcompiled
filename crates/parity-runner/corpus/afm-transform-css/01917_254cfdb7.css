@@ -1,0 +1,1 @@
+display: flex;flex-direction: row;align-items: center;flex-wrap: wrap;max-width: 40vw;row-gap: var(--ds-space-050, 4px);column-gap: var(--ds-space-025, 2px);margin-bottom: var(--ds-space-050, 4px);

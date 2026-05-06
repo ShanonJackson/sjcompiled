@@ -1,0 +1,1 @@
+&:hover { border-color: var(--ds-border-focused, #4688EC);text-decoration: none; }&:focus-within { border-color: var(--ds-border-focused, #4688EC); }

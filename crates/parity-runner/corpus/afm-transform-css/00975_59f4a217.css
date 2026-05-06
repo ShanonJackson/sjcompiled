@@ -1,0 +1,1 @@
+display: inline;color: var(--ds-link, #1868DB);cursor: pointer;text-decoration: none;background-color: var(--ds-background-neutral-subtle, #00000000);padding-top: var(--ds-space-0, 0px);padding-right: var(--ds-space-0, 0px);padding-bottom: var(--ds-space-0, 0px);padding-left: var(--ds-space-0, 0px);&:hover { text-decoration: underline; }

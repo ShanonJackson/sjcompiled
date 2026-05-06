@@ -1,0 +1,1 @@
+border-width: var(--ds-border-width-focused, 2px);border-color: var(--ds-border-danger, #E2483D);&:focus-within { box-shadow: none;border-color: var(--ds-border-danger, #E2483D); }

@@ -1,0 +1,1 @@
+position: relative;&::before { content: "";position: absolute;width: var(--commentLineWidth);inset-inline-start: var(--commentInlineStart);border-inline-start: var(--commentLineWidth) solid var(--commentLineColor);background-color: var(--ds-background-neutral-subtle, #00000000);height: calc(100% - var(--commentSpacing));top: var(--commentSpacing); }

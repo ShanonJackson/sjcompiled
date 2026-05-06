@@ -1,0 +1,1 @@
+border-radius: var(--ds-radius-small, 4px);max-width: 225px;padding-right: var(--ds-space-200, 16px);background-color: var(--ds-surface-overlay, #FFFFFF);white-space: nowrap;overflow: hidden;text-overflow: ellipsis;transform: rotate(-2deg);

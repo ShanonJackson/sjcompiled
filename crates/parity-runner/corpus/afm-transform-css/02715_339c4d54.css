@@ -1,0 +1,1 @@
+background-color: transparent;height: 100%;width: 100%;display: flex;align-items: center;padding-inline-start: var(--ds-space-100, 8px);padding-inline-end: var(--ds-space-100, 8px);overflow: hidden;border-radius: var(--ds-radius-small, 4px);&:focus-visible { outline-color: var(--ds-border-focused, #4688EC);outline-offset: var(--ds-space-negative-025, -2px); }

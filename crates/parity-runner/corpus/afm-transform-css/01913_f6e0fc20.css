@@ -1,0 +1,1 @@
+&::before { content: "•";margin-right: var(--ds-space-050, 4px);color: var(--ds-text-subtle, #505258); }

@@ -1,0 +1,1 @@
+margin-top: var(--ds-space-050, 4px);position: relative;display: flex;align-items: center;&:hover [data-ai-buttons-wrapper] { visibility: visible; }&:focus-within [data-ai-buttons-wrapper] { visibility: visible; }

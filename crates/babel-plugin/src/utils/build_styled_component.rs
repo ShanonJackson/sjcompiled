@@ -276,14 +276,31 @@ pub struct StyledTemplateOpts {
     pub tag: Tag,
     pub variables: Vec<crate::utils::types::Variable>,
     pub sheets: Vec<String>,
-    /// §6.8p — original styled-call argument expression(s) before
-    /// CSS extraction. Walked alongside `class_names` / `variables`
-    /// inside the invalid-DOM-prop derivation so that
-    /// `__cmplp.<name>` references in branches that produced NO
-    /// CSS (e.g. `props => props.x ? undefined : null`) still
-    /// surface in the consumed-prop destructure. Mirrors upstream's
-    /// `meta.parentPath` walk over the styled call's full subtree.
-    pub original_css_node: Option<Expr>,
+    /// §6.8x — the ORIGINAL styled CallExpr / TaggedTpl AST node, as
+    /// it lived in source BEFORE CSS extraction. Used as the SOLE
+    /// input to the invalid-DOM-prop walk inside `styled_template`,
+    /// mirroring upstream's
+    /// `getInvalidDomProps(meta.parentPath)` at
+    /// `packages/babel-plugin/src/utils/build-styled-component.ts:123`.
+    ///
+    /// **Why this and only this:** upstream's `path.traverse` walks
+    /// the static AST subtree of the styled call. It does NOT
+    /// auto-resolve identifier arguments; for
+    /// `styled.div(tabStyles)` it sees only the literal
+    /// `styled.div(tabStyles)` text — no `__cmplp.<name>`
+    /// MemberExprs reachable through the `tabStyles` Identifier.
+    /// To match byte-for-byte, the Rust port must walk this same
+    /// node and ONLY this node.
+    ///
+    /// Earlier ports (§6.8g/§6.8h/§6.8p) walked `class_names` /
+    /// `variables[].expression` / a post-extraction CSS node. Those
+    /// walks see resolved-init expansions that upstream's
+    /// `parentPath.traverse` cannot reach, so they over-report
+    /// invalid DOM props and emit a spurious
+    /// `const { X, Y, ...__cmpldp } = __cmplp` destructure
+    /// (drift exposed by the `ct-hover-display` snapshot fix
+    /// 2026-05-07; see FIXTURES_STATUS.md).
+    pub original_styled_call: Option<Expr>,
     /// §6.8p — the binding name of the surrounding `const X = styled...`
     /// VarDecl when its first declarator is a `Pat::Ident`. Powers
     /// the `addComponentName: true` `c_<name>` className emit
@@ -313,58 +330,37 @@ fn styled_template(
 
     // ───── invalidDomProps ─────
     //
-    // Upstream walks `meta.parentPath`. The Rust port walks the
-    // styled call's subtree via `meta` — but at this layer we don't
-    // have the parent path borrow live. Instead the caller
-    // (`build_styled_component`) walks the original styled CallExpr/
-    // TaggedTpl ahead of calling us and threads the result through
-    // opts. This keeps the function pure-ish (no environment-borrow
-    // surprise).
+    // Upstream `build-styled-component.ts:123`:
+    //   const invalidDomProps = isInBuiltComponent
+    //     ? getInvalidDomProps(meta.parentPath)
+    //     : [];
     //
-    // For now we re-derive from variables' expression bodies; the
-    // CSS extraction already rewrote the props references, so the
-    // variables carry the post-rewrite shape. This is byte-equivalent
-    // to upstream's parentPath walk because the only place
-    // `__cmplp.X` references live in the styled call's subtree is in
-    // the variable expression bodies.
+    // `meta.parentPath` is the styled CallExpr / TaggedTpl path.
+    // `path.traverse(invalidDomPropsVisitor, state)` walks the
+    // STATIC AST subtree of that node — it does NOT auto-resolve
+    // identifier arguments. For `styled.div(tabStyles)` the only
+    // nodes visited are `styled`, `div`, `tabStyles` — no
+    // `__cmplp.<name>` MemberExprs reachable through the
+    // `tabStyles` Identifier (the resolved init lives in a
+    // separate VarDecl that the traversal cannot enter).
+    //
+    // The Rust port mirrors this by threading the original styled
+    // call expression through `opts.original_styled_call` and
+    // walking ONLY that node. The previous shape (walk
+    // `class_names` + `variables[].expression` + a post-extraction
+    // CSS node) saw resolved-init expansions that upstream's
+    // `parentPath.traverse` cannot reach, over-reporting invalid
+    // DOM props for any fixture that resolves a binding into a
+    // styled call (e.g. `ct-hover-display`).
+    //
+    // For the `styled.div(tabStyles)` case both inputs are bare
+    // Identifiers — `get_invalid_dom_props` produces `[]` —
+    // exactly matching Babel's parentPath walk.
     let invalid_dom_props: Vec<String> = if is_in_built_component {
-        let mut names: indexmap::IndexSet<String> = indexmap::IndexSet::new();
-        // §6.8g extended the walk to `opts.class_names`. §6.8h orders
-        // class_names BEFORE variables so the resulting destructure
-        // matches upstream's source-order traversal of `meta.parentPath`:
-        // for a fixture like `(p) => p.isPrimary ? \`...${(p) => p.isShown ?
-        // 'none' : 'block'}...\` : '...'`, Babel's depth-first visit reaches
-        // the outer ternary's TEST (`isPrimary`) before recursing into the
-        // cons branch's inner arrow (`isShown`). Our variables list carries
-        // inner-arrow-body MemberExprs (`isShown`), and class_names carries
-        // the outer ternary (`isPrimary` at the test root); class_names-first
-        // produces the matching `{ isPrimary, isShown, ...__cmpldp }` order.
-        for cn in &opts.class_names {
-            for n in get_invalid_dom_props(cn) {
-                names.insert(n);
-            }
+        match &opts.original_styled_call {
+            Some(node) => get_invalid_dom_props(node),
+            None => Vec::new(),
         }
-        for var in &opts.variables {
-            if let Some(expr) = &var.expression {
-                for n in get_invalid_dom_props(expr) {
-                    names.insert(n);
-                }
-            }
-        }
-        // §6.8p — also walk the ORIGINAL styled-call argument
-        // expression(s). The above two loops only see post-CSS-extraction
-        // shape; conditional branches that produced no CSS (e.g. both
-        // sides of `props.isPrimary ? undefined : null`) drop out of
-        // both `class_names` and `variables`, so a `__cmplp.isPrimary`
-        // reference that exists only inside such a dead branch wouldn't
-        // surface here without this walk. Babel's `meta.parentPath`
-        // walk covers the full styled-call subtree regardless.
-        if let Some(orig) = &opts.original_css_node {
-            for n in get_invalid_dom_props(orig) {
-                names.insert(n);
-            }
-        }
-        names.into_iter().collect()
     } else {
         Vec::new()
     };
@@ -821,18 +817,18 @@ fn build_invalid_dom_props_destructure(invalid: &[String]) -> Stmt {
 /// `transform_css_items` on the conditional run, builds the final
 /// classNames + sheets, then delegates to `styled_template`.
 ///
-/// `original_css_node` (§6.8p) is the styled-call's argument
-/// expression(s) BEFORE CSS extraction. It is fed into the
-/// `invalid_dom_props` walk inside `styled_template` so a
-/// `__cmplp.<name>` reference in a branch that produced no CSS
-/// (e.g. `props => props.isPrimary ? undefined : null`) still
-/// surfaces as a destructured "consumed prop" — matching upstream's
-/// `meta.parentPath` walk that sees the entire styled call subtree
-/// regardless of whether each branch produced CSS output.
+/// `original_styled_call` (§6.8x) is the ORIGINAL styled CallExpr /
+/// TaggedTpl AST node, as it lived in source BEFORE any CSS
+/// extraction or identifier resolution. Threaded through
+/// `StyledTemplateOpts.original_styled_call` and walked as the
+/// SOLE input to the invalid-DOM-prop derivation, matching
+/// upstream's `getInvalidDomProps(meta.parentPath)`. See the
+/// field doc on `StyledTemplateOpts.original_styled_call` for
+/// the rationale (the §6.8g/§6.8h/§6.8p drift retraction).
 pub fn build_styled_component(
     tag: Tag,
     css_output: CSSOutput,
-    original_css_node: Option<&Expr>,
+    original_styled_call: Option<&Expr>,
     declared_var_name: Option<&str>,
     meta: &mut Metadata<'_>,
     recorder: &mut MutationRecorder,
@@ -881,7 +877,7 @@ pub fn build_styled_component(
             tag,
             sheets,
             variables: css_output.variables,
-            original_css_node: original_css_node.cloned(),
+            original_styled_call: original_styled_call.cloned(),
             declared_var_name: declared_var_name.map(|s| s.to_string()),
         },
         meta,

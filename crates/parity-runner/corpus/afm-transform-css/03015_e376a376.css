@@ -1,0 +1,1 @@
+display: flex;flex-direction: column;& > * { flex-shrink: 0; }border-radius: var(--ds-radius-small, 4px);margin-bottom: var(--ds-space-200, 16px);flex-shrink: 0;

@@ -1,0 +1,1 @@
+display: flex;flex: 1;height: 100%;min-width: 200px;align-items: center;& > :not(:last-child) { margin-right: var(--ds-space-100, 8px); }

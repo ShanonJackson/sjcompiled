@@ -1,0 +1,1 @@
+> div:first-of-type > div:nth-child(2) { min-height: var(--ds-space-400, 32px); }

@@ -1,0 +1,1 @@
+background-color: var(--ds-background-selected, #E9F2FE);border-width: var(--ds-border-width, 1px);border-style: solid;border-color: var(--ds-border-selected, #1868DB);color: var(--ds-text-selected, #1868DB);cursor: default;&:hover { background-color: var(--ds-background-selected, #E9F2FE);color: var(--ds-text-selected, #1868DB); }

@@ -1,0 +1,1 @@
+grid-column: 2;padding-inline-end: var(--ds-space-050, 4px);padding-inline-start: var(--ds-space-050, 4px);display: flex;flex-direction: column;gap: var(--ds-space-025, 2px);min-width: 1ch;overflow: hidden;&:focus-within { overflow: initial; }

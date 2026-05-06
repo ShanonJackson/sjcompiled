@@ -1,0 +1,1 @@
+position: relative;display: flex;flex: 1;align-items: center;color: var(--ds-text-subtle, #505258);overflow: hidden;padding: 0;background-color: transparent;&:hover { color: var(--ds-text, #292A2E);cursor: pointer;text-decoration: none; }&:focus { outline: none;box-shadow: none; }&:active { border-radius: var(--ds-radius-small, 4px);color: var(--ds-text-subtle, #505258); }

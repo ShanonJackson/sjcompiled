@@ -1,0 +1,1 @@
+display: var(--actions-on-hover-display);grid-area: actions-on-hover;align-items: center;gap: var(--ds-space-050, 4px);overflow: hidden;&:focus-within { overflow: initial; }

@@ -1,0 +1,1 @@
+&:hover, &:focus, &:focus-within { & svg { color:var(--ds-text-subtle, #505258) } }

@@ -1,0 +1,6 @@
+@keyframes kklkcp3 { 0% { background-position: -100px 0; }100% { background-position: 300px 0; } }animation-duration: 1s;animation-fill-mode: forwards;animation-iteration-count: infinite;animation-name: kklkcp3;animation-timing-function: linear;margin-top: var(--ds-space-100, 8px);margin-right: var(--ds-space-150, 12px);margin-bottom: var(--ds-space-100, 8px);margin-left: var(--ds-space-150, 12px);background-color: var(--ds-background-neutral, #0515240F);background-image: linear-gradient(
+        to right,
+        var(--ds-background-neutral, #0515240F) 10%,
+        var(--ds-background-neutral-subtle, #00000000) 30%,
+        var(--ds-background-neutral, #0515240F) 50%
+    );background-repeat: no-repeat;height: var(--_1neqek2);width: var(--_6f8077);border-radius: var(--ds-radius-small, 3px);

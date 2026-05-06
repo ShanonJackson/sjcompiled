@@ -1,0 +1,1 @@
+&::before { content: "";position: absolute;height: 0;width: 0;top: -3px;border-top: var(--ds-space-050, 4px) solid transparent;border-bottom: var(--ds-space-050, 4px) solid transparent;border-left: var(--ds-space-100, 8px) solid var(--ds-icon-brand, #1868DB); }

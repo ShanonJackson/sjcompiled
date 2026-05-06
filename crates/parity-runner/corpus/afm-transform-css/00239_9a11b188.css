@@ -1,0 +1,1 @@
+display: flex;align-items: center;justify-content: space-between;padding-block: var(--ds-space-200, 16px);padding-inline: var(--ds-space-300, 24px);position: sticky;inset-block-start: 0;background-color: var(--ds-surface, #FFFFFF);z-index: 1;border-block-end: var(--ds-border-width, 1px) solid transparent;

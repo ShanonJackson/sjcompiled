@@ -1,0 +1,1 @@
+background-color: var(--ds-surface-sunken, #F8F8F8);border-color: var(--ds-border, #0B120E24);border-style: solid;border-top-width: 0;border-bottom-width: 1px;border-left-width: 0;border-right-width: 1px;&:first-of-type { border-top-left-radius: var(--ds-radius-large, 8px); }&:last-of-type { border-top-right-radius: var(--ds-radius-large, 8px);border-right-width: 0; }

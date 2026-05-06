@@ -1,0 +1,1 @@
+cursor: pointer;&:hover > span { color: var(--ds-text, #292A2E) !important;background-color: var(--ds-background-neutral-hovered, #0B120E24) !important; }

@@ -1,0 +1,1 @@
+&:focus-within [data-component-selector="reports.cfd.chart-legend.color"], &:focus [data-component-selector="reports.cfd.chart-legend.color"], &:hover [data-component-selector="reports.cfd.chart-legend.color"] { background-color:var(--_omorsd); }

@@ -1,0 +1,1 @@
+;background: none;top: 0;border-radius: var(--ds-radius-medium, 6px);&::before {  }&::before { ;transition: opacity 0.2s;content: "";position: absolute;bottom: var(--ds-space-negative-025, -2px);left: 0;right: 0;height: 2px;pointer-events: none;background-color: var(--ds-blanket, #050C1F75); }

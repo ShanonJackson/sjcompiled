@@ -1,0 +1,1 @@
+max-width: 220px;padding-right: var(--ds-space-100, 8px);margin-right: var(--ds-space-negative-200, -16px);margin-bottom: var(--ds-space-100, 8px);max-height: 240px;overflow: auto;&::-webkit-scrollbar { width: 8px;background: transparent; }&::-webkit-scrollbar-thumb { background: #c1c1c1;border-radius: var(--ds-radius-full, 9999px); }

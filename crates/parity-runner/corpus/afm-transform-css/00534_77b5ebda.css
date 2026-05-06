@@ -1,0 +1,1 @@
+background-color: transparent;transition: box-shadow 0.1s cubic-bezier(0.47, 0.03, 0.49, 1.38);;&:focus { outline: none;box-shadow: 0 0 0 2px var(--ds-border-focused, #4688EC) inset; }

@@ -1,0 +1,1 @@
+position: absolute;inset: 0;padding: 0;margin: 0;width: auto;height: auto;background-color: transparent;border: none;cursor: pointer;&:focus { outline-offset: var(--ds-space-negative-025, -2px); }&:focus-visible { outline-offset: var(--ds-space-negative-025, -2px); }

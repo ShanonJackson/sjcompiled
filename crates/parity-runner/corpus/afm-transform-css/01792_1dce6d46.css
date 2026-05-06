@@ -1,0 +1,4 @@
+box-shadow: 
+                -8px 0 8px -8px var(--ds-shadow-overflow-spread, #1E1F2129),
+                -1px 0 1px -1px var(--ds-shadow-overflow-perimeter, #1E1F211f)
+            ;border-left-width: 1px !important;

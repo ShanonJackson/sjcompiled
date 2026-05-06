@@ -1,0 +1,1 @@
+&::after { height: 100%;width: 4px;content: '';opacity: 0.5;transition: opacity 0.25s;background-image: linear-gradient(90deg, #0000001a 0%, #0000);position: absolute;right: -5px;top: var(--ds-space-0, 0px); }

@@ -1,0 +1,20 @@
+
+		background: var(--ds-background-neutral-subtle, #00000000);
+		border-radius: var(--ds-radius-small, 4px);
+		cursor: var(--_lk280q);
+		display: flex;
+		position: relative;
+		
+		padding: 0 var(--ds-space-075, 6px);
+		margin: 0 var(--ds-space-025, 2px);
+
+		
+
+		
+
+	&:focus {
+			z-index: 1;
+			outline: none;
+			box-shadow: var(--ds-border-focused, #4688EC) 0 0 0 var(--ds-border-width-focused, 2px);
+		}
+	;

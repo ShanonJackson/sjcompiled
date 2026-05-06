@@ -1,0 +1,1 @@
+display: flex;justify-content: center;align-items: center;flex-direction: column;gap: var(--ds-space-200, 16px);position: fixed;left: 0;top: var(--topNavigationHeight);bottom: 0;right: 0;z-index: 199;background: linear-gradient(rgba(0, 0, 0, 0), var(--ds-background-accent-blue-subtlest, #E9F2FE) 50%);

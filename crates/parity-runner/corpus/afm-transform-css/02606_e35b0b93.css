@@ -1,0 +1,1 @@
+cursor: w-resize;right: var(--ds-space-075, 6px);&::before { right: 0;mask: conic-gradient(from 45deg at left, #0000, #000 1deg 89deg, #0000 90deg) 50%/100% 10px; }&::after { right: -1px;left: 1px;mask: conic-gradient(from 45deg at left, #0000, #000 1deg 89deg, #0000 90deg) 50%/100% 10px; }&:hover::before { right: 1px; }

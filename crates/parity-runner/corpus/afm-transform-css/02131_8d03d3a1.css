@@ -1,0 +1,1 @@
+min-width: 64px;width: 64px;height: 64px;border-radius: var(--ds-radius-medium, 6px);display: flex;align-items: center;justify-content: center;;margin-right: var(--ds-space-100, 8px);;&:hover { cursor: pointer; }

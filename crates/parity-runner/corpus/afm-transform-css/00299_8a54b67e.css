@@ -1,0 +1,1 @@
+display: flex;flex: none;flex-direction: column;gap: var(--ds-space-050, 4px);margin-block: 0;margin-inline: auto;padding-block-start: var(--ds-space-050, 4px);border-radius: var(--ds-radius-xlarge, 12px);box-sizing: border-box;background-color: var(--ds-surface-sunken, #F8F8F8);width: 270px;position: relative;outline-color: transparent;outline-offset: 0;outline-style: solid;

@@ -1,0 +1,1 @@
+color: var(--ds-link, #1868DB);cursor: pointer;margin-top: var(--ds-space-050, 4px);&:hover { text-decoration: underline; }&:active { color: var(--ds-link-pressed, #1558BC); }

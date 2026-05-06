@@ -1,0 +1,1 @@
+user-select: text;display: flex;padding: 0;background-color: transparent;border: none;color: var(--ds-text, #292A2E);&:hover { color: var(--ds-text, #292A2E);background-color: transparent;cursor: pointer;text-decoration: underline; }&:focus, &:active { color: var(--ds-text, #292A2E);outline: none;box-shadow: none;background-color: transparent; }

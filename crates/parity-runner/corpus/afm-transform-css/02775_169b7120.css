@@ -1,0 +1,1 @@
+color: var(--ds-text-subtlest, #6B6E76);flex-grow: 1;flex-shrink: 1;flex-basis: auto;display: inline-flex;overflow: hidden;& > .ellipsed { flex-grow: 1;flex-shrink: 1;flex-basis: auto; }

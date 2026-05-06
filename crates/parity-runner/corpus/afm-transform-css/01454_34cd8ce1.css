@@ -1,0 +1,1 @@
+& > a, & > span > a, button[id='navigation-apps.scope-switcher-trigger-button'] { &:hover, &[aria-current='page'] { background-color:var(--ds-background-selected, #E9F2FE) } }

@@ -1,0 +1,8 @@
+
+	&:last-child {
+		
+  box-shadow: none;
+;
+		border-bottom-color: transparent;
+	}
+;

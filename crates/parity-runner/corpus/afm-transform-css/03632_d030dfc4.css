@@ -1,0 +1,1 @@
+position: relative;&::after { content: "";position: absolute;top: 0;left: 0;bottom: 0;width: 2px;background-color: var(--ds-background-warning-bold, #FBC828);z-index: 2;pointer-events: none; }

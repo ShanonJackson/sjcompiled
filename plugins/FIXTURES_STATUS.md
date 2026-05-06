@@ -216,13 +216,148 @@ By category:
 
 ## Deferred — architectural blockers
 
-**Root cause (verified empirically 2026-05-06):**
 **Resolved 2026-05-07** — see "[FIXED 2026-05-07] sheet ordering
 cluster — 6 fixtures" in the **Closed (continued)** section above.
 The `transform_cache` port + enter-time dispatch flip landed in
 this session. Cluster is closed.
 
 ## Closed (continued)
+
+- **[FIXED 2026-05-07] scope-index snapshot staleness — Option 1
+  (pre-pass)** — the `init_expr` field on `Binding`
+  (`crates/babel-plugin/src/compat/scope.rs:216`) is a clone
+  taken at `ScopeIndex::build` time, but upstream Babel reads
+  `binding.path.node.init` LIVE every call
+  (`packages/babel-plugin/src/utils/resolve-binding.ts:261`).
+  The `ct-hover-display` fixture surfaced this: `tabStyles`'s
+  init contains arrows whose params get rewritten by
+  `normalize_props_usage` during `visit_mut_expr`, which fires
+  AFTER `ScopeIndex::build`. The styled handler later resolved
+  `tabStyles` and read the pre-rename snapshot — hash inputs
+  diverged.
+
+  **Fix (Option 1 of three considered):** hoist
+  `normalize_props_usage` to a pre-pass that runs BEFORE
+  `ScopeIndex::build`, so the clones captured into `init_expr`
+  are post-rename. Two phases at `Program::enter`:
+  1. Walk `module.body` for `ModuleDecl::Import` and call
+     `record_compiled_import` (idempotent — strips API
+     specifiers, so the children-walk re-call no-ops).
+  2. With `state.compiled_imports` populated, walk every Expr
+     and call `normalize_props_usage` on Compiled `css(...)` /
+     `styled(...)` / `css\`...\`` / `styled\`...\`` sites.
+
+  Implementation: new `PreNormalizeVisitor` struct in
+  `crates/babel-plugin/src/babel_plugin.rs` + new method
+  `BabelPluginVisitor::pre_pass_normalize_props_usage`, called
+  from `visit_mut_program` between `scan_jsx_pragma_comments`
+  and `ScopeIndex::build`. The `visit_mut_expr` retains its own
+  `normalize_props_usage` call (idempotent on already-renamed
+  arrows) for parity with upstream's per-Expr trigger and as a
+  safety net for any Compiled call sites that escape the
+  pre-pass (currently none — `PreNormalizeVisitor` recurses
+  into all positions `visit_mut_expr` would).
+
+  Doc-comment on `Binding::init_expr` and `destructured_init`
+  in `compat/scope.rs` records the new invariant: any future
+  in-place mutator that touches an `init_expr`-eligible Expr
+  MUST be hoisted into the same pre-pass, OR the snapshot
+  architecture itself revisited (Option 2 of the three
+  considered).
+
+  Cost: one extra full-module visit on `Program::enter` —
+  negligible vs SWC's parser/traversal advantage; preserves the
+  eager-Q1 lock (`compat/scope.rs:11-18`).
+
+  Verified: §6.5 JSON corpus 476/477 holds. Cargo
+  lib+integration 511 passed, 1 known-fail (the pre-existing
+  `resolver::engine::tests::build_from_config_with_transforms_doesnt_break_default_resolution`).
+
+  **`ct-hover-display` closed in same session — see next entry.**
+
+- **[FIXED 2026-05-07] ct-hover-display invalid-DOM-prop walk
+  drift (§6.8x retraction of §6.8g/§6.8h/§6.8p)** — the
+  scope-index snapshot fix above exposed a SECOND, pre-existing
+  drift in `styled_template`'s invalid-DOM-prop derivation.
+
+  **Root cause:** upstream
+  `packages/babel-plugin/src/utils/build-styled-component.ts:123`
+  calls `getInvalidDomProps(meta.parentPath)` — a
+  `path.traverse` over the styled CallExpr / TaggedTpl AST
+  subtree. `path.traverse` walks the static AST; it does NOT
+  auto-resolve identifier arguments. For `styled.div(tabStyles)`
+  it sees only the literal `styled.div(tabStyles)` text — no
+  `__cmplp.<name>` MemberExprs reachable through the
+  `tabStyles` Identifier. `invalidDomProps = []` → no
+  destructure.
+
+  The Rust port was walking `opts.class_names`,
+  `opts.variables[].expression`, and a post-extraction CSS
+  node (§6.8g/§6.8h/§6.8p). All three carry post-CSS-extraction
+  artifacts that include resolved-init expansions — i.e. the
+  inlined contents of `tabStyles`'s init. Those carry
+  `__cmplp.isDraggable` / `__cmplp.isDragging` refs which
+  triggered a spurious
+  `const { isDragging, isDraggable, ...__cmpldp } = __cmplp;`
+  destructure and `...__cmpldp` spread (where Babel emits
+  `...__cmplp` directly).
+
+  **Proof harness** at `parity-harness/_drift_proof.mjs`
+  (deleted post-fix) ran three cases:
+  1. `ct-hover-display` smoking-gun: pre-fix Babel emits no
+     destructure, SWC emits one — divergent. Post-fix:
+     byte-equal.
+  2. Minimal isolation (`css({ color: ({ isPrimary }) => … })`
+     resolved into `styled.div(myStyles)`): same shape as case
+     1 with one prop / one arrow / one resolution level.
+     Pre-fix divergent, post-fix byte-equal.
+  3. **Control: inline styled call**
+     (`styled.div({ color: ({ isPrimary }) => … })` — no
+     `css(...)` indirection). Babel's parentPath traversal
+     CAN see `__cmplp.isPrimary` here; both engines emitted
+     the destructure pre-fix; both emit the destructure
+     post-fix. Byte-equal pre AND post-fix. This control
+     proves the divergence was specifically about the
+     identifier-resolution boundary, not the detection logic
+     itself.
+
+  **Fix:**
+  - Renamed `StyledTemplateOpts::original_css_node` →
+    `original_styled_call`. The field now stores the
+    ORIGINAL styled CallExpr / TaggedTpl AST node (the
+    `expr` `try_visit_styled` enters with), NOT a
+    post-extraction CSS payload.
+  - `styled_template`'s invalid-DOM-prop loop now walks
+    ONLY `opts.original_styled_call` — exactly mirroring
+    upstream's `getInvalidDomProps(meta.parentPath)`. The
+    `class_names` and `variables[].expression` walks were
+    DROPPED in full.
+  - Caller in `crates/babel-plugin/src/styled/mod.rs`
+    threads the full styled-call `expr`, not the extracted
+    `css_node_expr`.
+
+  **Verified:**
+  - `/fixtures` triage: 289 parity (+1, the closed
+    `ct-hover-display`), 0 divergence, 2 swc-throws (the
+    documented WASM-panic cases).
+  - §6.5 JSON corpus 476/477 lock holds.
+  - `cargo test -p babel-plugin --release`: 511 passed, 1
+    pre-existing resolver-test fail (unchanged).
+  - All 3 proof-harness cases byte-equal.
+
+  **Drift retraction note:** the §6.8g/§6.8h/§6.8p comments
+  in `build_styled_component.rs` claimed the broader walk was
+  "byte-equivalent to upstream's parentPath walk" and
+  "matches upstream's source-order traversal". That claim
+  was wrong: it never matched, the over-reporting was
+  masked by the scope-index snapshot bug for the entire
+  history of those changes. With the snapshot fix landed,
+  the broader walk produced visible drift on the first
+  fixture that exercised resolved-init expansion through a
+  styled call. Comments rewritten to record the corrected
+  understanding.
+
+
 
 - **[FIXED 2026-05-07] ct-minheight-calc-fg-stack +
   ct-columns-container-minheight-stack +
@@ -295,8 +430,8 @@ to refresh):
 
 ```
 total                336
-parity               288  (+23 from baseline)
-divergence           1
+parity               289  (+24 from baseline; 0 remaining ct-* divergences)
+divergence           0
 swc-throws           2
 babel-throws         0
 both-throw           2     ← negative-test fixtures (OK)
@@ -304,39 +439,85 @@ skipped-multifile    43    ← gated behind --include-multi
 skipped-no-input     0
 ```
 
-### Stale scope-index snapshot (1) — `ct-hover-display`
+### ~~Drift detected — `build_styled_component` invalid-DOM-prop walk over-reports (1) — `ct-hover-display`~~ — CLOSED 2026-05-07
 
-`normalize_props_usage` rewrites the AST in place after the
-scope_index has already cloned `init_expr` for each binding
-(`crates/babel-plugin/src/compat/scope.rs:987` —
-`declarator.init.clone()`). Subsequent resolves through the
-scope_index return the STALE pre-rename snapshot, so
-`ix(<expr>)` runtime emits use `isDraggable` instead of
-`__cmplp.isDraggable`. Class hashes diverge accordingly.
+Closed in same session as the scope-index snapshot fix above.
+See `[FIXED 2026-05-07] ct-hover-display invalid-DOM-prop walk
+drift (§6.8x retraction of §6.8g/§6.8h/§6.8p)` in the **Closed
+(continued)** section. Section retained below for the
+historical triage record:
 
-Fix candidates (each with trade-offs):
+**The scope-index snapshot fix landed correctly** (closed
+above). Hash inputs now match Babel byte-for-byte. But it
+exposed a SECOND, pre-existing drift that had been masked by
+the snapshot bug.
 
-1. Run `normalize_props_usage` before scope_index build (requires
-   pre-resolving compiled imports first).
-2. Live-snapshot model: scope_index stores node-ids and looks up
-   live nodes per query (heavy borrow gymnastics with `&mut Module`).
-3. Re-run normalize_props_usage on the snapshot when resolving
-   (cheap, but invalidates the "single normalize per call" invariant).
+**Symptom:** for the input
 
-Status: open, blocked on architectural decision.
+```jsx
+const tabStyles = css({
+  '&:hover': ({ isDraggable }) => ({ ... }),
+  ...({ isDragging }) => (isDragging ? { opacity: 0.1 } : {}),
+});
+export const Component = styled.div(tabStyles);
+```
 
-### Other ct-* divergences (0 remaining)
+Babel emits `<C ...__cmplp ... />` (no destructure). The Rust
+port emits `const { isDragging, isDraggable, ...__cmpldp } =
+__cmplp;` and `<C ...__cmpldp ... />`. Both sides have the
+same `__cmplp.isDragging` / `__cmplp.isDraggable` references in
+the runtime body — only the destructure / spread target differs.
 
-All non-deferred single-file divergences are closed. The single
-remaining open divergence (`ct-hover-display`) is gated on the
-scope-index live-snapshot architectural decision; the
-sheet-ordering cluster was closed 2026-05-07 (see Closed section).
+**Root cause:** upstream
+`packages/babel-plugin/src/utils/build-styled-component.ts:123`
+calls `getInvalidDomProps(meta.parentPath)`, where
+`meta.parentPath` is the styled CALL EXPRESSION
+(`styled.div(tabStyles)`). Babel's `path.traverse` walks the
+AST subtree of that path; it does NOT auto-resolve identifier
+arguments. So Babel sees only `styled.div(tabStyles)` —
+literal text, no `__cmplp.<name>` MemberExprs reachable —
+and `invalidDomProps` is `[]` → no destructure.
 
-Use `bun parity-harness/fixtures-triage.mjs --only <name> --print-diffs`
-to start triage; the in-process debug-test pattern proven on
-`ct-ts-as-cast` and `ct-styled-token-nested-ternary` (write a
-short cargo integration test, parse + run_dispatcher, dump hash
-inputs) is the fastest way to find the divergent input string.
+The Rust port at
+`crates/babel-plugin/src/utils/build_styled_component.rs:330-367`
+walks `opts.class_names`, `opts.variables[i].expression`, and
+`opts.original_css_node` (the styled-call argument). All three
+carry post-CSS-extraction artifacts that include resolved-init
+expansions — i.e. the inlined contents of `tabStyles`'s init.
+Those carry `__cmplp.isDraggable` / `__cmplp.isDragging` refs
+which trigger the destructure.
+
+The §6.8g / §6.8h / §6.8p comments at lines 332-366 explicitly
+documented this as an INTENTIONAL extension to surface refs in
+"dead branches" (e.g. `props.x ? undefined : null`) — but
+that's drift: Babel wouldn't surface those either, since
+`meta.parentPath` traversal also can't reach them.
+
+**Status: drift flagged, not yet fixed.** Per CLAUDE.md
+("Drift detected in X — `<Explanation>`"), surfaced here for
+routing. Fix shape would be: walk ONLY the original styled
+call expression (the AST node `try_visit_styled` receives as
+`expr`), to match upstream's `meta.parentPath` granularity
+exactly. Drop the class_names/variables/original_css_node
+walks. Risk: any existing fixture that relied on the
+"dead-branch surfacing" shape (the §6.8p case) would
+regress; needs verification against the full corpus before
+landing.
+
+**Investigation needed before fixing:**
+1. What fixture(s) does the §6.8p `original_css_node` walk
+   currently power? `git log -p crates/babel-plugin/src/utils/build_styled_component.rs`
+   should show the introducing commit.
+2. Run that fixture against a "walk only `expr`" variant —
+   does Babel actually surface the dead-branch refs? If not,
+   §6.8p was over-engineering and dropping it is pure parity
+   improvement.
+3. Same audit for §6.8g (class_names) and §6.8h
+   (class_names+variables ordering): do those serve real
+   fixtures or are they hedges that introduced drift?
+
+Closing `ct-hover-display` requires this audit + the surgical
+walk-narrowing. Roughly 50 LOC + corpus re-verify.
 
 ### swc-throws (2)
 

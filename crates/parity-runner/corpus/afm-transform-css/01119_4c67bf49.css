@@ -1,0 +1,1 @@
+border-color: var(--ds-border-selected, #1868DB);background-color: var(--ds-background-selected, #E9F2FE);span:first-of-type::after { opacity: 1;background-color: var(--ds-interaction-pressed, #00000052); }

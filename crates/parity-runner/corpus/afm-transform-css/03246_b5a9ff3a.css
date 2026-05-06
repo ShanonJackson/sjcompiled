@@ -1,0 +1,1 @@
+height: 100%;display: flex;flex-direction: column;.fc-list-event-graphic { display: none; }&&& { .fc-list-day-cushion, .fc-list-day > th { background-color: var(--ds-surface, #FFFFFF); }.fc-list-event:hover > * { background-color: var(--ds-background-neutral-hovered, #0B120E24); }.fc-list-empty { background-color: transparent; } }

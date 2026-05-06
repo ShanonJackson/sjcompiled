@@ -1,0 +1,1 @@
+& span { color: var(--ds-link, #1868DB);cursor: pointer;&:hover { text-decoration: underline; } }

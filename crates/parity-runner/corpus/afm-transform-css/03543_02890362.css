@@ -1,0 +1,1 @@
+width: 60%;flex: 1 4 50%;text-decoration: none;& span { color: var(--option-link-color, inherit);&:hover { text-decoration: underline; } }

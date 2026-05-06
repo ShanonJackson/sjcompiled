@@ -1,0 +1,1 @@
+&:nth-of-type(n + 1) { padding-left: var(--ds-space-200, 16px); }

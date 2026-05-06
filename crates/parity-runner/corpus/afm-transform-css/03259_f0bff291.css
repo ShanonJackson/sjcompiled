@@ -1,0 +1,1 @@
+position: relative;height: 48px;width: 100%;;;box-sizing: border-box;border-radius: var(--ds-radius-medium, 6px);display: flex;align-items: center;justify-content: center;margin-top: var(--ds-space-100, 8px);margin-bottom: var(--ds-space-100, 8px);outline: none;&:hover { background-color: var(--ds-background-neutral-subtle-hovered, #0515240F);cursor: pointer; }

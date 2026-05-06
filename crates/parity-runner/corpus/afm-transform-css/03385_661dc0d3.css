@@ -1,0 +1,1 @@
+width: 100%;margin-top: var(--ds-space-100, 8px);& thead th { background-color: var(--ds-background-neutral-subtle, #00000000); }& tbody tr:last-of-type td:first-of-type { border-bottom-left-radius: var(--ds-radius-medium, 6px); }& tbody tr:last-of-type td:last-of-type { border-bottom-right-radius: var(--ds-radius-medium, 6px); }

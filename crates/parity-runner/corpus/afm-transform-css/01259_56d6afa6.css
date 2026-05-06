@@ -1,0 +1,1 @@
+align-items: center;display: flex;flex-flow: row-reverse wrap;& > * + * { margin-left: var(--ds-space-100, 8px); }

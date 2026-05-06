@@ -1,0 +1,3 @@
+background: linear-gradient(79deg,
+        var(--ds-background-accent-blue-subtlest, #E9F2FE),
+        var(--ds-background-accent-purple-subtlest, #F8EEFE));height: 90px;border-radius: var(--ds-radius-small, 4px) var(--ds-radius-small, 4px) 0 0;padding: 0;position: relative;

@@ -1,0 +1,1 @@
+@media not all and (min-width: 64rem) { &::after { width: 0 !important; } }

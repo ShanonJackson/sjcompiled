@@ -1,0 +1,1 @@
+section { border-top: none;border-right: none;border-left: none; }div:not([open]) > section { border-bottom-color: var(--ds-background-neutral-subtle, #00000000); }div[open] div:first-of-type { border: none; }

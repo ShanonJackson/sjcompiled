@@ -1,0 +1,1 @@
+margin-block-end: var(--ds-space-negative-100, -8px);details { div:first-of-type { border: none; } }details:not([open]) > summary { border-bottom-color: var(--ds-background-neutral-subtle, #00000000); }details > summary { border-top: none;border-right: none;border-left: none; }

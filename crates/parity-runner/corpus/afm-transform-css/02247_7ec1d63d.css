@@ -1,0 +1,1 @@
+pointer-events: auto;width: 10px;cursor: col-resize;opacity: 0;transition: opacity 250ms;user-select: none;display: flex;align-items: center;justify-content: center;&:hover { opacity: 1; }

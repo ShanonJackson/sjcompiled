@@ -1,0 +1,1 @@
+display: flex;align-items: center;justify-content: center;border-radius: var(--ds-radius-xlarge, 12px);box-shadow: 0px 0px 1px rgba(9, 30, 66, 0.31), 0px 10px 18px rgba(9, 30, 66, 0.15);height: 72px;min-width: 72px;color: var(--ds-text-inverse, #FFFFFF);background-color: var(--ds-background-brand-bold, #1868DB);

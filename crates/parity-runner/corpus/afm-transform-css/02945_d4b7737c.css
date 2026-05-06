@@ -1,0 +1,1 @@
+&:hover { background-color: var(--ds-background-neutral-subtle-hovered, #0515240F) !important;border-color: transparent !important; }&:not(:focus-within) { border-color: var(--ds-border, #0B120E24) !important; }&&:focus-within { background-color: var(--ds-background-neutral, #0515240F) !important;border-color: var(--ds-border-focused, #4688EC) !important; }

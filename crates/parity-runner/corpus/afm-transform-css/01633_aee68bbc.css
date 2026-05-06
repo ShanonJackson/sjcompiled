@@ -1,0 +1,1 @@
+width: 100%;position: relative;overflow: hidden;::after { content: "";top: 0;left: 0;display: block;height: 100%;width: 100%;position: absolute;transition: background-color 140ms ease-in-out;background: linear-gradient(to right, transparent 90%, var(--jsw-card-background-color) 100%);background-attachment: local; }

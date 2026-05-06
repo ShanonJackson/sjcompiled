@@ -1,0 +1,1 @@
+display: grid;grid-template-columns: [title] fit-content(100px) [content] 1fr;

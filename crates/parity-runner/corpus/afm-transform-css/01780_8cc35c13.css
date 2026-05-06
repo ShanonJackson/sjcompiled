@@ -1,0 +1,1 @@
+&:focus { box-shadow: unset;border-right: unset;&:before { border: unset; } }

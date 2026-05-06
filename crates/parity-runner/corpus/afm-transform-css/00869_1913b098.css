@@ -1,0 +1,1 @@
+text-decoration: none;color: var(--ds-text, #292A2E);&:hover { color: var(--ds-text, #292A2E);text-decoration: none;background-color: var(--ds-background-neutral-hovered, #0B120E24); }&:active { color: var(--ds-text, #292A2E);text-decoration: none; }&:focus { color: var(--ds-text, #292A2E);text-decoration: none; }

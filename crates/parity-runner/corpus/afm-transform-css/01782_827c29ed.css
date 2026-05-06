@@ -1,0 +1,1 @@
+:focus::before { top: 0px;right: -1px;left: -1px;bottom: -1px;height: calc(100% - 2px); }

@@ -1,0 +1,1 @@
+> button { border-left: var(--ds-border-width-selected, 2px) solid transparent;&:hover { border-left: var(--ds-border-width-selected, 2px) solid var(--ds-border-selected, #1868DB); }text-align: left; }

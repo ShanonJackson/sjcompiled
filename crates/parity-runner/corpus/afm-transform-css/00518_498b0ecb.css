@@ -1,0 +1,1 @@
+padding-inline-start: var(--ds-space-150, 12px);padding-inline-end: var(--ds-space-200, 16px);display: flex;flex-direction: column;gap: var(--ds-space-025, 2px);min-width: 1ch;overflow: hidden;text-overflow: ellipsis;&:focus-within { overflow: initial; }

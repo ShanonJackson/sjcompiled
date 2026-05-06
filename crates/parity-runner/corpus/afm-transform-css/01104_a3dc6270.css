@@ -1,0 +1,1 @@
+&& { height: 24px;width: 24px;margin-right: var(--ds-space-100, 8px); }&&[aria-disabled='true'] { cursor: not-allowed;background-color: transparent !important;text-decoration: none; }&&[data-item-elem-after] { margin-left: var(--ds-space-100, 8px);opacity: 1; }

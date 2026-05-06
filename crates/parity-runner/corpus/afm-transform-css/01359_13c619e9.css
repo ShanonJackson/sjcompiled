@@ -1,0 +1,1 @@
+&:focus-visible { outline-offset: var(--ds-space-negative-025, -2px); }

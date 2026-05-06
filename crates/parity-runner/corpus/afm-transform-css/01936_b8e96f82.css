@@ -1,0 +1,1 @@
+border-width: var(--ds-border-width, 1px);border-style: solid;border-color: var(--ds-border, #0B120E24);border-radius: var(--ds-radius-small, 4px);width: 32px;height: 32px;display: flex;align-items: center;justify-content: center;background-color: var(--ds-background-neutral-subtle, #00000000);padding: 0;

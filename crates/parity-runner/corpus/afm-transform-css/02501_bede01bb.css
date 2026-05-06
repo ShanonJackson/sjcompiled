@@ -1,0 +1,6 @@
+background-color: var(--ds-background-accent-blue-subtlest, #E9F2FE);background-image: 
+			linear-gradient(to right, transparent 50%, var(--ds-border-focused, #4688EC) 50%),
+			linear-gradient(to right, transparent 50%, var(--ds-border-focused, #4688EC) 50%),
+			linear-gradient(to bottom, transparent 50%, var(--ds-border-focused, #4688EC) 50%),
+			linear-gradient(to bottom, transparent 50%, var(--ds-border-focused, #4688EC) 50%)
+		;

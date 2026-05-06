@@ -1,0 +1,13 @@
+position: relative;border-radius: var(--ds-radius-medium, 6px);border: var(--ds-border-width, 1px) solid transparent;--multi-select-rovo-angle: 39deg;background: linear-gradient(var(--ds-surface, #ffffff), var(--ds-surface, #ffffff)) padding-box,
+			conic-gradient(
+	from var(--multi-select-rovo-angle) at 50% 50%,
+	var(--ds-background-accent-orange-subtle, #fca700) 0deg,
+	var(--ds-background-accent-orange-subtle, #fca700) 72.69deg,
+	var(--ds-background-accent-green-subtle, #6a9a23) 72.73deg,
+	var(--ds-background-accent-green-subtle, #6a9a23) 167.89deg,
+	var(--ds-background-accent-blue-subtle, #1868db) 167.93deg,
+	var(--ds-background-accent-blue-subtle, #1868db) 252.67deg,
+	var(--ds-background-accent-purple-subtle, #af59e0) 252.7deg,
+	var(--ds-background-accent-purple-subtle, #af59e0) 360deg
+)
+			border-box;animation: kdnx5ql 3s linear infinite;;

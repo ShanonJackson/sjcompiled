@@ -1,0 +1,1 @@
+&::before { border-color: transparent transparent var(--ds-border, #0B120E24);border-bottom: 3px solid var(--ds-border, #0B120E24); }&::after { border-color: var(--ds-border, #0B120E24) transparent transparent;border-top: 3px solid var(--ds-background-accent-gray-bolder, #6B6E76); }

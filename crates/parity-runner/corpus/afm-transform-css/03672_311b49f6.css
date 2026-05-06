@@ -1,0 +1,1 @@
+width: 32px;height: 32px;display: flex;align-items: center;justify-content: center;border-radius: var(--ds-radius-medium, 6px);background-color: var(--ds-background-neutral-bold, #292A2E);padding-top: var(--ds-space-050, 4px);padding-right: var(--ds-space-050, 4px);padding-bottom: var(--ds-space-050, 4px);padding-left: var(--ds-space-050, 4px);flex-shrink: 0;overflow: hidden;

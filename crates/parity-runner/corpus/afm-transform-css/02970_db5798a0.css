@@ -1,0 +1,1 @@
+border-width: var(--ds-border-width-selected, 2px);border-style: dashed;border-radius: var(--ds-radius-small, 3px);border-color: var(--ds-border-brand, #1868DB);transition: border-color 0.3s, background-color 0.3s;background-color: var(--ds-background-selected-hovered, #CFE1FD);

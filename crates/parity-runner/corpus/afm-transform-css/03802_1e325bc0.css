@@ -1,0 +1,4 @@
+;grid-row: card-extra-fields / end;display: grid;box-sizing: border-box;grid-template-columns: minmax(auto, max-content) var(--ds-space-100, 8px) minmax(auto, max-content) var(--ds-space-100, 8px) minmax(
+        auto,
+        max-content
+    );align-items: start;color: var(--ds-text-subtlest, #6B6E76);column-gap: var(--ds-space-050, 4px);;;overflow: hidden;& > * { min-width: 0;z-index: 1; }

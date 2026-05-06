@@ -1,0 +1,1 @@
+height: 40px;border-radius: var(--ds-radius-small, 4px);box-shadow: var(--ds-shadow-raised, 0px 1px 1px #1E1F2140, 0px 0px 1px #1E1F214f);button { opacity: 0;background-color: transparent; }&:hover { button { opacity: 1;background-color: transparent; }[data-hover-container] { background-color: var(--ds-background-neutral-subtle-hovered, #0515240F); } }

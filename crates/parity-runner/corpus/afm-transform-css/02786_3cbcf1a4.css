@@ -1,0 +1,1 @@
+min-width: 36px;margin-left: var(--ds-space-050, 4px);&:first-child { margin-left: var(--ds-space-0, 0px); }& > span { max-width: 100%; }

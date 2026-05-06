@@ -1,0 +1,1 @@
+clip-path: inherit;background-color: var(--ds-surface, #FFFFFF);padding-inline: var(--ds-border-width-selected, 2px);& [data-testid="filters.ui.filters.assignee.stateless.avatar.ak-avatar--inner"] { margin: 1px; }

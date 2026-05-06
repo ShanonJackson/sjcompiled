@@ -1,0 +1,4 @@
+:hover {
+                cursor: pointer;
+                background-color: var(--ds-surface-hovered, #F0F1F2);
+              };

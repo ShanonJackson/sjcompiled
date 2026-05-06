@@ -1,0 +1,1 @@
+display: flex;align-items: center;justify-content: space-between;& div[data-smart-link-container="true"] { border-radius: var(--ds-radius-large, 4px); }[data-component-selector="edit-button-aAZ"] { display: none; }&:hover { [data-component-selector="edit-button-aAZ"] { display: block; } }

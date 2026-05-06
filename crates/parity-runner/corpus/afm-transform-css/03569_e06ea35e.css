@@ -1,0 +1,1 @@
+background-color: var(--ds-background-selected, #E9F2FE);&::after { content: "";position: absolute;top: 0;bottom: 0;left: 0;right: 0;border-left: 24px solid var(--ds-border-inverse, #FFFFFF);border-right: 8px solid var(--ds-border-inverse, #FFFFFF); }[data-component-selector="ticket-type-item-wrapper-selector"] { pointer-events: none; }

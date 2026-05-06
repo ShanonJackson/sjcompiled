@@ -1,0 +1,1 @@
+--child-hover-opacity: 0;--name-mask: none;&:hover, &:active, &:focus-within { --child-hover-opacity: 1px;--name-mask: linear-gradient(to right, black 50%, rgba(0,0,0,0.7) 65%, transparent 80%); }

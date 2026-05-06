@@ -1,0 +1,1 @@
+display: flex;padding-bottom: var(--ds-space-400, 32px);padding-top: var(--ds-space-250, 20px);height: calc(100% - var(--ds-space-400, 32px) - var(--ds-space-250, 20px));

@@ -1,0 +1,1 @@
+display: block;color: var(--ds-text, #292A2E);white-space: nowrap;overflow: hidden;text-overflow: ellipsis;text-decoration: none;&:hover { color: var(--ds-text, #292A2E);text-decoration: underline; }

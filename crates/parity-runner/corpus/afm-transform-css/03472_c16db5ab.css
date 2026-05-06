@@ -1,0 +1,1 @@
+display: flex;gap: var(--ds-space-100, 8px);flex: 1;align-items: center;;border: 0;border-radius: var(--ds-radius-small, 3px);padding-top: 0;padding-right: var(--ds-space-050, 4px);padding-bottom: 0;padding-left: var(--ds-space-050, 4px);width: 100%;height: var(--ds-space-400, 32px);overflow-x: hidden;cursor { cursor: not-allowed; }color: inherit;outline: none;

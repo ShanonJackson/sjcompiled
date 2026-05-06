@@ -1,0 +1,1 @@
+display: flex;align-items: center;flex: 1;align-self: stretch;background-color: transparent;padding-block: var(--ds-space-150, 12px);padding-inline: var(--ds-space-0, 0px);border-radius: var(--ds-radius-small, 4px);&::after { content: "";position: absolute;inset: 0;border-radius: var(--ds-radius-small, 4px); }

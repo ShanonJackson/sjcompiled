@@ -1,0 +1,1 @@
+display: inline-flex;align-items: center;justify-content: center;padding-block: 0;padding-inline: var(--ds-space-100, 8px);height: 24px;min-height: 24px;border-radius: var(--ds-radius-medium, 6px);background-color: transparent;&:hover { background-color: var(--ds-background-neutral-subtle-hovered, #0515240F); }

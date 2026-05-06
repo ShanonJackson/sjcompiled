@@ -156,10 +156,22 @@ pub fn try_visit_styled(
         own_scope_override: None,
             in_conditional_branch: false,
     };
+    // §6.8x — pass the ORIGINAL styled CallExpr / TaggedTpl
+    // (the `expr` we entered with), NOT `css_node_expr`. Upstream's
+    // `getInvalidDomProps(meta.parentPath)` walks the bare styled
+    // call AST node and does NOT auto-resolve identifier arguments;
+    // `css_node_expr` is the EXTRACTED css-arg payload (which for
+    // the call form is the `(tabStyles)` argument unwrapped — same
+    // shape, but the explicit invariant is "feed Babel's parentPath
+    // analog, not the extracted CSS"). The two happen to be
+    // structurally identical for the call form, but for
+    // tagged-template / `styled(C)\`...\`` shapes the styled call
+    // wraps the css node in additional AST that Babel's traversal
+    // sees and we must too. See StyledTemplateOpts::original_styled_call.
     let replacement = build_styled_component(
         data.tag,
         css_output,
-        Some(&css_node_expr),
+        Some(expr),
         declared_var_name,
         &mut meta,
         recorder,

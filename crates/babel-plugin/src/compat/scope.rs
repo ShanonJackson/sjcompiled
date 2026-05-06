@@ -213,6 +213,33 @@ pub struct Binding {
     /// non-const binding deopts before reaching the init recursion).
     /// Finding 1's stored-bool reasoning applies — the gate is decided
     /// once at index-build time, not recomputed per lookup.
+    ///
+    /// ### Snapshot-vs-live invariant (§6.8x)
+    ///
+    /// This field is a **clone snapshot** taken at `ScopeIndex::build`
+    /// time. Upstream Babel's analog (`binding.path.node.init`) is a
+    /// **live read** of the AST — any in-place mutation that fires
+    /// between scope-build and the consumer read is observable to
+    /// upstream, NOT to us.
+    ///
+    /// To avoid a stale-snapshot divergence (the `ct-hover-display`
+    /// signature: `normalizePropsUsage` mutates the styled init's
+    /// arrows after scope-build, hash inputs read the pre-rename
+    /// clone), the visitor must run every relevant in-place mutator
+    /// BEFORE `ScopeIndex::build`. Today the ONLY known mutator that
+    /// touches an Expr captured by `init_expr` is
+    /// `crate::utils::normalize_props_usage::normalize_props_usage`,
+    /// hoisted into a pre-pass at
+    /// `babel_plugin.rs::pre_pass_normalize_props_usage`.
+    ///
+    /// **Drift watchpoint:** if a future change adds a second
+    /// in-place mutator that runs during the children walk and
+    /// touches an `init_expr`-eligible Expr (any `const x = …` RHS
+    /// reachable from a styled/css/keyframes/cssMap call), it MUST
+    /// either be hoisted into the same pre-pass, OR the snapshot
+    /// architecture itself revisited (FIXTURES_STATUS.md
+    /// "scope-index live-snapshot decision" — Option 2). Patching
+    /// the symptom at consumer call sites is drift; do not.
     pub init_expr: Option<Box<Expr>>,
     /// For VariableDeclarators only: the type of `node.id` —
     /// `"Identifier"` for plain `const x = …`, `"ObjectPattern"` for
@@ -244,6 +271,12 @@ pub struct Binding {
     /// `binding.path.node.init` (the source) at resolve time.
     /// Populated only when LHS is `Pat::Object` AND `init` is
     /// `Some(_)`. `None` everywhere else.
+    ///
+    /// **Same snapshot-vs-live invariant as `init_expr`** — see that
+    /// field's doc-comment. The pre-pass at
+    /// `babel_plugin.rs::pre_pass_normalize_props_usage` mutates
+    /// Compiled call sites BEFORE `ScopeIndex::build` so the clones
+    /// captured here are post-rename.
     pub destructured_pat: Option<Box<ObjectPat>>,
     pub destructured_init: Option<Box<Expr>>,
 }

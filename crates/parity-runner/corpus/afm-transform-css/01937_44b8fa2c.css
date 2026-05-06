@@ -1,0 +1,1 @@
+&:hover { background-color: var(--ds-background-neutral-subtle-hovered, #0515240F); }&:active { background-color: var(--ds-background-neutral-subtle-pressed, #0B120E24);border-color: var(--ds-border-accent-blue, #357DE8); }&:focus { background-color: var(--ds-background-selected, #E9F2FE);border-color: var(--ds-border-focused, #4688EC); }

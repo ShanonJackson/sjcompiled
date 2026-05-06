@@ -1,0 +1,1 @@
+display: flex;margin-top: var(--ds-space-100, 8px);margin-bottom: var(--ds-space-250, 20px);align-items: center;justify-content: space-between;& > div:nth-of-type(1) { flex: 1; }

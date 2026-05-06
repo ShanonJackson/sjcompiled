@@ -1,0 +1,3 @@
+flex: 0 1 auto;direction: rtl;white-space: nowrap;overflow: hidden;&:focus-within { outline: var(--ds-border-width-focused, 2px) auto
+
+            var(--ds-border-focused, #4688EC); }

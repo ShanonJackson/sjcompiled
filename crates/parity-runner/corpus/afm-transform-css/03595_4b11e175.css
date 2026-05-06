@@ -1,0 +1,1 @@
+padding-right: var(--ds-space-050, 4px);padding-left: var(--ds-space-050, 4px);border: none;width: 100%;text-align: left;background-color: var(--ds-background-neutral-subtle, #00000000);&:hover { background-color: var(--ds-background-neutral-subtle-hovered, #0515240F); }&:active { background-color: var(--ds-background-neutral-subtle-pressed, #0B120E24); }

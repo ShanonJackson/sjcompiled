@@ -1,0 +1,1 @@
+color: var(--ds-text-subtlest, #6B6E76);;min-width: 0;max-width: 100%;overflow: hidden;white-space: nowrap;position: relative;&::after { content: "";left: 0;top: 0;display: block;height: 100%;width: 100%;position: absolute;background: linear-gradient(to right, transparent 90%, var(--jsw-card-background-color, white) 100%);background-attachment: local; }& > * { margin-top: 0; }

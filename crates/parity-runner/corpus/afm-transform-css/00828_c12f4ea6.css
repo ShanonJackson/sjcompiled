@@ -1,0 +1,1 @@
+display: flex;align-items: center;gap: var(--ds-space-150, 12px);padding-inline: var(--ds-space-200, 16px);padding-block: var(--ds-space-100, 8px);cursor: pointer;width: 100%;border-left: var(--ds-border-width-selected, 2px) solid transparent;&:hover { background-color: var(--ds-background-selected-hovered, #CFE1FD);border-left-color: var(--ds-border-selected, #1868DB); }

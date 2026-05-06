@@ -1,0 +1,1 @@
+&& { color: var(--sidebar-menu-item-color);&:focus, &:visited { color: var(--sidebar-menu-item-color); } }[data-item-title] { color: var(--sidebar-menu-item-color); }

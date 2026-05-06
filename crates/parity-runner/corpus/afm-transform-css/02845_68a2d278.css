@@ -1,0 +1,1 @@
+border-width: var(--ds-border-width, 1px);border-style: solid;border-radius: var(--ds-radius-large, 8px);border-color: var(--ds-border, #0B120E24);background-color: var(--ds-surface, #FFFFFF);min-width: 400px;display: flex;flex-direction: column;

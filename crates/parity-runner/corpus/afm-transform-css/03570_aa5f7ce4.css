@@ -1,0 +1,1 @@
+padding-left: var(--ds-space-300, 24px);padding-right: var(--ds-space-100, 8px);&:hover { background-color: var(--ds-surface-raised, #FFFFFF); }&:hover [data-component-selector="ticket-type-item-wrapper-selector"] { background-color: transparent; }

@@ -1,0 +1,1 @@
+&:hover [data-testid="hexagon-border-container"], &:focus [data-testid="hexagon-border-container"], &:focus-within [data-testid="hexagon-border-container"] { clip-path:; }

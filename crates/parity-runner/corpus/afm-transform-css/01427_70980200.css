@@ -1,0 +1,1 @@
+position: relative;;height: 100%;;padding: 0;margin: 0;border: none;background-color: transparent;cursor: pointer;&:focus:not(:focus-visible) { box-shadow: none; }flex: 0 0 auto;outline: none;transition: box-shadow 0.2s cubic-bezier(0.47, 0.03, 0.49, 1.38);&:focus-visible { box-shadow: inset 0 0 0 2px var(--ds-text-selected, #1868DB);opacity: 1; }

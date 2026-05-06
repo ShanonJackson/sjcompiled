@@ -1,0 +1,1 @@
+color: var(--ds-text, #292A2E);background-color: var(--ds-background-selected, #E9F2FE);position: relative;&::before { content: "";position: absolute;top: 0;left: 0;bottom: 0;width: var(--ds-space-025, 2px);background-color: var(--ds-border-focused, #4688EC); }

@@ -1,0 +1,1 @@
+width: 100%;height: 100%;border-width: var(--ds-border-width, 1px);border-style: solid;border-color: var(--ds-border, #0B120E24);border-top: none;border-right: none;border-left: none;cursor: pointer;background-color: transparent;&:hover { background-color: var(--ds-background-neutral-subtle-hovered, #0515240F); }

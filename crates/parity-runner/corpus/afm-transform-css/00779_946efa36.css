@@ -1,0 +1,1 @@
+grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));gap: var(--ds-space-200, 16px);

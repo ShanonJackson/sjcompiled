@@ -1,0 +1,1 @@
+display: flex;justify-content: space-between;align-items: center;padding-block: var(--ds-space-050, 4px);padding-inline: var(--ds-space-100, 8px);background-color: var(--ds-background-neutral-subtle, #00000000);text-align: start;&:hover { background-color: var(--ds-background-neutral-subtle-hovered, #0515240F); }

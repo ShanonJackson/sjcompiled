@@ -1,0 +1,1 @@
+cursor: pointer;:hover { border-width: var(--ds-border-width, 1px);border-style: solid;border-color: var(--ds-border-focused, #4688EC); }:focus-within { border-width: var(--ds-border-width, 1px);border-style: solid;border-color: var(--ds-border-focused, #4688EC); }

@@ -1,0 +1,1 @@
+& div[data-smart-link-container="true"] { border-radius: var(--ds-radius-large, 4px); }& .actions-button-group { width: 0;min-width: 0;margin-left: var(--ds-space-negative-100, -8px);height: 20px; }&:hover { .actions-button-group { width: initial;min-width: initial;margin-left: -0.3rem; } }

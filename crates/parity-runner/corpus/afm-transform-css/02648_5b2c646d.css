@@ -1,0 +1,1 @@
+display: flex;padding-bottom: var(--ds-space-200, 16px);;@media (max-width: 600px) { gap: var(--ds-space-150, 12px) !important; }

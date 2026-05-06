@@ -1,0 +1,1 @@
+background-color: var(--ds-background-input, #FFFFFF);&:not(:focus-within):not([data-invalid="true"]) { border-color: transparent !important; }[data-component="delete-question-button"] { margin-right: var(--ds-space-075, 6px); }&:not(:hover, :focus-within) > [data-component="delete-question-button"] { opacity: 0; }

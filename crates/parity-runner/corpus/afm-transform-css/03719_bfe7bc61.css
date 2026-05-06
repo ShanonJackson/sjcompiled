@@ -1,0 +1,1 @@
+cursor: not-allowed;color: var(--ds-text-disabled, #080F214A);background-color: transparent;&:hover { color: var(--ds-text-disabled, #080F214A);background-color: transparent; }&:active { color: var(--ds-text-disabled, #080F214A);background-color: transparent; }&::after { border-color: var(--ds-border-disabled, #0515240F); }

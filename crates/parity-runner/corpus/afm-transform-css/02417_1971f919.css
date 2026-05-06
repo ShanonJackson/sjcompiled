@@ -1,0 +1,1 @@
+color: var(--ds-text-subtle, #505258);font-weight: var(--ds-font-weight-medium, 500);background-color: transparent;padding-top: var(--ds-space-0, 0px);padding-right: var(--ds-space-0, 0px);padding-bottom: var(--ds-space-0, 0px);padding-left: var(--ds-space-0, 0px);&:hover { text-decoration: underline; }&:active { color: var(--ds-text, #292A2E); }

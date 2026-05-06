@@ -1,0 +1,1 @@
+display: flex;flex-grow: 1;min-width: 0px;margin: 0;padding-block: 0;padding-inline-start: var(--ds-space-025, 2px);padding-inline-end: 0;background-color: transparent;text-align: start;border-radius: var(--ds-radius-small, 4px);transition: background 0.2s;&:hover { background-color: var(--ds-background-neutral-subtle-hovered, #0515240F); }

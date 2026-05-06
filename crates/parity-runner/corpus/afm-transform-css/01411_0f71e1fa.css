@@ -1,0 +1,1 @@
+border-color: var(--ds-border-danger, #E2483D);color: var(--ds-text, #292A2E);background-color: var(--ds-background-danger, #FFECEB);&:hover { background-color: var(--ds-background-danger-hovered, #FFD5D2); }&:active { background-color: var(--ds-background-danger-pressed, #FFB8B2); }

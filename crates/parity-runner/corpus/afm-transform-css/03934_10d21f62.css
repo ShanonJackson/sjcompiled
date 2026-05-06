@@ -1,0 +1,1 @@
+display: grid;width: 100%;gap: var(--ds-space-100, 8px) var(--ds-space-050, 4px);min-height: 28px;grid-template-rows: 1fr;grid-template-columns: minmax(0, 1fr) auto auto;grid-template-areas: var(--_o48r1v);

@@ -1,0 +1,1 @@
+display: flex;align-items: center;height: 100%;width: 100%;padding-left: var(--ds-space-150, 12px);background-color: transparent;color: var(--ds-link, #1868DB);&:hover { text-decoration: underline; }&:active { color: var(--ds-link-pressed, #1558BC); }

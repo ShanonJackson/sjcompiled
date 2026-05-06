@@ -1,0 +1,1 @@
+&:hover:not(:focus) [class*="_ImportModuleTileContent"] { background-color:var(--ds-background-selected, #E9F2FE); }

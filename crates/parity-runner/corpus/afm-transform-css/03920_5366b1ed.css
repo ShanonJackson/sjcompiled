@@ -1,0 +1,1 @@
+height: 100%;box-sizing: border-box;display: flex;flex-direction: column;padding-top: var(--ds-space-150, 12px);padding-right: var(--ds-space-150, 12px);padding-bottom: var(--ds-space-150, 12px);padding-left: var(--ds-space-150, 12px);gap: var(--ds-space-100, 8px);& > *:nth-of-type(2):last-of-type { margin-top: var(--ds-space-050, 4px); }

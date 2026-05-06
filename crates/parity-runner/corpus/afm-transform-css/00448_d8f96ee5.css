@@ -1,0 +1,1 @@
+display: flex;align-items: center;color: var(--ds-text-subtlest, #6B6E76);> span { padding-right: var(--ds-space-100, 8px); }pointer-events: none;

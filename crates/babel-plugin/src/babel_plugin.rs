@@ -559,6 +559,40 @@ fn imported_name(spec: &swc_core::ecma::ast::ImportNamedSpecifier) -> String {
     }
 }
 
+/// §6.8x — pre-pass visitor that runs `normalize_props_usage` on
+/// every Compiled `css(...)` / `styled(...)` /
+/// `css\`...\`` / `styled\`...\`` site, BEFORE
+/// `ScopeIndex::build` snapshots `binding.init_expr`.
+///
+/// Holds an immutable borrow of `State` (predicates only read).
+/// Mutates the matched `Expr`s in place via
+/// `crate::utils::normalize_props_usage::normalize_props_usage`.
+///
+/// See `BabelPluginVisitor::pre_pass_normalize_props_usage` for the
+/// rationale and the integration site in `visit_mut_program`.
+struct PreNormalizeVisitor<'a> {
+    state: &'a State,
+}
+
+impl<'a> VisitMut for PreNormalizeVisitor<'a> {
+    fn visit_mut_expr(&mut self, n: &mut Expr) {
+        // Recurse first so nested compiled calls (e.g. a styled call
+        // whose argument contains a css call) are normalised at every
+        // level. Order does not matter for correctness because
+        // `normalize_props_usage` is idempotent on already-normalised
+        // arrows (early-returns on `__cmplp`-named first param).
+        n.visit_mut_children_with(self);
+
+        let has_styles = is_compiled_css_call_expression(n, self.state)
+            || is_compiled_styled_call_expression(n, self.state)
+            || is_compiled_css_tagged_template_expression(n, self.state)
+            || is_compiled_styled_tagged_template_expression(n, self.state);
+        if has_styles {
+            crate::utils::normalize_props_usage::normalize_props_usage(n);
+        }
+    }
+}
+
 /// `BabelPluginVisitor` — the top-level dispatcher.
 ///
 /// Holds owned `State` (Babel's PluginPass analog) and a
@@ -751,6 +785,60 @@ impl<C: Comments> BabelPluginVisitor<C> {
                 &mut self.state,
             );
         }
+    }
+
+    /// §6.8x — pre-pass that hoists the `normalizePropsUsage` mutator
+    /// to BEFORE `ScopeIndex::build`. See `visit_mut_program`'s call
+    /// site for the full rationale (Option 1 of the
+    /// snapshot-vs-live decision; closes `ct-hover-display`).
+    ///
+    /// Runs in two phases against the program's `Module` body:
+    ///
+    /// 1. **Import recognition** — for every
+    ///    `ModuleItem::ModuleDecl(ModuleDecl::Import(_))` in the body,
+    ///    call `record_compiled_import`. This populates
+    ///    `state.compiled_imports` with the user's local API names
+    ///    AND strips recognised API specifiers from the import.
+    ///    Idempotent: the children-walk's `visit_mut_module_decl`
+    ///    re-call finds no remaining API specifiers and no-ops.
+    ///
+    /// 2. **`normalizePropsUsage` mutator** — with
+    ///    `state.compiled_imports` populated, walk every `Expr` in
+    ///    the module via [`PreNormalizeVisitor`] and call
+    ///    `normalize_props_usage(&mut expr)` on each that matches
+    ///    `is_compiled_(css|styled)_(call|tagged_template)_expression`.
+    ///    Mirrors upstream's
+    ///    `babel-plugin.ts:321-329` `hasStyles → normalizePropsUsage(path)`
+    ///    gate, just hoisted earlier in the pipeline.
+    ///
+    /// The children-walk's `visit_mut_expr` retains its own
+    /// `normalize_props_usage` call (line ~1340) for parity with
+    /// upstream's per-`hasStyles`-Expr trigger and as a safety net
+    /// for any compiled call sites that escape this pre-pass's walk
+    /// (currently none — the visitor recurses into all positions
+    /// `visit_mut_expr` would). The second call is idempotent
+    /// because `normalize_props_usage` early-returns on arrows
+    /// whose first param is already `__cmplp`.
+    fn pre_pass_normalize_props_usage(&mut self, program: &mut Program) {
+        let Program::Module(module) = program else {
+            return;
+        };
+
+        // Phase 1 — import recognition. Iterate by index so the borrow
+        // for `record_compiled_import(&mut self, decl: &mut ImportDecl)`
+        // doesn't conflict with the surrounding iteration.
+        for i in 0..module.body.len() {
+            if let ModuleItem::ModuleDecl(ModuleDecl::Import(import)) = &mut module.body[i] {
+                self.record_compiled_import(import);
+            }
+        }
+
+        // Phase 2 — normalise prop usage on Compiled css/styled
+        // call/tagged-tpl sites. The visitor borrows `&self.state`
+        // immutably (predicates only need a read) and mutates the
+        // matched Exprs.
+        let mut visitor = PreNormalizeVisitor { state: &self.state };
+        module.visit_mut_with(&mut visitor);
     }
 
     /// §2.3(a) + §2.3(b) — `findClassicJsxPragmaImport` analog. Walks
@@ -988,9 +1076,55 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         self.scan_classic_jsx_pragma_import(program);
         self.scan_jsx_pragma_comments(program);
 
-        // §4.6 bridge: build the scope index over the Module AST
-        // before the children walk. Phase 6 handler dispatch sites
-        // read `self.scope_index` / `self.program_scope` to feed
+        // §6.8x — pre-pass: hoist import recognition + the
+        // `normalizePropsUsage` mutator BEFORE `ScopeIndex::build`.
+        //
+        // Upstream Babel reads `binding.path.node.init` LIVE every
+        // call (`packages/babel-plugin/src/utils/resolve-binding.ts:261`),
+        // so by the time `resolve_binding` consults a binding's init,
+        // any in-place mutation that has fired (notably
+        // `normalizePropsUsage` at `babel-plugin.ts:328`) is observable
+        // to it. The Rust port snapshots `init_expr` once at scope-build
+        // time (`compat/scope.rs:985-989` — `declarator.init.clone()`),
+        // so any post-build AST mutation creates a stale-read window.
+        //
+        // The `ct-hover-display` fixture surfaced this: `tabStyles`'s
+        // init contains arrows whose params get rewritten by
+        // `normalize_props_usage` during `visit_mut_expr`, which fires
+        // AFTER `ScopeIndex::build`. The styled handler later resolves
+        // `tabStyles` and reads the pre-rename snapshot — hash inputs
+        // diverge from Babel.
+        //
+        // Fix (Option 1 in the perf-comparison brief): run the
+        // mutator BEFORE the scope-index snapshot is taken, so the
+        // clones captured into `init_expr` are post-rename.
+        // Mathematically zero staleness window for the only known
+        // mutator. End-to-end byte-equal with Babel.
+        //
+        // Pre-pass shape:
+        //   1. Walk `module.body` once for `ModuleDecl::Import`,
+        //      calling `record_compiled_import` (idempotent — the
+        //      function strips recognised specifiers, so the
+        //      children-walk's `visit_mut_module_decl` re-call is a
+        //      no-op).
+        //   2. With `state.compiled_imports` now populated, walk the
+        //      whole module once and call `normalize_props_usage` on
+        //      every Compiled `css(...)` / `styled(...)` /
+        //      `css\`...\`` / `styled\`...\`` site. The
+        //      `visit_mut_expr` re-call (line ~1340) is idempotent
+        //      because `normalize_props_usage` early-returns on
+        //      arrows whose first param is already `__cmplp`.
+        //
+        // Cost: one extra full-module visit on `Program::enter`. In
+        // the noise vs SWC's parser/traversal advantage; preserves
+        // the eager-Q1 lock (`compat/scope.rs:11-18`).
+        if matches!(&*program, Program::Module(_)) {
+            self.pre_pass_normalize_props_usage(program);
+        }
+
+        // §4.6 bridge: build the scope index over the (post-pre-pass)
+        // Module AST. Phase 6 handler dispatch sites read
+        // `self.scope_index` / `self.program_scope` to feed
         // `evaluate_expression` / `resolve_binding`. Script programs
         // are not produced by Compiled call sites in practice
         // (consumer monorepo is ESM/JSX); the field stays `None`.

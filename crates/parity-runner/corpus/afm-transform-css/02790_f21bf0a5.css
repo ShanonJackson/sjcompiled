@@ -1,0 +1,1 @@
+min-height: 40px;width: 100%;display: flex;align-items: center;& > div { width: 100%;padding-block: var(--ds-space-0, 0px);padding-inline: var(--ds-space-100, 8px); }

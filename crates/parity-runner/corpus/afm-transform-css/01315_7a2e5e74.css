@@ -1,0 +1,1 @@
+text-decoration: underline;color: var(--ds-link, #1868DB);&:hover { text-decoration: none;color: var(--ds-link, #1868DB); }&:active { color: var(--ds-link-pressed, #1558BC); }

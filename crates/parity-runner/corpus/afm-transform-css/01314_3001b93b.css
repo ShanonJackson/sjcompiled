@@ -1,0 +1,1 @@
+&:visited { color: var(--ds-link-visited, #803FA5); }&:visited:hover { color: var(--ds-link-visited, #803FA5); }&:visited:active { color: var(--ds-link-visited-pressed, #48245D); }

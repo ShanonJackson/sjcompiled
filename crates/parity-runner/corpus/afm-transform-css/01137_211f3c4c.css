@@ -1,0 +1,1 @@
+textarea::-webkit-scrollbar { width: 8px;background: transparent; }textarea::-webkit-scrollbar-thumb { background: #c1c1c1;border-radius: var(--ds-radius-full, 9999px); }

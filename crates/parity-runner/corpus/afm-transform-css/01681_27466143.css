@@ -1,0 +1,1 @@
+margin: 0;padding: 0;border-radius: var(--ds-radius-full, 50%);border-width: 2px;;border-style: solid;border-color: var(--ds-text-inverse, #FFFFFF);background-color: var(--ds-background-accent-gray-subtlest, #F0F1F2);transition: background-color 0.1s ease-out 0s;;&:focus {  }&:focus { ;outline: none; }&:hover {  }&:hover { ; }

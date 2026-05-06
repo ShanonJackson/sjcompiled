@@ -1,0 +1,1 @@
+position: absolute;top: 40px;bottom: 0;z-index: 4;pointer-events: none;width: 2px;border-left: 2px solid var(--ds-chart-information, #357DE8);&::before { display: block;content: "";position: sticky;height: 0;width: 0;top: 0;margin-left: -5px;border-left: 4px solid transparent;border-right: 4px solid transparent;border-top: 8px solid var(--ds-chart-information, #357DE8); }

@@ -1,0 +1,1 @@
+display: grid;position: sticky;top: 0;z-index: 200;background-color: var(--ds-surface, #FFFFFF);grid-template-columns: 1fr;height: 42px;overflow: visible;

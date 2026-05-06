@@ -1,0 +1,1 @@
+display: grid;align-content: center;grid-template-columns: repeat(2, auto);;row-gap: var(--ds-space-050, 4px);column-gap: var(--ds-space-150, 12px);width: max-content;align-items: center;[role='presentation'] {  }[role='presentation'] { ; }

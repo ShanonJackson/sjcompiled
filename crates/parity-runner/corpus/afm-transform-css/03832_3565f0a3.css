@@ -1,0 +1,1 @@
+height: 32px;display: flex;flex-direction: row;align-items: center;justify-content: center;gap: var(--ds-space-100, 8px);margin-bottom: var(--ds-space-150, 12px);flex-grow: 1;&:hover, &:active { [data-component-selector="software-backlog-divider-grabber"], [data-component-selector="software-backlog-divider-grabber-line"] { opacity: 1; } }

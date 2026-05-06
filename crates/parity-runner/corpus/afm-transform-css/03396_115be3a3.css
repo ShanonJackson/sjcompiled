@@ -1,0 +1,1 @@
+&:hover, &:active, &:visited, &:link { color:var(--ds-text-selected, #1868DB) }

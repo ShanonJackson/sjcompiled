@@ -1,0 +1,1 @@
+display: grid;gap: var(--ds-space-0, 0px);grid-template-columns: 1fr 1fr;margin-right: var(--ds-space-negative-150, -12px);padding-right: var(--ds-space-150, 12px);overflow-y: auto;

@@ -1,0 +1,1 @@
+padding-left: var(--ds-space-500, 40px);counter-increment: log-counter;&::before { content: counter(log-counter);position: absolute;left: var(--ds-space-200, 16px);color: var(--ds-text-subtle, #505258); }

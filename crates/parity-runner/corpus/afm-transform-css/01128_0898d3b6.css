@@ -1,0 +1,1 @@
+& div[data-read-view-fit-container-width] { margin-top: var(--ds-space-negative-050, -4px);margin-bottom: var(--ds-space-negative-050, -4px);border: var(--ds-space-0, 0px);&:hover { background-color: var(--ds-background-neutral-subtle, #00000000); } }

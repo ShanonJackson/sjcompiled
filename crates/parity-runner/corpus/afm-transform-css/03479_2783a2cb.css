@@ -1,0 +1,1 @@
+display: inline-block;button:focus { box-shadow: inset 0 0 0 2px var(--ds-border-focused, #4688EC); }button:focus-visible { outline: unset;outline-offset: unset; }

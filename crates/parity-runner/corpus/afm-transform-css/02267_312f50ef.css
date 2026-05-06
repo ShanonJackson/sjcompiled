@@ -1,0 +1,1 @@
+display: flex;border-bottom: var(--ds-border-width, 1px) solid var(--ds-border, #0B120E24);padding-top: var(--ds-space-150, 12px);padding-right: var(--ds-space-150, 12px);padding-bottom: var(--ds-space-150, 12px);padding-left: var(--ds-space-150, 12px);align-items: center;&:last-of-type { border-bottom: none; }

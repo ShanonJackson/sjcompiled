@@ -1,0 +1,1 @@
+.table { &__row { &[role='rowgroup'] { .table__row-cell { background-color:#F4F5F7 } } } }

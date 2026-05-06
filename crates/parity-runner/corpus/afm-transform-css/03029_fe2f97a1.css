@@ -1,0 +1,1 @@
+display: -webkit-box;color: var(--ds-text, #292A2E);:focus { color: var(--ds-link, #1868DB);text-decoration: underline; }transition: color ease-in-out 0.2s;

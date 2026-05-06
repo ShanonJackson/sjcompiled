@@ -1,0 +1,2 @@
+width: calc(320px + var(--ds-space-400, 32px));height: 40px;background: linear-gradient(var(--ds-surface-sunken, #F8F8F8), var(--ds-surface-sunken, #F8F8F8)) padding-box,
+              linear-gradient(to right, var(--ds-background-accent-green-bolder, #1F845A), var(--ds-border, #0B120E24), var(--ds-background-accent-red-bolder, #C9372C)) border-box;border-width: var(--ds-border-width-selected, 2px);border-style: solid;border-color: transparent;border-radius: 8px 8px 0 0;border-bottom: none;

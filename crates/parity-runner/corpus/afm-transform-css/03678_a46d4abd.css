@@ -1,0 +1,1 @@
+& nav { padding-inline-start: calc(var(--ds-space-400, 32px) + var(--ds-space-050, 4px));padding-inline-end: var(--ds-space-400, 32px);margin-block-end: var(--ds-space-100, 8px); }& nav span, & nav a { color: var(--ds-text-subtlest, #6B6E76); }

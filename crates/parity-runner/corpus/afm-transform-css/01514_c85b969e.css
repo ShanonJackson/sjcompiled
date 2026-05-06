@@ -1,0 +1,8 @@
+
+	&:last-child > div {
+		
+  box-shadow: none;
+;
+		border-bottom-color: transparent;
+	}
+;

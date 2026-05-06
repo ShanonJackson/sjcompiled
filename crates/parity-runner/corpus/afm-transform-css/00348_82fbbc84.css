@@ -1,0 +1,1 @@
+--action-display: none;--speaker-display: flex;--name-padding-end: 0px;position: relative;&:hover { --action-display: flex;--speaker-display: none;--name-padding-end: var(--ds-space-400, 32px); }&:focus-within { --action-display: flex;--speaker-display: none;--name-padding-end: var(--ds-space-400, 32px);z-index: 1; }

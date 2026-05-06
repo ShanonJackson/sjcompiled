@@ -1,0 +1,1 @@
+min-width: 0;display: flex;flex: 1;align-items: center;cursor: pointer;gap: var(--ds-space-100, 8px);color: var(--ds-text-subtle, #505258);&:hover { color: var(--ds-text-subtle, #505258);text-decoration: none; }

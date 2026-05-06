@@ -1,0 +1,1 @@
+&:hover, &:active { &::before { background-color:var(--ds-border, #0B120E24) } }

@@ -1,0 +1,1 @@
+&:focus { box-shadow:0 0 0 var(--ds-border-width-focused, 2px) var(--ds-background-neutral-pressed, #080F214A); }

@@ -1,0 +1,1 @@
+display: flex;align-items: center;height: 24px;;white-space: nowrap;overflow: hidden;text-overflow: ellipsis;button:focus &, [data-component-selector="header-wrapper-experiment-component-selector"]:hover & {  }button:focus &, [data-component-selector="header-wrapper-experiment-component-selector"]:hover & { ; }

@@ -1,0 +1,7 @@
+box-sizing: border-box;border-radius: var(--ds-radius-medium, 6px);padding: var(--ds-border-width, 1px);display: flex;flex-direction: column;width: 100%;position: relative;--angle: 0deg;background: conic-gradient(
+	from var(--angle),
+	var(--ds-background-accent-orange-subtle, #fca700) 25%,
+	var(--ds-background-accent-green-subtle, #6a9a23) 25% 50%,
+	var(--ds-background-accent-blue-subtle, #1868db) 50% 75%,
+	var(--ds-background-accent-purple-subtle, #af59e0) 75% 100%
+);animation: k8aw4r6 3s linear infinite;;box-shadow: var(--ds-shadow-overlay, 0px 8px 12px #1E1F2126, 0px 0px 1px #1E1F214f);

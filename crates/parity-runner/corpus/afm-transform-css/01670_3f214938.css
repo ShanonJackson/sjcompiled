@@ -1,0 +1,1 @@
+& > input:focus-visible + [data-component-selector="avatar-border"] { border-color:; }

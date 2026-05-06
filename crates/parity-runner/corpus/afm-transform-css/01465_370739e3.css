@@ -1,0 +1,1 @@
+color: var(--ds-text-subtlest, #6B6E76);font: font.body.small;text-decoration: none;display: inline-flex;align-items: center;&:hover { color: var(--ds-text-subtle, #505258);text-decoration: none; }&:focus { color: var(--ds-text-subtle, #505258);outline: none;text-decoration: 0; }

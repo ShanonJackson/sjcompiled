@@ -1,0 +1,1 @@
+button:focus &, [data-component-selector="header-wrapper-experiment-component-selector"]:hover & { max-width:; }

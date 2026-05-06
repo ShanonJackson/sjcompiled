@@ -1,0 +1,1 @@
+&:focus-within { background-color: var(--ds-background-selected-hovered, #CFE1FD);border-color: var(--ds-border-focused, #4688EC); }

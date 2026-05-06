@@ -1,0 +1,1 @@
+background: var(--card-bg);&:hover { background: var(--card-hover-bg);box-shadow: var(--card-hover-shadow); }

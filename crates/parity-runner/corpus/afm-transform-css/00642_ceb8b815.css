@@ -1,0 +1,1 @@
+display: grid;grid-template-columns: 1fr auto;align-items: center;gap: var(--ds-space-075, 6px);transition: background-color 0.2s ease-in-out;border-radius: var(--ds-radius-xlarge, 12px);border-color: transparent;border-width: var(--ds-border-width, 1px);border-style: solid;&:hover { background-color: var(--ds-surface-hovered, #F0F1F2); }

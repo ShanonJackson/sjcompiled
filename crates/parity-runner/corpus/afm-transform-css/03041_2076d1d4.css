@@ -1,0 +1,1 @@
+width: 48px;padding-top: var(--ds-space-150, 12px);padding-right: var(--ds-space-0, 0px);padding-bottom: var(--ds-space-150, 12px);padding-left: var(--ds-space-0, 0px);text-align: center;&:first-of-type { padding-left: var(--ds-space-0, 0px); }&:last-of-type { padding-right: var(--ds-space-0, 0px); }

@@ -1,0 +1,1 @@
+display: flex;align-items: center;padding-top: 8px;padding-right: 8px;padding-bottom: 8px;padding-left: 8px;border-width: 2px;& > * { margin-right: 8px; }& > *:last-child,[data-isEditable][data-testid="project-settings-apps-issue-type-page.field-item-navigation-dropdown-menu.dropdown-menu--trigger"] { margin-right: 0; }

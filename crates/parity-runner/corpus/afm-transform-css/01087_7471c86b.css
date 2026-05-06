@@ -1,0 +1,1 @@
+position: relative;border-width: var(--ds-border-width-selected, 2px);border-style: solid;border-color: var(--ds-border-focused, #4688EC);border-radius: var(--ds-radius-small, 3px);padding-top: 0;padding-right: var(--ds-space-075, 6px);padding-bottom: 0;padding-left: var(--ds-space-075, 6px);display: flex;align-items: center;box-sizing: border-box;min-height: 32px;

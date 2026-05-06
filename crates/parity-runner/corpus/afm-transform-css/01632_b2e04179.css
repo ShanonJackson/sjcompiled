@@ -1,0 +1,1 @@
+> span { background-color: transparent;border-style: solid;border-width: var(--ds-border-width, 1px);border-color: var(--tag-border-color); }> span > a { color: var(--ds-text, #292A2E); }> span > a:hover { color: var(--ds-text, #292A2E); }

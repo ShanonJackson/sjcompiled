@@ -1,0 +1,8 @@
+padding-block: var(--ds-space-150, 12px);padding-inline: var(--ds-space-200, 16px);border-radius: var(--ds-radius-small, 4px);background-color: var(--ds-surface, #FFFFFF);border-width: var(--ds-border-width-focused, 2px);border-style: solid;border-color: transparent;background-image: linear-gradient(var(--ds-surface, #FFFFFF), var(--ds-surface, #FFFFFF)), linear-gradient(
+			90deg,
+			var(--ds-border-discovery, #AF59E1),
+			var(--ds-border-information, #357DE8),
+			var(--ds-border-success, #6A9A23),
+			var(--ds-border-warning, #E06C00),
+			var(--ds-border-discovery, #AF59E1)
+		);background-origin: border-box;background-clip: padding-box, border-box;background-size: auto, 200% 100%;animation: k1aor545 2.5s ease-in-out infinite;;

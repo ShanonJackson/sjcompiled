@@ -1,0 +1,6 @@
+width: calc(
+				 
+									  100vw - var(--rightSidebarWidth, 0px) - var(--rightPanelWidth, 0px) - var(--leftSidebarWidth, 0px) -
+				 
+										  var(--leftPanelWidth, 0px) - var(--_zsmmub)
+								  ) ;;margin: 0 -40px;box-sizing: content-box;overflow: auto;

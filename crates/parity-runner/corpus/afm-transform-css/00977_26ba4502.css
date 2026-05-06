@@ -1,0 +1,1 @@
+border-style: solid;border-width: var(--ds-border-width, 1px);border-color: var(--ds-border-input, #8C8F97);border-radius: var(--ds-radius-medium, 6px);background-color: var(--ds-background-input, #FFFFFF);overflow: hidden;width: 100%;&:focus-within { border-color: var(--ds-border-focused, #4688EC); }

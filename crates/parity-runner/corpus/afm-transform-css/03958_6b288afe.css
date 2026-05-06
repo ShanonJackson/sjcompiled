@@ -1,0 +1,1 @@
+opacity: 0;&:hover, &:focus, &:focus-within { opacity: 1; }[data-component-selector="platform-board-kit.ui.column.draggable-column"] :hover & { opacity: 1; }[data-component-selector="platform-board-kit.ui.column.draggable-column"] :focus & { opacity: 1; }[data-component-selector="platform-board-kit.ui.column.draggable-column"] :focus-within & { opacity: 1; }

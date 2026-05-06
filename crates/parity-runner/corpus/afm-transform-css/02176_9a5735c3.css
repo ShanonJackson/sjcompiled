@@ -1,0 +1,1 @@
+display: flex;align-items: center;height: 40px;border-bottom: var(--ds-border-width, 1px) solid var(--ds-border, #0B120E24);transition: 0.3s;&:hover { background-color: var(--ds-background-neutral-hovered, #0B120E24); }

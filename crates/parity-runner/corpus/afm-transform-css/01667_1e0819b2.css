@@ -1,0 +1,1 @@
+& > input:focus-visible + [data-component-selector="avatar-border"] { background-color:var(--ds-border-focused, #4688EC) }
