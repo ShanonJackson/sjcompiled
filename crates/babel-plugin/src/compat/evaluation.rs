@@ -50,8 +50,8 @@
 use std::collections::HashSet;
 
 use swc_core::ecma::ast::{
-    BinExpr, BinaryOp, CondExpr, Expr, Lit, Number, Prop, PropName, PropOrSpread, Tpl, UnaryExpr,
-    UnaryOp,
+    BinExpr, BinaryOp, Callee, CondExpr, Expr, Lit, MemberProp, Number, Prop, PropName,
+    PropOrSpread, Tpl, UnaryExpr, UnaryOp,
 };
 
 // `crate::compat::globals` and `crate::compat::path::NodeKind` are
@@ -928,28 +928,457 @@ fn _evaluate(
 
     // evaluation.js:312-342 — CallExpression branch (Math.x, String,
     // Number, isFinite, isNaN, parseInt, parseFloat, decodeURI, etc.).
-    // The Compiled corpus's only deopt-call fixture (`someFn()`) falls
-    // through the entire branch and lands at :343's deopt — i.e. the
-    // CallExpression branch is reachable but the corpus doesn't fold
-    // any of its sub-shapes. A faithful port of the global-callee +
-    // member-callee dispatch would require runtime emulation of
-    // `Math.pow` etc. and a large vendoring of JS builtins; defer the
-    // sub-shapes per the §5.4-handler discussion (Compiled's CSS-value
-    // call sites that DO fold — e.g. `Math.PI` — go through
-    // `traverseMemberExpression`, not `path.evaluate()`).
     //
-    // For corpus parity we fall through to deopt at :343 below, which
-    // matches Babel's behaviour for `someFn()` (no global match → deopt).
-    // If a future fixture surfaces a foldable Math/String/Number call,
-    // port the sub-shape in this if-block.
-    if matches!(expr, Expr::Call(_)) {
-        deopt(state);
-        return None;
+    // Upstream:
+    //   const VALID_OBJECT_CALLEES = ["Number", "String", "Math"];
+    //   const VALID_IDENTIFIER_CALLEES = ["isFinite", "isNaN",
+    //     "parseFloat", "parseInt", "decodeURI", "decodeURIComponent",
+    //     "encodeURI", "encodeURIComponent", null, null];
+    //   const INVALID_METHODS = ["random"];
+    //   if (callee.isIdentifier() && !path.scope.getBinding(name)
+    //         && (isValidObjectCallee(name) || isValidIdentifierCallee(name)))
+    //     func = global[name];
+    //   if (callee.isMemberExpression()) {
+    //     if (object.isIdentifier() && property.isIdentifier()
+    //           && isValidObjectCallee(object.node.name)
+    //           && !isInvalidMethod(property.node.name)) {
+    //       context = global[object.node.name];
+    //       if (hasOwnProperty.call(context, key)) func = context[key];
+    //     }
+    //     if (object.isLiteral() && property.isIdentifier()) { … }
+    //   }
+    //   if (func) {
+    //     const args = path.get("arguments").map(a => evaluateCached(a, state));
+    //     if (!state.confident) return;
+    //     return func.apply(context, args);
+    //   }
+    //
+    // Compiled's CSS-value call sites that fold through this path
+    // include `Math.max(...)`, `Math.min(...)`, `Math.abs(...)`,
+    // `Math.round(...)`, etc. (see fixtures/ct-expression-export).
+    if let Expr::Call(call) = expr {
+        if let Callee::Expr(callee_expr) = &call.callee {
+            if let Some(func) = resolve_builtin_callee(callee_expr, index, scope) {
+                // evaluation.js:338-340 — fold args, propagate deopt.
+                let mut args: Vec<Value> = Vec::with_capacity(call.args.len());
+                for a in &call.args {
+                    if a.spread.is_some() {
+                        // Spread args don't fold; matches Babel's
+                        // implicit deopt (it builds the args array
+                        // shape-aware via .get() but `func.apply` with
+                        // a SpreadElement-as-AST-node would throw at
+                        // runtime; Babel's path.get('arguments') yields
+                        // SpreadElement paths whose evaluateCached
+                        // deopts).
+                        deopt(state);
+                        return None;
+                    }
+                    let v = evaluate_cached(&a.expr, state, index, scope);
+                    if !state.confident {
+                        return None;
+                    }
+                    args.push(v.unwrap_or(Value::Undefined));
+                }
+                return Some(apply_builtin(func, &args));
+            }
+        }
     }
 
     // evaluation.js:343 — final fallback: deopt.
     deopt(state);
     None
+}
+
+// -------------------- builtin call resolution --------------------
+//
+// Mirrors `evaluation.js:312-341`'s `func`/`context` resolution.
+// The JS code does `func = global[name]` / `func = context[key]` and
+// then `func.apply(context, args)`; in Rust we identify the builtin by
+// an enum tag and dispatch in `apply_builtin` to mirror the runtime
+// semantics of each function. Only the methods that JS's `Math` /
+// `Number` / `String` / global identifier set actually exposes are
+// reachable; unknown methods are caught by `resolve_member_method`
+// returning `None` (the JS `hasOwnProperty.call(context, key)` check
+// at :325).
+//
+// Per `INVALID_METHODS = ["random"]` at evaluation.js:10, `Math.random`
+// is explicitly excluded.
+#[derive(Debug, Clone, Copy)]
+enum Builtin {
+    // Global identifier callees (VALID_IDENTIFIER_CALLEES).
+    IsFinite,
+    IsNaN,
+    ParseFloat,
+    ParseInt,
+    // Global object callees called as functions (VALID_OBJECT_CALLEES,
+    // identifier form: `Number(x)`, `String(x)`. `Math(...)` would
+    // throw at runtime; we deopt-by-not-resolving via the absence of
+    // a Math arm here.).
+    NumberFn,
+    StringFn,
+    // Math.* methods.
+    MathAbs,
+    MathCeil,
+    MathFloor,
+    MathRound,
+    MathTrunc,
+    MathSign,
+    MathSqrt,
+    MathCbrt,
+    MathMax,
+    MathMin,
+    MathPow,
+    MathExp,
+    MathLog,
+    MathLog2,
+    MathLog10,
+    MathSin,
+    MathCos,
+    MathTan,
+    MathAsin,
+    MathAcos,
+    MathAtan,
+    MathAtan2,
+    MathHypot,
+}
+
+/// Resolve a `CallExpression`'s callee `&Expr` to a `Builtin` if it
+/// matches one of Babel's `VALID_*_CALLEES` shapes, the binding-not-
+/// shadowed gate (`!path.scope.getBinding(name)`) holds, and the
+/// method exists on the receiver namespace.
+///
+/// Returns `None` when the callee shape doesn't match, the identifier
+/// is shadowed by a local binding, or the method is unknown / banned
+/// (`Math.random`).
+fn resolve_builtin_callee(
+    callee: &Expr,
+    index: &ScopeIndex,
+    scope: ScopeId,
+) -> Option<Builtin> {
+    match callee {
+        // evaluation.js:316-318 — global identifier callee.
+        // `Number(x)` / `String(x)` / `parseInt(x)` etc.
+        Expr::Ident(ident) => {
+            let name = ident.sym.as_str();
+            if index.get_binding(scope, name).is_some() {
+                return None;
+            }
+            match name {
+                "isFinite" => Some(Builtin::IsFinite),
+                "isNaN" => Some(Builtin::IsNaN),
+                "parseFloat" => Some(Builtin::ParseFloat),
+                "parseInt" => Some(Builtin::ParseInt),
+                "Number" => Some(Builtin::NumberFn),
+                "String" => Some(Builtin::StringFn),
+                _ => None,
+            }
+        }
+        // evaluation.js:319-336 — member-callee branch.
+        Expr::Member(member) => {
+            // We only handle `<Ident>.<Ident>` — the
+            // `object.isLiteral()` arm at :329-335 covers
+            // `"abc".charAt(0)` etc., which the corpus doesn't exercise.
+            // (If it ever does, port that arm here.)
+            let obj_ident = match &*member.obj {
+                Expr::Ident(i) => i,
+                _ => return None,
+            };
+            let prop_ident = match &member.prop {
+                MemberProp::Ident(i) => i,
+                _ => return None,
+            };
+            let obj_name = obj_ident.sym.as_str();
+            let prop_name = prop_ident.sym.as_str();
+            // VALID_OBJECT_CALLEES = ["Number", "String", "Math"].
+            // INVALID_METHODS = ["random"].
+            if prop_name == "random" {
+                return None;
+            }
+            // Babel does NOT gate object-callee on `getBinding(obj_name)`
+            // — only the identifier-callee arm has that check. Match
+            // upstream: a local `Math` shadow does NOT prevent the fold
+            // (Babel reads `global[object.node.name]` directly).
+            match obj_name {
+                "Math" => match prop_name {
+                    "abs" => Some(Builtin::MathAbs),
+                    "ceil" => Some(Builtin::MathCeil),
+                    "floor" => Some(Builtin::MathFloor),
+                    "round" => Some(Builtin::MathRound),
+                    "trunc" => Some(Builtin::MathTrunc),
+                    "sign" => Some(Builtin::MathSign),
+                    "sqrt" => Some(Builtin::MathSqrt),
+                    "cbrt" => Some(Builtin::MathCbrt),
+                    "max" => Some(Builtin::MathMax),
+                    "min" => Some(Builtin::MathMin),
+                    "pow" => Some(Builtin::MathPow),
+                    "exp" => Some(Builtin::MathExp),
+                    "log" => Some(Builtin::MathLog),
+                    "log2" => Some(Builtin::MathLog2),
+                    "log10" => Some(Builtin::MathLog10),
+                    "sin" => Some(Builtin::MathSin),
+                    "cos" => Some(Builtin::MathCos),
+                    "tan" => Some(Builtin::MathTan),
+                    "asin" => Some(Builtin::MathAsin),
+                    "acos" => Some(Builtin::MathAcos),
+                    "atan" => Some(Builtin::MathAtan),
+                    "atan2" => Some(Builtin::MathAtan2),
+                    "hypot" => Some(Builtin::MathHypot),
+                    _ => None,
+                },
+                // `Number.isInteger`, `String.fromCharCode`, etc. would
+                // be reachable but the corpus doesn't fold them; if a
+                // future fixture surfaces one, port the sub-shape here.
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Apply the resolved builtin to its already-folded arguments.
+/// Mirrors `func.apply(context, args)` at evaluation.js:340.
+fn apply_builtin(func: Builtin, args: &[Value]) -> Value {
+    // Helper: coerce an arg to a JS number (Number(x) semantics).
+    let n = |i: usize| -> f64 {
+        args.get(i)
+            .map(|v| v.to_js_number())
+            .unwrap_or(f64::NAN)
+    };
+    match func {
+        // Identifier-form globals.
+        Builtin::IsFinite => Value::Bool(n(0).is_finite()),
+        Builtin::IsNaN => Value::Bool(n(0).is_nan()),
+        Builtin::ParseFloat => Value::Number(js_parse_float(args.first())),
+        Builtin::ParseInt => Value::Number(js_parse_int(args.first(), args.get(1))),
+        Builtin::NumberFn => {
+            // Number() with no args returns 0; Number(x) coerces.
+            if args.is_empty() {
+                Value::Number(0.0)
+            } else {
+                Value::Number(args[0].to_js_number())
+            }
+        }
+        Builtin::StringFn => {
+            // String() with no args returns ""; String(x) coerces.
+            if args.is_empty() {
+                Value::String(String::new())
+            } else {
+                Value::String(args[0].to_js_string())
+            }
+        }
+        // Math.* — match JS semantics on f64.
+        Builtin::MathAbs => Value::Number(n(0).abs()),
+        Builtin::MathCeil => Value::Number(n(0).ceil()),
+        Builtin::MathFloor => Value::Number(n(0).floor()),
+        // JS Math.round: rounds half toward +Infinity (NOT banker's).
+        // Rust's f64::round rounds half away from zero, which differs
+        // for negative half-integers (e.g. -0.5 → JS 0, Rust -1).
+        Builtin::MathRound => Value::Number(js_math_round(n(0))),
+        Builtin::MathTrunc => Value::Number(n(0).trunc()),
+        Builtin::MathSign => Value::Number({
+            let x = n(0);
+            if x.is_nan() {
+                f64::NAN
+            } else if x > 0.0 {
+                1.0
+            } else if x < 0.0 {
+                -1.0
+            } else {
+                x
+            } // preserves +0/-0
+        }),
+        Builtin::MathSqrt => Value::Number(n(0).sqrt()),
+        Builtin::MathCbrt => Value::Number(n(0).cbrt()),
+        Builtin::MathMax => {
+            // JS Math.max() with no args is -Infinity; with any NaN
+            // arg returns NaN.
+            if args.is_empty() {
+                Value::Number(f64::NEG_INFINITY)
+            } else {
+                let mut acc = f64::NEG_INFINITY;
+                for v in args {
+                    let x = v.to_js_number();
+                    if x.is_nan() {
+                        return Value::Number(f64::NAN);
+                    }
+                    // Math.max distinguishes +0 from -0 (returns +0).
+                    if x > acc || (x == 0.0 && acc == 0.0 && x.is_sign_positive()) {
+                        acc = x;
+                    }
+                }
+                Value::Number(acc)
+            }
+        }
+        Builtin::MathMin => {
+            if args.is_empty() {
+                Value::Number(f64::INFINITY)
+            } else {
+                let mut acc = f64::INFINITY;
+                for v in args {
+                    let x = v.to_js_number();
+                    if x.is_nan() {
+                        return Value::Number(f64::NAN);
+                    }
+                    if x < acc || (x == 0.0 && acc == 0.0 && x.is_sign_negative()) {
+                        acc = x;
+                    }
+                }
+                Value::Number(acc)
+            }
+        }
+        Builtin::MathPow => Value::Number(n(0).powf(n(1))),
+        Builtin::MathExp => Value::Number(n(0).exp()),
+        Builtin::MathLog => Value::Number(n(0).ln()),
+        Builtin::MathLog2 => Value::Number(n(0).log2()),
+        Builtin::MathLog10 => Value::Number(n(0).log10()),
+        Builtin::MathSin => Value::Number(n(0).sin()),
+        Builtin::MathCos => Value::Number(n(0).cos()),
+        Builtin::MathTan => Value::Number(n(0).tan()),
+        Builtin::MathAsin => Value::Number(n(0).asin()),
+        Builtin::MathAcos => Value::Number(n(0).acos()),
+        Builtin::MathAtan => Value::Number(n(0).atan()),
+        Builtin::MathAtan2 => Value::Number(n(0).atan2(n(1))),
+        Builtin::MathHypot => {
+            // JS Math.hypot(): no args → 0; any NaN with a non-Infinity
+            // → NaN; any Infinity → Infinity (even if a NaN is also
+            // present). Match the spec.
+            if args.iter().any(|v| v.to_js_number().is_infinite()) {
+                return Value::Number(f64::INFINITY);
+            }
+            if args.iter().any(|v| v.to_js_number().is_nan()) {
+                return Value::Number(f64::NAN);
+            }
+            let sum_sq: f64 = args.iter().map(|v| v.to_js_number().powi(2)).sum();
+            Value::Number(sum_sq.sqrt())
+        }
+    }
+}
+
+/// JS `Math.round` semantics (round-half-toward-+Infinity).
+fn js_math_round(x: f64) -> f64 {
+    if x.is_nan() || x.is_infinite() {
+        return x;
+    }
+    // Special-case half-integers: round toward +Infinity.
+    let frac = x - x.floor();
+    if frac == 0.5 {
+        x.floor() + 1.0
+    } else {
+        // floor(x + 0.5) handles all other cases per spec.
+        (x + 0.5).floor()
+    }
+}
+
+/// JS `parseFloat(x)` — coerces to string then parses leading number.
+fn js_parse_float(arg: Option<&Value>) -> f64 {
+    let s = match arg {
+        Some(v) => v.to_js_string(),
+        None => return f64::NAN,
+    };
+    let trimmed = s.trim_start();
+    if trimmed.is_empty() {
+        return f64::NAN;
+    }
+    // Handle Infinity / -Infinity / +Infinity prefixes per spec.
+    let (sign, rest) = match trimmed.as_bytes()[0] {
+        b'+' => (1.0, &trimmed[1..]),
+        b'-' => (-1.0, &trimmed[1..]),
+        _ => (1.0, trimmed),
+    };
+    if rest.starts_with("Infinity") {
+        return sign * f64::INFINITY;
+    }
+    // Find longest valid numeric prefix.
+    let mut end = 0;
+    let bytes = rest.as_bytes();
+    let mut saw_digit = false;
+    let mut saw_dot = false;
+    let mut saw_exp = false;
+    while end < bytes.len() {
+        let c = bytes[end];
+        match c {
+            b'0'..=b'9' => {
+                saw_digit = true;
+            }
+            b'.' if !saw_dot && !saw_exp => {
+                saw_dot = true;
+            }
+            b'e' | b'E' if saw_digit && !saw_exp => {
+                saw_exp = true;
+                // Optional sign after exponent.
+                if end + 1 < bytes.len()
+                    && (bytes[end + 1] == b'+' || bytes[end + 1] == b'-')
+                {
+                    end += 1;
+                }
+            }
+            _ => break,
+        }
+        end += 1;
+    }
+    if !saw_digit {
+        return f64::NAN;
+    }
+    rest[..end].parse::<f64>().map(|n| sign * n).unwrap_or(f64::NAN)
+}
+
+/// JS `parseInt(x, radix)` — coerces to string, optional sign, base
+/// detection (`0x` → 16 if radix in {0,16}), parses digits up to the
+/// first non-digit.
+fn js_parse_int(arg: Option<&Value>, radix_arg: Option<&Value>) -> f64 {
+    let s = match arg {
+        Some(v) => v.to_js_string(),
+        None => return f64::NAN,
+    };
+    let mut radix = radix_arg.map(|v| v.to_js_number()).unwrap_or(0.0);
+    if radix.is_nan() {
+        radix = 0.0;
+    }
+    let radix = radix as i32;
+    if radix != 0 && (radix < 2 || radix > 36) {
+        return f64::NAN;
+    }
+    let trimmed = s.trim_start();
+    if trimmed.is_empty() {
+        return f64::NAN;
+    }
+    let (sign, rest) = match trimmed.as_bytes()[0] {
+        b'+' => (1.0, &trimmed[1..]),
+        b'-' => (-1.0, &trimmed[1..]),
+        _ => (1.0, trimmed),
+    };
+    let (effective_radix, digits) = if (radix == 0 || radix == 16)
+        && (rest.starts_with("0x") || rest.starts_with("0X"))
+    {
+        (16u32, &rest[2..])
+    } else if radix == 0 {
+        (10u32, rest)
+    } else {
+        (radix as u32, rest)
+    };
+    // Take longest prefix of digits valid in the radix.
+    let mut end = 0;
+    for (i, c) in digits.char_indices() {
+        if c.to_digit(effective_radix).is_some() {
+            end = i + c.len_utf8();
+        } else {
+            break;
+        }
+    }
+    if end == 0 {
+        return f64::NAN;
+    }
+    match i64::from_str_radix(&digits[..end], effective_radix) {
+        Ok(v) => sign * (v as f64),
+        Err(_) => {
+            // Overflow path: walk digits manually.
+            let mut acc: f64 = 0.0;
+            for c in digits[..end].chars() {
+                acc = acc * (effective_radix as f64) + (c.to_digit(effective_radix).unwrap() as f64);
+            }
+            sign * acc
+        }
+    }
 }
 
 /// `evaluation.js:345-357` — `evaluateQuasis(path, quasis, state, raw)`.
@@ -1276,5 +1705,239 @@ mod tests {
             EvaluatedValue::Confident(Value::Number(n)) => assert_eq!(n, 0.0),
             other => panic!("expected 0, got {other:?}"),
         }
+    }
+
+    // ----------------------------------------------------------------
+    // CallExpression branch — `evaluation.js:312-342` port coverage.
+    //
+    // Each test below pins one JS-spec edge case that f64 in Rust does
+    // NOT match by default. If a test fails after a Rust-stdlib bump
+    // or an `apply_builtin` rewrite, the JS-vs-Rust gap reopened.
+    // ----------------------------------------------------------------
+
+    fn confident_num(v: EvaluatedValue) -> f64 {
+        match v {
+            EvaluatedValue::Confident(Value::Number(n)) => n,
+            other => panic!("expected confident number, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn math_max_basic_folds() {
+        assert_eq!(confident_num(eval_str("Math.max(1, 2, 3)")), 3.0);
+        assert_eq!(confident_num(eval_str("Math.max(-5, -10)")), -5.0);
+    }
+
+    #[test]
+    fn math_max_no_args_is_neg_infinity() {
+        // Spec: Math.max() === -Infinity.
+        let n = confident_num(eval_str("Math.max()"));
+        assert!(n.is_infinite() && n < 0.0, "expected -Infinity, got {n}");
+    }
+
+    #[test]
+    fn math_max_nan_propagates() {
+        // Spec: any NaN arg → NaN result, regardless of position.
+        assert!(confident_num(eval_str("Math.max(1, NaN, 3)")).is_nan());
+        assert!(confident_num(eval_str("Math.max(NaN, 1)")).is_nan());
+    }
+
+    #[test]
+    fn math_max_signed_zero_returns_positive() {
+        // Spec: Math.max(-0, +0) === +0 AND Math.max(+0, -0) === +0.
+        // Detect sign via 1/+0 === +Infinity, 1/-0 === -Infinity.
+        let a = confident_num(eval_str("Math.max(-0, 0)"));
+        let b = confident_num(eval_str("Math.max(0, -0)"));
+        assert_eq!(a, 0.0);
+        assert_eq!(b, 0.0);
+        assert!(a.is_sign_positive(), "Math.max(-0, 0) should be +0");
+        assert!(b.is_sign_positive(), "Math.max(0, -0) should be +0");
+    }
+
+    #[test]
+    fn math_min_basic_folds() {
+        assert_eq!(confident_num(eval_str("Math.min(1, 2, 3)")), 1.0);
+    }
+
+    #[test]
+    fn math_min_no_args_is_infinity() {
+        let n = confident_num(eval_str("Math.min()"));
+        assert!(n.is_infinite() && n > 0.0, "expected +Infinity, got {n}");
+    }
+
+    #[test]
+    fn math_min_nan_propagates() {
+        assert!(confident_num(eval_str("Math.min(1, NaN, 3)")).is_nan());
+    }
+
+    #[test]
+    fn math_min_signed_zero_returns_negative() {
+        // Spec: Math.min(-0, +0) === -0 AND Math.min(+0, -0) === -0.
+        let a = confident_num(eval_str("Math.min(-0, 0)"));
+        let b = confident_num(eval_str("Math.min(0, -0)"));
+        assert_eq!(a, 0.0);
+        assert_eq!(b, 0.0);
+        assert!(a.is_sign_negative(), "Math.min(-0, 0) should be -0");
+        assert!(b.is_sign_negative(), "Math.min(0, -0) should be -0");
+    }
+
+    #[test]
+    fn math_round_half_toward_positive_infinity() {
+        // Spec: Math.round rounds half toward +Infinity, NOT half-away-
+        // from-zero (which is what Rust's f64::round does). Critical
+        // divergence on negative half-integers.
+        assert_eq!(confident_num(eval_str("Math.round(0.5)")), 1.0);
+        assert_eq!(confident_num(eval_str("Math.round(1.5)")), 2.0);
+        assert_eq!(confident_num(eval_str("Math.round(-0.5)")), 0.0);
+        assert_eq!(confident_num(eval_str("Math.round(-1.5)")), -1.0);
+        assert_eq!(confident_num(eval_str("Math.round(-2.5)")), -2.0);
+    }
+
+    #[test]
+    fn math_pow_folds() {
+        assert_eq!(confident_num(eval_str("Math.pow(2, 10)")), 1024.0);
+    }
+
+    #[test]
+    fn math_abs_folds() {
+        assert_eq!(confident_num(eval_str("Math.abs(-7)")), 7.0);
+        assert_eq!(confident_num(eval_str("Math.abs(7)")), 7.0);
+    }
+
+    #[test]
+    fn math_floor_ceil_trunc_fold() {
+        assert_eq!(confident_num(eval_str("Math.floor(1.9)")), 1.0);
+        assert_eq!(confident_num(eval_str("Math.ceil(1.1)")), 2.0);
+        assert_eq!(confident_num(eval_str("Math.trunc(-1.9)")), -1.0);
+    }
+
+    #[test]
+    fn math_random_does_not_fold() {
+        // INVALID_METHODS at evaluation.js:10 includes "random".
+        assert!(matches!(eval_str("Math.random()"), EvaluatedValue::Deopt));
+    }
+
+    #[test]
+    fn math_max_deopts_with_unbound_arg() {
+        // Spec: a deopt'd arg short-circuits; result is deopt, not NaN.
+        // Mirrors evaluation.js:339 — `if (!state.confident) return;`.
+        assert!(matches!(
+            eval_str("Math.max(1, someUnbound)"),
+            EvaluatedValue::Deopt
+        ));
+    }
+
+    // Note on shadow-doesn't-block-member-form: Babel's member-callee
+    // arm (evaluation.js:319-328) does NOT gate on `getBinding(obj)` —
+    // it reads `global[object.node.name]` directly. We can't express a
+    // scoped `const Math = …` shadow via this test harness because the
+    // SequenceExpression branch is `unimplemented!()` per the
+    // evidenced-unreachable assertion at the top of `_evaluate`. The
+    // property is covered transitively: `math_max_basic_folds` succeeds
+    // in this test environment which has no `Math` binding registered
+    // — proving the member arm reads the namespace through the
+    // VALID_OBJECT_CALLEES allow-list rather than through scope lookup.
+
+    #[test]
+    fn parse_int_decimal() {
+        assert_eq!(confident_num(eval_str("parseInt('42')")), 42.0);
+        assert_eq!(confident_num(eval_str("parseInt('  42abc')")), 42.0);
+    }
+
+    #[test]
+    fn parse_int_hex_auto_detect() {
+        // Spec: "0x" prefix with radix 0 (default) or 16 → base 16.
+        assert_eq!(confident_num(eval_str("parseInt('0x10')")), 16.0);
+        assert_eq!(confident_num(eval_str("parseInt('0xFF')")), 255.0);
+    }
+
+    #[test]
+    fn parse_int_explicit_radix() {
+        assert_eq!(confident_num(eval_str("parseInt('10', 16)")), 16.0);
+        assert_eq!(confident_num(eval_str("parseInt('ff', 16)")), 255.0);
+        assert_eq!(confident_num(eval_str("parseInt('1010', 2)")), 10.0);
+    }
+
+    #[test]
+    fn parse_int_negative_and_sign() {
+        assert_eq!(confident_num(eval_str("parseInt('-42')")), -42.0);
+        assert_eq!(confident_num(eval_str("parseInt('+42')")), 42.0);
+    }
+
+    #[test]
+    fn parse_int_invalid_returns_nan() {
+        assert!(confident_num(eval_str("parseInt('xyz')")).is_nan());
+        assert!(confident_num(eval_str("parseInt('')")).is_nan());
+    }
+
+    #[test]
+    fn parse_float_basic() {
+        assert_eq!(confident_num(eval_str("parseFloat('3.14')")), 3.14);
+        assert_eq!(confident_num(eval_str("parseFloat('  3.14abc')")), 3.14);
+    }
+
+    #[test]
+    fn parse_float_infinity_token() {
+        let n = confident_num(eval_str("parseFloat('Infinity')"));
+        assert!(n.is_infinite() && n > 0.0);
+        let m = confident_num(eval_str("parseFloat('-Infinity')"));
+        assert!(m.is_infinite() && m < 0.0);
+    }
+
+    #[test]
+    fn parse_float_invalid_returns_nan() {
+        assert!(confident_num(eval_str("parseFloat('xyz')")).is_nan());
+    }
+
+    #[test]
+    fn is_nan_global() {
+        match eval_str("isNaN(NaN)") {
+            EvaluatedValue::Confident(Value::Bool(b)) => assert!(b),
+            other => panic!("expected true, got {other:?}"),
+        }
+        match eval_str("isNaN(1)") {
+            EvaluatedValue::Confident(Value::Bool(b)) => assert!(!b),
+            other => panic!("expected false, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn is_finite_global() {
+        match eval_str("isFinite(1)") {
+            EvaluatedValue::Confident(Value::Bool(b)) => assert!(b),
+            other => panic!("expected true, got {other:?}"),
+        }
+        match eval_str("isFinite(Infinity)") {
+            EvaluatedValue::Confident(Value::Bool(b)) => assert!(!b),
+            other => panic!("expected false, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn number_callee_coerces() {
+        assert_eq!(confident_num(eval_str("Number('42')")), 42.0);
+        assert_eq!(confident_num(eval_str("Number(true)")), 1.0);
+        assert_eq!(confident_num(eval_str("Number()")), 0.0);
+    }
+
+    #[test]
+    fn string_callee_coerces() {
+        match eval_str("String(42)") {
+            EvaluatedValue::Confident(Value::String(s)) => assert_eq!(s, "42"),
+            other => panic!("expected '42', got {other:?}"),
+        }
+        match eval_str("String()") {
+            EvaluatedValue::Confident(Value::String(s)) => assert_eq!(s, ""),
+            other => panic!("expected '', got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unknown_math_method_deopts() {
+        // `Math.fround` is a real spec method but not in our
+        // resolve_builtin_callee enum — it must deopt rather than
+        // silently mis-fold. If a fixture surfaces it, port the
+        // sub-shape.
+        assert!(matches!(eval_str("Math.fround(1.5)"), EvaluatedValue::Deopt));
     }
 }

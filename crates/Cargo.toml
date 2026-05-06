@@ -146,3 +146,16 @@ opt-level = 2
 lto = "off"
 codegen-units = 16
 debug = false
+
+# Fast iteration profile for parity tests. Optimisation OFF, no LTO,
+# max codegen parallelism, no debuginfo. Builds in seconds; runtime
+# is plenty fast enough for corpus-size diff runs.
+[profile.dev]
+opt-level = 0
+lto = "off"
+codegen-units = 256
+debug = false
+incremental = true
+
+[profile.dev.package."*"]
+opt-level = 0

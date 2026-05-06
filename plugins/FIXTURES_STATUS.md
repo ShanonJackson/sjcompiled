@@ -236,6 +236,28 @@ the resulting CSS).
   LogicalExpression) without recursive automatic-positive on
   Logical. +3 parity.
 
+- **[FIXED 2026-05-07] ct-expression-export** — `compat::evaluation`'s
+  CallExpression branch was a deopt-stub. Upstream's
+  `@babel/traverse/lib/path/evaluation.js:312-342` folds calls whose
+  callee is one of `VALID_OBJECT_CALLEES = ["Number","String","Math"]`
+  (in member-callee form, e.g. `Math.max(...)`) or
+  `VALID_IDENTIFIER_CALLEES = ["isFinite","isNaN","parseFloat",
+  "parseInt","decodeURI",…]` (in identifier-callee form). The Rust
+  port previously deopt'd unconditionally with a TODO comment. With
+  `Math.max(base - 5, 0)` in `border-radius` no longer folding to `5`
+  on the SWC side, the CSS-builder fell through to the dynamic
+  CSS-variable path and emitted `border-radius:var(--_y28lkp)` +
+  a `--_y28lkp: ix(Math.max(base - 5, 0), "px")` runtime, where
+  Babel emits the static `border-radius:5px`. Ported the full
+  CallExpression branch in `crates/babel-plugin/src/compat/evaluation.rs`:
+  added a `Builtin` enum + `resolve_builtin_callee` mirroring upstream's
+  callee-shape gate (including the binding-not-shadowed check on the
+  identifier arm and the `INVALID_METHODS = ["random"]` exclusion on
+  Math.*) + `apply_builtin` dispatching to f64 ops with JS-spec
+  semantics (NaN propagation in Math.max/min, `Math.round` half-toward-
+  +Infinity, `parseFloat`/`parseInt` with radix-prefix detection). +1
+  parity.
+
 - **[FIXED 2026-05-07] ct-optional-chain-dynamic-style** — generator
   missing `OptChain` arm. Babel's `@babel/generator` has explicit
   `OptionalMemberExpression` / `OptionalCallExpression` printers
@@ -262,8 +284,8 @@ to refresh):
 
 ```
 total                336
-parity               281  (+16 from baseline)
-divergence           8
+parity               282  (+17 from baseline)
+divergence           7
 swc-throws           2
 babel-throws         0
 both-throw           2     ← negative-test fixtures (OK)
@@ -305,12 +327,11 @@ Fix candidates (each with trade-offs):
 
 Status: open, blocked on architectural decision.
 
-### Other ct-* divergences (2 remaining)
+### Other ct-* divergences (1 remaining)
 
 Surface-traced individually as the iteration loop continues:
 
 - `ct-editor-big`
-- `ct-expression-export`
 
 Use `bun parity-harness/fixtures-triage.mjs --only <name> --print-diffs`
 to start triage; the in-process debug-test pattern proven on
