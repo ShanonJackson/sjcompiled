@@ -21,7 +21,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use parity_runner::{diff_summary, rust_run_stage, JsBridge, Stage};
+use parity_runner::{diff_summary, run_batch, rust_run_stage, Stage};
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
@@ -95,30 +95,29 @@ fn main() -> ExitCode {
 }
 
 fn run_parity(stage: Stage, entries: &[(String, String)]) -> ExitCode {
-    let mut js = match JsBridge::spawn() {
-        Ok(b) => b,
+    let inputs: Vec<&str> = entries.iter().map(|(_, css)| css.as_str()).collect();
+    let js_responses = match run_batch(stage, &inputs) {
+        Ok(r) => r,
         Err(e) => { eprintln!("{e}"); return ExitCode::from(2); }
     };
 
     let mut failures = 0usize;
-    for (label, css) in entries {
-        let js_out = match js.run(stage, css) {
-            Ok(r) if r.ok => r.css,
-            Ok(r) => { eprintln!("[{label}] JS error: {}", r.error); failures += 1; continue; }
-            Err(e) => { eprintln!("[{label}] bridge error: {e}"); failures += 1; continue; }
-        };
+    for ((label, css), js_resp) in entries.iter().zip(js_responses.iter()) {
+        if !js_resp.ok {
+            eprintln!("[{label}] JS error: {}", js_resp.error);
+            failures += 1;
+            continue;
+        }
         let rs_out = match rust_run_stage(stage, css) {
             Ok(s) => s,
             Err(e) => { eprintln!("[{label}] RUST error: {e}"); failures += 1; continue; }
         };
-        let d = diff_summary(label, &js_out, &rs_out);
+        let d = diff_summary(label, &js_resp.css, &rs_out);
         if !d.equal {
             failures += 1;
             eprintln!("{}", d.summary);
         }
     }
-
-    let _ = js.shutdown();
 
     if failures == 0 {
         println!("OK — {} inputs, all byte-clean (JS vs Rust)", entries.len());
@@ -133,36 +132,28 @@ fn run_determinism(stage: Stage, entries: &[(String, String)]) -> ExitCode {
     // Two independent JS bridge spawns. Different processes — if their
     // outputs diverge, the JS oracle has hidden state (env, fs, cache)
     // bleeding into the answer.
-    let mut js_a = match JsBridge::spawn() {
-        Ok(b) => b,
+    let inputs: Vec<&str> = entries.iter().map(|(_, css)| css.as_str()).collect();
+    let resp_a = match run_batch(stage, &inputs) {
+        Ok(r) => r,
         Err(e) => { eprintln!("{e}"); return ExitCode::from(2); }
     };
-    let mut js_b = match JsBridge::spawn() {
-        Ok(b) => b,
+    let resp_b = match run_batch(stage, &inputs) {
+        Ok(r) => r,
         Err(e) => { eprintln!("{e}"); return ExitCode::from(2); }
     };
 
     let mut failures = 0usize;
-    for (label, css) in entries {
-        let a = match js_a.run(stage, css) {
-            Ok(r) if r.ok => r.css,
-            Ok(r) => { eprintln!("[{label}] JS-A error: {}", r.error); failures += 1; continue; }
-            Err(e) => { eprintln!("[{label}] bridge-A error: {e}"); failures += 1; continue; }
-        };
-        let b = match js_b.run(stage, css) {
-            Ok(r) if r.ok => r.css,
-            Ok(r) => { eprintln!("[{label}] JS-B error: {}", r.error); failures += 1; continue; }
-            Err(e) => { eprintln!("[{label}] bridge-B error: {e}"); failures += 1; continue; }
-        };
-        let d = diff_summary(label, &a, &b);
+    for (i, (label, _css)) in entries.iter().enumerate() {
+        let a = &resp_a[i];
+        let b = &resp_b[i];
+        if !a.ok { eprintln!("[{label}] JS-A error: {}", a.error); failures += 1; continue; }
+        if !b.ok { eprintln!("[{label}] JS-B error: {}", b.error); failures += 1; continue; }
+        let d = diff_summary(label, &a.css, &b.css);
         if !d.equal {
             failures += 1;
             eprintln!("JS-vs-JS divergence: {}", d.summary);
         }
     }
-
-    let _ = js_a.shutdown();
-    let _ = js_b.shutdown();
 
     if failures == 0 {
         println!(

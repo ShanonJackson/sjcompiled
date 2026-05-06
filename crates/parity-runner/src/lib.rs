@@ -24,5 +24,5 @@ pub mod js_bridge;
 pub mod stages;
 
 pub use diff::{diff_summary, DiffResult};
-pub use js_bridge::{JsBridge, JsRequest, JsResponse};
+pub use js_bridge::{run_batch, JsBridge, JsRequest, JsResponse};
 pub use stages::{rust_run_stage, Stage};

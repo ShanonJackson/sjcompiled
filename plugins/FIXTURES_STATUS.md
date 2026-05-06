@@ -154,62 +154,73 @@ By category:
   the slot. Wired through `has_postfix_part` and
   `binary_needs_parens`. +1 parity.
 
-## Deferred — requires transform_cache port
+## Closed (continued)
 
-### Sheet ordering for nested `<outer css>` / `<inner xcss>` (4 fixtures)
+- **[FIXED 2026-05-07] sheet ordering cluster — 6 fixtures**:
+  `ct-xcss-css-map-atlaskit`, `ct-navigation-system-logo-xcss`,
+  `ct-complex-runtime-combo`, `ct-css-null-literal-styles`,
+  `ct-css-null-literal-variables`, `ct-editor-big`. Root cause:
+  the Rust port's `visit_mut_jsx_element` ran `n.visit_mut_children_with(self)`
+  BEFORE handler dispatch (children-first / exit-time), reversing
+  the order of `hoist_sheet` calls relative to upstream's
+  enter-time `JSXElement` / `JSXOpeningElement` visitors at
+  `packages/babel-plugin/src/babel-plugin.ts:351-367`. Same atomic
+  CSS rule set on both sides; only the `const _N = "..."` numeric
+  labels were permuted.
 
-**Affected:** `ct-xcss-css-map-atlaskit`, `ct-navigation-system-logo-xcss`,
-`ct-complex-runtime-combo`, `ct-css-null-literal-styles`. All produce
-**byte-identical sets** of atomic CSS rules — the divergence is the
-ORDER of `const _N = "<rule>"` declarations in the emitted output.
+  Two coordinated fixes (faithful to upstream):
+
+  1. **`state.transform_cache` field** in
+     `crates/babel-plugin/src/state.rs` — port of upstream's
+     `state.transformCache: WeakMap<NodePath, true>` (`types.ts:210`,
+     `babel-plugin.ts:118`). Keyed on JSXOpeningElement `Span`
+     (the SWC analog of upstream's `NodePath<JSXOpeningElement>`
+     granularity). Out-of-capture per STATE_MUTATIONS.md
+     classification.
+
+  2. **xcss-prop cache gate** at the head of
+     `crates/babel-plugin/src/xcss_prop/mod.rs::try_handle_jsx_element`
+     — `if state.transform_cache_has(opening_span) { return None; }`
+     then `state.transform_cache_insert(opening_span)`, BEFORE
+     any other early-bail (matches upstream `xcss-prop/index.ts:58-64`
+     ordering: stamp before propPath/container lookup).
+
+  3. **Enter-time dispatch flip** in
+     `crates/babel-plugin/src/babel_plugin.rs::visit_mut_jsx_element`
+     — handlers run BEFORE `n.visit_mut_children_with(self)`,
+     mirroring Babel's enter visitors. After replacement, the
+     explicit child walk is the SWC analog of `@babel/traverse`'s
+     automatic descent into `replaceWith` results: xcss-prop's
+     wrapper `<CC><CS/>{originalEl}</CC>` is recursed into, the
+     inner re-enters the handler with its span already in the
+     cache, short-circuits → terminates. css-prop doesn't need
+     the cache because upstream `css-prop/index.ts:77` strips the
+     `css` attribute pre-wrap; the inner re-entry sees no `css`
+     attr → no-op.
+
+  Audits performed before flipping (per DEV_LOOP.md drift-discipline):
+  - `crates/babel-plugin/src/utils/hoist_sheet.rs::emit_hoisted_sheets`
+    confirmed faithful: each sheet inserted at the SAME `insert_idx`
+    pushes earlier inserts down, producing reverse-of-arrival body
+    order — exactly Babel's `parentBody.filter(!isImport)[0]
+    .insertBefore(...)` semantics with `path` re-evaluated each call.
+  - `crates/babel-plugin/src/css_prop/mod.rs::try_handle_jsx_element:203`
+    confirmed strips the css attribute pre-wrap (`el.opening.attrs
+    .remove(attr_idx)`), matching upstream line 77.
+
+  Verified: §6.5 JSON corpus holds at 476/477. /fixtures corpus
+  282 → 288 parity (+6). Cargo lib+integration tests 511 passed,
+  1 failed (the pre-existing
+  `resolver::engine::tests::build_from_config_with_transforms_doesnt_break_default_resolution`).
+  +6 parity.
+
+## Deferred — architectural blockers
 
 **Root cause (verified empirically 2026-05-06):**
-Upstream Babel's plugin uses **enter-time** visitors for
-`JSXElement` and `JSXOpeningElement` (`packages/babel-plugin/src/babel-plugin.ts:351-367`),
-so for `<outer css={A}><inner xcss={B}/></outer>`:
-
-1. ENTER `outer` → `visitCssPropPath` pushes A's sheets first.
-2. ENTER `inner` → `visitXcssPropPath` pushes B's sheets second.
-
-Result: `[A..., B...]`.
-
-The Rust port's `visit_mut_jsx_element` runs **children first**
-(`n.visit_mut_children_with(self)` BEFORE the dispatch block at
-`crates/babel-plugin/src/babel_plugin.rs::visit_mut_jsx_element`).
-This is documented as an intentional "single-pass design"
-(`crates/babel-plugin/src/xcss_prop/mod.rs:48-54`) — children-first
-prevents the wrap-then-recurse infinite loop that would happen if
-xcss-prop's `<CC>...</CC>` wrapper were re-walked, because the
-inner replaced JSXElement still has the `xcss` attr that would
-re-trigger dispatch.
-
-Result with children-first: `[B..., A...]` — same rules, reversed
-order.
-
-**Why we haven't fixed it yet:**
-
-Switching to enter-time dispatch (parent-first) requires porting
-upstream's `transformCache: WeakMap<NodePath, true>` (used at
-`packages/babel-plugin/src/xcss-prop/index.ts:59-64` to gate
-re-entry). Without it, the parent-first walk infinitely recurses
-on the wrapper's inner element. Verified empirically:
-`STATUS_STACK_OVERFLOW` on `xcss-prop-tests-transformation--should-transform-xcss-prop-when-compiled-is-in-scope`.
-
-**Investigation needed:**
-
-1. Add `state.transform_cache: HashSet<*const JSXElement>` (or a
-   marker on the AST node — pointer is risky across mutations).
-2. Gate `try_handle_jsx_element` for both xcss-prop and css-prop on
-   cache membership.
-3. Flip dispatch to enter-time (BEFORE
-   `visit_mut_children_with(self)`).
-4. Verify JSON corpus stays at 476/477 parity.
-
-Roughly 100-200 LOC + careful test pass. Not a blocker for current
-fixtures-triage progress; the consts re-order but the runtime
-className compilation is unaffected (the order only matters for
-HMR cache keying / source-map debugging, not for correctness of
-the resulting CSS).
+**Resolved 2026-05-07** — see "[FIXED 2026-05-07] sheet ordering
+cluster — 6 fixtures" in the **Closed (continued)** section above.
+The `transform_cache` port + enter-time dispatch flip landed in
+this session. Cluster is closed.
 
 ## Closed (continued)
 
@@ -284,27 +295,14 @@ to refresh):
 
 ```
 total                336
-parity               282  (+17 from baseline)
-divergence           7
+parity               288  (+23 from baseline)
+divergence           1
 swc-throws           2
 babel-throws         0
 both-throw           2     ← negative-test fixtures (OK)
 skipped-multifile    43    ← gated behind --include-multi
 skipped-no-input     0
 ```
-
-### Likely sheet-ordering (4-5 fixtures)
-
-Same shape as the deferred section above. Each produces the SAME
-atomic CSS-rule strings but in a different `const _N = "..."` order.
-Will resolve when the parent-first dispatch + `transform_cache`
-port lands.
-
-- `ct-xcss-css-map-atlaskit`
-- `ct-navigation-system-logo-xcss`
-- `ct-complex-runtime-combo`
-- `ct-css-null-literal-styles`
-- `ct-css-null-literal-variables`
 
 ### Stale scope-index snapshot (1) — `ct-hover-display`
 
@@ -327,11 +325,12 @@ Fix candidates (each with trade-offs):
 
 Status: open, blocked on architectural decision.
 
-### Other ct-* divergences (1 remaining)
+### Other ct-* divergences (0 remaining)
 
-Surface-traced individually as the iteration loop continues:
-
-- `ct-editor-big`
+All non-deferred single-file divergences are closed. The single
+remaining open divergence (`ct-hover-display`) is gated on the
+scope-index live-snapshot architectural decision; the
+sheet-ordering cluster was closed 2026-05-07 (see Closed section).
 
 Use `bun parity-harness/fixtures-triage.mjs --only <name> --print-diffs`
 to start triage; the in-process debug-test pattern proven on

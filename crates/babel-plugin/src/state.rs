@@ -32,12 +32,14 @@
 //! ### Fields under same-visibility for compile-time enforcement (NOT diff-captured)
 //!
 //! `pragma`, `uses_xcss`, `imported_compiled_imports`,
-//! `paths_to_cleanup`, `opts`, `import_sources`, `cache`. Per
-//! STATE_MUTATIONS.md these are out-of-capture (set during
-//! `Program::enter` / `ImportDeclaration` / once-per-file init), but
+//! `paths_to_cleanup`, `opts`, `import_sources`, `cache`,
+//! `transform_cache`. Per STATE_MUTATIONS.md these are
+//! out-of-capture (set during `Program::enter` /
+//! `ImportDeclaration` / per-file traversal scaffolding), but
 //! still `pub(crate)` so the encapsulation barrier is uniform.
 //! Mutating methods on `State` (e.g. `set_pragma_jsx`,
-//! `ensure_compiled_imports`) provide the controlled write paths.
+//! `ensure_compiled_imports`, `transform_cache_insert`) provide
+//! the controlled write paths.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -169,9 +171,34 @@ pub struct State {
     /// of an unknown `BytePos` returns `None`, treated upstream as
     /// "no loc, skip the directive check".
     pub(crate) span_lines: HashMap<u32, usize>,
-    // `transformCache` (Babel WeakMap on NodePath) is a Babel-only
-    // construct — the Rust visitor's single-pass design (PLAN.md §3.5)
-    // eliminates the re-visit problem the WeakMap was guarding against.
+
+    /// `transformCache` — 1:1 port of upstream's
+    /// `state.transformCache: WeakMap<NodePath<any>, true>`
+    /// (`packages/babel-plugin/src/types.ts:210`,
+    /// `babel-plugin.ts:118` `this.transformCache = new WeakMap()`).
+    ///
+    /// Used ONLY by `xcss-prop` (`xcss-prop/index.ts:58-64`) to
+    /// short-circuit re-entry on a JSXOpeningElement that has
+    /// already been transformed. Required because xcss-prop's
+    /// `compiledTemplate` wraps the original element in
+    /// `<CC><CS/>{originalEl}</CC>` and reuses the same
+    /// `JSXOpeningElement` (xcss attribute name remains; only the
+    /// expression value is swapped). Without the cache, the
+    /// post-replacement re-walk would re-fire xcss-prop on the
+    /// inner element → stack overflow.
+    ///
+    /// Keyed on the JSXOpeningElement's `Span` (Babel keys on
+    /// `NodePath<JSXOpeningElement>`; SWC's analog at the same
+    /// granularity is the opening-element span). Real source spans
+    /// are distinct; synthesised wrappers (`<CC>`, `<CS>`) carry
+    /// `DUMMY_SP` and are NEVER inserted because xcss-prop only
+    /// inserts on actual transform paths.
+    ///
+    /// Out-of-capture per STATE_MUTATIONS.md classification —
+    /// per-file scaffolding (same shape as `pragma`,
+    /// `paths_to_cleanup`, `comment_lines`). Initialised to empty
+    /// at `Default` / per-file `pre()`.
+    pub(crate) transform_cache: std::collections::HashSet<swc_core::common::Span>,
 }
 
 // ───────── Read-only getters (public API) ─────────
@@ -254,6 +281,22 @@ impl State {
     /// the directive check").
     pub fn line_of(&self, byte_pos: u32) -> Option<usize> {
         self.span_lines.get(&byte_pos).copied()
+    }
+
+    /// `transformCache.has(path)` analog. Returns `true` if
+    /// `xcss-prop` has previously transformed the JSXOpeningElement
+    /// identified by `span`.
+    pub fn transform_cache_has(&self, span: swc_core::common::Span) -> bool {
+        self.transform_cache.contains(&span)
+    }
+
+    /// `transformCache.set(path, true)` analog. Idempotent.
+    /// `pub(crate)` write path: only `xcss-prop` calls it. Not
+    /// routed through `MutationRecorder` because the cache is
+    /// per-file scaffolding (out-of-capture per STATE_MUTATIONS.md
+    /// classification — same shape as `pragma`).
+    pub(crate) fn transform_cache_insert(&mut self, span: swc_core::common::Span) {
+        self.transform_cache.insert(span);
     }
 }
 

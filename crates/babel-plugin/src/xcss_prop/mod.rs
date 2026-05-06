@@ -22,13 +22,18 @@
 //!
 //! ### Dispatch site
 //!
-//! `babel_plugin.rs::visit_mut_jsx_element` runs the children walk
-//! FIRST, then calls [`try_handle_jsx_element`]. Post-order is
-//! required so the original element's children are processed before
-//! we wrap it; the wrapper's synthesised children (`<CS>` + the
-//! original JSX) are NOT re-walked, which mirrors Babel's
-//! `transformCache` short-circuit (a JSXOpeningElement that has been
-//! seen by xcss-prop is skipped on re-entry).
+//! `babel_plugin.rs::visit_mut_jsx_element` calls
+//! [`try_handle_jsx_element`] BEFORE recursing into children
+//! (parent-first / enter-time dispatch — matches upstream's
+//! `JSXOpeningElement` enter visitor at `babel-plugin.ts:358-367`).
+//! After a successful replacement, the caller explicitly recurses
+//! into the new `<CC><CS/>{originalEl}</CC>` subtree; the inner
+//! original element re-enters this handler with its
+//! `JSXOpeningElement.span` already in `state.transform_cache` and
+//! short-circuits. This is the byte-equality contract for the
+//! sheet-decl `_N` ordering — `hoist_sheet` calls fire in
+//! parent-first order, matching Babel's `insertBefore`-driven
+//! reverse-of-arrival body layout.
 //!
 //! ### Babel → SWC divergences
 //!
@@ -46,12 +51,13 @@
 //!   The set of variants reachable from a JSX-attr expression matches
 //!   upstream's `@babel/traverse` walk on the same shape.
 //!
-//! * **No `transformCache`.** Babel's WeakMap on NodePath guards
-//!   against re-visiting the same path after `replaceWith`. The Rust
-//!   visitor is post-order: the wrapper's children are NOT walked
-//!   again because `n.visit_mut_children_with(self)` ran BEFORE the
-//!   replacement. See `state.rs` field doc on `transform_cache` (the
-//!   field is intentionally absent — single-pass design).
+//! * **`transformCache` keyed on Span, not NodePath.** Upstream uses
+//!   a `WeakMap<NodePath, true>`; SWC plugins don't carry NodePath,
+//!   so the Rust port keys the cache on the JSXOpeningElement's
+//!   `Span` (lo/hi/ctxt). Real-source spans are distinct;
+//!   synthesised wrappers (`<CC>`, `<CS>`) carry `DUMMY_SP` and are
+//!   never inserted because they don't match the xcss handler's
+//!   entry condition.
 
 use swc_core::common::DUMMY_SP;
 use swc_core::ecma::ast::{
@@ -277,6 +283,27 @@ pub fn try_handle_jsx_element(
     if !state.opts().process_xcss.unwrap_or(true) {
         return None;
     }
+
+    // Upstream `xcss-prop/index.ts:58-64`:
+    //
+    //     if (meta.state.transformCache.has(path)) {
+    //       return;
+    //     }
+    //     meta.state.transformCache.set(path, true);
+    //
+    // Keyed on the JSXOpeningElement's span — the SWC analog of
+    // upstream's `NodePath<JSXOpeningElement>`. Stamps unconditionally
+    // BEFORE any other early-bail (matches upstream's order: the set
+    // happens before `propPath`/`container` lookup, so a no-xcss-attr
+    // bail still counts as "cache stamped"). Required to terminate
+    // the post-replacement re-walk of `<CC><CS/>{originalEl}</CC>`
+    // — the inner JSXOpeningElement is the same span as the original
+    // and would otherwise re-trigger this handler indefinitely.
+    let opening_span = el.opening.span;
+    if state.transform_cache_has(opening_span) {
+        return None;
+    }
+    state.transform_cache_insert(opening_span);
 
     let attrs = &el.opening.attrs;
     let attr_idx = find_xcss_attr(attrs)?;

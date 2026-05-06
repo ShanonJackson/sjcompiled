@@ -1403,20 +1403,52 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         n.visit_mut_children_with(self);
     }
 
-    /// Phase 6 §6.4 — `xcss-prop` dispatch. Runs the children walk
-    /// FIRST so the original element's children are processed before
-    /// we wrap, then calls `xcss_prop::try_handle_jsx_element`. On
-    /// success the handler returns a `<CC>...</CC>` JSXElement; we
-    /// swap it into place via assignment. The wrapper's children are
-    /// NOT re-walked because the children walk has already run on
-    /// the pre-replacement element — this mirrors Babel's
-    /// `transformCache` short-circuit (see upstream
-    /// `xcss-prop/index.ts:59-64`).
+    /// Phase 6 §6.4–§6.6 — JSXElement dispatch. **Enter-time
+    /// (parent-first)** to match upstream's
+    /// `JSXElement` / `JSXOpeningElement` enter visitors at
+    /// `babel-plugin.ts:351-367`.
+    ///
+    /// Order of operations:
+    ///
+    /// 1. ClassNames at JSXElement (`babel-plugin.ts:351-357`).
+    ///    Replaces the entire element with `<CC>{body}</CC>`; we
+    ///    recurse into the replacement so nested handlers (e.g.
+    ///    css-prop on a JSX inside the function-body return) still
+    ///    fire. Matches Babel's automatic re-walk after
+    ///    `replaceWith`.
+    /// 2. xcss-prop at JSXOpeningElement (lines 358-362). Wraps as
+    ///    `<CC><CS/>{originalEl}</CC>`. The original opening element
+    ///    keeps its `xcss` attribute (only the value is rewritten),
+    ///    so the post-replacement recursion would re-fire indefinitely
+    ///    without a re-entry guard. xcss-prop stamps
+    ///    `state.transform_cache` on the opening-element span at
+    ///    handler entry; the inner re-entry hits the cache and
+    ///    short-circuits.
+    /// 3. css-prop at JSXOpeningElement (lines 364-366). Wraps the
+    ///    same way but **strips** the `css` attribute (`splice` at
+    ///    upstream `css-prop/index.ts:77`); the post-replacement
+    ///    recursion sees no `css` attr → no-op. No cache needed.
+    /// 4. After all handlers have run, recurse into children to
+    ///    process nested JSX. This is the explicit Rust analog of
+    ///    `@babel/traverse`'s automatic descent.
+    ///
+    /// Why enter-time matters for byte-equality: `hoist_sheet` calls
+    /// `state.set_sheet(...)` in invocation order. With parent-first
+    /// dispatch, the outer `<section css={A}>` hoists A's sheets
+    /// before its children's `css={B}` hoist B's sheets. Combined
+    /// with `emit_hoisted_sheets`'s reverse-of-arrival body layout
+    /// (each `body.insert(idx, …)` pushes earlier inserts down),
+    /// the final `const _N = "..."` order matches Babel's
+    /// `parentBody.filter(!isImport)[0].insertBefore(...)` semantics.
+    /// Children-first dispatch produced a reversed `_N` sequence —
+    /// see deferred sheet-ordering cluster in `FIXTURES_STATUS.md`.
     ///
     /// Dispatch precondition: `self.scope_index` and
-    /// `self.program_scope` must be initialised — they are at
-    /// `visit_mut_program` time. We assert via `expect()` so a
-    /// regression in the bridge fires loud.
+    /// `self.program_scope` must be initialised at
+    /// `visit_mut_program` time. Script programs (no Module body)
+    /// leave both as None; we treat that as a no-op (Compiled
+    /// doesn't operate on classic scripts in practice) and still
+    /// recurse into children for completeness.
     fn visit_mut_jsx_element(&mut self, n: &mut swc_core::ecma::ast::JSXElement) {
         #[cfg(debug_assertions)]
         if self
@@ -1427,66 +1459,83 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         {
             self.stub_log.push("jsx_element_visited".to_string());
         }
-        n.visit_mut_children_with(self);
 
         // §6.4 dispatch — needs scope_index + program_scope initialised
         // by the §4.6 bridge at `visit_mut_program`. Script programs
-        // (no Module body) leave both as None; we treat that as a
-        // no-op for xcss-prop because Compiled doesn't operate on
-        // classic scripts in practice.
-        let (Some(scope_index), Some(parent_scope)) =
-            (self.scope_index.as_mut(), self.program_scope)
-        else {
-            return;
-        };
+        // (no Module body) leave both as None.
+        if let (Some(_), Some(_)) = (self.scope_index.as_ref(), self.program_scope) {
+            // Take mutable borrows scoped to each handler call. We
+            // can't hold a single `let (scope_index, parent_scope) =
+            // (self.scope_index.as_mut(), self.program_scope)` across
+            // all three dispatches because the `*n = replacement`
+            // assignment between calls borrows `n` mutably, and we
+            // need the handlers to take `&mut self.state` etc. each
+            // pass. Re-extract per call.
 
-        // §6.6 dispatch — `<ClassNames>` element handler runs at the
-        // JSXElement level (upstream `babel-plugin.ts:351-357`),
-        // BEFORE the JSXOpeningElement-level xcss/css-prop dispatch.
-        // We dispatch first because ClassNames REPLACES the entire
-        // JSXElement with a `<CC>...</CC>` wrapper whose inner is the
-        // function body; subsequent xcss/css-prop dispatch runs on
-        // the wrapper, not the original element, and finds no
-        // matching attribute → no-op. Matches upstream's path
-        // staleness semantics.
-        if let Some(replacement) = crate::class_names::try_handle_jsx_element(
-            n,
-            &mut self.state,
-            &mut self.recorder,
-            scope_index,
-            parent_scope,
-        ) {
-            *n = replacement.new_element;
-            return;
+            // §6.6 — `<ClassNames>`. Replaces the entire JSXElement
+            // with a `<CC>{body}</CC>` wrapper. Recurse into the new
+            // subtree so nested css/xcss/styled handlers still run
+            // on the function-body return value.
+            if let Some(replacement) = crate::class_names::try_handle_jsx_element(
+                n,
+                &mut self.state,
+                &mut self.recorder,
+                self.scope_index.as_mut().expect("checked above"),
+                self.program_scope.expect("checked above"),
+            ) {
+                *n = replacement.new_element;
+                n.visit_mut_children_with(self);
+                return;
+            }
+
+            // §6.4 — xcss-prop. Wraps as `<CC><CS/>{originalEl}</CC>`.
+            // Stamps `state.transform_cache` on the opening-element
+            // span at handler entry; the post-replacement child walk
+            // re-enters the inner element with the same span and
+            // short-circuits.
+            if let Some(replacement) = crate::xcss_prop::try_handle_jsx_element(
+                n,
+                &mut self.state,
+                &mut self.recorder,
+                self.scope_index.as_mut().expect("checked above"),
+                self.program_scope.expect("checked above"),
+            ) {
+                *n = replacement.new_element;
+                // Fall through to css-prop on the (now-wrapped)
+                // element. The wrapper `<CC>` has no css attr → no-op
+                // there. The inner original element will be visited
+                // during the children walk below; its xcss handler
+                // will cache-hit, and css-prop will run on it if it
+                // also carried a css attr. Matches upstream's order:
+                // both visitors fire on the same JSXOpeningElement
+                // (`babel-plugin.ts:358-367`), xcss first then css.
+            }
+
+            // §6.5 — css-prop. Strips the `css` attribute then wraps
+            // as `<CC><CS/>{originalEl}</CC>`. No cache needed — the
+            // attribute strip prevents re-entry.
+            if let Some(replacement) = crate::css_prop::try_handle_jsx_element(
+                n,
+                &mut self.state,
+                &mut self.recorder,
+                self.scope_index.as_mut().expect("checked above"),
+                self.program_scope.expect("checked above"),
+            ) {
+                *n = replacement.new_element;
+            }
         }
 
-        if let Some(replacement) = crate::xcss_prop::try_handle_jsx_element(
-            n,
-            &mut self.state,
-            &mut self.recorder,
-            scope_index,
-            parent_scope,
-        ) {
-            *n = replacement.new_element;
-            // After xcss wraps the element with `<CC>...</CC>`, the
-            // css-prop dispatch below runs on the WRAPPER which has
-            // no css attribute — no-op. Mirrors upstream's `path`
-            // staleness semantics (xcss-prop's parentPath.replaceWith
-            // changes what subsequent visitors see).
-        }
-
-        // §6.5 dispatch — runs AFTER xcss-prop per upstream's
-        // JSXOpeningElement visitor registration order
-        // (`babel-plugin.ts:358-367`).
-        if let Some(replacement) = crate::css_prop::try_handle_jsx_element(
-            n,
-            &mut self.state,
-            &mut self.recorder,
-            scope_index,
-            parent_scope,
-        ) {
-            *n = replacement.new_element;
-        }
+        // Recurse into children AFTER dispatch — explicit Rust
+        // analog of `@babel/traverse`'s automatic descent into
+        // replaced subtrees. For a non-replaced element this is the
+        // ordinary post-order walk of the original children. For a
+        // replaced element this walks the new `<CC>...</CC>`
+        // wrapper, which (a) finds the inner original element still
+        // carrying `xcss`/`css` attrs, (b) hits the transform_cache
+        // for xcss / sees no css attr after css-prop's splice, and
+        // (c) recurses into the original element's grandchildren so
+        // nested `css`/`xcss` handlers run.
+        n.visit_mut_children_with(self);
     }
 
     /// Phase 6 §6.7 — styled displayName pre-detect. The styled

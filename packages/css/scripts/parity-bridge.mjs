@@ -14,6 +14,24 @@
 import { createInterface } from 'node:readline';
 import postcss from 'postcss';
 
+// Bun block-buffers `process.stdout` (and even `fs.writeSync(1, ...)`)
+// when stdout is a pipe to a non-TTY parent. That deadlocks the
+// parity-runner Rust harness — it does a blocking `read_line` for
+// each request's response, but bun never flushes until the buffer
+// fills (~8KB) or the process exits. `Bun.write(Bun.stdout, ...)`
+// is unbuffered and reaches the runner immediately. We resolve the
+// global `Bun` lazily so the script still runs under plain Node if
+// invoked outside the harness (falls back to `process.stdout.write`).
+const hasBun = typeof Bun !== 'undefined';
+const writeLine = (obj) => {
+  const line = JSON.stringify(obj) + '\n';
+  if (hasBun) {
+    Bun.write(Bun.stdout, line);
+  } else {
+    process.stdout.write(line);
+  }
+};
+
 import { discardEmptyRules } from '../src/plugins/discard-empty-rules.ts';
 import { discardDuplicates } from '../src/plugins/discard-duplicates.ts';
 import { extractStyleSheets } from '../src/plugins/extract-stylesheets.ts';
@@ -506,19 +524,19 @@ rl.on('line', (line) => {
   try {
     req = JSON.parse(trimmed);
   } catch (e) {
-    process.stdout.write(JSON.stringify({ ok: false, error: `bad request JSON: ${e.message}` }) + '\n');
+    writeLine({ ok: false, error: `bad request JSON: ${e.message}` });
     return;
   }
   const fn = STAGES[req.stage];
   if (!fn) {
-    process.stdout.write(JSON.stringify({ ok: false, error: `unknown stage: ${req.stage}` }) + '\n');
+    writeLine({ ok: false, error: `unknown stage: ${req.stage}` });
     return;
   }
   try {
     const out = fn(req.css);
-    process.stdout.write(JSON.stringify({ ok: true, css: out }) + '\n');
+    writeLine({ ok: true, css: out });
   } catch (e) {
-    process.stdout.write(JSON.stringify({ ok: false, error: String(e && e.message || e) }) + '\n');
+    writeLine({ ok: false, error: String(e && e.message || e) });
   }
 });
 

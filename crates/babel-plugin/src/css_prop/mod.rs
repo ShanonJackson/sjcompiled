@@ -27,11 +27,16 @@
 //!   we mutate it in place by destructuring the `Expr::JSXElement`
 //!   returned by `build_compiled_component`.
 //!
-//! * **No `transformCache`.** Babel's WeakMap on NodePath guards
-//!   against re-visiting the same path after `replaceWith`. The Rust
-//!   visitor is post-order: the wrapper's children are NOT walked
-//!   again because `n.visit_mut_children_with(self)` ran BEFORE the
-//!   replacement.
+//! * **No `transformCache` needed.** Upstream `visitCssPropPath`
+//!   doesn't consult `transformCache` either — `path.node.attributes
+//!   .splice(cssPropIndex, 1)` (line 77) strips the `css` attribute
+//!   BEFORE wrapping, so the post-replacement re-walk re-enters the
+//!   inner element with no `css` attr → handler bails on the
+//!   `find_css_attr_index` lookup. Same termination guarantee
+//!   without the cache. xcss-prop differs because it swaps the
+//!   ATTRIBUTE VALUE (not the attribute itself), so the inner
+//!   element still carries `xcss` on re-entry — hence
+//!   `state.transform_cache` exists for xcss only.
 //!
 //! ### Disable-directive (§6.5)
 //!
