@@ -18,7 +18,13 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { babelEngine, swcEngine, diffSummary, type BabelPluginFixtureOpts } from './engines';
+import {
+  babelEngine,
+  swcEngine,
+  diffSummary,
+  reconcileJsxRuntimeOrdering,
+  type BabelPluginFixtureOpts,
+} from './engines';
 
 const FIXTURES_DIR = resolve(__dirname, 'fixtures');
 const EXTRACTOR = resolve(__dirname, 'extract-fixtures.mjs');
@@ -140,18 +146,28 @@ describe('Babel ↔ SWC parity (Phase 2 §2.2 — pass-through baseline)', () =>
         // TS-only constructs in test code). Treat as pre-Phase-6 expected divergence.
         return;
       }
-      if (babelOut === swcOut) {
+      // §6.8q — strip matching `*/jsx-runtime` import line from both
+      // outputs before comparison. SWC's react transform unshifts the
+      // import to body[0] (`prepend_stmt`); Babel's preset-react
+      // appends it after existing imports. Our plugin runs BEFORE the
+      // react transform with no after-hook available, so the
+      // ordering delta is host-environment-only and does not
+      // represent plugin drift. See `reconcileJsxRuntimeOrdering` in
+      // engines.ts for full rationale and the conservative-strip
+      // safety argument.
+      const [babelCmp, swcCmp] = reconcileJsxRuntimeOrdering(babelOut, swcOut);
+      if (babelCmp === swcCmp) {
         // Lucky pass-through case (fixture didn't trigger any
         // Compiled transformation, AND prettier round-trips
         // identically through both parsers). This must stay green
         // when handlers land.
-        expect(swcOut).toBe(babelOut);
+        expect(swcCmp).toBe(babelCmp);
       } else {
         // Expected divergence at Phase 2. The diff summary is
         // emitted only when an upgraded handler accidentally
         // achieves parity for a fixture that hadn't been ungated
         // — at that point flip the fixture to no-expectedToFail.
-        expect(swcOut).not.toBe(babelOut);
+        expect(swcCmp).not.toBe(babelCmp);
       }
       // Use diffSummary to surface meaningful errors when this
       // describe is upgraded post-handler-port. Quiet at Phase 2.

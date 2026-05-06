@@ -237,6 +237,52 @@ fn find_match_in_object_pat(
 /// `reference_name`. Returns the corresponding `key` name; if no
 /// match, returns `reference_name` unchanged.
 ///
+/// Pre-order DFS through an Expression looking for the first
+/// ObjectProperty whose key is `Ident(reference_name)` (or
+/// equivalent shorthand normalisation), recursing into Object
+/// values. Mirrors upstream
+/// `traverse(expression, { ObjectProperty: { exit ... } })` with
+/// `path.stop()` on first match. Non-Object values are skipped (no
+/// match possible deeper). Returns the matching property's value
+/// expression cloned.
+fn deep_find_object_expression_property(expr: &Expr, reference_name: &str) -> Option<Box<Expr>> {
+    let Expr::Object(obj) = expr else {
+        return None;
+    };
+    for prop in &obj.props {
+        let PropOrSpread::Prop(boxed) = prop else {
+            continue;
+        };
+        match &**boxed {
+            Prop::KeyValue(kv) => {
+                if let PropName::Ident(id) = &kv.key {
+                    if id.sym == *reference_name {
+                        return Some(kv.value.clone());
+                    }
+                }
+                // Recurse into nested ObjectExpressions on the value.
+                if let Some(found) =
+                    deep_find_object_expression_property(&kv.value, reference_name)
+                {
+                    return Some(found);
+                }
+            }
+            Prop::Shorthand(id) => {
+                // `{ color }` shorthand — JS sees `ObjectProperty`
+                // with key/value both Identifier("color"). Match via
+                // the local name.
+                if id.sym == *reference_name {
+                    return Some(Box::new(Expr::Ident(id.clone())));
+                }
+            }
+            // Method / Setter / Getter / Assign — none are
+            // ObjectProperty in Babel; skip.
+            _ => continue,
+        }
+    }
+    None
+}
+
 /// JS doc: `Eg. const { key: value } = { key: 'something' }, ref =
 /// 'value'` returns `'key'` so the lookup against the source object
 /// can find `something`.
@@ -288,50 +334,53 @@ pub fn resolve_object_pattern_value_node<EvalFn>(
 where
     EvalFn: Fn(&Expr) -> Option<Box<Expr>>,
 {
-    if let Expr::Object(obj) = expression {
-        // Direct object-literal: walk for a property whose key
-        // matches reference_name.
-        for prop in &obj.props {
-            let PropOrSpread::Prop(boxed) = prop else {
-                continue;
-            };
-            let Prop::KeyValue(kv) = &**boxed else {
-                continue;
-            };
-            if let PropName::Ident(id) = &kv.key {
-                if id.sym == *reference_name {
-                    return Some(kv.value.clone());
-                }
-            }
-        }
-        return None;
+    if let Expr::Object(_) = expression {
+        // Direct object-literal: deep-walk for a property whose key
+        // matches reference_name. Mirrors upstream's
+        // `traverse(expression, { ObjectProperty: { exit ... } })`
+        // which walks every nested ObjectProperty and stops at the
+        // first match (`path.stop()`). Without the recursive walk,
+        // `const { small } = theme.fonts` resolves through the
+        // identifier-recursion branch to the FULL `theme` object
+        // (not `theme.fonts`), so the matching `small` lives inside
+        // `theme.fonts.small` — one level deeper than this top-level
+        // search would find without recursion. Pre-order DFS matches
+        // upstream behaviour for the unique-key case (the only shape
+        // any fixture in the corpus surfaces); the rare ambiguous
+        // multi-match case mirrors the JS `traverse` deterministic
+        // order.
+        return deep_find_object_expression_property(expression, reference_name);
     }
 
-    if let Expr::Member(_) = expression {
-        // The JS branch:
-        //   else if (t.isMemberExpression(expression) &&
-        //            t.isMemberExpression(expression.object)) {
-        //     const { value: node, meta: updatedMeta } =
-        //       evaluateExpression(expression, meta);
-        //     return resolveObjectPatternValueNode(node, ...);
-        //   }
-        // Member-on-member (e.g. `theme.color.primary`) needs the
-        // evaluator to fold. With `evaluate_expression = None` we
-        // deopt; with Some we recurse on the folded value.
-        if let Some(evaluator) = evaluate_expression {
-            if let Some(folded) = evaluator(expression) {
-                return resolve_object_pattern_value_node(
-                    &folded,
-                    reference_name,
-                    meta,
-                    scope_index,
-                    parent_scope,
-                    own_scope,
-                    evaluate_expression,
-                );
+    // Member: split the JS branches that the §5.4e port collapsed.
+    // - Member-on-member (`obj.member`): needs the evaluator to fold;
+    //   matches JS branch `t.isMemberExpression(expression) &&
+    //   t.isMemberExpression(expression.object)`.
+    // - Single-Member with Ident object (`obj.x`): falls through to
+    //   the identifier-recursion branch below; matches JS branch
+    //   `t.isMemberExpression(expression) && t.isIdentifier(expression.object)`.
+    if let Expr::Member(member) = expression {
+        if matches!(&*member.obj, Expr::Member(_)) {
+            // Member-on-member (e.g. `theme.color.primary`) needs the
+            // evaluator to fold. With `evaluate_expression = None` we
+            // deopt; with Some we recurse on the folded value.
+            if let Some(evaluator) = evaluate_expression {
+                if let Some(folded) = evaluator(expression) {
+                    return resolve_object_pattern_value_node(
+                        &folded,
+                        reference_name,
+                        meta,
+                        scope_index,
+                        parent_scope,
+                        own_scope,
+                        evaluate_expression,
+                    );
+                }
             }
+            return None;
         }
-        return None;
+        // Otherwise (single-Member) fall through to the
+        // identifier-recursion branch below.
     }
 
     // Identifier OR member-on-identifier — recurse into the

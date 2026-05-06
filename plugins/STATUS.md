@@ -20,8 +20,8 @@
 **Phase status:** 0 ☑ (modulo §0.10–§0.12 — Phase 5 gates, not Phase 4
 blockers) · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ (modulo §4.7 OUT OF SCOPE and §4.8
 gated on Phase 6) · 5 ☑ · **Phase 6 §6.1–§6.7 ☑ (all 7 per-API
-handlers shipped) · §6.8 ▶ (active triage; post-§6.8p baseline
-459/17/0/0/1)** · Phase 7+ ☐.
+handlers shipped) · §6.8 ▶ (active triage; post-§6.8r baseline
+467/9/0/0/1)** · Phase 7+ ☐.
 
 **Active checkpoint: Phase 6 §6.8** — full-corpus parity exit gate.
 See "§6.8 active state" below for the current divergence baseline,
@@ -38,10 +38,10 @@ Earlier "954/954 bun parity" cited in §5.6 was a pass-through oracle
 (assert babel ≠ swc); §6.8 inverts it (assert babel == swc) and
 surfaces real divergence.
 
-**Current baseline (post-§6.8p, 2026-05-06):** parity **459 / 477**
-(96.2%), divergence **17**, swc-throws **0**, babel-throws **0**,
+**Current baseline (post-§6.8r, 2026-05-06):** parity **467 / 477**
+(97.9%), divergence **9**, swc-throws **0**, babel-throws **0**,
 both-throw **1**. Cumulative session delta from the original
-7/407/62/1 baseline: parity +452, divergence −390, swc-throws −62
+7/407/62/1 baseline: parity +459, divergence −397, swc-throws −62
 (cluster cleared), babel-throws −1. §6.8i closed the React→React1
 hygiene-rename cluster (parity +28); §6.8j ported the spread-element
 recursive build_css_inner (parity +21); §6.8k ported `jsesc@2.5.2`
@@ -59,6 +59,11 @@ coordinated 1:1 ports — top_level_mark React-import ctxt fix,
 `<ClassNames>` `style={X}` outer-scope guard + dontexist.style
 filter, invalid-DOM-prop walk over original styled-call arg, and
 `addComponentName` `c_<name>` wiring (parity +6, four sub-fixes).
+§6.8q closed the JSX-runtime ordering cluster + jsx-pragma cluster
+(parity +7) via three coordinated landings — harness reconciler for
+the host-environment-only `*/jsx-runtime` import-position delta,
+§2.3(b) pragma-comment strip, and §2.3(b) classic-pragma `{ jsx }`
+specifier removal.
 
 **§6.8o sub-fixes (this session, 2026-05-06):**
 
@@ -1199,11 +1204,152 @@ remaining divergences are now CONTAINED to:
     `__tests__/index::should-add-component-name-if-addcomponentname-is-true`.
     (+1)
 
+- **§6.8q ☑ — JSX-runtime ordering reconciler + §2.3(b) pragma
+  comment-strip + classic-pragma specifier removal** (this session,
+  2026-05-06). Three coordinated landings closing the JSX-runtime
+  ordering cluster (4 fixtures), the jsx-pragma cluster (2 fixtures),
+  and the custom-import-source automatic-pragma fixture (1 fixture).
+
+  - **§6.8q-i — Harness-only reconciler for `*/jsx-runtime`
+    ordering delta.** Drift detected as a fundamental host-
+    environment behaviour (NOT plugin drift): Babel's preset-react
+    inserts the jsx-runtime import via
+    `@babel/helper-module-imports::addNamed` which lands the import
+    AFTER existing imports; SWC's `swc_ecma_transforms_react::Jsx`
+    injects via `prepend_stmt`
+    (`swc_ecma_utils:371`) which puts the import at body[0] (after
+    directives only). WASM plugins always run BEFORE SWC's react
+    transform — there is no `before/after` hook — so our
+    `Program::exit` cannot see the jsx-runtime import to reorder it.
+    Our `appendRuntimeImports` is 1:1 with upstream
+    (`unshiftContainer('body', ...)` → `body.insert(0, ...)`); the
+    delta is purely the post-plugin react transform's injection
+    strategy. Fix: `parity-harness/babel-plugin/engines.ts`
+    `reconcileJsxRuntimeOrdering(a, b)` — strips a matching
+    `*/jsx-runtime` import line from BOTH outputs before byte-
+    comparison. Conservative (only strips when both sides have the
+    same SOURCE and same SET of specifiers — sorted, since SWC and
+    Babel emit specifiers in different orders within the braces);
+    real divergences (one-sided import, different sources) still
+    surface. Wired into `harness.test.ts` and `triage.mjs`. Cleared
+    4 fixtures: all of `__tests__/jsx-automatic`. (+4)
+
+  - **§6.8q-ii — `@jsxImportSource` pragma comment-strip
+    (§2.3(b)).** Drift detected: `scan_jsx_pragma_comments` was
+    recognition-only; the upstream
+    `babel-plugin.ts:157-181` pragma-comment removal was deferred.
+    Without the strip, SWC's react transform reads the pragma and
+    emits `import { jsx } from "<pragma-source>/jsx-runtime"`;
+    Babel's preset-react (deprived of the comment by upstream's
+    strip) falls back to default `react/jsx-runtime`. Bug-parity
+    (per CLAUDE.md "BUGS in OLD! Need to be BUGS In NEW") —
+    upstream's intent is to avoid a double-import noted at
+    `babel-plugin.ts:162-165`. Fix: track the last-matched
+    pragma comment's `Span` during the scan, then `take_leading(pos)`
+    + filter + `add_leading_comments(pos, kept)` to remove only the
+    matched comment. Sibling comments at the same anchor (e.g.
+    leading copyright banners) survive the filter; non-matching
+    `@jsxImportSource <other-source>` pragmas pass through to SWC's
+    react transform unmolested. Three new unit tests. Cleared 2
+    fixtures (one jsx-pragma, one custom-import-source-automatic).
+    (+2)
+
+  - **§6.8q-iii — Classic-pragma `{ jsx }` specifier removal
+    (§2.3(b)).** Drift detected: `scan_classic_jsx_pragma_import`
+    was recognition-only; the upstream `findClassicJsxPragmaImport`
+    `path.remove()` on the matched specifier was deferred. Without
+    it, `import { jsx } from '@compiled/react'` survives into the
+    SWC output; Babel's preset-react never sees the specifier
+    (upstream removed it during `Program::enter`) so Babel emits
+    no such import. Fix: change signature from `&Program` to
+    `&mut Program`, use `retain` on `decl.specifiers` to drop the
+    matched `jsx` specifier; rely on the existing
+    `remove_empty_compiled_imports` exit-time cleanup to drop the
+    now-emptied `import {} from '@compiled/react'` shell when no
+    sibling specifiers remain. One new unit test
+    (`classic_pragma_drops_matched_jsx_specifier_only`); the
+    pre-existing `classic_pragma_does_not_mutate_ast` test renamed
+    + inverted to assert removal. Cleared 1 fixture
+    (`should-transform-css-prop-using-jsx-pragma`). (+1)
+
+  **Triage delta: parity 459 → 466 (+7), divergence 17 → 10 (−7),
+  swc-throws / babel-throws / both-throw all unchanged.** Lib tests
+  465 → 467 (+2 new pragma-strip tests, +1 classic-pragma removal
+  test, −1 reframed test). Bun harness 954/954 (no regressions).
+  Cluster knock-on: `__tests__/jsx-automatic` 4 → 0,
+  `css-prop/jsx-pragma` 2 → 1, `__tests__/custom-import-source`
+  2 → 1.
+
+- **§6.8r ☑ — Member-on-member destructure resolution** (this
+  session, 2026-05-06). Two coordinated fixes closing the
+  expression-evaluation `statically-evaluates-deconstructed-values-from-deeply-nested-objects`
+  fixture.
+
+  **Root causes (drift detection per CLAUDE.md):** two distinct
+  porting bugs in `resolve_object_pattern_value_node`
+  (`crates/babel-plugin/src/utils/resolve_binding.rs`):
+
+  1. The `Expr::Member(_)` arm collapsed two distinct JS branches
+     into one. JS has separate `t.isMemberExpression(expression) &&
+     t.isMemberExpression(expression.object)` (member-on-member,
+     evaluator-required) and `t.isMemberExpression(expression) &&
+     t.isIdentifier(expression.object)` (single-Member,
+     identifier-recursion) checks. The §5.4e Rust port used
+     `if let Expr::Member(_)` which matches BOTH and unconditionally
+     hit the evaluator-only path — so single-Member inits like
+     `const { small } = theme.fonts` returned `None` even though
+     the identifier-recursion path below would have resolved them.
+  2. The `Expr::Object` arm walked only top-level properties. JS
+     uses `traverse(expression, { ObjectProperty: { exit ... } })`
+     with `path.stop()` on first match — a recursive DFS that
+     surfaces nested matches. So `resolveObjectPatternValueNode(
+     theme_object, 'small')` finds `theme.fonts.small` via the
+     deep walk; our top-level-only port returned `None`. Bug-parity
+     note: when the key is ambiguous (e.g. `small` exists both at
+     `theme.fonts.small` AND `theme.foo.small`), the JS deep-DFS
+     returns the first traversal-order match — same shape our
+     pre-order DFS produces. No fixture in the corpus exercises the
+     ambiguous-multi-match case.
+
+  **Fixes.**
+
+  - **§6.8r-i — split the Member arm.** Inner arm now matches
+    `member.obj` against `Expr::Member(_)` to decide
+    member-on-member vs single-Member. Member-on-member returns
+    None without an evaluator (existing behaviour); single-Member
+    falls through to the identifier-recursion branch unchanged.
+  - **§6.8r-ii — recursive ObjectExpression walk.** New
+    `deep_find_object_expression_property` helper walks
+    PropOrSpread::Prop trees pre-order DFS, matching `Prop::KeyValue`
+    with `Ident` key and recursing into `kv.value` when it's an
+    Object. Also handles `Prop::Shorthand` (matches local sym; JS
+    sees `ObjectProperty { key, value }` both Identifier).
+  - **§6.8r-iii — Member-on-member fallback in `traverse_identifier`.**
+    Mirrors the JS member-on-member branch (`evaluateExpression`-
+    folds the chain) at the leaf where the closure is in scope —
+    the public `resolve_binding` surface takes `&Metadata`/
+    `&ScopeIndex` and threading mutable refs through 12+ call sites
+    would be invasive. The leaf already holds the closure, so a
+    targeted fallback covers the case without restructuring the
+    call graph: when the binding has destructured_pat +
+    destructured_init AND init is member-on-member, fold the chain
+    via the local closure, then walk the folded ObjectExpression
+    for the destructure key.
+
+  **Triage delta: parity 466 → 467 (+1), divergence 10 → 9 (−1),
+  swc-throws / babel-throws / both-throw all unchanged.** Lib tests
+  stay 467/467. Bun harness 954/954 (no regressions). Single-fixture
+  impact (the deeply-nested-objects expression-evaluation case) but
+  the underlying ports — split branches, deep walk, leaf-level
+  member-on-member fallback — close the structural gap upstream's
+  resolveObjectPatternValueNode covers. Future fixtures with this
+  shape will route through the ported path automatically.
+
 ### Verifying the current state from a cold pickup
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 465/465 (post-§6.8p)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 467/467 (post-§6.8q)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact)
@@ -1220,7 +1366,7 @@ BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1 \
   bun test parity-harness/babel-plugin/harness.test.ts                  # 954/954 (pass-through oracle)
 
 # §6.8 inverted oracle (where the real work is):
-bun parity-harness/babel-plugin/triage.mjs                              # 459/17/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8p
+bun parity-harness/babel-plugin/triage.mjs                              # 467/9/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8r
 
 # CSS-port producer-side gate.
 bun run packages/equality-harness/scripts/verify.mjs                    # 336/336 (run under bun, NOT node)

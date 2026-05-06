@@ -18,7 +18,7 @@
 import { readdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { babelEngine, swcEngine, diffSummary } from './engines.ts';
+import { babelEngine, swcEngine, diffSummary, reconcileJsxRuntimeOrdering } from './engines.ts';
 
 const FIXTURES_DIR = resolve(import.meta.dirname, 'fixtures');
 const REPORT_PATH = resolve(import.meta.dirname, 'triage-report.json');
@@ -64,11 +64,23 @@ for (const file of files) {
     swcRes = { ok: false, msg: err.message };
   }
 
+  // §6.8q — reconcile the host-environment-only `*/jsx-runtime` import
+  // ordering delta before classifying. See `reconcileJsxRuntimeOrdering`
+  // in engines.ts for full rationale (SWC's `prepend_stmt` vs Babel's
+  // `helper-module-imports::addNamed` end-of-imports placement). The
+  // reconciler is conservative (only strips when both sides have the
+  // same line) so real divergences still surface.
+  let babelCmp = babelRes.ok ? babelRes.out : null;
+  let swcCmp = swcRes.ok ? swcRes.out : null;
+  if (babelRes.ok && swcRes.ok) {
+    [babelCmp, swcCmp] = reconcileJsxRuntimeOrdering(babelRes.out, swcRes.out);
+  }
+
   let cat;
   if (!babelRes.ok && !swcRes.ok) cat = 'both-throw';
   else if (!babelRes.ok && swcRes.ok) cat = 'babel-throws';
   else if (babelRes.ok && !swcRes.ok) cat = 'swc-throws';
-  else if (babelRes.out === swcRes.out) cat = 'parity';
+  else if (babelCmp === swcCmp) cat = 'parity';
   else cat = 'divergence';
 
   const entry = {
@@ -76,7 +88,7 @@ for (const file of files) {
     sourceFile: fx.sourceFile,
   };
   if (cat === 'divergence') {
-    entry.diff = diffSummary(babelRes.out, swcRes.out, 60);
+    entry.diff = diffSummary(babelCmp, swcCmp, 60);
   } else if (cat === 'swc-throws') {
     entry.error = swcRes.msg;
   } else if (cat === 'babel-throws') {

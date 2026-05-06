@@ -1,12 +1,12 @@
 {
   "summary": {
     "total": 477,
-    "parity": 459,
-    "divergence": 17,
+    "parity": 467,
+    "divergence": 9,
     "swc-throws": 0,
     "babel-throws": 0,
     "both-throw": 1,
-    "elapsedSeconds": 41
+    "elapsedSeconds": 42
   },
   "results": {
     "parity": [
@@ -377,6 +377,14 @@
       {
         "name": "css-prop-tests-css-map/css-map-behaviour--should-evaluate-css-map-with-various-syntactic-patterns",
         "sourceFile": "css-prop/__tests__/css-map.test.ts"
+      },
+      {
+        "name": "css-prop-tests-jsx-pragma/local-jsx-namespace--should-transform-css-prop-using-jsx-import-source",
+        "sourceFile": "css-prop/__tests__/jsx-pragma.test.ts"
+      },
+      {
+        "name": "css-prop-tests-jsx-pragma/local-jsx-namespace--should-transform-css-prop-using-jsx-pragma",
+        "sourceFile": "css-prop/__tests__/jsx-pragma.test.ts"
       },
       {
         "name": "css-prop-tests-object-literal/css-prop-object-literal--should-inline-the-variable-when-it-is-a-constant-in-string-css",
@@ -1635,6 +1643,10 @@
         "sourceFile": "__tests__/custom-import-source.test.ts"
       },
       {
+        "name": "tests-custom-import-source/custom-import-source--should-pick-up-an-automatic-pragma-from-a-custom-package-import-source",
+        "sourceFile": "__tests__/custom-import-source.test.ts"
+      },
+      {
         "name": "tests-expression-evaluation/import-specifiers--should-evaluate-simple-expressions",
         "sourceFile": "__tests__/expression-evaluation.test.ts"
       },
@@ -1660,6 +1672,10 @@
       },
       {
         "name": "tests-expression-evaluation/import-specifiers--handles-object-destructuring",
+        "sourceFile": "__tests__/expression-evaluation.test.ts"
+      },
+      {
+        "name": "tests-expression-evaluation/import-specifiers--statically-evaluates-deconstructed-values-from-deeply-nested-objects",
         "sourceFile": "__tests__/expression-evaluation.test.ts"
       },
       {
@@ -1811,6 +1827,22 @@
         "sourceFile": "__tests__/index.test.ts"
       },
       {
+        "name": "tests-jsx-automatic/jsx-automatic--should-work-with-css-prop-and-a-custom-import-source",
+        "sourceFile": "__tests__/jsx-automatic.test.ts"
+      },
+      {
+        "name": "tests-jsx-automatic/jsx-automatic--should-work-with-css-prop",
+        "sourceFile": "__tests__/jsx-automatic.test.ts"
+      },
+      {
+        "name": "tests-jsx-automatic/jsx-automatic--should-work-with-class-names",
+        "sourceFile": "__tests__/jsx-automatic.test.ts"
+      },
+      {
+        "name": "tests-jsx-automatic/jsx-automatic--should-work-with-styled",
+        "sourceFile": "__tests__/jsx-automatic.test.ts"
+      },
+      {
         "name": "tests-module-imports/import-specifiers--should-remove-entrypoint-if-no-imports-found",
         "sourceFile": "__tests__/module-imports.test.ts"
       },
@@ -1864,16 +1896,6 @@
         "diff": "divergence at byte 96 (a.length=343, b.length=733)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst RedDiv = React.createElement(\"div\", {\n  css: {\n    color: \"r\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._syazbf54{color:"
       },
       {
-        "name": "css-prop-tests-jsx-pragma/local-jsx-namespace--should-transform-css-prop-using-jsx-import-source",
-        "sourceFile": "css-prop/__tests__/jsx-pragma.test.ts",
-        "diff": "divergence at byte 9 (a.length=323, b.length=333)\n--- a +0..69\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nimport { js\n+++ b +0..69\nimport { jsx as _jsx, jsxs as _jsxs } from \"@compiled/react/jsx-runti"
-      },
-      {
-        "name": "css-prop-tests-jsx-pragma/local-jsx-namespace--should-transform-css-prop-using-jsx-pragma",
-        "sourceFile": "css-prop/__tests__/jsx-pragma.test.ts",
-        "diff": "divergence at byte 90 (a.length=300, b.length=291)\n--- a +30..150\n;\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz5scu{color:red}\";\nReact.createElement(\n  CC\n+++ b +30..150\n;\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nimport { jsx } from \"@compiled/react\";\nconst _ = \"._syaz5scu"
-      },
-      {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-a-single-element",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts",
         "diff": "divergence at byte 296 (a.length=668, b.length=669)\n--- a +236..356\n-_k85g0d);opacity:0}}\";\nconst generateKeyframes = (fromColor, toColor) => null;\nReact.createElement(\n  CC,\n  null,\n  Rea\n+++ b +236..356\n-_k85g0d);opacity:0}}\";\nconst generateKeyframes = (fromColor1, toColor) => null;\nReact.createElement(\n  CC,\n  null,\n  Re"
@@ -1902,36 +1924,6 @@
         "name": "tests-custom-import-source/custom-import-source--should-pick-up-custom-relative-import-source",
         "sourceFile": "__tests__/custom-import-source.test.ts",
         "diff": "divergence at byte 7 (a.length=292, b.length=128)\n--- a +0..67\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@co\n+++ b +0..67\nimport { css } from \"../bar/stub-api\";\nconst styles = css({\n  color"
-      },
-      {
-        "name": "tests-custom-import-source/custom-import-source--should-pick-up-an-automatic-pragma-from-a-custom-package-import-source",
-        "sourceFile": "__tests__/custom-import-source.test.ts",
-        "diff": "divergence at byte 9 (a.length=298, b.length=305)\n--- a +0..69\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nimport { js\n+++ b +0..69\nimport { jsx as _jsx, jsxs as _jsxs } from \"@af/compiled/jsx-runtime\""
-      },
-      {
-        "name": "tests-expression-evaluation/import-specifiers--statically-evaluates-deconstructed-values-from-deeply-nested-objects",
-        "sourceFile": "__tests__/expression-evaluation.test.ts",
-        "diff": "divergence at byte 108 (a.length=914, b.length=1072)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48p1fw0{font-weight:700}\";\nconst _3 = \"._1wyb1fwx{font-size:12p\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pdo4x{font-weight:var(--_le9e55)}\";\nconst _3 = \"._1wyb6uie{fo"
-      },
-      {
-        "name": "tests-jsx-automatic/jsx-automatic--should-work-with-css-prop-and-a-custom-import-source",
-        "sourceFile": "__tests__/jsx-automatic.test.ts",
-        "diff": "divergence at byte 9 (a.length=340, b.length=340)\n--- a +0..69\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nimport { js\n+++ b +0..69\nimport { jsx as _jsx, jsxs as _jsxs } from \"react/jsx-runtime\";\nimpor"
-      },
-      {
-        "name": "tests-jsx-automatic/jsx-automatic--should-work-with-css-prop",
-        "sourceFile": "__tests__/jsx-automatic.test.ts",
-        "diff": "divergence at byte 9 (a.length=299, b.length=299)\n--- a +0..69\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nimport { js\n+++ b +0..69\nimport { jsx as _jsx, jsxs as _jsxs } from \"react/jsx-runtime\";\nimpor"
-      },
-      {
-        "name": "tests-jsx-automatic/jsx-automatic--should-work-with-class-names",
-        "sourceFile": "__tests__/jsx-automatic.test.ts",
-        "diff": "divergence at byte 9 (a.length=299, b.length=299)\n--- a +0..69\nimport { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nimport { js\n+++ b +0..69\nimport { jsx as _jsx, jsxs as _jsxs } from \"react/jsx-runtime\";\nimpor"
-      },
-      {
-        "name": "tests-jsx-automatic/jsx-automatic--should-work-with-styled",
-        "sourceFile": "__tests__/jsx-automatic.test.ts",
-        "diff": "divergence at byte 9 (a.length=614, b.length=614)\n--- a +0..69\nimport { forwardRef } from \"react\";\nimport { ax, ix, CC, CS } from \"@\n+++ b +0..69\nimport { jsx as _jsx, jsxs as _jsxs } from \"react/jsx-runtime\";\nimpor"
       }
     ],
     "babel-throws": [],

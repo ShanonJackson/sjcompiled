@@ -562,24 +562,45 @@ impl<C: Comments> BabelPluginVisitor<C> {
         }
     }
 
-    /// §2.3(a) — `findClassicJsxPragmaImport` analog. Walk the module
-    /// body for `ImportDeclaration`s whose source is a Compiled origin
-    /// and look for an `ImportSpecifier::Named` where the imported
-    /// name (or local name when imported is None — the `{ jsx }`
-    /// no-rename shape) is `"jsx"`. Records the local name and sets
-    /// `pragma.classic_jsx_pragma_is_compiled = Some(true)` via
-    /// `state.set_classic_jsx_pragma(local)`.
+    /// §2.3(a) + §2.3(b) — `findClassicJsxPragmaImport` analog. Walks
+    /// the module body for `ImportDeclaration`s whose source is a
+    /// Compiled origin and looks for an `ImportSpecifier::Named` where
+    /// the imported name (or local name when imported is None — the
+    /// `{ jsx }` no-rename shape) is `"jsx"`. Records the local name,
+    /// sets `pragma.classic_jsx_pragma_is_compiled = Some(true)` via
+    /// `state.set_classic_jsx_pragma(local)`, AND removes the
+    /// matching specifier from the import — mirrors upstream
+    /// `babel-plugin.ts:43-66`'s `path.remove()` on the specifier.
+    /// Empty-import cleanup at `Program::exit`
+    /// (`remove_empty_compiled_imports`) drops the now-emptied
+    /// `import { } from '@compiled/react'` shell.
     ///
-    /// Recognition only — does NOT call `path.remove()` on the
-    /// specifier. The `// §2.3(b):` TODO inside marks where the
-    /// queue_cleanup call lands.
+    /// Why removal matters: without it, `import { jsx } from
+    /// '@compiled/react'` survives into SWC's react transform output.
+    /// Babel's preset-react never sees this specifier (upstream removed
+    /// it during `Program::enter`) so Babel's output omits it. SWC's
+    /// react transform doesn't recognise it as the classic-pragma
+    /// `jsx` and leaves the import intact. Result: source-of-divergence
+    /// on every fixture using `/** @jsx jsx */`-style classic pragma.
     ///
-    /// Mirrors upstream `babel-plugin.ts` lines 43–66.
-    fn scan_classic_jsx_pragma_import(&mut self, program: &Program) {
+    /// Order: this runs at `Program::enter` (BEFORE the children walk
+    /// that calls `record_compiled_import`), matching upstream's
+    /// `path.traverse(findClassicJsxPragmaImport)` placement at
+    /// lines 127. After we drop the `jsx` specifier here,
+    /// `record_compiled_import` walks the same import and processes
+    /// any remaining API names (e.g. `{ jsx, styled }` → drops `jsx`
+    /// here, then drops `styled` in `record_compiled_import`).
+    fn scan_classic_jsx_pragma_import(&mut self, program: &mut Program) {
         let Program::Module(module) = program else {
             return;
         };
-        for item in &module.body {
+        // Track whether we've matched once — upstream's visitor early-
+        // `return`s after the first match (one classic pragma per file).
+        let mut matched = false;
+        for item in &mut module.body {
+            if matched {
+                break;
+            }
             let ModuleItem::ModuleDecl(ModuleDecl::Import(decl)) = item else {
                 continue;
             };
@@ -588,26 +609,27 @@ impl<C: Comments> BabelPluginVisitor<C> {
             if !is_compiled_module_source(userland, &self.import_sources) {
                 continue;
             }
-            for spec in &decl.specifiers {
-                let ImportSpecifier::Named(named) = spec else { continue };
+            // Find-and-record-and-remove the first `jsx` specifier.
+            // `retain_mut` walks once and lets us short-circuit the
+            // record on the matched element.
+            decl.specifiers.retain(|spec| {
+                if matched {
+                    return true;
+                }
+                let ImportSpecifier::Named(named) = spec else {
+                    return true;
+                };
                 if imported_name(named) != "jsx" {
-                    continue;
+                    return true;
                 }
                 // STATE_MUTATIONS.md classifies `pragma.*` writes as
                 // out-of-capture (per-file scaffolding). Use the
                 // init-time mutator on `State`.
                 self.state
                     .set_classic_jsx_pragma(named.local.sym.as_ref().to_string());
-                // §2.3(b): state.queue_cleanup(CleanupAction { action:
-                // Remove, id: <recorder-issued-handle> }) — upstream's
-                // `path.remove()` hides the classic JSX pragma from
-                // `@babel/plugin-transform-react-jsx` so it doesn't
-                // re-emit `_jsx`-style calls. NOT load-bearing for any
-                // §2.3 / §2.4 / §2.5 verification gate; load-bearing
-                // for §6.5 (css-prop) where the pragma drives output
-                // divergence.
-                return; // first match wins, matches upstream's early `return`
-            }
+                matched = true;
+                false // drop this specifier (upstream `path.remove()`)
+            });
         }
     }
 
@@ -647,6 +669,14 @@ impl<C: Comments> BabelPluginVisitor<C> {
             return;
         };
 
+        // Upstream `babel-plugin.ts:124` declares `let jsxComment` outside
+        // the loop and reassigns on each match; the post-loop filter
+        // (lines 157-181) drops that single (last-matched) comment. We
+        // mirror by tracking the last-matched span — Comment has no
+        // identity beyond its span, but each comment in a SWC comment
+        // store has a unique span (distinct lo/hi byte positions).
+        let mut drop_span: Option<swc_core::common::Span> = None;
+
         for comment in &leading {
             let text = comment.text.as_ref();
 
@@ -662,9 +692,7 @@ impl<C: Comments> BabelPluginVisitor<C> {
                         // both classified as init / non-captured.
                         self.state.ensure_compiled_imports();
                         self.state.set_pragma_jsx_import_source();
-                        // §2.3(b): record `comment.span` for the AST-
-                        // mutation queue so the pragma comment is
-                        // dropped from the comment store at exit.
+                        drop_span = Some(comment.span);
                     }
                 }
             }
@@ -681,8 +709,35 @@ impl<C: Comments> BabelPluginVisitor<C> {
                 if matches_classic {
                     self.state.ensure_compiled_imports();
                     self.state.set_pragma_jsx();
-                    // §2.3(b): same comment-filter TODO as above.
+                    drop_span = Some(comment.span);
                 }
+            }
+        }
+
+        // §2.3(b) — strip the matched pragma comment from the SWC
+        // comment store so SWC's `swc_ecma_transforms_react::Jsx`
+        // doesn't see it and fall back to the pragma's source. Mirrors
+        // upstream `babel-plugin.ts:157-181` which filters
+        // `file.ast.comments` and `body[0].leadingComments` to hide the
+        // pragma from `@babel/plugin-transform-react-jsx`. Without this
+        // strip, fixtures with `/** @jsxImportSource @compiled/react */`
+        // diverge: SWC's react transform reads the pragma and emits
+        // `import { jsx } from "@compiled/react/jsx-runtime"`; Babel's
+        // preset-react (deprived of the comment) falls back to the
+        // default and emits `import { jsx } from "react/jsx-runtime"`.
+        // The strip is bug-parity (per CLAUDE.md "BUGS in OLD! Need to
+        // be BUGS In NEW") — upstream's intent is to avoid the
+        // double-import noted in the comment at lines 162-165.
+        if let Some(span_to_drop) = drop_span {
+            // `take_leading` removes ALL leading comments at this
+            // position; we filter and re-add the kept ones.
+            let all = self.comments.take_leading(pos).unwrap_or_default();
+            let kept: Vec<_> = all
+                .into_iter()
+                .filter(|c| c.span != span_to_drop)
+                .collect();
+            if !kept.is_empty() {
+                self.comments.add_leading_comments(pos, kept);
             }
         }
     }
@@ -733,7 +788,12 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
     /// runs AFTER, so the bootstrapped struct gets populated rather
     /// than clobbering — exactly upstream's order.
     fn visit_mut_program(&mut self, program: &mut Program) {
-        // §2.3(a) — recognition only, no AST mutations.
+        // §2.3(a)/(b) — classic-pragma scan now removes the matched
+        // `{ jsx }` specifier (upstream `path.remove()` mirror); the
+        // pragma-comment scan strips the matched `@jsxImportSource`
+        // / `@jsx` comment from the SWC store (upstream
+        // `babel-plugin.ts:157-181` mirror). Both run BEFORE the
+        // children walk, matching upstream's `Program::enter` order.
         self.scan_classic_jsx_pragma_import(program);
         self.scan_jsx_pragma_comments(program);
 
@@ -1663,7 +1723,8 @@ mod tests {
             vec![named_specifier("jsx", None)],
         )]);
         let mut v = fresh();
-        v.scan_classic_jsx_pragma_import(&Program::Module(module));
+        let mut program = Program::Module(module);
+        v.scan_classic_jsx_pragma_import(&mut program);
         assert_eq!(v.state.pragma().classic_jsx_pragma_is_compiled, Some(true));
         assert_eq!(
             v.state.pragma().classic_jsx_pragma_local_name.as_deref(),
@@ -1680,7 +1741,8 @@ mod tests {
             vec![named_specifier("myJsx", Some("jsx"))],
         )]);
         let mut v = fresh();
-        v.scan_classic_jsx_pragma_import(&Program::Module(module));
+        let mut program = Program::Module(module);
+        v.scan_classic_jsx_pragma_import(&mut program);
         assert_eq!(v.state.pragma().classic_jsx_pragma_is_compiled, Some(true));
         assert_eq!(
             v.state.pragma().classic_jsx_pragma_local_name.as_deref(),
@@ -1698,7 +1760,8 @@ mod tests {
             vec![named_specifier_str_imported("foo", "jsx")],
         )]);
         let mut v = fresh();
-        v.scan_classic_jsx_pragma_import(&Program::Module(module));
+        let mut program = Program::Module(module);
+        v.scan_classic_jsx_pragma_import(&mut program);
         assert_eq!(v.state.pragma().classic_jsx_pragma_is_compiled, Some(true));
         assert_eq!(
             v.state.pragma().classic_jsx_pragma_local_name.as_deref(),
@@ -1709,33 +1772,49 @@ mod tests {
     #[test]
     fn classic_pragma_skipped_for_non_compiled_source() {
         // `import { jsx } from '@emotion/react'` — emotion's jsx is
-        // NOT a Compiled binding. Recognition must skip.
+        // NOT a Compiled binding. Recognition must skip — and the
+        // specifier survives the scan.
         let module = module_with_imports(vec![import_decl(
             "@emotion/react",
             vec![named_specifier("jsx", None)],
         )]);
         let mut v = fresh();
-        v.scan_classic_jsx_pragma_import(&Program::Module(module));
+        let mut program = Program::Module(module);
+        v.scan_classic_jsx_pragma_import(&mut program);
         assert!(v.state.pragma().classic_jsx_pragma_is_compiled.is_none());
         assert!(v.state.pragma().classic_jsx_pragma_local_name.is_none());
+        if let Program::Module(m) = &program {
+            if let ModuleItem::ModuleDecl(ModuleDecl::Import(im)) = &m.body[0] {
+                assert_eq!(im.specifiers.len(), 1, "non-Compiled jsx kept");
+            }
+        }
     }
 
     #[test]
-    fn classic_pragma_does_not_mutate_ast() {
-        // §2.3(a) discipline: recognition must not call path.remove().
-        // Verify the module body and specifier counts are unchanged
-        // after the scan.
+    fn classic_pragma_drops_matched_jsx_specifier_only() {
+        // §2.3(b) — the matched `jsx` specifier is dropped from the
+        // import (upstream `path.remove()` mirror); sibling Compiled
+        // specifiers (e.g. `css`) survive the classic-pragma scan.
+        // The empty-import cleanup at `Program::exit` would drop a
+        // single-`jsx`-specifier import, but here `css` keeps it
+        // alive for the children walk's `record_compiled_import` to
+        // process.
         let module = module_with_imports(vec![import_decl(
             "@compiled/react",
             vec![named_specifier("jsx", None), named_specifier("css", None)],
         )]);
         let mut v = fresh();
-        let program = Program::Module(module);
-        v.scan_classic_jsx_pragma_import(&program);
+        let mut program = Program::Module(module);
+        v.scan_classic_jsx_pragma_import(&mut program);
         if let Program::Module(m) = &program {
-            assert_eq!(m.body.len(), 1);
+            assert_eq!(m.body.len(), 1, "import shell preserved");
             if let ModuleItem::ModuleDecl(ModuleDecl::Import(im)) = &m.body[0] {
-                assert_eq!(im.specifiers.len(), 2);
+                assert_eq!(im.specifiers.len(), 1, "only `css` remains");
+                if let ImportSpecifier::Named(n) = &im.specifiers[0] {
+                    assert_eq!(n.local.sym.as_ref(), "css");
+                } else {
+                    panic!("expected named specifier");
+                }
             }
         }
     }
@@ -1756,6 +1835,14 @@ mod tests {
         Comment {
             kind: CommentKind::Block,
             span: DUMMY_SP,
+            text: text.into(),
+        }
+    }
+
+    fn comment_with_span(text: &str, lo: u32, hi: u32) -> Comment {
+        Comment {
+            kind: CommentKind::Block,
+            span: swc_core::common::Span::new(BytePos(lo), BytePos(hi)),
             text: text.into(),
         }
     }
@@ -1860,20 +1947,83 @@ mod tests {
     }
 
     #[test]
-    fn pragma_scan_does_not_mutate_comment_store() {
-        // §2.3(a) discipline: comment-store filtering is §2.3(b) work.
-        // Verify the comment is still queryable after the scan.
+    fn pragma_scan_strips_matched_jsx_import_source_comment() {
+        // §2.3(b) — `scan_jsx_pragma_comments` now mirrors upstream
+        // `babel-plugin.ts:157-181` and removes the matched
+        // `@jsxImportSource <compiled-source>` comment from the SWC
+        // comment store. Without this, SWC's react transform reads
+        // the pragma and emits `import { jsx } from
+        // "@compiled/react/jsx-runtime"` (the pragma source) instead
+        // of the default `react/jsx-runtime` Babel falls back to once
+        // upstream has stripped the comment.
         let comments = SingleThreadedComments::default();
         let pos = BytePos(100);
-        comments.add_leading(pos, comment("* @jsxImportSource @compiled/react "));
+        // Real comments have distinct spans (their actual byte
+        // positions in source); test mirrors that so the
+        // span-equality filter works.
+        comments.add_leading(
+            pos,
+            comment_with_span("* @jsxImportSource @compiled/react ", 1, 35),
+        );
         let mut v: BabelPluginVisitor<SingleThreadedComments> =
             BabelPluginVisitor::new(PluginOptions::default(), comments);
         let module = module_with_first_body_at(pos);
         v.scan_jsx_pragma_comments(&Program::Module(module));
-        // The comment store still has the leading comment at `pos`.
-        let still_there = v.comments.get_leading(pos);
-        assert!(still_there.is_some());
-        assert_eq!(still_there.unwrap().len(), 1);
+        // The matched pragma is gone — `get_leading` returns either
+        // None (the only comment was stripped) or an empty Vec
+        // (kept-list was empty so we didn't re-add).
+        let after = v.comments.get_leading(pos);
+        assert!(
+            after.as_ref().map_or(true, |v| v.is_empty()),
+            "matched pragma comment should be stripped, got {:?}",
+            after
+        );
+    }
+
+    #[test]
+    fn pragma_scan_preserves_unmatched_leading_comments() {
+        // The strip is conservative: only the matched pragma comment
+        // is removed. Sibling comments at the same anchor position
+        // (e.g. a leading copyright banner) survive the filter.
+        // Each comment has a distinct span so the filter
+        // identifies the right one.
+        let comments = SingleThreadedComments::default();
+        let pos = BytePos(100);
+        comments.add_leading(pos, comment_with_span("* (c) Acme Corp 2026 ", 1, 20));
+        comments.add_leading(
+            pos,
+            comment_with_span("* @jsxImportSource @compiled/react ", 21, 55),
+        );
+        comments.add_leading(pos, comment_with_span("* unrelated trailing block ", 56, 80));
+        let mut v: BabelPluginVisitor<SingleThreadedComments> =
+            BabelPluginVisitor::new(PluginOptions::default(), comments);
+        let module = module_with_first_body_at(pos);
+        v.scan_jsx_pragma_comments(&Program::Module(module));
+        let kept = v.comments.get_leading(pos).unwrap_or_default();
+        assert_eq!(kept.len(), 2, "two unrelated comments kept");
+        for c in &kept {
+            assert!(
+                !c.text.contains("@jsxImportSource"),
+                "matched pragma not in kept set"
+            );
+        }
+    }
+
+    #[test]
+    fn pragma_scan_skips_strip_when_pragma_does_not_match() {
+        // `@jsxImportSource <other-source>` (not in importSources)
+        // doesn't trigger pragma state OR the comment strip — the
+        // comment passes through to SWC's react transform.
+        let comments = SingleThreadedComments::default();
+        let pos = BytePos(100);
+        comments.add_leading(pos, comment_with_span("* @jsxImportSource preact ", 1, 25));
+        let mut v: BabelPluginVisitor<SingleThreadedComments> =
+            BabelPluginVisitor::new(PluginOptions::default(), comments);
+        let module = module_with_first_body_at(pos);
+        v.scan_jsx_pragma_comments(&Program::Module(module));
+        let after = v.comments.get_leading(pos).unwrap_or_default();
+        assert_eq!(after.len(), 1, "non-matching pragma not stripped");
+        assert!(after[0].text.contains("@jsxImportSource preact"));
     }
 
     #[test]

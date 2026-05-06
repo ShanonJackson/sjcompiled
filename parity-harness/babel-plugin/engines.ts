@@ -222,6 +222,58 @@ export function swcEngine(source: string, opts: BabelPluginFixtureOpts = {}): st
   return normalise(codeSnippet);
 }
 
+/**
+ * Phase 6 §6.8q reconciliation: strip a matching jsx-runtime import
+ * (`<source>/jsx-runtime`) line from BOTH outputs before byte-comparison.
+ *
+ * Why this is harness-only and not a fix in the plugin or a wrapper:
+ *
+ * Babel's preset-react inserts the jsx-runtime import via
+ * `@babel/helper-module-imports::addNamed`, which lands the new import
+ * AFTER existing imports (Babel-side end-of-imports placement). SWC's
+ * `swc_ecma_transforms_react::Jsx` injects via `prepend_stmt`
+ * (`swc_ecma_utils:371`), which puts the import at body[0] (after
+ * directives only). WASM plugins always run BEFORE SWC's react
+ * transform — there is no `before/after` hook — so our `Program::exit`
+ * cannot see the jsx-runtime import to reorder it. The plugin's
+ * `appendRuntimeImports` is a 1:1 port of upstream
+ * (`unshiftContainer('body', ...)` → `body.insert(0, ...)`); the
+ * delta is purely host-environment behavior, not plugin drift.
+ *
+ * The reconciler is conservative — it only strips when BOTH outputs
+ * carry the SAME jsx-runtime import line (same source, same
+ * specifiers). If only one side has it, or they differ, we leave both
+ * intact so the divergence surfaces normally. This means we cannot
+ * accidentally hide a real bug like "automatic mode failed to trigger
+ * on one side": that would manifest as a one-sided import (or
+ * different sources / specifiers) and be reported as a divergence.
+ */
+export function reconcileJsxRuntimeOrdering(a: string, b: string): [string, string] {
+  // Match a single line: `import { ...specs } from "<anything>/jsx-runtime";\n`.
+  // The trailing `\n` is consumed so removal doesn't leave a blank line.
+  // Capture specifiers and source separately so we can compare semantically:
+  // SWC and Babel may emit the same specifier set in different orders within
+  // the braces (Babel's preset-react emits `jsxs as _jsxs, jsx as _jsx`;
+  // SWC's react transform emits `jsx as _jsx, jsxs as _jsxs`). That ordering
+  // is cosmetic — we treat the lines as equivalent if the SOURCE is identical
+  // and the SET of specifiers (sorted) is identical.
+  const re = /^import\s*\{([^}]+)\}\s*from\s*(["'])([^"']+\/jsx-runtime)\2;?\n/m;
+  const am = a.match(re);
+  const bm = b.match(re);
+  if (!am || !bm) return [a, b];
+  const normSpecs = (raw: string): string =>
+    raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .sort()
+      .join(',');
+  if (am[3] === bm[3] && normSpecs(am[1]) === normSpecs(bm[1])) {
+    return [a.replace(re, ''), b.replace(re, '')];
+  }
+  return [a, b];
+}
+
 export function diffSummary(a: string, b: string, context = 80): string {
   if (a === b) return 'EQUAL';
   let i = 0;

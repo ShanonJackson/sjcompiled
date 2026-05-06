@@ -45,12 +45,12 @@
 //! For this leaf's recursive `evaluate_expression` call on a
 //! same-file binding, scope info is the caller's by design.
 
-use swc_core::ecma::ast::{Expr, Ident};
+use swc_core::ecma::ast::{Expr, Prop, PropName, PropOrSpread, Ident};
 
-use crate::compat::scope::{ScopeId, ScopeIndex};
+use crate::compat::scope::{Binding, ScopeId, ScopeIndex};
 use crate::types::Metadata;
 use crate::utils::create_result_pair::{create_result_pair, ResultPair};
-use crate::utils::resolve_binding::resolve_binding;
+use crate::utils::resolve_binding::{get_destructured_object_pattern_key, resolve_binding};
 
 /// 1:1 port of `traverseIdentifier`.
 ///
@@ -90,10 +90,102 @@ where
         }
     }
 
+    // §6.8r — Member-on-member destructure fallback. Mirrors upstream
+    // `resolve-binding.ts:resolveObjectPatternValueNode`'s
+    // member-on-member branch (lines surrounding the
+    // `t.isMemberExpression(expression) &&
+    // t.isMemberExpression(expression.object)` check) which calls
+    // `evaluateExpression(expression, meta)` to fold the chain into
+    // an ObjectExpression before extracting the destructure key.
+    //
+    // Why here and not inside `resolve_object_pattern_value_node`:
+    // that function is reached via `resolve_binding`, whose public
+    // surface takes `&Metadata` / `&ScopeIndex` (immutable). The
+    // recursive evaluator requires `&mut Metadata` / `&mut
+    // ScopeIndex`. Threading mutable refs through every
+    // `resolve_binding` caller (12+ sites across css-builders,
+    // traverse-expression, evaluate-expression) would be invasive.
+    // This leaf already holds an `evaluate_expression` closure and
+    // mutable `Metadata` — the exact frame upstream's JS closes over
+    // — so the targeted fallback lands the missing branch without
+    // restructuring the call graph.
+    //
+    // Applies only when:
+    //   1. `resolve_binding` returned `None` OR `node = None`
+    //      (otherwise the upstream branch was satisfied)
+    //   2. Local binding is a destructure (`destructured_pat` +
+    //      `destructured_init` both Some)
+    //   3. `destructured_init` is a member-on-member chain (depth ≥ 2)
+    //   4. Binding is constant (matches upstream's
+    //      `binding.constantViolations.length > 0` deopt)
+    //
+    // The folded ObjectExpression is then walked with the same
+    // KeyValue+Ident-key lookup `resolve_object_pattern_value_node`
+    // uses, and the matched value is recursively evaluated to handle
+    // nested folds (e.g. matched value is itself an Identifier).
+    let effective_own_scope = meta.own_scope_override.or(own_scope);
+    if let Some(b) =
+        lookup_binding_for_destructure(scope_index, parent_scope, effective_own_scope, name)
+    {
+        if !b.constant {
+            return create_result_pair(None, meta);
+        }
+        if let (Some(pat), Some(init)) =
+            (b.destructured_pat.as_ref(), b.destructured_init.as_ref())
+        {
+            // Gate on member-on-member shape — single-Member init is
+            // already handled by `resolve_object_pattern_value_node`'s
+            // identifier-recursion path.
+            let is_member_on_member =
+                matches!(&**init, Expr::Member(m) if matches!(&*m.obj, Expr::Member(_)));
+            if is_member_on_member {
+                let key = get_destructured_object_pattern_key(pat, name);
+                // Clone the init so we don't hold a borrow on `b`
+                // while invoking the closure (which mutably borrows
+                // through `meta`).
+                let init_owned = init.clone();
+                let folded = evaluate_expression(&init_owned, meta).value;
+                if let Some(folded_expr) = folded {
+                    if let Expr::Object(obj) = &*folded_expr {
+                        for prop in &obj.props {
+                            let PropOrSpread::Prop(boxed) = prop else { continue };
+                            let Prop::KeyValue(kv) = &**boxed else { continue };
+                            let PropName::Ident(id) = &kv.key else { continue };
+                            if id.sym == *key {
+                                let result = evaluate_expression(&kv.value, meta);
+                                return create_result_pair(result.value, meta);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Fall-through: JS `value as t.Expression` is `undefined` when
     // resolution / constancy / node-presence fails. Mirror with
     // `Option::None`.
     create_result_pair(None, meta)
+}
+
+/// Walk own-scope first then parent-scope to find a binding by name —
+/// matches the lookup order in `resolve_binding::get_binding`. Surfaced
+/// here so the §6.8r fallback can read `Binding::destructured_pat` /
+/// `destructured_init` directly without re-routing through
+/// `resolve_binding` (which strips that information into
+/// `PartialBindingWithMeta` and discards the destructure init).
+fn lookup_binding_for_destructure<'idx>(
+    scope_index: &'idx ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
+    name: &str,
+) -> Option<&'idx Binding> {
+    if let Some(own) = own_scope {
+        if let Some(b) = scope_index.get_own_binding(own, name) {
+            return Some(b);
+        }
+    }
+    scope_index.get_binding(parent_scope, name)
 }
 
 #[cfg(test)]
