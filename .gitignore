@@ -4,6 +4,15 @@ dist/
 .DS_Store
 *.log
 bun.lockb
+# SWC's WASM-plugin runtime cache (auto-managed via
+# `experimental.cacheRoot`). Files are regenerated when the WASM
+# changes.
+.swc/
+# `bun parity-harness/fixtures-triage.mjs` writes here; regenerable
+# (the analogous JSON-corpus report at
+# `parity-harness/babel-plugin/triage-report.json` is intentionally
+# checked in for the §6.5 baseline lock).
+parity-harness/fixtures-triage-report.json
 parity-harness/strip-runtime/_scratch/
 # §1.8 synth corpus is regenerable from the deterministic seed in
 # synthesize-fixtures.mjs; checking in 1000 small fixtures bloats the

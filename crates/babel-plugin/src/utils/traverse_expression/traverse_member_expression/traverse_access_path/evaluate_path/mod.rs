@@ -62,7 +62,11 @@ use crate::utils::create_result_pair::{create_result_pair, ResultPair};
 pub fn evaluate_path(expression: &Expr, meta: &mut Metadata<'_>, path_name: &str) -> ResultPair {
     match expression {
         Expr::Object(obj) => evaluate_object_path(obj, meta, path_name),
+        // Babel's `t.isTSAsExpression` covers both `x as T` AND
+        // `x as const`. SWC splits these into two AST variants, so
+        // we recurse on either.
         Expr::TsAs(ts_as) => evaluate_path(&ts_as.expr, meta, path_name),
+        Expr::TsConstAssertion(ts_const) => evaluate_path(&ts_const.expr, meta, path_name),
         // The `t.isImportNamespaceSpecifier` JS branch is unreachable
         // from this dispatcher — see module docs. When the §5.6
         // cross-file owner lands the sidecar discriminator, this

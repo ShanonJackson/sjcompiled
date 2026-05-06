@@ -61,7 +61,23 @@ pub fn unwrap_paren_and_ts_as(expr: &Expr) -> &Expr {
     loop {
         match current {
             Expr::Paren(p) => current = &*p.expr,
+            // Babel: `t.isTSAsExpression` covers `x as T` AND
+            // `x as const` (the latter parses as TSAsExpression with
+            // a TSTypeReference("const") annotation in @babel/parser).
+            // SWC splits these into two AST variants — `Expr::TsAs`
+            // and `Expr::TsConstAssertion`. Both are observationally
+            // identical to Babel's TSAsExpression for evaluator
+            // purposes (CSS-value extraction is type-agnostic), so
+            // both unwrap to their inner expression.
+            //
+            // `TsTypeAssertion` (`<T>x`) and `TsSatisfies` (`x satisfies T`)
+            // are NOT covered by upstream's `t.isTSAsExpression`, so
+            // we leave them alone — a fixture that exercises one of
+            // these will deopt the same way Babel's evaluator deopts
+            // when it doesn't have an explicit unwrap, matching the
+            // upstream behaviour bit-for-bit.
             Expr::TsAs(ts) => current = &*ts.expr,
+            Expr::TsConstAssertion(ts) => current = &*ts.expr,
             _ => break current,
         }
     }

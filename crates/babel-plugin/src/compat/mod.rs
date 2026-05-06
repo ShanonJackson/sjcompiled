@@ -22,3 +22,4 @@ pub mod jsesc;
 pub mod paren;
 pub mod path;
 pub mod scope;
+pub mod template_literal_raw;

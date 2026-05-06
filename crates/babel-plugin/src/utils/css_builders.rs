@@ -1889,6 +1889,11 @@ fn build_css_inner(
     if let Expr::TsAs(ts_as) = node {
         return build_css_inner(&ts_as.expr, meta, scope_index, parent_scope, own_scope, recorder);
     }
+    // Babel's `t.isTSAsExpression` covers `x as const` too — SWC
+    // splits it into a separate variant. Treat identically.
+    if let Expr::TsConstAssertion(ts_const) = node {
+        return build_css_inner(&ts_const.expr, meta, scope_index, parent_scope, own_scope, recorder);
+    }
 
     if let Expr::Tpl(tpl) = node {
         return extract_template_literal(tpl, meta, scope_index, parent_scope, own_scope, recorder);

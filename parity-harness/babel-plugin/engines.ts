@@ -71,10 +71,16 @@ function stripComments(code: string): string {
  * regardless of its `pretty: false` flag. The flag was an upstream-test
  * affordance for inline snapshots; the parity oracle is byte-equality of
  * the formatted output of both engines, so we always normalise.
+ *
+ * The §6.8t spread-collapse reconciliation runs BEFORE prettier so the
+ * formatter sees the same input shape on both sides — otherwise Babel's
+ * multi-line `{ ...props }` keeps the line break post-collapse and SWC's
+ * single-line form doesn't, surfacing as a non-content divergence.
  */
 function normalise(code: string): string {
   const stripped = stripComments(code);
-  return format(stripped, { parser: 'babel-ts' });
+  const collapsed = reconcileReactCreateElementSpreadCollapse(stripped);
+  return format(collapsed, { parser: 'babel-ts' });
 }
 
 export function babelEngine(source: string, opts: BabelPluginFixtureOpts = {}): string {
@@ -211,6 +217,19 @@ export function swcEngine(source: string, opts: BabelPluginFixtureOpts = {}): st
       // and prettier does not see blank lines where comments used to be.
       preserveAllComments: false,
       experimental: {
+        // §6.8v — `runPluginFirst: true` makes the WASM plugin run
+        // BEFORE SWC's built-in TypeScript strip. Without this,
+        // SWC strips TS expression wrappers (`x as T`, `<T>x`, `x!`,
+        // `x as const`, `x satisfies T`) before our plugin's
+        // `process()` entry, so the AST we walk is missing the TS
+        // shape that `@compiled/babel-plugin` (running under Babel
+        // in production) WOULD see — Babel's preset-typescript runs
+        // AFTER plugins. The hash-input divergence on TS-cast sites
+        // would re-hash every class name on the AFM Babel→SWC
+        // migration, breaking byte-equality of the generated `.css`.
+        // See https://github.com/swc-project/swc/issues/9132 and
+        // `fixtures/ct-ts-as-cast` for the reproduction.
+        runPluginFirst: true,
         // §6.8u — thread `root` so the plugin can resolve relative
         // `importSources` entries (e.g. `'./bar/stub-api'`) the same
         // way Babel does (`state.opts.root ?? this.cwd` at
@@ -394,6 +413,44 @@ export function reconcileSwcParamHygieneRenames(a: string, b: string): [string, 
     newB = newB.replace(new RegExp(`\\b${from}\\b`, 'g'), to);
   }
   return [a, newB];
+}
+
+/**
+ * Phase 6 §6.8t reconciliation: SWC's react transform collapses a JSX
+ * spread-only attribute pattern `<Tag {...props} />` to
+ * `React.createElement(Tag, props)`, where Babel's preset-react keeps
+ * the object literal: `React.createElement(Tag, { ...props })`. The
+ * collapse only fires when:
+ *  - the JSX element has exactly ONE attribute,
+ *  - and that attribute is a JSXSpreadAttribute over an Identifier (not
+ *    a member-expression or call) — `<Tag {...props.x} />` is left as
+ *    `{...props.x}` by both engines, so the reconciler must NOT match
+ *    member-expression spreads.
+ *
+ * No plugin involvement — `<BaseButton>` etc. are user code Compiled
+ * never touches. Same shape as §6.8q (jsx-runtime ordering) and §6.8s
+ * (hygiene renames): a host-env-only delta the harness fixes, not
+ * the plugin.
+ *
+ * Conservative pattern: only collapse `{ ...IDENT }` (single spread,
+ * Identifier-only inside, optional trailing comma + whitespace). Any
+ * other shape — extra props, member-expression spread, call-expression
+ * — is left intact so a real divergence still surfaces.
+ *
+ * Apply to BOTH outputs so:
+ *  - Babel's `React.createElement("button", { ...props })` collapses
+ *    to `React.createElement("button", props)` (matches SWC).
+ *  - SWC's already-collapsed form is a no-op (the pattern doesn't
+ *    match the bare-identifier shape).
+ */
+export function reconcileReactCreateElementSpreadCollapse(s: string): string {
+  // Match `{` + optional whitespace/newlines + `...IDENT` + optional `,`
+  // + optional whitespace/newlines + `}`. The IDENT is `[A-Za-z_$][A-Za-z0-9_$]*`
+  // — anchoring on identifier chars only avoids matching `...obj.prop` or
+  // `...fn()`. The surrounding context must look like a createElement
+  // arg position (preceded by `, ` and followed by `)` or `, `).
+  const re = /([,(]\s*)\{\s*\.\.\.([A-Za-z_$][A-Za-z0-9_$]*)\s*,?\s*\}(\s*[,)])/g;
+  return s.replace(re, '$1$2$3');
 }
 
 export function diffSummary(a: string, b: string, context = 80): string {

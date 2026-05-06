@@ -220,7 +220,7 @@ pub fn arrow(p: &mut Printer, node: &ArrowExpr, parent: &Expr) {
 /// surface.
 fn pat(p: &mut Printer, node: &Pat, parent: &Expr) {
     match node {
-        Pat::Ident(bi) => binding_ident(p, bi),
+        Pat::Ident(bi) => binding_ident(p, bi, parent),
         Pat::Object(o) => object_pat(p, o, parent),
         Pat::Array(a) => array_pat(p, a, parent),
         Pat::Rest(r) => rest_pat(p, r, parent),
@@ -232,8 +232,21 @@ fn pat(p: &mut Printer, node: &Pat, parent: &Expr) {
     }
 }
 
-fn binding_ident(p: &mut Printer, bi: &BindingIdent) {
+fn binding_ident(p: &mut Printer, bi: &BindingIdent, parent: &Expr) {
     p.word(bi.id.sym.as_ref());
+    // Babel emits Identifier `?` then `: TypeAnnotation` when present.
+    // Upstream: `@babel/generator/lib/generators/types.js::Identifier`
+    // (the print() pipeline appends typeAnnotation after the name) +
+    // the `OptionalMemberExpression`-style `?` token when `optional`.
+    // The TS compat slice lives in `super::typescript`.
+    if bi.id.optional {
+        p.token_char(b'?');
+    }
+    if let Some(type_ann) = &bi.type_ann {
+        p.token_char(b':');
+        p.space();
+        super::typescript::ts_type_inner(p, &type_ann.type_ann, parent);
+    }
 }
 
 fn object_pat(p: &mut Printer, node: &ObjectPat, parent: &Expr) {

@@ -67,6 +67,14 @@ pub fn block_statement(p: &mut Printer, node: &BlockStmt) {
 /// do (e.g. ReturnStatement.argument) pass `None` because the
 /// expression-needsParens policy keys off Expr-shaped parents only.
 pub fn print_statement(p: &mut Printer, stmt: &Stmt) {
+    // Babel's printer fires `_printLeadingComments` /
+    // `_printTrailingComments` for every node it dispatches. The Expr
+    // path (`Printer::print`) does this; we mirror for Stmt so block-
+    // body comments survive into hash inputs (e.g. arrow body
+    // `{ /* eslint-disable */ return X; }` in
+    // `fixtures/ct-styled-token-nested-ternary`).
+    let span = stmt_span(stmt);
+    p.print_leading_comments_at(span.lo);
     match stmt {
         Stmt::Block(b) => block_statement(p, b),
         Stmt::Return(r) => return_statement(p, r),
@@ -91,6 +99,20 @@ pub fn print_statement(p: &mut Printer, stmt: &Stmt) {
         Stmt::ForIn(_) => p.buf.append("/*UNHANDLED-STMT-FORIN*/"),
         Stmt::ForOf(_) => p.buf.append("/*UNHANDLED-STMT-FOROF*/"),
         Stmt::Decl(_) => p.buf.append("/*UNHANDLED-STMT-DECL*/"),
+    }
+    p.print_trailing_comments_at(span.hi);
+}
+
+fn stmt_span(stmt: &Stmt) -> swc_core::common::Span {
+    use swc_core::common::Spanned;
+    match stmt {
+        Stmt::Block(b) => b.span,
+        Stmt::Return(r) => r.span,
+        Stmt::Throw(t) => t.span,
+        Stmt::Expr(e) => e.span,
+        Stmt::If(i) => i.span,
+        Stmt::Empty(e) => e.span,
+        other => other.span(),
     }
 }
 

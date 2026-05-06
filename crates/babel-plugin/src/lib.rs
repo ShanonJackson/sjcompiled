@@ -108,13 +108,35 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
     // both; without them, upstream's `getNodeComments` per-line
     // filter has nothing to match against. See `utils/comments.rs`
     // module doc and the §6.5 closure note in `plugins/STATUS.md`.
-    let p = program;
+    let mut p = program;
+    // Babel-parser parity: SWC parser preserves CRLF in
+    // `TplElement.raw`; Babel's parser normalises CR/CRLF → LF per
+    // ECMAScript §12.8.6 TRV rules. Keyframes naming and every other
+    // raw-quasi consumer hashes the byte sequence, so a CR/LF
+    // mismatch flips class names on a CRLF source checkout. One-shot
+    // pre-pass aligns the SWC AST to Babel's shape before any
+    // visitor runs. See `crates/babel-plugin/src/compat/template_literal_raw.rs`.
+    crate::compat::template_literal_raw::normalize_template_literal_raw(&mut p);
     let line_index = collect_line_comments(&p, &visitor.comments, &meta.source_map);
     visitor.state.set_comment_lines(line_index.comments);
     visitor.state.set_span_lines(line_index.spans);
 
-    let mut p = p;
+    // Install the ambient comments handle for `compat::generator::generate`.
+    // Babel's @babel/generator reads `node.leadingComments` /
+    // `trailingComments` directly off the AST; SWC's parser stores
+    // them out-of-band. Without an ambient handle, every
+    // `generate(&Expr)` call site drops comments, and hash inputs
+    // computed from `generate(node).code` (CSS-variable / class-name
+    // hashing in `utils/css_builders.rs`) diverge whenever the
+    // hashed expression carries inline comments — see
+    // `fixtures/ct-styled-token-nested-ternary` for a reproduction.
+    //
+    // SAFETY: `visitor.comments` (a `PluginCommentsProxy`) lives for
+    // the entirety of the `visit_mut_with` call, and the cleanup
+    // call below clears the thread-local before the function returns.
+    crate::compat::generator::set_ambient_comments(&visitor.comments);
     p.visit_mut_with(&mut visitor);
+    crate::compat::generator::clear_ambient_comments();
     p
 }
 

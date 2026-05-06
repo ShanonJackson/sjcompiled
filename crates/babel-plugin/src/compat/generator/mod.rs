@@ -46,10 +46,89 @@ pub mod generators;
 pub mod node;
 pub mod printer;
 
+use std::cell::Cell;
+
 use swc_core::common::comments::Comments;
 use swc_core::ecma::ast::{Expr, JSXAttr, Stmt};
 
 use printer::Printer;
+
+thread_local! {
+    /// Ambient comments handle for `generate(&Expr)` and friends.
+    ///
+    /// Babel's `@babel/generator` reads `node.leadingComments` /
+    /// `trailingComments` directly off AST nodes. SWC stores comments
+    /// out-of-band keyed by `BytePos`, so the printer needs a
+    /// `Comments` trait reference to query.
+    ///
+    /// Threading `Comments` through every `generate()` call site in
+    /// `utils/css_builders.rs` and `utils/normalize_props_usage.rs`
+    /// (10+ sites) would touch every signature on the call-graph.
+    /// Instead, the plugin entry (`lib.rs::process`) installs the
+    /// host's `PluginCommentsProxy` here for the duration of
+    /// `visit_mut_with`, and `generate()` reads from it.
+    ///
+    /// **Soundness:** the pointer is set via [`set_ambient_comments`]
+    /// from a scope that owns the comments value (`process()` /
+    /// `run_dispatcher()`); cleared via [`clear_ambient_comments`]
+    /// before that scope exits. Plugin invocations are single-threaded
+    /// (SWC runs each plugin call on its own WASI instance with no
+    /// inter-call shared state), so the cross-plugin-call view is
+    /// always `None` at entry. Within a call, every `generate()` runs
+    /// on the same thread under the same scope.
+    ///
+    /// Stored as a fat pointer (`(*const T, *const VTable)`) — `Cell`
+    /// is `Copy`-friendly so we use it without a `RefCell`.
+    static AMBIENT_COMMENTS: Cell<Option<*const dyn Comments>> = const { Cell::new(None) };
+}
+
+/// Install a comments handle for the duration of the current plugin
+/// invocation. SAFETY: `comments` MUST outlive every subsequent call
+/// to `generate()` until [`clear_ambient_comments`] is called.
+///
+/// In production, `lib.rs::process` calls this with `&meta.comments`
+/// before `program.visit_mut_with(&mut visitor)`, and clears
+/// immediately after. Tests / `run_dispatcher` follow the same
+/// scoping discipline (or skip the install — `generate()` falls back
+/// to `Printer::new()` when no ambient is set, dropping comments —
+/// matching the pre-fix behaviour).
+pub fn set_ambient_comments<C: Comments>(comments: &C) {
+    // Lifetime erasure: store as `*const dyn Comments` so the
+    // thread-local can outlive the borrow's static-lifetime
+    // requirement. `Cell` only stores by-value, and a non-`'static`
+    // borrow inside a `Cell<...>` would fail the borrow checker
+    // even with an explicit scope. SAFETY: see thread-local doc —
+    // caller MUST `clear_ambient_comments` before `comments` drops.
+    let trait_ref: &dyn Comments = comments;
+    let ptr: *const dyn Comments = unsafe {
+        // Coerce `&'_ dyn Comments` to `&'static dyn Comments` then
+        // to `*const dyn Comments`. The unsafe block widens the
+        // lifetime; we re-narrow it (back to "valid for current
+        // scope") at every read site by ensuring `clear_ambient_comments`
+        // runs before the source borrow ends.
+        std::mem::transmute::<&dyn Comments, &'static dyn Comments>(trait_ref)
+    };
+    AMBIENT_COMMENTS.with(|c| c.set(Some(ptr)));
+}
+
+/// Clear the ambient comments handle. Call BEFORE the comments value
+/// goes out of scope. Idempotent.
+pub fn clear_ambient_comments() {
+    AMBIENT_COMMENTS.with(|c| c.set(None));
+}
+
+/// Build a `Printer` that uses the ambient comments if installed.
+/// SAFETY: any `*const dyn Comments` we read here was set via
+/// `set_ambient_comments` from a scope that owns the comments value
+/// and clears the cell before exit. The visitor pass is synchronous.
+fn printer_with_ambient_comments<'a>() -> Printer<'a> {
+    AMBIENT_COMMENTS.with(|c| match c.get() {
+        // SAFETY: see thread-local doc — pointer is live for the
+        // current visitor call.
+        Some(ptr) => unsafe { Printer::with_comments(Some(&*ptr)) },
+        None => Printer::new(),
+    })
+}
 
 /// `generate(ast, opts)` — upstream's `lib/index.js::generate`. Our
 /// signature takes a single `Expr` because the 5 upstream call sites
@@ -63,7 +142,7 @@ use printer::Printer;
 /// `/*UNHANDLED-*/` marker so the byte-parity gate fails with a
 /// clear pointer.
 pub fn generate(expr: &Expr) -> String {
-    let mut p = Printer::new();
+    let mut p = printer_with_ambient_comments();
     p.print(expr, None);
     p.finish()
 }
@@ -95,7 +174,7 @@ pub fn generate_with_comments(expr: &Expr, comments: &dyn Comments) -> String {
 /// `Printer::print(&Expr, _)` so the existing precedence /
 /// quote-preservation / comment-threading paths apply.
 pub fn generate_jsx_attribute(attr: &JSXAttr) -> String {
-    let mut p = Printer::new();
+    let mut p = printer_with_ambient_comments();
     generators::jsx::jsx_attribute(&mut p, attr);
     p.finish()
 }
@@ -118,7 +197,7 @@ pub fn generate_jsx_attribute_with_comments(
 /// Used directly by the unit tests in
 /// `generators/statements.rs`.
 pub fn generate_stmt(stmt: &Stmt) -> String {
-    let mut p = Printer::new();
+    let mut p = printer_with_ambient_comments();
     generators::statements::print_statement(&mut p, stmt);
     p.finish()
 }

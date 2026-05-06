@@ -186,6 +186,9 @@ fn collect_member_object_idents(expr: &Expr, out: &mut Vec<String>) {
         Expr::TsAs(t) => {
             collect_member_object_idents(&t.expr, out);
         }
+        Expr::TsConstAssertion(t) => {
+            collect_member_object_idents(&t.expr, out);
+        }
         Expr::TsNonNull(t) => {
             collect_member_object_idents(&t.expr, out);
         }

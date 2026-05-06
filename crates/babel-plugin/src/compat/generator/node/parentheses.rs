@@ -51,23 +51,39 @@ fn is_logical_op(op: BinaryOp) -> bool {
 /// member/call/new/tagged-template expression where the parent walks
 /// the dot-chain. Used to force parens around child expressions that
 /// would otherwise re-bind the postfix.
+///
+/// Pointer-eq matches the exact slot the child occupies. SWC's parser
+/// wraps source-side parens in `Expr::Paren` (Babel's parser strips
+/// these and stores `extra.parenthesized` instead). The printer at
+/// `printer.rs::print` makes Paren transparent — recursing on the
+/// inner expression with the same parent — so when this predicate
+/// fires for the inner expression, the parent's slot still points to
+/// the OUTER `Expr::Paren`, not the inner. Match either form.
+fn slot_holds(slot: &Expr, child: &Expr) -> bool {
+    if std::ptr::eq(slot as *const Expr, child as *const Expr) {
+        return true;
+    }
+    if let Expr::Paren(p) = slot {
+        if std::ptr::eq(&*p.expr as *const Expr, child as *const Expr) {
+            return true;
+        }
+    }
+    false
+}
+
 fn has_postfix_part(child: &Expr, parent: &Expr) -> bool {
     match parent {
-        Expr::Member(m) => std::ptr::eq(&*m.obj as *const Expr, child as *const Expr),
+        Expr::Member(m) => slot_holds(&*m.obj, child),
         Expr::OptChain(OptChainExpr { base, .. }) => match &**base {
-            OptChainBase::Member(m) => std::ptr::eq(&*m.obj as *const Expr, child as *const Expr),
-            OptChainBase::Call(c) => {
-                std::ptr::eq(&*c.callee as *const Expr, child as *const Expr)
-            }
+            OptChainBase::Member(m) => slot_holds(&*m.obj, child),
+            OptChainBase::Call(c) => slot_holds(&*c.callee, child),
         },
         Expr::Call(c) => match &c.callee {
-            Callee::Expr(e) => std::ptr::eq(&**e as *const Expr, child as *const Expr),
+            Callee::Expr(e) => slot_holds(&**e, child),
             _ => false,
         },
-        Expr::New(NewExpr { callee, .. }) => {
-            std::ptr::eq(&**callee as *const Expr, child as *const Expr)
-        }
-        Expr::TaggedTpl(t) => std::ptr::eq(&*t.tag as *const Expr, child as *const Expr),
+        Expr::New(NewExpr { callee, .. }) => slot_holds(&**callee, child),
+        Expr::TaggedTpl(t) => slot_holds(&*t.tag, child),
         Expr::TsNonNull(_) => true,
         _ => false,
     }
@@ -96,9 +112,7 @@ pub fn binary_needs_parens(node: &BinExpr, parent: &Expr, child: &Expr) -> bool 
     // required to disambiguate.
     if node.op == BinaryOp::Exp {
         if let Expr::Bin(p) = parent {
-            if p.op == BinaryOp::Exp
-                && std::ptr::eq(&*p.left as *const Expr, child as *const Expr)
-            {
+            if p.op == BinaryOp::Exp && slot_holds(&*p.left, child) {
                 return true;
             }
         }
@@ -117,7 +131,7 @@ pub fn binary_needs_parens(node: &BinExpr, parent: &Expr, child: &Expr) -> bool 
         // for logical operators which are explicitly allowed to
         // chain right-to-left without parens.
         if (parent_pos == node_pos
-            && std::ptr::eq(&*p.right as *const Expr, child as *const Expr)
+            && slot_holds(&*p.right, child)
             && !is_logical_op(p.op))
             || parent_pos > node_pos
         {

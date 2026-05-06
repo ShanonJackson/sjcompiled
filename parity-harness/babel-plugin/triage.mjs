@@ -24,6 +24,7 @@ import {
   diffSummary,
   reconcileJsxRuntimeOrdering,
   reconcileSwcParamHygieneRenames,
+  reconcileReactCreateElementSpreadCollapse,
 } from './engines.ts';
 
 const FIXTURES_DIR = resolve(import.meta.dirname, 'fixtures');
@@ -83,6 +84,11 @@ for (const file of files) {
     // §6.8s — host-environment-only SWC hygiene-rename of function
     // params. See reconcileSwcParamHygieneRenames in engines.ts.
     [babelCmp, swcCmp] = reconcileSwcParamHygieneRenames(babelCmp, swcCmp);
+    // §6.8t — host-environment-only `<Tag {...x} />` spread collapse.
+    // SWC's react transform unwraps the lone object literal; Babel's
+    // preset-react keeps it.
+    babelCmp = reconcileReactCreateElementSpreadCollapse(babelCmp);
+    swcCmp = reconcileReactCreateElementSpreadCollapse(swcCmp);
   }
 
   let cat;

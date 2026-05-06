@@ -308,6 +308,12 @@ impl<'c> Printer<'c> {
             Expr::JSXEmpty(e) => generators::jsx::jsx_empty_expression(self, e),
             Expr::JSXMember(m) => generators::jsx::jsx_member_expression(self, m),
             Expr::JSXNamespacedName(n) => generators::jsx::jsx_namespaced_name(self, n),
+            Expr::TsAs(t) => generators::typescript::ts_as_expr(self, t, node),
+            Expr::TsSatisfies(t) => generators::typescript::ts_satisfies_expr(self, t, node),
+            Expr::TsTypeAssertion(t) => generators::typescript::ts_type_assertion(self, t, node),
+            Expr::TsNonNull(t) => generators::typescript::ts_non_null_expr(self, t, node),
+            Expr::TsConstAssertion(t) => generators::typescript::ts_const_assertion(self, t, node),
+            Expr::TsInstantiation(t) => generators::typescript::ts_instantiation(self, t, node),
             other => {
                 let _ = other;
                 self.buf.append("/*UNHANDLED-EXPR*/");
@@ -439,6 +445,16 @@ pub fn needs_parens_for(child: &Expr, parent: &Expr) -> bool {
             // For/Return/Throw etc. None of those are reachable from our
             // entry point (we always start at an Expression node, not a
             // Statement), so default to true.
+            true
+        }
+        // TS expression wrappers — upstream `parentheses.js:165-167`
+        // (`function TSAsExpression() { return true; }`) — these
+        // unconditionally wrap in parens, regardless of parent. The
+        // same handler covers TSAsExpression, TSSatisfiesExpression,
+        // and TSTypeAssertion (re-exported on the same line in
+        // `parentheses.js:22`).
+        Expr::TsAs(_) | Expr::TsSatisfies(_) | Expr::TsTypeAssertion(_) => {
+            let _ = parent;
             true
         }
         _ => false,

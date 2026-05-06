@@ -5,8 +5,6 @@
 //! We omit the upstream files that are NOT reachable from our 5
 //! call-site corpus:
 //! - `flow.js` — Flow types; not used by Compiled consumers.
-//! - `typescript.js` — TS-only AST nodes; the corpus uses the TS
-//!   parser surface but the fixtures don't carry TS-only nodes.
 //! - `classes.js`, `methods.js`, `modules.js`, `statements.js` —
 //!   `generate(&Expr)` doesn't see Statement / Declaration nodes,
 //!   so these are out of scope unless a future call site lands one.
@@ -21,3 +19,4 @@ pub mod jsx;
 pub mod statements;
 pub mod template_literals;
 pub mod types;
+pub mod typescript;
