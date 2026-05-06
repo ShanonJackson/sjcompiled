@@ -20,8 +20,8 @@
 **Phase status:** 0 ☑ (modulo §0.10–§0.12 — Phase 5 gates, not Phase 4
 blockers) · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ (modulo §4.7 OUT OF SCOPE and §4.8
 gated on Phase 6) · 5 ☑ · **Phase 6 §6.1–§6.7 ☑ (all 7 per-API
-handlers shipped) · §6.8 ▶ (active triage; post-§6.8n baseline
-441/35/0/0/1)** · Phase 7+ ☐.
+handlers shipped) · §6.8 ▶ (active triage; post-§6.8p baseline
+459/17/0/0/1)** · Phase 7+ ☐.
 
 **Active checkpoint: Phase 6 §6.8** — full-corpus parity exit gate.
 See "§6.8 active state" below for the current divergence baseline,
@@ -38,10 +38,10 @@ Earlier "954/954 bun parity" cited in §5.6 was a pass-through oracle
 (assert babel ≠ swc); §6.8 inverts it (assert babel == swc) and
 surfaces real divergence.
 
-**Current baseline (post-§6.8o, 2026-05-06):** parity **453 / 477**
-(95.0%), divergence **23**, swc-throws **0**, babel-throws **0**,
+**Current baseline (post-§6.8p, 2026-05-06):** parity **459 / 477**
+(96.2%), divergence **17**, swc-throws **0**, babel-throws **0**,
 both-throw **1**. Cumulative session delta from the original
-7/407/62/1 baseline: parity +446, divergence −384, swc-throws −62
+7/407/62/1 baseline: parity +452, divergence −390, swc-throws −62
 (cluster cleared), babel-throws −1. §6.8i closed the React→React1
 hygiene-rename cluster (parity +28); §6.8j ported the spread-element
 recursive build_css_inner (parity +21); §6.8k ported `jsesc@2.5.2`
@@ -54,7 +54,11 @@ destructured-binding resolution + IIFE-scope propagation fixes
 (parity +19, six sub-fixes); §6.8o landed the
 `getVariableDeclaratorValueForOwnPath` IIFE-binding lookup +
 per-prop `own_scope_override` snapshot/restore + `Variable.expression`
-no-init Option (parity +12, three sub-fixes).
+no-init Option (parity +12, three sub-fixes); §6.8p landed four
+coordinated 1:1 ports — top_level_mark React-import ctxt fix,
+`<ClassNames>` `style={X}` outer-scope guard + dontexist.style
+filter, invalid-DOM-prop walk over original styled-call arg, and
+`addComponentName` `c_<name>` wiring (parity +6, four sub-fixes).
 
 **§6.8o sub-fixes (this session, 2026-05-06):**
 
@@ -1118,11 +1122,88 @@ remaining divergences are now CONTAINED to:
   member-expression-of-arrow-call shapes (`mixin().color`,
   `mixin.foo()` patterns).
 
+- **§6.8p ☑ — Four coordinated 1:1 ports** (this session, 2026-05-06).
+  Cumulative parity 453 → 459 (+6), divergence 23 → 17 (−6), swc /
+  babel / both-throw unchanged. Lib tests stay 465/465.
+
+  - **§6.8p-i — drop the unsound first-non-unresolved-Ident walker;
+    always derive `top_level_mark` ctxt for the React-import inject
+    via `Mark::from_u32(unresolved_mark.as_u32() + 1)`.** Drift detected:
+    the §6.8i `program_top_level_ctxt` walker grabbed the FIRST Ident
+    whose `ctxt != unresolved_ctxt`. SWC's resolver assigns a
+    *function-scope* mark to function/arrow params and their inner
+    references, which ALSO satisfy "non-empty + != unresolved" — so
+    fixtures whose only such Idents lived inside arrow bodies (e.g.
+    `import '@compiled/react'; ['x'].map((str) => <div>{str}</div>)`)
+    grabbed the function-scope ctxt and SWC's hygiene then renamed
+    our injected `import * as React` to `React1`. Fix: the
+    `Program::exit` injection now ALWAYS uses
+    `unresolved_mark + 1` (= `top_level_mark`, empirically reliable
+    across SWC's pipeline). Fixtures cleared:
+    `css-prop/behaviour::should-retain-keys-for-mapped-react-components`,
+    `__tests__/index::should-compress-conditional-class-names`. (+2)
+
+  - **§6.8p-ii — `<ClassNames>` `style={dontexist.style}` filter +
+    `style={style}` outer-scope guard.** Drift detected against
+    upstream `class-names/index.ts:153-188`. Two issues:
+    (a) The Member arm replaced ANY `<x>.style` with the variables-built
+    style value. Upstream gates on
+    `t.isIdentifier(obj) && scope.hasOwnBinding(obj.name)` — when
+    obj is an Ident NOT bound at the children-fn scope (e.g.
+    `dontexist`), the replacement is skipped. Fix: collect every
+    binding name introduced by the children-fn's first parameter
+    (Ident param OR ObjectPat destructure) into a `bound_names`
+    HashSet on `StyleRefReplacer`; gate the Member-arm replacement
+    on `bound_names.contains(obj.name)`. Fixture cleared:
+    `class-names/behaviour::should-not-transform-object-property-access-from-invalid-style-prop`.
+    (b) The Ident arm replaced `style={style}` whenever
+    `rename.original("style") == Some("style")` — true on every
+    fixture (we seed identity entries for the css-call dispatch).
+    Upstream gates on `scope.hasOwnBinding('style')` so an outer-scope
+    `style` reference (e.g. `({ style }) => <ClassNames>{({ css }) =>
+    <span style={style}>...`) passes through unchanged. Fix: gate
+    the Ident replacement on `bound_names.contains(id.sym)`.
+    Fixture cleared:
+    `class-names/behaviour::should-not-transform-style-identifier-when-its-coming-from-outer-scope`.
+    (+2)
+
+  - **§6.8p-iii — extend invalid-DOM-prop walk to original styled-call
+    arg expression.** Drift detected: the §6.8g/h walk operated only
+    on POST-extraction `opts.class_names` and `opts.variables`. For
+    fixtures where both branches of a conditional produce no CSS
+    (e.g. `styled.div({ color: props => props.isPrimary ? undefined : null })`),
+    the conditional class-name doesn't make it into `opts.class_names`
+    — but `props.isPrimary` IS still referenced in the styled call's
+    original argument subtree. Babel's `meta.parentPath` walk catches
+    it; ours missed. Fix: thread the original `css_node_expr` from the
+    styled handler through `build_styled_component` →
+    `StyledTemplateOpts.original_css_node`, and run the
+    InvalidDomPropsVisitor over it alongside class_names/variables.
+    Fixture cleared:
+    `styled/behaviour::should-apply-no-classes-when-both-conditional-branches-contains-empty-values`.
+    (+1)
+
+  - **§6.8p-iv — wire `addComponentName` opt's `c_<name>` className
+    emit.** Drift detected: `derive_component_name` was a stub
+    returning `None`. Upstream uses
+    `meta.parentPath.findParent(VariableDeclaration)` to read the
+    surrounding `const X = styled...` binding name; we already capture
+    that name in `visit_mut_var_decl` for the displayName queue, so
+    plumb the same value forward. Fix: add
+    `current_styled_var_name: Option<String>` field on
+    `BabelPluginVisitor`, set it pre-children-walk in
+    `visit_mut_var_decl` (matching the displayName name capture's
+    `decls[0].id` bug-parity), thread through `try_visit_styled` →
+    `build_styled_component` → `StyledTemplateOpts.declared_var_name`
+    → `derive_component_name_from_opts`. Fixture cleared:
+    `__tests__/index::should-add-component-name-if-addcomponentname-is-true`.
+    (+1)
+
 ### Verifying the current state from a cold pickup
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 465/465 (post-§6.8n)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 465/465 (post-§6.8p)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact)
@@ -1139,7 +1220,7 @@ BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1 \
   bun test parity-harness/babel-plugin/harness.test.ts                  # 954/954 (pass-through oracle)
 
 # §6.8 inverted oracle (where the real work is):
-bun parity-harness/babel-plugin/triage.mjs                              # 441/35/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8n
+bun parity-harness/babel-plugin/triage.mjs                              # 459/17/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8p
 
 # CSS-port producer-side gate.
 bun run packages/equality-harness/scripts/verify.mjs                    # 336/336 (run under bun, NOT node)

@@ -75,6 +75,7 @@ pub fn try_visit_styled(
     recorder: &mut MutationRecorder,
     scope_index: &mut ScopeIndex,
     parent_scope: ScopeId,
+    declared_var_name: Option<&str>,
 ) -> Option<StyledReplacement> {
     // Upstream `babel-plugin.ts:316`: dispatch only fires for
     // expressions whose top-level shape is recognised by
@@ -155,7 +156,14 @@ pub fn try_visit_styled(
         own_scope_override: None,
             in_conditional_branch: false,
     };
-    let replacement = build_styled_component(data.tag, css_output, &mut meta, recorder);
+    let replacement = build_styled_component(
+        data.tag,
+        css_output,
+        Some(&css_node_expr),
+        declared_var_name,
+        &mut meta,
+        recorder,
+    );
     Some(StyledReplacement { replacement })
 }
 
@@ -532,7 +540,7 @@ mod tests {
         let mut idx = empty_module_index();
         let parent = idx.program_scope();
         let call = member_call("styled", "div", vec![obj_color_red()]);
-        let res = try_visit_styled(&call, &mut state, &mut recorder, &mut idx, parent);
+        let res = try_visit_styled(&call, &mut state, &mut recorder, &mut idx, parent, None);
         assert!(res.is_none());
     }
 
@@ -544,7 +552,7 @@ mod tests {
         let parent = idx.program_scope();
 
         let call = member_call("styled", "div", vec![obj_color_red()]);
-        let result = try_visit_styled(&call, &mut state, &mut recorder, &mut idx, parent)
+        let result = try_visit_styled(&call, &mut state, &mut recorder, &mut idx, parent, None)
             .expect("should wrap");
         let Expr::Call(c) = &result.replacement else {
             panic!("not a CallExpr")

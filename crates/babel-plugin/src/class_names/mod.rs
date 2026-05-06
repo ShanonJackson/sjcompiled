@@ -162,6 +162,63 @@ fn record_rename_from_pat(pat: &Pat, out: &mut RenameMap) {
     }
 }
 
+/// §6.8p — collect every binding name introduced by the children-fn's
+/// FIRST parameter. Mirrors upstream's
+/// `path.scope.hasOwnBinding(<name>)` lookup for the
+/// `class-names/index.ts:178` invalid-MemberExpr filter.
+///
+/// Handles both shapes the corpus reaches:
+///   - Plain Ident param: `(props) => ...` → `{"props"}`
+///   - Object destructure: `({ css, style }) => ...` → `{"css", "style"}`
+///   - Renamed destructure: `({ css: c, style: s }) => ...` → `{"c", "s"}`
+///
+/// ArrayPat / RestPat / nested patterns are not exercised by the
+/// ClassNames render-prop usage in the corpus.
+fn bound_names_from_pat(pat: &Pat) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    match pat {
+        Pat::Ident(BindingIdent { id, .. }) => {
+            out.insert(id.sym.as_ref().to_string());
+        }
+        Pat::Object(obj) => {
+            for prop in &obj.props {
+                match prop {
+                    ObjectPatProp::KeyValue(kv) => {
+                        if let Pat::Ident(BindingIdent { id, .. }) = &*kv.value {
+                            out.insert(id.sym.as_ref().to_string());
+                        }
+                    }
+                    ObjectPatProp::Assign(a) => {
+                        out.insert(a.key.id.sym.as_ref().to_string());
+                    }
+                    ObjectPatProp::Rest(r) => {
+                        if let Pat::Ident(BindingIdent { id, .. }) = &*r.arg {
+                            out.insert(id.sym.as_ref().to_string());
+                        }
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
+fn bound_names_from_arrow(arrow: &ArrowExpr) -> std::collections::HashSet<String> {
+    arrow
+        .params
+        .first()
+        .map(bound_names_from_pat)
+        .unwrap_or_default()
+}
+
+fn bound_names_from_function(fun: &Function) -> std::collections::HashSet<String> {
+    fun.params
+        .first()
+        .map(|p| bound_names_from_pat(&p.pat))
+        .unwrap_or_default()
+}
+
 /// Test whether the dispatch element is a `<ClassNames>` element bound
 /// to a Compiled `class_names` import. Mirrors upstream's
 /// `meta.state.compiledImports?.ClassNames?.includes(name)` check.
@@ -335,6 +392,16 @@ impl<'a> VisitMut for CssCallReplacer<'a> {
 struct StyleRefReplacer<'a> {
     rename: RenameMap,
     variables: &'a [Variable],
+    /// §6.8p — every binding name that exists at the children-fn's
+    /// own scope (the JSX render-prop's first parameter, whether
+    /// destructured or a plain Ident). Mirrors upstream
+    /// `path.scope.hasOwnBinding(...)` for the
+    /// `dontexist.style` filter at `class-names/index.ts:178` —
+    /// without this, references like `<div style={dontexist.style}>`
+    /// (object Ident is a free reference, NOT a children-fn param)
+    /// are incorrectly treated as `props.style`-shape and replaced
+    /// with `undefined`.
+    bound_names: std::collections::HashSet<String>,
 }
 
 impl<'a> StyleRefReplacer<'a> {
@@ -362,14 +429,41 @@ impl<'a> VisitMut for StyleRefReplacer<'a> {
 
         match n {
             Expr::Ident(id) => {
-                // `style={style}` or rename `style={s}`.
-                if self.rename.original(id.sym.as_ref()) == Some("style") {
+                // §6.8p — upstream `class-names/index.ts:153-175`
+                // rewrites `style={X}` ONLY when `X` is bound at the
+                // children-fn's scope (`path.scope.hasOwnBinding(X)`).
+                // Without that gate, our identity rename-map entries
+                // (`"style" → "style"`, seeded so the css-call
+                // matcher is uniform) caused `style={style}` to be
+                // replaced even when `style` was a free reference
+                // from the OUTER component scope (e.g.
+                // `({ className, style }) => <ClassNames>{({ css }) =>
+                // <span style={style}> ... </ClassNames>`). Babel
+                // emits `style: style` (passthrough) for that fixture;
+                // we now match by gating on `bound_names`.
+                if self.rename.original(id.sym.as_ref()) == Some("style")
+                    && self.bound_names.contains(id.sym.as_ref())
+                {
                     *n = self.build_style_value();
                 }
             }
             Expr::Member(m) => {
                 if let MemberProp::Ident(prop) = &m.prop {
                     if prop.sym.as_ref() == "style" {
+                        // §6.8p — upstream `class-names/index.ts:178`
+                        // filters out invalid calls like `dontexist.style`:
+                        //   `if (t.isIdentifier(obj) && !scope.hasOwnBinding(obj.name)) return;`
+                        // Without this gate, any `<div style={anything.style}>`
+                        // inside `<ClassNames>` got rewritten to
+                        // `style: undefined`. Now we only rewrite when
+                        // the object Ident IS a known children-fn
+                        // parameter binding (e.g. `props` in
+                        // `(props) => <div style={props.style}>`).
+                        if let Expr::Ident(obj_id) = &*m.obj {
+                            if !self.bound_names.contains(obj_id.sym.as_ref()) {
+                                return;
+                            }
+                        }
                         // `style={props.style}`.
                         *n = self.build_style_value();
                     }
@@ -408,6 +502,13 @@ pub fn try_handle_jsx_element(
         Expr::Fn(f) => rename_map_from_function(&f.function),
         _ => unreachable!("get_jsx_children_function only returns Arrow or Fn"),
     };
+    // §6.8p — `path.scope.hasOwnBinding(...)` proxy for the upstream
+    // invalid-MemberExpr filter (`dontexist.style` shapes).
+    let bound_names = match &children_fn {
+        Expr::Arrow(arrow) => bound_names_from_arrow(arrow),
+        Expr::Fn(f) => bound_names_from_function(&f.function),
+        _ => unreachable!("get_jsx_children_function only returns Arrow or Fn"),
+    };
 
     let runtime_lib = {
         let meta = Metadata {
@@ -441,6 +542,7 @@ pub fn try_handle_jsx_element(
     let mut style_pass = StyleRefReplacer {
         rename,
         variables: &variables,
+        bound_names,
     };
     el.visit_mut_with(&mut style_pass);
 

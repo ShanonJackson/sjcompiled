@@ -451,18 +451,21 @@ pub struct BabelPluginVisitor<C: Comments> {
     /// `None` only in non-WASM in-process tests — production paths
     /// always set it via the `lib.rs` plugin entry.
     pub unresolved_mark: Option<Mark>,
-    /// §6.8i — first `top_level_mark`-derived `SyntaxContext` seen
-    /// during the main walk (skipping `unresolved_mark`-derived
-    /// Idents). Used at `Program::exit` to colour the synthesised
-    /// `import * as React` so SWC's hygiene preserves it. Folded
-    /// into `visit_mut_ident` so we don't pay for a separate
-    /// post-walk over the module.
-    pub program_top_level_ctxt: Option<SyntaxContext>,
     /// §6.8i — set when any free `React` Ident is observed during the
     /// main walk. Gates the post-injection rebind walk so we only
     /// pay for it when source actually has `React.<x>`-shaped free
     /// references (the minority of fixtures).
     pub has_free_react: bool,
+    /// §6.8p — the binding name captured at `visit_mut_var_decl`'s
+    /// pre-children-walk pass when the decl's first declarator id is
+    /// a `Pat::Ident` AND any declarator's init looks like a styled
+    /// call/tagged-tpl. Read by the styled handler's
+    /// `derive_component_name` to emit `c_<name>` (controlled by
+    /// `addComponentName` opt). Cleared after the children walk.
+    /// Mirrors upstream's `meta.parentPath.findParent(isVariableDeclaration)`
+    /// — same `decls[0].id` bug-parity as the displayName queue
+    /// (which the same captured name powers).
+    pub current_styled_var_name: Option<String>,
 }
 
 impl<C: Comments> BabelPluginVisitor<C> {
@@ -490,8 +493,8 @@ impl<C: Comments> BabelPluginVisitor<C> {
             program_scope: None,
             pending_styled_display_names: Vec::new(),
             unresolved_mark: None,
-            program_top_level_ctxt: None,
             has_free_react: false,
+            current_styled_var_name: None,
         }
     }
 
@@ -686,21 +689,30 @@ impl<C: Comments> BabelPluginVisitor<C> {
 }
 
 impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
-    /// §6.8i — observe Idents during the main walk to (a) snapshot
-    /// the first `top_level_mark`-derived `SyntaxContext` for the
-    /// React-import injection at `Program::exit`, and (b) flag when a
+    /// §6.8i — observe Idents during the main walk to flag when a
     /// free `React.<x>` reference exists so the rebind walk only
     /// fires when needed. Folded into the dispatcher to avoid a
     /// dedicated post-walk over the entire module.
+    ///
+    /// §6.8p — previously this also snapshotted the first non-empty,
+    /// non-`unresolved_mark` ctxt as `program_top_level_ctxt`. That
+    /// was incorrect: SWC's resolver gives function/arrow params and
+    /// their inner references a *function-scope* mark — non-empty
+    /// AND != unresolved — so for a fixture like
+    /// `import '@compiled/react'; ['x'].map((str) => <div>{str}</div>)`
+    /// (no top-level bindings) the walker grabbed the function-scope
+    /// ctxt of `str`. SWC's hygiene then renamed our injected
+    /// `import * as React` to `React1`. The `Program::exit` site
+    /// always uses the `Mark::from_u32(unresolved_mark.as_u32() + 1)`
+    /// = `top_level_mark` derivation now, which is reliable across
+    /// every fixture (top_level_mark is allocated immediately after
+    /// unresolved_mark in @swc/core's pipeline).
     fn visit_mut_ident(&mut self, id: &mut swc_core::ecma::ast::Ident) {
         if id.ctxt != SyntaxContext::empty() {
             let unresolved_ctxt = self
                 .unresolved_mark
                 .map(|m| SyntaxContext::empty().apply_mark(m));
             let is_unresolved = unresolved_ctxt == Some(id.ctxt);
-            if !is_unresolved && self.program_top_level_ctxt.is_none() {
-                self.program_top_level_ctxt = Some(id.ctxt);
-            }
             if is_unresolved && id.sym.as_ref() == "React" {
                 self.has_free_react = true;
             }
@@ -795,25 +807,35 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
                         _ => false,
                     };
                     if !has_react_binding {
-                        // §6.8i — colour the injected `import * as
-                        // React` with a `top_level_mark`-derived
-                        // ctxt so SWC's hygiene preserves it. The
-                        // ctxt was snapshotted incrementally during
-                        // the main walk via `visit_mut_ident`. When
-                        // the source has no top-level binding (e.g.
-                        // `import '@compiled/react'; <div ... />`)
-                        // fall back to `Mark::from_u32(unresolved_mark
-                        // .as_u32() + 1)` — empirically `top_level_mark`
-                        // sits one Mark above `unresolved_mark` in
-                        // @swc/core's pipeline.
-                        let ctxt = self.program_top_level_ctxt.unwrap_or_else(|| {
-                            self.unresolved_mark
-                                .map(|m| {
-                                    SyntaxContext::empty()
-                                        .apply_mark(Mark::from_u32(m.as_u32() + 1))
-                                })
-                                .unwrap_or(SyntaxContext::empty())
-                        });
+                        // §6.8i / §6.8p — colour the injected
+                        // `import * as React` with a
+                        // `top_level_mark`-derived ctxt so SWC's
+                        // hygiene preserves it. SWC's plugin
+                        // metadata exposes only `unresolved_mark`,
+                        // not `top_level_mark`, but the latter is
+                        // empirically allocated immediately after
+                        // the former in @swc/core's pipeline (a
+                        // `Mark::new()` directly after
+                        // `Mark::new()`), so
+                        // `Mark::from_u32(unresolved_mark.as_u32() + 1)`
+                        // recovers it. The pre-§6.8p
+                        // first-non-unresolved-Ident walker was
+                        // unsound: function/arrow param ctxts also
+                        // satisfy "non-empty + != unresolved" but
+                        // do NOT match the program-scope ctxt SWC's
+                        // react-classic transform uses for its
+                        // synthesised `React.createElement(...)`,
+                        // which surfaced as `React1` renames on
+                        // fixtures whose only non-unresolved Idents
+                        // were inside arrow bodies (e.g.
+                        // `['x'].map((str) => <div>{str}</div>)`).
+                        let ctxt = self
+                            .unresolved_mark
+                            .map(|m| {
+                                SyntaxContext::empty()
+                                    .apply_mark(Mark::from_u32(m.as_u32() + 1))
+                            })
+                            .unwrap_or(SyntaxContext::empty());
                         m.body.insert(0, build_react_namespace_import(ctxt));
                         // §6.8i — only walk to rebind free `React`
                         // refs when source actually has any. The
@@ -1097,6 +1119,7 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
             &mut self.recorder,
             scope_index,
             parent_scope,
+            self.current_styled_var_name.as_deref(),
         ) {
             *n = replacement.replacement;
         }
@@ -1250,7 +1273,18 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
             None
         };
 
+        // §6.8p — make the captured name visible to the styled
+        // handler during the children walk so `addComponentName` can
+        // emit `c_<name>`. Mirrors the same `decls[0].id` bug-parity
+        // shape as the displayName queue. Save/restore around the
+        // walk so nested styled var decls (e.g. inside an arrow body)
+        // don't leak.
+        let saved_var_name = self.current_styled_var_name.take();
+        self.current_styled_var_name = captured_name.clone();
+
         n.visit_mut_children_with(self);
+
+        self.current_styled_var_name = saved_var_name;
 
         if let Some(name) = captured_name {
             self.pending_styled_display_names.push(name);

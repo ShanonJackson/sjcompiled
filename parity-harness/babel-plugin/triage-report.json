@@ -1,12 +1,12 @@
 {
   "summary": {
     "total": 477,
-    "parity": 453,
-    "divergence": 23,
+    "parity": 459,
+    "divergence": 17,
     "swc-throws": 0,
     "babel-throws": 0,
     "both-throw": 1,
-    "elapsedSeconds": 42
+    "elapsedSeconds": 41
   },
   "results": {
     "parity": [
@@ -28,6 +28,10 @@
       },
       {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-keyframes",
+        "sourceFile": "class-names/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "class-names-tests-behaviour/class-names-behaviour--should-not-transform-object-property-access-from-invalid-style-prop",
         "sourceFile": "class-names/__tests__/behaviour.test.ts"
       },
       {
@@ -64,6 +68,10 @@
       },
       {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-replace-style-identifier-with-css-variable-object",
+        "sourceFile": "class-names/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "class-names-tests-behaviour/class-names-behaviour--should-not-transform-style-identifier-when-its-coming-from-outer-scope",
         "sourceFile": "class-names/__tests__/behaviour.test.ts"
       },
       {
@@ -360,6 +368,10 @@
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-use-destructured-props-in-conditional-css-rule",
+        "sourceFile": "css-prop/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-retain-keys-for-mapped-react-components",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts"
       },
       {
@@ -1115,6 +1127,10 @@
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
       {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-no-classes-when-both-conditional-branches-contains-empty-values",
+        "sourceFile": "styled/__tests__/behaviour.test.ts"
+      },
+      {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-conditionally-apply-css-mixins",
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
@@ -1751,6 +1767,10 @@
         "sourceFile": "__tests__/index.test.ts"
       },
       {
+        "name": "tests-index/babel-plugin--should-add-component-name-if-addcomponentname-is-true",
+        "sourceFile": "__tests__/index.test.ts"
+      },
+      {
         "name": "tests-index/babel-plugin--should-add-a-prefix-to-style-hash-classhashprefix-is-present",
         "sourceFile": "__tests__/index.test.ts"
       },
@@ -1776,6 +1796,10 @@
       },
       {
         "name": "tests-index/babel-plugin--should-compress-nested-selector",
+        "sourceFile": "__tests__/index.test.ts"
+      },
+      {
+        "name": "tests-index/babel-plugin--should-compress-conditional-class-names",
         "sourceFile": "__tests__/index.test.ts"
       },
       {
@@ -1825,16 +1849,6 @@
     ],
     "divergence": [
       {
-        "name": "class-names-tests-behaviour/class-names-behaviour--should-not-transform-object-property-access-from-invalid-style-prop",
-        "sourceFile": "class-names/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 164 (a.length=223, b.length=217)\n--- a +104..224\n   React.createElement(\n      \"div\",\n      {\n        style: dontexist.style,\n      },\n      \"hello, world!\"\n    )\n  );\n\n+++ b +104..224\n   React.createElement(\n      \"div\",\n      {\n        style: undefined,\n      },\n      \"hello, world!\"\n    )\n  );\n"
-      },
-      {
-        "name": "class-names-tests-behaviour/class-names-behaviour--should-not-transform-style-identifier-when-its-coming-from-outer-scope",
-        "sourceFile": "class-names/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 340 (a.length=458, b.length=462)\n--- a +280..400\n  React.createElement(\n      \"span\",\n      {\n        style: style,\n        className: ax([\"_syazxdf1 _1p1dangw _k48p1fw0\n+++ b +280..400\n  React.createElement(\n      \"span\",\n      {\n        style: undefined,\n        className: ax([\"_syazxdf1 _1p1dangw _k48p"
-      },
-      {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-style-and-css-renamed-prop-coming-from-local-variable",
         "sourceFile": "class-names/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 6 (a.length=433, b.length=388)\n--- a +0..66\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb19bv{font-siz\n+++ b +0..66\nconst ListItem = () =>\n  React.createElement(\n    CC,\n    null,\n  "
@@ -1843,11 +1857,6 @@
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-concat-explicit-use-of-style-prop-on-an-element-when-destructured-templat",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 96 (a.length=383, b.length=335)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst [color] = [\"blue\"];\nReac\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst [color] = [\"blue\"];\nReact.createElement(\n  CC,\n  null,\n  Rea"
-      },
-      {
-        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-retain-keys-for-mapped-react-components",
-        "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 17 (a.length=399, b.length=400)\n--- a +0..77\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ax, ix, CC, CS } from \"@compiled/re"
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-not-transform-css-prop-with-comment-directive",
@@ -1887,12 +1896,7 @@
       {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-and-boolean-in-the-same-line",
         "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=967, b.length=719)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz5scu{color:red}\";\nconst _2 = \"._syaz13q2{color:bl\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybgktf{font-size:20px}\";\nconst Component = forwardRe"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-no-classes-when-both-conditional-branches-contains-empty-values",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 324 (a.length=718, b.length=669)\n--- a +264..384\nError(\"Please use 'ref' instead of 'innerRef'.\");\n    }\n    const { isPrimary, ...__cmpldp } = __cmplp;\n    return React\n+++ b +264..384\nError(\"Please use 'ref' instead of 'innerRef'.\");\n    }\n    return React.createElement(\n      CC,\n      null,\n      Reac"
+        "diff": "divergence at byte 133 (a.length=967, b.length=778)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz5scu{color:red}\";\nconst _2 = \"._syaz13q2{color:bl\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybgktf{font-size:20px}\";\nconst Component = forwardRe"
       },
       {
         "name": "tests-custom-import-source/custom-import-source--should-pick-up-custom-relative-import-source",
@@ -1908,16 +1912,6 @@
         "name": "tests-expression-evaluation/import-specifiers--statically-evaluates-deconstructed-values-from-deeply-nested-objects",
         "sourceFile": "__tests__/expression-evaluation.test.ts",
         "diff": "divergence at byte 108 (a.length=914, b.length=1072)\n--- a +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48p1fw0{font-weight:700}\";\nconst _3 = \"._1wyb1fwx{font-size:12p\n+++ b +48..168\n CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48pdo4x{font-weight:var(--_le9e55)}\";\nconst _3 = \"._1wyb6uie{fo"
-      },
-      {
-        "name": "tests-index/babel-plugin--should-add-component-name-if-addcomponentname-is-true",
-        "sourceFile": "__tests__/index.test.ts",
-        "diff": "divergence at byte 573 (a.length=718, b.length=707)\n--- a +513..633\nyle: __cmpls,\n        ref: __cmplr,\n        className: ax([\"c_MyDiv\", \"_1wyb1fwx\", __cmplp.className]),\n      })\n    );\n\n+++ b +513..633\nyle: __cmpls,\n        ref: __cmplr,\n        className: ax([\"_1wyb1fwx\", __cmplp.className]),\n      })\n    );\n  }\n);\nif ("
-      },
-      {
-        "name": "tests-index/babel-plugin--should-compress-conditional-class-names",
-        "sourceFile": "__tests__/index.test.ts",
-        "diff": "divergence at byte 17 (a.length=472, b.length=473)\n--- a +0..77\nimport * as React from \"react\";\nimport { ac, ix, CC, CS } from \"@compiled/rea\n+++ b +0..77\nimport * as React1 from \"react\";\nimport { ac, ix, CC, CS } from \"@compiled/re"
       },
       {
         "name": "tests-jsx-automatic/jsx-automatic--should-work-with-css-prop-and-a-custom-import-source",

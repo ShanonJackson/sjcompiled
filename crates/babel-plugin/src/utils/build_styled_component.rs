@@ -276,6 +276,23 @@ pub struct StyledTemplateOpts {
     pub tag: Tag,
     pub variables: Vec<crate::utils::types::Variable>,
     pub sheets: Vec<String>,
+    /// §6.8p — original styled-call argument expression(s) before
+    /// CSS extraction. Walked alongside `class_names` / `variables`
+    /// inside the invalid-DOM-prop derivation so that
+    /// `__cmplp.<name>` references in branches that produced NO
+    /// CSS (e.g. `props => props.x ? undefined : null`) still
+    /// surface in the consumed-prop destructure. Mirrors upstream's
+    /// `meta.parentPath` walk over the styled call's full subtree.
+    pub original_css_node: Option<Expr>,
+    /// §6.8p — the binding name of the surrounding `const X = styled...`
+    /// VarDecl when its first declarator is a `Pat::Ident`. Powers
+    /// the `addComponentName: true` `c_<name>` className emit
+    /// upstream wires from `meta.parentPath.findParent(VariableDeclaration)`.
+    /// `None` when the styled expression is not directly assigned to
+    /// a `Pat::Ident` declarator (e.g. `[X] = [styled.div...]` or
+    /// returned from an arrow body) — same scope-of-pre-detect
+    /// caveat as the displayName queue.
+    pub declared_var_name: Option<String>,
 }
 
 /// `styledTemplate` upstream lines 115–199. Returns the
@@ -334,6 +351,19 @@ fn styled_template(
                 }
             }
         }
+        // §6.8p — also walk the ORIGINAL styled-call argument
+        // expression(s). The above two loops only see post-CSS-extraction
+        // shape; conditional branches that produced no CSS (e.g. both
+        // sides of `props.isPrimary ? undefined : null`) drop out of
+        // both `class_names` and `variables`, so a `__cmplp.isPrimary`
+        // reference that exists only inside such a dead branch wouldn't
+        // surface here without this walk. Babel's `meta.parentPath`
+        // walk covers the full styled-call subtree regardless.
+        if let Some(orig) = &opts.original_css_node {
+            for n in get_invalid_dom_props(orig) {
+                names.insert(n);
+            }
+        }
         names.into_iter().collect()
     } else {
         Vec::new()
@@ -355,7 +385,8 @@ fn styled_template(
     //   * conditionalClassNames: each Logical/Conditional Expr from
     //     `opts.class_names` is appended directly.
     //   * trailing __cmplp.className.
-    let component_name = derive_component_name(meta);
+    let component_name =
+        derive_component_name_from_opts(&opts).or_else(|| derive_component_name(meta));
     let component_class_name: Option<String> = component_class_name_for(meta, component_name.as_deref());
 
     let mut unconditional_buf = String::new();
@@ -645,6 +676,15 @@ fn derive_component_name(_meta: &Metadata<'_>) -> Option<String> {
     None
 }
 
+/// §6.8p variant — derive the component name from the styled
+/// VarDecl's binding (captured via `current_styled_var_name` on the
+/// dispatcher visitor and threaded through `StyledTemplateOpts`).
+/// Mirrors upstream's `findParent(VariableDeclaration)` walk for the
+/// `addComponentName: true` className emit.
+fn derive_component_name_from_opts(opts: &StyledTemplateOpts) -> Option<String> {
+    opts.declared_var_name.clone()
+}
+
 /// Mirrors upstream lines 142–147. `c_<componentName>` when
 /// `addComponentName=true` AND non-prod AND we have a name.
 fn component_class_name_for(meta: &Metadata<'_>, component_name: Option<&str>) -> Option<String> {
@@ -780,9 +820,20 @@ fn build_invalid_dom_props_destructure(invalid: &[String]) -> Stmt {
 /// `transform_css` on the unconditional run for atomic dedup, runs
 /// `transform_css_items` on the conditional run, builds the final
 /// classNames + sheets, then delegates to `styled_template`.
+///
+/// `original_css_node` (§6.8p) is the styled-call's argument
+/// expression(s) BEFORE CSS extraction. It is fed into the
+/// `invalid_dom_props` walk inside `styled_template` so a
+/// `__cmplp.<name>` reference in a branch that produced no CSS
+/// (e.g. `props => props.isPrimary ? undefined : null`) still
+/// surfaces as a destructured "consumed prop" — matching upstream's
+/// `meta.parentPath` walk that sees the entire styled call subtree
+/// regardless of whether each branch produced CSS output.
 pub fn build_styled_component(
     tag: Tag,
     css_output: CSSOutput,
+    original_css_node: Option<&Expr>,
+    declared_var_name: Option<&str>,
     meta: &mut Metadata<'_>,
     recorder: &mut MutationRecorder,
 ) -> Expr {
@@ -830,6 +881,8 @@ pub fn build_styled_component(
             tag,
             sheets,
             variables: css_output.variables,
+            original_css_node: original_css_node.cloned(),
+            declared_var_name: declared_var_name.map(|s| s.to_string()),
         },
         meta,
         recorder,
@@ -1010,7 +1063,7 @@ mod tests {
         let mut state = State::default();
         let mut recorder = MutationRecorder::new();
         let mut meta = fresh_meta(&mut state);
-        let result = build_styled_component(tag, output, &mut meta, &mut recorder);
+        let result = build_styled_component(tag, output, None, None, &mut meta, &mut recorder);
         let call = extract_call(&result);
         assert_eq!(callee_name(call), "forwardRef");
         assert_eq!(call.args.len(), 1);
@@ -1029,7 +1082,7 @@ mod tests {
         let mut state = State::default();
         let mut recorder = MutationRecorder::new();
         let mut meta = fresh_meta(&mut state);
-        let result = build_styled_component(tag, output, &mut meta, &mut recorder);
+        let result = build_styled_component(tag, output, None, None, &mut meta, &mut recorder);
         let call = extract_call(&result);
         let arrow = extract_arrow(&call.args[0].expr);
         assert_eq!(arrow.params.len(), 2);
@@ -1066,7 +1119,7 @@ mod tests {
         let mut state = State::default();
         let mut recorder = MutationRecorder::new();
         let mut meta = fresh_meta(&mut state);
-        let result = build_styled_component(tag, output, &mut meta, &mut recorder);
+        let result = build_styled_component(tag, output, None, None, &mut meta, &mut recorder);
         let call = extract_call(&result);
         let arrow = extract_arrow(&call.args[0].expr);
         let Pat::Object(obj) = &arrow.params[0] else {
@@ -1097,7 +1150,7 @@ mod tests {
         let mut state = State::default();
         let mut recorder = MutationRecorder::new();
         let mut meta = fresh_meta(&mut state);
-        let result = build_styled_component(tag, output, &mut meta, &mut recorder);
+        let result = build_styled_component(tag, output, None, None, &mut meta, &mut recorder);
         let call = extract_call(&result);
         let arrow = extract_arrow(&call.args[0].expr);
         let Pat::Object(obj) = &arrow.params[0] else {
@@ -1128,7 +1181,7 @@ mod tests {
         let mut state = State::default();
         let mut recorder = MutationRecorder::new();
         let mut meta = fresh_meta(&mut state);
-        let result = build_styled_component(tag, output, &mut meta, &mut recorder);
+        let result = build_styled_component(tag, output, None, None, &mut meta, &mut recorder);
         let call = extract_call(&result);
         let arrow = extract_arrow(&call.args[0].expr);
         let block = extract_block(arrow);
