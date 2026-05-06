@@ -50,8 +50,17 @@ export type BabelPluginFixtureOpts = {
  * (`preserveAllComments: true`).
  */
 function stripComments(code: string): string {
-  // Single-line `// ...` comments
-  let out = code.replace(/\/\/[^\n\r]*/g, '');
+  // Whole-line `// ...` comments (leading whitespace + comment + trailing
+  // newline) — drop the WHOLE line so a comment on its own line doesn't
+  // leave a stray blank line behind. Babel's `comments: false` strips
+  // the line entirely; SWC's `preserveAllComments: false` doesn't
+  // (comments attached to surviving nodes round-trip through codegen),
+  // so we do the same condensing in the harness to keep both sides
+  // byte-equal. §6.5 surfaces this on `should-not-transform-css-prop-with-comment-directive`.
+  let out = code.replace(/^[ \t]*\/\/[^\n\r]*\r?\n/gm, '');
+  // Inline (trailing) `// ...` comments — same line as code; just
+  // strip the comment text, leaving any preceding whitespace/code.
+  out = out.replace(/\/\/[^\n\r]*/g, '');
   // Block `/* ... */` comments (non-greedy, dotall via [\s\S])
   out = out.replace(/\/\*[\s\S]*?\*\//g, '');
   return out;

@@ -39,9 +39,11 @@
 //! Mutating methods on `State` (e.g. `set_pragma_jsx`,
 //! `ensure_compiled_imports`) provide the controlled write paths.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
+use swc_core::common::comments::CommentKind;
 
 use crate::mutation_recorder::{ApiKind, MutationRecorder, StateDiff};
 use crate::resolver::Resolver;
@@ -140,6 +142,33 @@ pub struct State {
     /// in-memory transforms in some test harnesses). `None` until
     /// `set_filename` is called by the visitor on `Program::enter`.
     pub(crate) filename: Option<String>,
+
+    /// §6.5 comment-store: every comment in the file with its line
+    /// numbers resolved up-front. Mirrors upstream's
+    /// `meta.state.file.ast.comments` flat list — Babel walks it by
+    /// line during `getNodeComments`. SWC's plugin-comments proxy is
+    /// BytePos-keyed and doesn't expose iteration, so the visitor
+    /// builds this list at `Program::enter` by walking the AST and
+    /// querying `comments.get_leading/get_trailing` for every span,
+    /// then resolves each `BytePos` to a 1-indexed line via the
+    /// plugin's source-map proxy. Out-of-capture per
+    /// STATE_MUTATIONS.md (per-file scaffolding, not part of the
+    /// cross-file caching contract — same classification as
+    /// `pragma`). Empty in tests / contexts that lack a source-map
+    /// (`is_css_prop_disabled` returns false there, matching
+    /// upstream's "no directive present" fast path).
+    pub(crate) comment_lines: Vec<LineComment>,
+
+    /// §6.5 span→line index. Populated alongside `comment_lines` at
+    /// `Program::enter` so dispatch sites can resolve a node span's
+    /// 1-indexed line without holding a source-map themselves. The
+    /// pre-pass visits every node touched by the comment-collection
+    /// walk (Stmt / Expr / JSX nodes / VarDeclarator / Pat /
+    /// BlockStmt / Function / ArrowExpr / Class / Module / Script)
+    /// and records `(span.lo → line)` and `(span.hi → line)`. Lookup
+    /// of an unknown `BytePos` returns `None`, treated upstream as
+    /// "no loc, skip the directive check".
+    pub(crate) span_lines: HashMap<u32, usize>,
     // `transformCache` (Babel WeakMap on NodePath) is a Babel-only
     // construct — the Rust visitor's single-pass design (PLAN.md §3.5)
     // eliminates the re-visit problem the WeakMap was guarding against.
@@ -212,6 +241,20 @@ impl State {
     pub fn filename(&self) -> Option<&str> {
         self.filename.as_deref()
     }
+
+    /// File-wide comment store with pre-resolved line numbers (§6.5).
+    /// Empty when the visitor was invoked without a source-map (tests).
+    pub fn comment_lines(&self) -> &[LineComment] {
+        &self.comment_lines
+    }
+
+    /// 1-indexed line of `byte_pos` if the §6.5 pre-pass observed
+    /// the position, else `None`. `None` matches upstream's
+    /// `path.node?.loc?.start.line` undefined-guard ("no loc → skip
+    /// the directive check").
+    pub fn line_of(&self, byte_pos: u32) -> Option<usize> {
+        self.span_lines.get(&byte_pos).copied()
+    }
 }
 
 // ───────── Init-time / non-captured mutators ─────────
@@ -246,6 +289,23 @@ impl State {
     /// directly. `resolve_binding.rs` reads via `Self::filename`.
     pub fn set_filename(&mut self, filename: String) {
         self.filename = Some(filename);
+    }
+
+    /// Wire the pre-resolved comment-line store. §6.5 — called once
+    /// from `lib.rs::process` after the AST-walk pre-pass that
+    /// resolves every `BytePos` to a 1-indexed line via the plugin
+    /// source-map proxy. Tests can populate this directly to exercise
+    /// the disable-directive code path without a real source-map.
+    pub fn set_comment_lines(&mut self, lines: Vec<LineComment>) {
+        self.comment_lines = lines;
+    }
+
+    /// §6.5 — wire the pre-resolved `BytePos → 1-indexed line` map.
+    /// Tests that exercise `is_css_prop_disabled` without going through
+    /// the plugin entry pre-pass populate this manually with the JSX
+    /// element / JSX attribute span positions they care about.
+    pub fn set_span_lines(&mut self, lines: HashMap<u32, usize>) {
+        self.span_lines = lines;
     }
 
     pub(crate) fn set_import_sources(&mut self, sources: Vec<String>) {
@@ -481,6 +541,19 @@ pub enum CleanupKind {
 /// dependency on the unported cache module.
 #[derive(Debug, Default)]
 pub struct CacheSlot;
+
+/// One entry in the §6.5 file-wide comment store. `start_line` /
+/// `end_line` are 1-indexed lines as resolved through the SWC
+/// plugin's source-map proxy at `Program::enter`. Mirrors the shape
+/// `getNodeComments` upstream consumes from `comment.loc.start.line`
+/// / `comment.loc.end.line` on a Babel `CommentLine` / `CommentBlock`.
+#[derive(Debug, Clone)]
+pub struct LineComment {
+    pub start_line: usize,
+    pub end_line: usize,
+    pub kind: CommentKind,
+    pub text: String,
+}
 
 #[cfg(test)]
 mod tests {

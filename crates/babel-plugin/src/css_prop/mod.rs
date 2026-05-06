@@ -33,26 +33,23 @@
 //!   again because `n.visit_mut_children_with(self)` ran BEFORE the
 //!   replacement.
 //!
-//! ### Disable-directive divergence — §6.5 incomplete branch
+//! ### Disable-directive (§6.5)
 //!
-//! `is_css_prop_disabled` upstream walks
+//! `isCssPropDisabled` upstream walks
 //! `meta.state.file.ast.comments`, filtering by line number against
-//! `path.node.loc.start.line` / `lineNumber - 1`. SWC's plugin runtime
-//! doesn't expose source-position-to-line conversion to the visitor
-//! today — converting `BytePos` to `Loc` requires a `SourceMap` proxy
-//! we haven't threaded into the visitor yet.
+//! `path.node.loc.start.line` / `lineNumber - 1`. The Rust port
+//! pre-resolves every comment in the file to its 1-indexed line at
+//! `Program::enter` (`utils/comments.rs::collect_line_comments`,
+//! reading SWC's plugin source-map proxy) and exposes
+//! `is_css_prop_disabled(state, start_line, end_line)`. The dispatch
+//! checks the JSXOpeningElement span AND the css JSXAttribute span,
+//! mirroring upstream's two-call shape:
 //!
-//! The Rust port returns `false` (transform always runs) when no
-//! `@compiled-disable*` directives are present in the file's comment
-//! store; if any directive IS present, we bail conservatively (no
-//! transform) until the SourceMap-based per-line filtering lands. This
-//! matches "BUGS in OLD = BUGS in NEW" by erring TOWARD upstream's
-//! disable behaviour: directives in the file disable BROADLY rather
-//! than per-line, but no false-positive transforms.
-//!
-//! See `comments.rs` module doc for the SourceMap-thread followup.
+//! ```js
+//! if (isCssPropDisabled(path, meta) || isCssPropDisabled(cssProp, meta)) return;
+//! ```
 
-use swc_core::common::DUMMY_SP;
+use swc_core::common::{Spanned, DUMMY_SP};
 use swc_core::ecma::ast::{
     Expr, JSXAttr, JSXAttrName, JSXAttrOrSpread, JSXAttrValue, JSXElement, JSXExpr, Lit,
 };
@@ -62,7 +59,7 @@ use crate::mutation_recorder::MutationRecorder;
 use crate::state::State;
 use crate::types::{Metadata, MetadataContext};
 use crate::utils::build_compiled_component::build_compiled_component;
-use crate::utils::comments::is_css_prop_disabled_via_comment_store;
+use crate::utils::comments::is_css_prop_disabled;
 use crate::utils::css_builders::build_css;
 use crate::utils::types::CSSOutput;
 
@@ -160,10 +157,18 @@ pub fn try_handle_jsx_element(
 
     // Upstream: `if (isCssPropDisabled(path, meta) ||
     //              isCssPropDisabled(cssProp, meta)) return;`
-    // The two checks share the same comment-store walk; in the Rust
-    // port we collapse to a single check on the file-level store. See
-    // module doc for the divergence rationale.
-    if is_css_prop_disabled_via_comment_store(state) {
+    // Each check passes the path's `loc.start.line` / `end.line` to
+    // `getNodeComments`. The Rust port resolves both at
+    // `Program::enter` (`utils/comments.rs::collect_line_comments`
+    // + `state.line_of`) so dispatch sees pre-computed line numbers.
+    let opening_lo_line = state.line_of(el.opening.span.lo.0).unwrap_or(0);
+    let opening_hi_line = state.line_of(el.opening.span.hi.0).unwrap_or(0);
+    let attr_span = css_attr.span();
+    let attr_lo_line = state.line_of(attr_span.lo.0).unwrap_or(0);
+    let attr_hi_line = state.line_of(attr_span.hi.0).unwrap_or(0);
+    if is_css_prop_disabled(state, opening_lo_line, opening_hi_line)
+        || is_css_prop_disabled(state, attr_lo_line, attr_hi_line)
+    {
         return None;
     }
 

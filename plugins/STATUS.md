@@ -20,8 +20,8 @@
 **Phase status:** 0 ☑ (modulo §0.10–§0.12 — Phase 5 gates, not Phase 4
 blockers) · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ (modulo §4.7 OUT OF SCOPE and §4.8
 gated on Phase 6) · 5 ☑ · **Phase 6 §6.1–§6.7 ☑ (all 7 per-API
-handlers shipped) · §6.8 ▶ (active triage; post-§6.8x baseline
-475/1/0/0/1)** · Phase 7+ ☐.
+handlers shipped) · §6.8 ▶ (post-§6.5 closure baseline
+476/0/0/0/1 — sole residual is bug-parity both-throw)** · Phase 7+ ☐.
 
 **Active checkpoint: Phase 6 §6.8** — full-corpus parity exit gate.
 See "§6.8 active state" below for the current divergence baseline,
@@ -29,6 +29,61 @@ triage tooling, and next-step punch list.
 
 **Independently shippable while §6.8 runs:** §5.7 (`included-files.json`
 sidecar), §2.3(b) AST/comment-store mutations bundle.
+
+### §6.5 closure (2026-05-06, this session)
+
+§6.5 (`@compiled-disable-line` / `@compiled-disable-next-line`
+directive support) — port-completion of the previously stubbed
+`utils/comments.rs::is_css_prop_disabled_via_comment_store`
+file-wide bail-out. Three coordinated changes:
+
+1. **`lib.rs::process` pre-pass.** Threads
+   `meta.source_map` (`PluginSourceMapProxy`) +
+   `meta.comments` (`PluginCommentsProxy`) into a single AST walk
+   (`utils/comments.rs::collect_line_comments`) at `Program::enter`.
+   The pass dedupes per-`BytePos` and per-`(span.lo, span.hi)`,
+   resolves each `BytePos` to a 1-indexed line via
+   `source_map.lookup_char_pos(...).line`, and returns a `LineIndex`
+   carrying both the comment list and a `BytePos → line` map. Both
+   land on `State` (new fields `comment_lines: Vec<LineComment>` and
+   `span_lines: HashMap<u32, usize>`, classified out-of-capture per
+   `STATE_MUTATIONS.md` — same shape as `pragma`).
+
+2. **`utils/comments.rs` 1:1 port.** Replaces the file-wide
+   conservative-bail stub with `get_node_comments(state, start_line,
+   end_line) → (before, current)` mirroring upstream's
+   `meta.state.file.ast.comments` walk + line-equality filter +
+   `CommentLine`-only predicate, and `is_css_prop_disabled(state,
+   start_line, end_line)` mirroring the upstream `startsWith` check
+   on `@compiled-disable-next-line transform-css-prop` (in `before`)
+   / `@compiled-disable-line transform-css-prop` (in `current`).
+   Multi-line path skip preserved. 8 unit tests cover the shape.
+
+3. **`css_prop/mod.rs` dispatch.** Now calls `is_css_prop_disabled`
+   twice — once on the JSXOpeningElement span, once on the css
+   JSXAttribute span — matching upstream's `babel-plugin.ts:70`
+   two-call pattern (`isCssPropDisabled(path, meta) ||
+   isCssPropDisabled(cssProp, meta)`). Span lo/hi are looked up via
+   `state.line_of(byte_pos.0)`; an unknown BytePos returns `None`,
+   treated as "no loc → skip" per upstream's
+   `path.node?.loc?.start.line` undefined-guard.
+
+**Harness companion fix.** `parity-harness/babel-plugin/engines.ts::stripComments`
+gained a whole-line `// ...` strip (`/^[ \t]*\/\/[^\n\r]*\r?\n/gm`)
+*before* the inline-comment strip. Babel's `comments: false`
+removes the entire line; SWC's `preserveAllComments: false` only
+suppresses codegen-time emission for orphan comments — comments
+attached to surviving nodes round-trip through codegen. Without the
+whole-line strip, the directive line round-tripped as a blank line
+in SWC output, prettier preserved it, and we'd have shipped a
+1-byte divergence even though the substantive transform was correct.
+
+**Parity delta:** 475 → **476 / 477** (99.79%). Sole residual is
+the documented `both-throw` (`should-not-add-quotes-to-content-values-that-shouldn-t-accept-them`)
+— both engines throw the same error, which is bug-parity per
+CLAUDE.md "BUGS in OLD = BUGS in NEW", not divergence.
+
+**Lib tests:** 467 → 475 (+8 from `comments::tests`, all green).
 
 ### §6.8 active state (2026-05-05)
 

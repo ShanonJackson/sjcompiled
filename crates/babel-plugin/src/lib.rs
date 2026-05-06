@@ -53,6 +53,7 @@ use swc_core::plugin::proxies::{PluginCommentsProxy, TransformPluginProgramMetad
 use crate::babel_plugin::BabelPluginVisitor;
 use crate::resolver::build_default;
 use crate::types::PluginOptions;
+use crate::utils::comments::collect_line_comments;
 
 #[plugin_transform]
 pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Program {
@@ -99,7 +100,20 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
     // `SyntaxContext` and SWC's hygiene pass renames our import to
     // `React1`. See `babel_plugin.rs::build_react_namespace_import`.
     visitor.unresolved_mark = Some(meta.unresolved_mark);
-    let mut p = program;
+
+    // §6.5 bridge: walk the program once with `meta.source_map`
+    // (`PluginSourceMapProxy`) + `meta.comments` to build the
+    // line-indexed comment store + span→line index. The css-prop
+    // disable-directive gate (`is_css_prop_disabled`) reads from
+    // both; without them, upstream's `getNodeComments` per-line
+    // filter has nothing to match against. See `utils/comments.rs`
+    // module doc and the §6.5 closure note in `plugins/STATUS.md`.
+    let p = program;
+    let line_index = collect_line_comments(&p, &visitor.comments, &meta.source_map);
+    visitor.state.set_comment_lines(line_index.comments);
+    visitor.state.set_span_lines(line_index.spans);
+
+    let mut p = p;
     p.visit_mut_with(&mut visitor);
     p
 }

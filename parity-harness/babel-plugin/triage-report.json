@@ -1,12 +1,12 @@
 {
   "summary": {
     "total": 477,
-    "parity": 475,
-    "divergence": 1,
+    "parity": 476,
+    "divergence": 0,
     "swc-throws": 0,
     "babel-throws": 0,
     "both-throw": 1,
-    "elapsedSeconds": 42
+    "elapsedSeconds": 41
   },
   "results": {
     "parity": [
@@ -380,6 +380,10 @@
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-retain-keys-for-mapped-react-components",
+        "sourceFile": "css-prop/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-not-transform-css-prop-with-comment-directive",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts"
       },
       {
@@ -1911,13 +1915,7 @@
         "sourceFile": "__tests__/rule-hoisting.test.ts"
       }
     ],
-    "divergence": [
-      {
-        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-not-transform-css-prop-with-comment-directive",
-        "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 96 (a.length=343, b.length=733)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst RedDiv = React.createElement(\"div\", {\n  css: {\n    color: \"r\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._syazbf54{color:"
-      }
-    ],
+    "divergence": [],
     "babel-throws": [],
     "swc-throws": [],
     "both-throw": [
