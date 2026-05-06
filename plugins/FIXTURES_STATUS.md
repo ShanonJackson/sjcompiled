@@ -236,6 +236,25 @@ the resulting CSS).
   LogicalExpression) without recursive automatic-positive on
   Logical. +3 parity.
 
+- **[FIXED 2026-05-07] ct-optional-chain-dynamic-style** — generator
+  missing `OptChain` arm. Babel's `@babel/generator` has explicit
+  `OptionalMemberExpression` / `OptionalCallExpression` printers
+  (`node_modules/@babel/generator/lib/generators/expressions.js:150-189`);
+  SWC unifies both under `Expr::OptChain(OptChainExpr { optional, base })`.
+  The Rust port's `Printer::print` dispatch in
+  `crates/babel-plugin/src/compat/generator/printer.rs` had no arm
+  for `Expr::OptChain` so it fell through to the
+  `_ => "/*UNHANDLED-EXPR*/"` catch-all. For the styled `left:` and
+  `top:` arrows whose only difference is `?.left` vs `?.top`, both
+  arrow-source strings collapsed to the same `/*UNHANDLED-EXPR*/`
+  payload, hashing to the same `--_2wqa78` CSS variable name.
+  Babel emitted distinct `--_1qibnji` (left) / `--_1gg2u2w` (top)
+  hashes. Added `opt_chain` / `optional_member` / `optional_call`
+  in `compat/generator/generators/expressions.rs` mirroring the
+  upstream `OptionalMemberExpression` / `OptionalCallExpression`
+  byte logic (computed-bracket form, `?.` token vs `.` for
+  `optional: false` continuation). +1 parity.
+
 ## Open divergences
 
 Snapshot after this session's fixes (run `bun parity-harness/fixtures-triage.mjs`
@@ -243,8 +262,8 @@ to refresh):
 
 ```
 total                336
-parity               280  (+15 from baseline)
-divergence           9
+parity               281  (+16 from baseline)
+divergence           8
 swc-throws           2
 babel-throws         0
 both-throw           2     ← negative-test fixtures (OK)
@@ -286,13 +305,12 @@ Fix candidates (each with trade-offs):
 
 Status: open, blocked on architectural decision.
 
-### Other ct-* divergences (3 remaining)
+### Other ct-* divergences (2 remaining)
 
 Surface-traced individually as the iteration loop continues:
 
 - `ct-editor-big`
 - `ct-expression-export`
-- `ct-optional-chain-dynamic-style`
 
 Use `bun parity-harness/fixtures-triage.mjs --only <name> --print-diffs`
 to start triage; the in-process debug-test pattern proven on

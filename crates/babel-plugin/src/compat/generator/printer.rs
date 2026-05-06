@@ -297,6 +297,7 @@ impl<'c> Printer<'c> {
             Expr::Unary(u) => generators::expressions::unary(self, u, node),
             Expr::Member(m) => generators::expressions::member(self, m, node),
             Expr::Call(c) => generators::expressions::call(self, c, node),
+            Expr::OptChain(o) => generators::expressions::opt_chain(self, o, node),
             Expr::Object(o) => generators::types::object(self, o),
             Expr::Array(a) => generators::types::array(self, a, node),
             Expr::Tpl(t) => generators::template_literals::tpl(self, t, node),

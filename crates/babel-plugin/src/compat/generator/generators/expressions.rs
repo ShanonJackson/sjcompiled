@@ -5,7 +5,8 @@ use crate::compat::generator::printer::Printer;
 use swc_core::ecma::ast::{
     ArrayPat, ArrowExpr, AssignPat, AssignPatProp, BinExpr, BinaryOp, BindingIdent, BlockStmtOrExpr,
     CallExpr, Callee, CondExpr, Expr, ExprOrSpread, KeyValuePatProp, MemberExpr, MemberProp,
-    ObjectPat, ObjectPatProp, ParenExpr, Pat, PropName, RestPat, UnaryExpr, UnaryOp,
+    ObjectPat, ObjectPatProp, OptCall, OptChainBase, OptChainExpr, ParenExpr, Pat, PropName,
+    RestPat, UnaryExpr, UnaryOp,
 };
 
 /// `UnaryExpression(node)`.
@@ -124,6 +125,71 @@ pub fn call(p: &mut Printer, node: &CallExpr, parent_expr: &Expr) {
         Callee::Expr(e) => p.print(e, Some(parent_expr)),
         Callee::Super(_) => p.word("super"),
         Callee::Import(_) => p.word("import"),
+    }
+    p.token_char(b'(');
+    for (i, arg) in node.args.iter().enumerate() {
+        if i > 0 {
+            p.token_char(b',');
+            p.space();
+        }
+        call_arg(p, arg, parent_expr);
+    }
+    p.token_char(b')');
+}
+
+/// `OptionalMemberExpression(node)` / `OptionalCallExpression(node)` —
+/// 1:1 port of `@babel/generator@7.23.0/lib/generators/expressions.js:150-189`.
+///
+/// SWC unifies both shapes under `Expr::OptChain(OptChainExpr { optional, base })`
+/// where `base` is either `Member` (→ `OptionalMemberExpression`) or
+/// `Call` (→ `OptionalCallExpression`). The `optional: bool` flag matches
+/// Babel's `node.optional` exactly: `true` emits `?.`, `false` emits `.`
+/// (or just `(` for calls). Without this arm the printer's catch-all
+/// emits `/*UNHANDLED-EXPR*/` for every `?.` expression, collapsing
+/// every CSS-variable hash to the same constant — see
+/// `ct-optional-chain-dynamic-style` divergence (2026-05-07).
+pub fn opt_chain(p: &mut Printer, node: &OptChainExpr, parent_expr: &Expr) {
+    match &*node.base {
+        OptChainBase::Member(m) => optional_member(p, m, node.optional, parent_expr),
+        OptChainBase::Call(c) => optional_call(p, c, node.optional, parent_expr),
+    }
+}
+
+fn optional_member(p: &mut Printer, node: &MemberExpr, optional: bool, parent_expr: &Expr) {
+    p.print(&node.obj, Some(parent_expr));
+    match &node.prop {
+        MemberProp::Ident(i) => {
+            if optional {
+                p.token("?.");
+            } else {
+                p.token_char(b'.');
+            }
+            p.word(i.sym.as_ref());
+        }
+        MemberProp::PrivateName(pn) => {
+            if optional {
+                p.token("?.");
+            } else {
+                p.token_char(b'.');
+            }
+            p.token_char(b'#');
+            p.word(pn.name.as_ref());
+        }
+        MemberProp::Computed(c) => {
+            if optional {
+                p.token("?.");
+            }
+            p.token_char(b'[');
+            p.print(&c.expr, Some(parent_expr));
+            p.token_char(b']');
+        }
+    }
+}
+
+fn optional_call(p: &mut Printer, node: &OptCall, optional: bool, parent_expr: &Expr) {
+    p.print(&node.callee, Some(parent_expr));
+    if optional {
+        p.token("?.");
     }
     p.token_char(b'(');
     for (i, arg) in node.args.iter().enumerate() {
