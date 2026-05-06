@@ -964,13 +964,28 @@ impl Builder {
         // (`evaluation.rs:445`, `traverse_identifier`'s `if binding.constant`).
         // `var` deopts unconditionally at `evaluation.rs:457`, so a
         // populated `init_expr` for `var` is harmless but never read
-        // through that path. Destructuring bindings deopt (no single
-        // `binding.path.init` to recurse on).
+        // through that path.
+        //
+        // §6.8t — `Pat::Array` LHS (e.g. `const [color] = ['blue']`)
+        // ALSO populates init_expr. Babel's `path.evaluate()` does
+        // not slot-extract for ArrayPattern (or for any LHS shape) —
+        // it just calls `binding.path.get('init')` and folds the
+        // whole init (`@babel/traverse/path/evaluation.js:162-168`).
+        // The whole-array Value is then string-coerced by the
+        // template-literal/binary-`+` quasi-concat path
+        // (Array.prototype.toString = elements.join(',')), which is
+        // exactly what `Value::Array.to_js_string()` does in
+        // evaluation.rs:109-113. Compiled's resolve-binding wrapper
+        // also doesn't slot-extract ArrayPattern (only ObjectPattern
+        // at resolve-binding.ts:263), so the whole-array shape is
+        // what the upstream pipeline observes end-to-end. ObjectPattern
+        // bindings continue to use the destructured_pat / destructured_init
+        // pair below (init_expr stays None) so the §6.8n slot-extract
+        // branch is the one that fires.
         let init_expr_for_const_ident: Option<Box<Expr>> =
-            if matches!(declarator.name, Pat::Ident(_)) {
-                declarator.init.clone()
-            } else {
-                None
+            match &declarator.name {
+                Pat::Ident(_) | Pat::Array(_) => declarator.init.clone(),
+                _ => None,
             };
 
         // §6.8n — capture the LHS ObjectPat + RHS init for

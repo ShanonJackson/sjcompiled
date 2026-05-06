@@ -23,6 +23,7 @@ import {
   swcEngine,
   diffSummary,
   reconcileJsxRuntimeOrdering,
+  reconcileSwcParamHygieneRenames,
   type BabelPluginFixtureOpts,
 } from './engines';
 
@@ -155,7 +156,13 @@ describe('Babel ↔ SWC parity (Phase 2 §2.2 — pass-through baseline)', () =>
       // represent plugin drift. See `reconcileJsxRuntimeOrdering` in
       // engines.ts for full rationale and the conservative-strip
       // safety argument.
-      const [babelCmp, swcCmp] = reconcileJsxRuntimeOrdering(babelOut, swcOut);
+      let [babelCmp, swcCmp] = reconcileJsxRuntimeOrdering(babelOut, swcOut);
+      // §6.8s — host-environment-only SWC hygiene-rename of function
+      // params (e.g. `(fromColor, ...)` → `(fromColor1, ...)` when an
+      // outer free reference `fromColor` exists). Babel's generator has
+      // no hygiene pass; SWC's resolver+hygiene rewrites the binding to
+      // disambiguate ctxts. Conservative reconciler in engines.ts.
+      [babelCmp, swcCmp] = reconcileSwcParamHygieneRenames(babelCmp, swcCmp);
       if (babelCmp === swcCmp) {
         // Lucky pass-through case (fixture didn't trigger any
         // Compiled transformation, AND prettier round-trips

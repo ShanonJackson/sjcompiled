@@ -202,7 +202,27 @@ export function swcEngine(source: string, opts: BabelPluginFixtureOpts = {}): st
       // and prettier does not see blank lines where comments used to be.
       preserveAllComments: false,
       experimental: {
-        plugins: [[BABEL_PLUGIN_WASM, { optimizeCss, importReact, ...pluginOptions }]],
+        // §6.8u — thread `root` so the plugin can resolve relative
+        // `importSources` entries (e.g. `'./bar/stub-api'`) the same
+        // way Babel does (`state.opts.root ?? this.cwd` at
+        // `babel-plugin.ts:75`). Babel's default is `process.cwd()`;
+        // we mirror it here. Tests that explicitly pass `root` in
+        // `pluginOptions` continue to take precedence (the spread
+        // below comes AFTER our default).
+        //
+        // Forward-slash normalisation: `path.resolve` on Windows
+        // returns backslash-separated paths. The Rust port's
+        // `normalize_path` outputs forward slashes; matching that
+        // here keeps the comparison well-defined cross-platform.
+        plugins: [[
+          BABEL_PLUGIN_WASM,
+          {
+            root: process.cwd().replace(/\\/g, '/'),
+            optimizeCss,
+            importReact,
+            ...pluginOptions,
+          },
+        ]],
       },
     },
   });
@@ -272,6 +292,99 @@ export function reconcileJsxRuntimeOrdering(a: string, b: string): [string, stri
     return [a.replace(re, ''), b.replace(re, '')];
   }
   return [a, b];
+}
+
+/**
+ * Phase 6 §6.8s reconciliation: SWC's resolver+hygiene pass renames a
+ * function parameter to `<name><N>` when the parameter shadows a
+ * free reference of the same name elsewhere in the module. Babel's
+ * generator preserves source identifier names verbatim and has no
+ * hygiene pass.
+ *
+ * Repro (no plugin involved):
+ *
+ *   const f = (fromColor, toColor) => null;
+ *   const y = fromColor;   // free ref at module scope
+ *
+ * Babel emits the source verbatim. SWC emits
+ * `(fromColor1, toColor) => null;` because the resolver tags the
+ * param's `SyntaxContext` differently from the unresolved free ref,
+ * and the hygiene pass picks a fresh source name for the binding to
+ * keep the two ctxts disambiguated post-codegen.
+ *
+ * This is a host-environment-only delta. The plugin produces
+ * semantically-correct AST; SWC's pipeline behaviour after the plugin
+ * exits introduces the rename. Same shape as §6.8q (jsx-runtime
+ * import ordering) — fixed in the harness, not the plugin.
+ *
+ * Conservative reconciliation: walk the two outputs in lockstep. The
+ * ONLY divergences allowed are insertions of a digit-suffix on an
+ * identifier in `b` (SWC) where `a` (Babel) has the un-suffixed
+ * identifier, AND the surrounding context is otherwise byte-equal.
+ * If we see any other kind of divergence, return `[a, b]` unchanged
+ * so the real divergence surfaces normally — we cannot accidentally
+ * mask a port defect.
+ *
+ * After identifying renames, apply them as a global word-boundary
+ * substitution in `b`. The hygiene rename uses a fresh suffix not
+ * otherwise present in source, so renaming all occurrences back is
+ * safe — every `<name><N>` in the SWC output IS the renamed binding
+ * (the rename target itself plus any references to it inside the
+ * function body).
+ */
+export function reconcileSwcParamHygieneRenames(a: string, b: string): [string, string] {
+  if (a === b) return [a, b];
+  const isIdentChar = (c: string): boolean => /[A-Za-z0-9_$]/.test(c);
+  const renames: Array<[string, string]> = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      i++;
+      j++;
+      continue;
+    }
+    // Mismatch — try to detect a `<name>` (in a) vs `<name><digits>` (in b)
+    // hygiene rename. Walk back to the start of the current identifier:
+    // both `a` and `b` matched up to (i, j) so they share the prefix.
+    let identStart = i;
+    while (identStart > 0 && isIdentChar(a[identStart - 1])) identStart--;
+    if (identStart === i) {
+      // Mismatch isn't on/inside an identifier — genuine divergence.
+      return [a, b];
+    }
+    let aWordEnd = i;
+    while (aWordEnd < a.length && isIdentChar(a[aWordEnd])) aWordEnd++;
+    let bWordEnd = j;
+    while (bWordEnd < b.length && isIdentChar(b[bWordEnd])) bWordEnd++;
+    const aWord = a.slice(identStart, aWordEnd);
+    const bWord = b.slice(identStart, bWordEnd);
+    if (!bWord.startsWith(aWord)) return [a, b];
+    const suffix = bWord.slice(aWord.length);
+    // The suffix must be all digits and non-empty, AND aWord must not
+    // itself end in a digit (otherwise we can't tell where the
+    // original name ends and the hygiene suffix begins).
+    if (suffix.length === 0 || !/^\d+$/.test(suffix)) return [a, b];
+    if (aWord.length === 0 || /\d$/.test(aWord)) return [a, b];
+    renames.push([bWord, aWord]);
+    i = aWordEnd;
+    j = bWordEnd;
+  }
+  if (i !== a.length || j !== b.length) return [a, b];
+  if (renames.length === 0) return [a, b];
+  // Apply renames to b. Each `<name><digits>` is replaced with `<name>`
+  // at every word-boundary occurrence in the SWC output. Dedupe the
+  // pairs first so the same hygiene rename observed at multiple sites
+  // (the binding + each reference) only produces one substitution.
+  const seen = new Set<string>();
+  let newB = b;
+  for (const [from, to] of renames) {
+    const key = `${from}\u0000${to}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    newB = newB.replace(new RegExp(`\\b${from}\\b`, 'g'), to);
+  }
+  return [a, newB];
 }
 
 export function diffSummary(a: string, b: string, context = 80): string {

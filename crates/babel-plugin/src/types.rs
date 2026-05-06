@@ -141,6 +141,21 @@ pub struct PluginOptions {
     /// the JS plugin; the Rust port preserves the same warning path.
     #[serde(default)]
     pub class_hash_prefix: Option<String>,
+
+    /// Project root used as the base for resolving relative
+    /// `importSources` entries (e.g. `'./bar/stub-api'`) and for
+    /// relative-path import-declaration matching. Mirrors upstream
+    /// `state.opts.root ?? this.cwd` (`babel-plugin.ts:75`); Babel
+    /// falls back to the babel cwd when `opts.root` is absent. The
+    /// SWC plugin runs inside WASI with no `process.cwd()`, so the
+    /// host wrapper (parity-harness `engines.ts`, production Parcel
+    /// transformer) MUST thread the cwd through this field — there's
+    /// no in-plugin fallback. When `None`, relative-path
+    /// `importSources` entries are kept as-is (won't match relative
+    /// userland imports), preserving the §2.3 deferral note's
+    /// behaviour.
+    #[serde(default)]
+    pub root: Option<String>,
 }
 
 /// `cache: true | 'file-pass' | false`. Custom (de)serializer matches

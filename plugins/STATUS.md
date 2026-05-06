@@ -20,8 +20,8 @@
 **Phase status:** 0 ☑ (modulo §0.10–§0.12 — Phase 5 gates, not Phase 4
 blockers) · 1 ☑ · 2 ☑ · 3 ☑ · 4 ☑ (modulo §4.7 OUT OF SCOPE and §4.8
 gated on Phase 6) · 5 ☑ · **Phase 6 §6.1–§6.7 ☑ (all 7 per-API
-handlers shipped) · §6.8 ▶ (active triage; post-§6.8r baseline
-467/9/0/0/1)** · Phase 7+ ☐.
+handlers shipped) · §6.8 ▶ (active triage; post-§6.8x baseline
+475/1/0/0/1)** · Phase 7+ ☐.
 
 **Active checkpoint: Phase 6 §6.8** — full-corpus parity exit gate.
 See "§6.8 active state" below for the current divergence baseline,
@@ -38,11 +38,16 @@ Earlier "954/954 bun parity" cited in §5.6 was a pass-through oracle
 (assert babel ≠ swc); §6.8 inverts it (assert babel == swc) and
 surfaces real divergence.
 
-**Current baseline (post-§6.8r, 2026-05-06):** parity **467 / 477**
-(97.9%), divergence **9**, swc-throws **0**, babel-throws **0**,
+**Current baseline (post-§6.8x, 2026-05-06):** parity **475 / 477**
+(99.6%), divergence **1**, swc-throws **0**, babel-throws **0**,
 both-throw **1**. Cumulative session delta from the original
-7/407/62/1 baseline: parity +459, divergence −397, swc-throws −62
-(cluster cleared), babel-throws −1. §6.8i closed the React→React1
+7/407/62/1 baseline: parity +468, divergence −406, swc-throws −62
+(cluster cleared), babel-throws −1. The single residual divergence
+is the documented §6.5 deferral
+(`css-prop-tests-behaviour/should-not-transform-css-prop-with-comment-directive`)
+— the SourceMap-based per-line `@compiled-disable*` filter requires
+threading SWC's source-map proxy through the visitor and is gated
+on its own checkpoint per `utils/comments.rs` doc. §6.8i closed the React→React1
 hygiene-rename cluster (parity +28); §6.8j ported the spread-element
 recursive build_css_inner (parity +21); §6.8k ported `jsesc@2.5.2`
 default-string mode for synthesised sheet-const StringLiterals
@@ -1345,11 +1350,193 @@ remaining divergences are now CONTAINED to:
   resolveObjectPatternValueNode covers. Future fixtures with this
   shape will route through the ported path automatically.
 
+- **§6.8s ☑ — Host-environment-only SWC param hygiene-rename
+  reconciler** (this session, 2026-05-06). SWC's resolver+hygiene
+  pass renames a function parameter to `<name><N>` when the param
+  shadows a free reference of the same name elsewhere in the module
+  (`(fromColor, toColor) => ...` becomes `(fromColor1, toColor) =>
+  ...` when `fromColor` is also referenced at module scope). Babel's
+  generator preserves source identifier names verbatim. Repro
+  confirmed without our plugin loaded — purely host (SWC) behavior.
+
+  Same shape as §6.8q (jsx-runtime ordering): fixed in the harness,
+  not the plugin. New `reconcileSwcParamHygieneRenames(a, b)` in
+  `parity-harness/babel-plugin/engines.ts` walks both outputs in
+  lockstep; the ONLY divergences allowed are insertions of a
+  digit-suffix on an identifier in `b` (SWC) where `a` (Babel) has
+  the un-suffixed identifier, with surrounding context byte-equal.
+  Renames apply globally as `\b<name><digits>\b` substitution in
+  the SWC output. Wired into both `triage.mjs` and
+  `harness.test.ts` after the §6.8q reconciler.
+
+  Cleared the keyframes-shadowed-values cluster (2 fixtures): both
+  `dynamic-keyframe-with-shadowed-values--applied-to-a-single-element`
+  and `*-applied-to-multiple-elements`.
+
+  **Triage delta: parity 467 → 469 (+2), divergence 9 → 7 (−2).**
+  Lib tests stay 467/467. Bun harness 954/954.
+
+- **§6.8t ☑ — `Pat::Array` LHS init_expr population** (this session,
+  2026-05-06). Drift detected in `compat/scope.rs:976-987`: the
+  §6.8n landing populated `init_expr` for `Pat::Ident` only; `Pat::Array`
+  was paired with `Pat::Object` as "destructure deopt". This is
+  incorrect for ArrayPattern — Babel's `path.evaluate()`
+  (`@babel/traverse/path/evaluation.js:162-168`) doesn't slot-extract
+  for ANY LHS shape; it just folds the whole init via
+  `binding.path.get('init')`. For `const [color] = ['blue']`, Babel
+  returns `Value::Array(['blue'])`, which the
+  template-literal/binary-`+` quasi-concat path then string-coerces
+  via `Array.prototype.toString = elements.join(',')` → `"blue"`.
+
+  Compiled's resolve-binding wrapper at `resolve-binding.ts:263`
+  also doesn't slot-extract ArrayPattern (only ObjectPattern), so
+  the whole-array shape is what the upstream pipeline observes
+  end-to-end. The Rust fix matches: extend the `init_expr_for_const_ident`
+  match to also cover `Pat::Array`. ObjectPattern bindings continue
+  to use the `destructured_pat` / `destructured_init` pair (init_expr
+  stays None) so the §6.8n slot-extract branch is the one that fires.
+
+  Cleared `css-prop-behaviour--should-concat-explicit-use-of-style-prop-on-an-element-when-destructured-templat`
+  (the `const [color] = ['blue']` + `\`${color}\`` template fixture).
+
+  **Triage delta: parity 469 → 470 (+1), divergence 7 → 6 (−1).**
+  Lib tests stay 467/467.
+
+- **§6.8u ☑ — `importSources` relative-path resolution +
+  filename-aware matcher** (this session, 2026-05-06). Closes the
+  custom-import-source-relative deferral marked at
+  `babel_plugin.rs::resolve_import_sources` ("Relative-path resolution
+  from upstream is deferred to §5.4"). Upstream behaviour
+  (`babel-plugin.ts:96-108` + `:243-259`):
+  1. `importSources` entries starting with `.` get rewritten via
+     `join(rootPath, origin)` where `rootPath = state.opts.root ??
+     this.cwd` (Babel's cwd default).
+  2. The `ImportDeclaration` handler matches userland imports against
+     `this.importSources` first by exact match, then by a relative-
+     path fallback: `userLand[0] === '.' && userLand.endsWith(basename(compiledOrigin))`
+     gates `resolve(dirname(filename), userLand) === compiledOrigin`.
+
+  Three landings, all 1:1 against upstream:
+  1. **`PluginOptions::root: Option<String>`** in `types.rs`. The host
+     wrapper threads `process.cwd()` (parity harness) or the project
+     root (production Parcel transformer). The plugin runs in WASI
+     with no `process.cwd()`, so this field is the only path-base
+     channel — when `None`, relative entries pass through unchanged
+     (preserves §2.3 pre-§6.8u behaviour).
+  2. **Lexical path helpers in `babel_plugin.rs`** —
+     `normalize_path` (Node `path.normalize`-equivalent: drops `.` /
+     `..` lexically, strips empty components, normalises `\` to `/`
+     for cross-platform string equality), `lexical_join`,
+     `dirname`, `basename`. No filesystem access — WASI-safe.
+  3. **`is_compiled_module_source_for_import(userland, sources, filename, root)`**
+     mirrors the relative-path fallback at `babel-plugin.ts:243-259`.
+     Used by `record_compiled_import` (the only upstream call site
+     that does the fallback) and `remove_empty_compiled_imports` (so
+     emptied relative-import shells get dropped end-to-end). Pragma
+     scan continues to use the exact-only `is_compiled_module_source`
+     to match upstream's `Array.includes(...)` shape at
+     `babel-plugin.ts:49`.
+
+  Harness wiring: `parity-harness/babel-plugin/engines.ts::swcEngine`
+  injects `root: process.cwd().replace(/\\/g, '/')` so the SWC
+  pipeline matches Babel's default cwd — Babel reads cwd
+  automatically from its own state.
+
+  Cleared `tests-custom-import-source/should-pick-up-custom-relative-import-source`.
+
+  **Triage delta: parity 470 → 471 (+1), divergence 6 → 5 (−1).**
+  Lib tests stay 467/467.
+
+- **§6.8v ☑ — class-names in-body destructure rename + bound_names
+  extension** (this session, 2026-05-06). Drift detected in
+  `class_names/mod.rs`: the `RenameMap` was built from the
+  children-fn's parameter list ONLY. Upstream's
+  `class-names/index.ts:50-61` (renamed `c({...})` detection) and
+  `:163-175` (renamed `style={styl}` detection) reach the rename via
+  `path.scope.getBinding(name)` → `binding.path.node` →
+  `resolveIdentifierComingFromDestructuring`, which also catches
+  in-body destructure declarations like `(arg) => { const { css: c,
+  style: styl } = arg; ... }`.
+
+  Two landings:
+  1. **`extend_rename_map_from_body(block, rename)`** walks the
+     children-fn's top-level Block for `const { css: <local> } = ...`
+     and `const { style: <local> } = ...` declarations, adding the
+     (local, key) pairs to the rename map. Handles both `KeyValue`
+     (rename) and `Assign` (shorthand) variants. Scope: top-level
+     Block only — matches upstream's `path.scope.hasOwnBinding(...)`
+     own-scope semantics.
+  2. **`extend_bound_names_from_body(block, set)`** + new free-function
+     `collect_pat_names(pat)` extends the `bound_names` set
+     similarly. Without this, the §6.8p bound-names gate at
+     `StyleRefReplacer` (`class_names/mod.rs:444-448`) would skip
+     replacing `style={styl}` because `styl` wasn't in the param-
+     only `bound_names` set.
+
+  Cleared `class-names-behaviour--should-transform-style-and-css-renamed-prop-coming-from-local-variable`.
+
+  **Triage delta: parity 471 → 472 (+1), divergence 5 → 4 (−1).**
+  Lib tests stay 467/467.
+
+- **§6.8w ☑ — Arrow value paren-unwrap + Tpl-body arrow swap**
+  (this session, 2026-05-06). Two coordinated fixes for the
+  styled-conditional-CSS cluster — paren-shim convention extended
+  to two more paths in `extract_object_expression`'s Arrow handler.
+
+  1. **Paren-unwrap before `Expr::Cond` match** (line 1053). SWC
+     preserves `Expr::Paren` for `(p) => (cond ? a : b)` while
+     Babel's parser strips it. Without unwrap, the explicit-parens
+     shape (`color: (props) => (props.isPrimary ? 'blue' : 'red')`
+     in fixture 0256) fell through to the catch-all CSS-variable
+     path. Same shim shape as §6.8f-#2.
+  2. **Apply upstream's `prop.value.body = firstExpression` mutation
+     against a CLONED arrow** for the Tpl-with-Cond body shape
+     (`({ isLast }) => \`${isLast ? 5 : 10}px\`` in fixture 0256
+     marginRight). Upstream mutates `propValue.body` in place — our
+     §4.4 stub left a comment saying the corpus didn't reach this
+     path; §6.8w now does. Without the swap, the synthesised Tpl
+     wraps an Arrow whose body is still the outer template, and the
+     inner-arrow optimization gate at `extract_template_literal`
+     never matches the Cond. Net effect: deopt to catch-all
+     CSS-variable. Fix: clone the arrow, replace its body with the
+     unwrapped first-expression (the Cond), then synthesize the Tpl.
+
+  Cleared `styled-component-behaviour--should-apply-conditional-css-with-ternary-operator-for-object-styles`
+  AND `*--should-apply-multi-conditional-logical-expression-with-different-props-lines-and`.
+
+  **Triage delta: parity 472 → 474 (+2), divergence 4 → 2 (−2).**
+  Lib tests stay 467/467.
+
+- **§6.8x ☑ — `extract_branch` paren-unwrap** (this session,
+  2026-05-06). Drift detected in `css_builders.rs::extract_branch`:
+  the `match path_node` at line 557 didn't unwrap `Expr::Paren`. SWC
+  preserves the paren wrapper around branches like
+  `cond ? ({ color: 'blue' }) : ({ color: 'red' })`, while Babel's
+  parser strips it. Without unwrap, paren-wrapped Object / String /
+  Tpl / Cond / Member branches fell through to the catch-all
+  `_ => None` arm and the entire conditional was DROPPED from the
+  output (fixture 0280's arg2 `(props) => cond ? (obj) : (obj)`
+  produced no atomic sheets, no conditional className).
+
+  Fix: one-line paren-unwrap at the top of the match. Same shim
+  shape as §6.8f / §6.8w.
+
+  Cleared `styled-component-behaviour--should-apply-conditional-css-with-ternary-and-boolean-in-the-same-line`.
+
+  **Triage delta: parity 474 → 475 (+1), divergence 2 → 1 (−1).**
+  Lib tests stay 467/467. Bun harness 954/954. The single residual
+  divergence is the documented §6.5 deferral
+  (`should-not-transform-css-prop-with-comment-directive`) — gated
+  on threading SWC's source-map proxy through the visitor so the
+  per-line `@compiled-disable*` filter at
+  `utils/comments.rs::is_css_prop_disabled_via_comment_store` can
+  graduate from its always-false stub.
+
 ### Verifying the current state from a cold pickup
 
 ```bash
 # Plugin unit + integration tests.
-RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 467/467 (post-§6.8q)
+RUSTFLAGS="" cargo test -p babel-plugin --lib                          # 467/467 (post-§6.8x)
 RUSTFLAGS="" cargo test -p babel-plugin --test hash_parity              # 4/4 over 10037 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test transform_css_integration  # 3/3 over 120 entries
 RUSTFLAGS="" cargo test -p babel-plugin --test compat_generator_integration  # 3/3 (55/55 byte-exact)
@@ -1366,7 +1553,7 @@ BABEL_PLUGIN_FULL_PARITY=1 BABEL_PLUGIN_FULL_DETERMINISM=1 \
   bun test parity-harness/babel-plugin/harness.test.ts                  # 954/954 (pass-through oracle)
 
 # §6.8 inverted oracle (where the real work is):
-bun parity-harness/babel-plugin/triage.mjs                              # 467/9/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8r
+bun parity-harness/babel-plugin/triage.mjs                              # 475/1/0/0/1 (parity/div/swc-throw/babel-throw/both-throw) post-§6.8x
 
 # CSS-port producer-side gate.
 bun run packages/equality-harness/scripts/verify.mjs                    # 336/336 (run under bun, NOT node)

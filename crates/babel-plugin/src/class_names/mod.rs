@@ -52,9 +52,10 @@
 
 use swc_core::common::DUMMY_SP;
 use swc_core::ecma::ast::{
-    ArrayLit, ArrowExpr, BindingIdent, BlockStmtOrExpr, CallExpr, Callee, Expr, ExprOrSpread,
-    Function, Ident, JSXElement, JSXElementChild, JSXElementName, JSXExpr, KeyValueProp,
-    MemberExpr, MemberProp, ObjectLit, ObjectPatProp, Pat, Prop, PropName, PropOrSpread,
+    ArrayLit, ArrowExpr, BindingIdent, BlockStmt, BlockStmtOrExpr, CallExpr, Callee, Decl, Expr,
+    ExprOrSpread, Function, Ident, JSXElement, JSXElementChild, JSXElementName, JSXExpr,
+    KeyValueProp, MemberExpr, MemberProp, ObjectLit, ObjectPatProp, Pat, Prop, PropName,
+    PropOrSpread, Stmt,
 };
 use swc_core::ecma::visit::{VisitMut, VisitMutWith};
 
@@ -162,6 +163,58 @@ fn record_rename_from_pat(pat: &Pat, out: &mut RenameMap) {
     }
 }
 
+/// §6.8v — extend the rename map with in-body destructure declarations.
+/// Mirrors the upstream scope-lookup path at
+/// `class-names/index.ts:50-61` (renamed `c({...})` detection) and
+/// `:163-175` (renamed `style={styl}` detection): when the children
+/// function destructures the render-prop arg INSIDE its body
+/// (`(arg) => { const { css: c, style: styl } = arg; ... }`),
+/// upstream reaches the rename via `path.scope.getBinding(name)` →
+/// `binding.path.node` → `resolveIdentifierComingFromDestructuring`.
+/// The pre-built rename map mirrors the same observable by walking
+/// the function's body Block for `const { css: <local> } = ...` and
+/// `const { style: <local> } = ...` declarations.
+///
+/// Scope: only the body's TOP-level Block is walked. Bindings nested
+/// inside `if` / `for` / nested function bodies are out of scope for
+/// `path.scope.hasOwnBinding(name)` upstream — which is the function's
+/// own scope, not nested-block scopes — so we mirror by stopping at
+/// the top-level Block.
+fn extend_rename_map_from_body(body: &BlockStmt, out: &mut RenameMap) {
+    for stmt in &body.stmts {
+        let Stmt::Decl(Decl::Var(var_decl)) = stmt else {
+            continue;
+        };
+        for declarator in &var_decl.decls {
+            if let Pat::Object(obj_pat) = &declarator.name {
+                for prop in &obj_pat.props {
+                    match prop {
+                        ObjectPatProp::KeyValue(kv) => {
+                            let key = match &kv.key {
+                                PropName::Ident(id) => id.sym.as_ref().to_string(),
+                                PropName::Str(s) => s.value.to_atom_lossy().as_str().to_string(),
+                                _ => continue,
+                            };
+                            if key == "css" || key == "style" {
+                                if let Pat::Ident(BindingIdent { id, .. }) = &*kv.value {
+                                    out.inner.insert(id.sym.as_ref().to_string(), key);
+                                }
+                            }
+                        }
+                        ObjectPatProp::Assign(a) => {
+                            let local = a.key.id.sym.as_ref().to_string();
+                            if local == "css" || local == "style" {
+                                out.inner.insert(local.clone(), local);
+                            }
+                        }
+                        ObjectPatProp::Rest(_) => {}
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// §6.8p — collect every binding name introduced by the children-fn's
 /// FIRST parameter. Mirrors upstream's
 /// `path.scope.hasOwnBinding(<name>)` lookup for the
@@ -217,6 +270,69 @@ fn bound_names_from_function(fun: &Function) -> std::collections::HashSet<String
         .first()
         .map(|p| bound_names_from_pat(&p.pat))
         .unwrap_or_default()
+}
+
+/// §6.8v — extend `bound_names` with in-body declarations. Mirrors
+/// `path.scope.hasOwnBinding(name)` upstream: a binding declared via
+/// `const`/`let`/`var` at the function's top-level Block IS owned by
+/// the function's own scope and reachable from
+/// `hasOwnBinding`. Nested-block declarations would still be
+/// own-scope-reachable in JS for `var` (function-scoped) but NOT
+/// for `let`/`const` (block-scoped) — the upstream walk treats the
+/// function body as a single own-scope which is consistent with the
+/// corpus's reach (arrow body's only Block is the function body).
+fn extend_bound_names_from_body(body: &BlockStmt, out: &mut std::collections::HashSet<String>) {
+    for stmt in &body.stmts {
+        if let Stmt::Decl(Decl::Var(var_decl)) = stmt {
+            for declarator in &var_decl.decls {
+                for name in collect_pat_names(&declarator.name) {
+                    out.insert(name);
+                }
+            }
+        }
+    }
+}
+
+/// Collect every binding name introduced by a `Pat`. Mirrors
+/// `bound_names_from_pat` but operates as a free function so it can
+/// be reused by `extend_bound_names_from_body` for declarator IDs.
+fn collect_pat_names(pat: &Pat) -> Vec<String> {
+    let mut out = Vec::new();
+    match pat {
+        Pat::Ident(BindingIdent { id, .. }) => out.push(id.sym.as_ref().to_string()),
+        Pat::Object(obj) => {
+            for prop in &obj.props {
+                match prop {
+                    ObjectPatProp::KeyValue(kv) => out.extend(collect_pat_names(&kv.value)),
+                    ObjectPatProp::Assign(a) => out.push(a.key.id.sym.as_ref().to_string()),
+                    ObjectPatProp::Rest(r) => out.extend(collect_pat_names(&r.arg)),
+                }
+            }
+        }
+        Pat::Array(arr) => {
+            for elem in arr.elems.iter().flatten() {
+                out.extend(collect_pat_names(elem));
+            }
+        }
+        Pat::Rest(r) => out.extend(collect_pat_names(&r.arg)),
+        Pat::Assign(a) => out.extend(collect_pat_names(&a.left)),
+        _ => {}
+    }
+    out
+}
+
+/// Return the function's body Block when it has one (block-bodied
+/// arrow OR Fn). Expression-bodied arrows have no Block, so no
+/// in-body destructure declarations to walk — return `None`.
+fn body_block(children_fn: &Expr) -> Option<&BlockStmt> {
+    match children_fn {
+        Expr::Arrow(arrow) => match &*arrow.body {
+            BlockStmtOrExpr::BlockStmt(b) => Some(b),
+            _ => None,
+        },
+        Expr::Fn(f) => f.function.body.as_ref(),
+        _ => None,
+    }
 }
 
 /// Test whether the dispatch element is a `<ClassNames>` element bound
@@ -497,18 +613,29 @@ pub fn try_handle_jsx_element(
 
     // Build the rename map from the children-as-function's parameters.
     let children_fn = get_jsx_children_function(el);
-    let rename = match &children_fn {
+    let mut rename = match &children_fn {
         Expr::Arrow(arrow) => rename_map_from_arrow(arrow),
         Expr::Fn(f) => rename_map_from_function(&f.function),
         _ => unreachable!("get_jsx_children_function only returns Arrow or Fn"),
     };
     // §6.8p — `path.scope.hasOwnBinding(...)` proxy for the upstream
     // invalid-MemberExpr filter (`dontexist.style` shapes).
-    let bound_names = match &children_fn {
+    let mut bound_names = match &children_fn {
         Expr::Arrow(arrow) => bound_names_from_arrow(arrow),
         Expr::Fn(f) => bound_names_from_function(&f.function),
         _ => unreachable!("get_jsx_children_function only returns Arrow or Fn"),
     };
+    // §6.8v — extend the rename map and bound_names with in-body
+    // destructure declarations like
+    // `const { css: c, style: styl } = arg`. Upstream reaches these
+    // via `path.scope.getBinding(name)` during the children walk;
+    // we mirror by walking the function's top-level Block once at
+    // dispatch entry. See `extend_rename_map_from_body` for the
+    // scope-walk rationale.
+    if let Some(body) = body_block(&children_fn) {
+        extend_rename_map_from_body(body, &mut rename);
+        extend_bound_names_from_body(body, &mut bound_names);
+    }
 
     let runtime_lib = {
         let meta = Metadata {

@@ -18,7 +18,13 @@
 import { readdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { babelEngine, swcEngine, diffSummary, reconcileJsxRuntimeOrdering } from './engines.ts';
+import {
+  babelEngine,
+  swcEngine,
+  diffSummary,
+  reconcileJsxRuntimeOrdering,
+  reconcileSwcParamHygieneRenames,
+} from './engines.ts';
 
 const FIXTURES_DIR = resolve(import.meta.dirname, 'fixtures');
 const REPORT_PATH = resolve(import.meta.dirname, 'triage-report.json');
@@ -74,6 +80,9 @@ for (const file of files) {
   let swcCmp = swcRes.ok ? swcRes.out : null;
   if (babelRes.ok && swcRes.ok) {
     [babelCmp, swcCmp] = reconcileJsxRuntimeOrdering(babelRes.out, swcRes.out);
+    // §6.8s — host-environment-only SWC hygiene-rename of function
+    // params. See reconcileSwcParamHygieneRenames in engines.ts.
+    [babelCmp, swcCmp] = reconcileSwcParamHygieneRenames(babelCmp, swcCmp);
   }
 
   let cat;

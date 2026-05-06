@@ -67,19 +67,120 @@ use crate::utils::is_compiled::{
 };
 use crate::utils::normalize_props_usage::normalize_props_usage;
 
+/// Lexical path normalisation — Node.js `path.normalize`-equivalent.
+/// Splits on `/` or `\`, drops empty / `.` components, resolves `..`
+/// against the prior component (or pushes literal `..` when the
+/// path is relative and we'd otherwise escape the root). Backslashes
+/// are normalised to `/` in the output so cross-platform string
+/// comparison is well-defined (Windows `path.resolve` returns
+/// backslash-separated paths; the host wrapper supplies an
+/// `opts.root` we treat with the same forward-slash form).
+fn normalize_path(input: &str) -> String {
+    // Detect Windows drive-letter prefix (`C:`).
+    let mut rest = input;
+    let mut prefix = String::new();
+    if input.len() >= 2 {
+        let bytes = input.as_bytes();
+        if bytes[1] == b':' && bytes[0].is_ascii_alphabetic() {
+            prefix.push(bytes[0] as char);
+            prefix.push(':');
+            rest = &input[2..];
+        }
+    }
+    let absolute = rest.starts_with('/') || rest.starts_with('\\');
+    let mut stack: Vec<&str> = Vec::new();
+    for part in rest.split(['/', '\\']) {
+        if part.is_empty() || part == "." {
+            continue;
+        }
+        if part == ".." {
+            if stack.last().is_some_and(|x| *x != "..") {
+                stack.pop();
+                continue;
+            }
+            if !absolute && prefix.is_empty() {
+                stack.push("..");
+            }
+            // for absolute paths, `..` at root is silently dropped
+            // (matches `path.resolve('/x/../..')` → '/').
+            continue;
+        }
+        stack.push(part);
+    }
+    let mut out = prefix;
+    if absolute {
+        out.push('/');
+    }
+    out.push_str(&stack.join("/"));
+    out
+}
+
+/// Lexical `path.join(base, rel)` — concatenate then normalise.
+fn lexical_join(base: &str, rel: &str) -> String {
+    if rel.starts_with('/') || rel.starts_with('\\') {
+        return normalize_path(rel);
+    }
+    if rel.len() >= 2 {
+        let bytes = rel.as_bytes();
+        if bytes[1] == b':' && bytes[0].is_ascii_alphabetic() {
+            return normalize_path(rel);
+        }
+    }
+    let mut combined = String::from(base);
+    if !combined.is_empty() && !combined.ends_with('/') && !combined.ends_with('\\') {
+        combined.push('/');
+    }
+    combined.push_str(rel);
+    normalize_path(&combined)
+}
+
+/// Lexical equivalent of Node.js `path.dirname` — returns the
+/// containing directory of `p`. Empty input gives `"."`; trailing
+/// slashes are stripped before splitting.
+fn dirname(p: &str) -> &str {
+    let trimmed = p.trim_end_matches(['/', '\\']);
+    if let Some(idx) = trimmed.rfind(['/', '\\']) {
+        &trimmed[..idx]
+    } else {
+        "."
+    }
+}
+
+/// Lexical equivalent of Node.js `path.basename`. Mirrors upstream's
+/// `basename(compiledModuleOrigin)` at babel-plugin.ts:251.
+fn basename(p: &str) -> &str {
+    let trimmed = p.trim_end_matches(['/', '\\']);
+    if let Some(idx) = trimmed.rfind(['/', '\\']) {
+        &trimmed[idx + 1..]
+    } else {
+        trimmed
+    }
+}
+
 /// Resolve the effective import-sources set: `DEFAULT_IMPORT_SOURCES`
 /// ∪ user `opts.import_sources`. Mirrors upstream `pre()`'s
-/// `this.importSources = [...DEFAULT_IMPORT_SOURCES, ...opts.importSources]`.
+/// `this.importSources = [...DEFAULT_IMPORT_SOURCES,
+/// ...opts.importSources?.map(origin => origin[0] === '.' ?
+/// join(rootPath, origin) : origin)]` (`babel-plugin.ts:96-108`).
 ///
-/// Relative-path resolution from upstream (`origin[0] === '.'` →
-/// `join(rootPath, origin)`) is deferred to §5.4 — `rootPath` comes
-/// from `state.opts.root ?? this.cwd`, and the cwd-anchored resolver
-/// is Phase 5's `oxc_resolver` config. For §2.3 we just ingest user
-/// values verbatim and let Phase 5's resolver handle path resolution.
+/// `rootPath` comes from `opts.root` — the host wrapper threads
+/// `process.cwd()` (or the project root). When `opts.root` is `None`,
+/// relative entries (`./foo`, `../foo`) are passed through unchanged;
+/// they'll only match userland imports that LITERALLY start with the
+/// same `./` text. The host MUST set `root` for relative-path
+/// resolution to work end-to-end (§6.8u landing — see types.rs
+/// `PluginOptions::root` doc).
 pub fn resolve_import_sources(opts: &PluginOptions) -> Vec<String> {
     let mut out: Vec<String> = DEFAULT_IMPORT_SOURCES.iter().map(|s| s.to_string()).collect();
     if let Some(extra) = &opts.import_sources {
+        let root = opts.root.as_deref();
         for src in extra {
+            if src.starts_with('.') {
+                if let Some(r) = root {
+                    out.push(lexical_join(r, src));
+                    continue;
+                }
+            }
             out.push(src.clone());
         }
     }
@@ -181,6 +282,8 @@ fn build_display_name_stmt(name: &str) -> swc_core::ecma::ast::Stmt {
 fn remove_empty_compiled_imports(
     module: &mut swc_core::ecma::ast::Module,
     import_sources: &[String],
+    filename: Option<&str>,
+    root: Option<&str>,
 ) {
     module.body.retain(|item| {
         let ModuleItem::ModuleDecl(ModuleDecl::Import(decl)) = item else {
@@ -190,7 +293,19 @@ fn remove_empty_compiled_imports(
             return true;
         }
         let userland_atom = decl.src.value.to_atom_lossy();
-        !is_compiled_module_source(userland_atom.as_str(), import_sources)
+        // §6.8u — match upstream `babel-plugin.ts:243-291`: the
+        // `if (path.node.specifiers.length === 0) path.remove()` runs
+        // inside the same `ImportDeclaration` handler that already
+        // gated on the relative-path `isCompiledModule` check. Use
+        // the same matcher here so emptied relative-import shells
+        // (e.g. `import '../bar/stub-api'` after the `css` specifier
+        // was drained) get removed end-to-end.
+        !is_compiled_module_source_for_import(
+            userland_atom.as_str(),
+            import_sources,
+            filename,
+            root,
+        )
     });
 }
 
@@ -351,17 +466,82 @@ fn build_forward_ref_import() -> ModuleItem {
     ModuleItem::ModuleDecl(ModuleDecl::Import(import))
 }
 
-/// Match `userland_module_specifier` against `import_sources`.
-/// Mirrors upstream lines 242–259 — exact match wins; fallback is a
-/// relative-path comparison that resolves the user's `./foo` against
-/// the file's dirname and compares against each compiled origin.
-///
-/// §2.3 implements only the EXACT-match path; the relative-path
-/// comparison needs the file's dirname and the resolver, both of
-/// which arrive in Phase 5. Documented here so the §5.4 wiring is a
-/// localised diff.
+/// Match `userland_module_specifier` against `import_sources` —
+/// EXACT match only. Used by call sites whose upstream equivalent
+/// uses `Array.includes` (`findClassicJsxPragmaImport` at
+/// `babel-plugin.ts:49` and the empty-import retain at
+/// `remove_empty_compiled_imports`). The longer
+/// `is_compiled_module_source_for_import` form below adds the
+/// relative-path fallback for the `ImportDeclaration` visitor at
+/// `babel-plugin.ts:243-259`, which is the only call site upstream
+/// that does the fallback.
 pub fn is_compiled_module_source(userland: &str, import_sources: &[String]) -> bool {
     import_sources.iter().any(|src| src == userland)
+}
+
+/// Match `userland_module_specifier` against `import_sources` —
+/// exact match OR relative-path fallback. Mirrors upstream
+/// `babel-plugin.ts:243-259`:
+///
+/// ```ts
+/// const isCompiledModule = this.importSources.some((compiledModuleOrigin) => {
+///   if (compiledModuleOrigin === userLandModule) return true;
+///   if (
+///     state.filename &&
+///     userLandModule[0] === '.' &&
+///     userLandModule.endsWith(basename(compiledModuleOrigin))
+///   ) {
+///     const fullpath = resolve(dirname(state.filename), userLandModule);
+///     return fullpath === compiledModuleOrigin;
+///   }
+///   return false;
+/// });
+/// ```
+///
+/// `compiledModuleOrigin` here is the POST-`resolve_import_sources`
+/// form — i.e. relative entries have already been transformed via
+/// `join(opts.root, origin)`. The userland's `resolve(dirname(filename),
+/// userLandModule)` likewise needs an absolute base. Babel uses the
+/// process cwd as the base; we use `opts.root` (host-supplied) for
+/// the same effect.
+pub fn is_compiled_module_source_for_import(
+    userland: &str,
+    import_sources: &[String],
+    filename: Option<&str>,
+    root: Option<&str>,
+) -> bool {
+    for compiled_origin in import_sources {
+        if compiled_origin == userland {
+            return true;
+        }
+        let Some(fname) = filename else { continue };
+        if !userland.starts_with('.') {
+            continue;
+        }
+        if !userland.ends_with(basename(compiled_origin)) {
+            continue;
+        }
+        // Upstream's `resolve(dirname(state.filename), userLandModule)`.
+        // `path.resolve` always produces an absolute path, prepending
+        // the cwd when the inputs are relative. We mirror via
+        // `opts.root` as the cwd substitute.
+        let dir = dirname(fname);
+        let resolved = match root {
+            Some(r) => lexical_join(&lexical_join(r, dir), userland),
+            // Without a host-supplied root we can't fully mimic the
+            // absolute-path comparison; fall back to a normalised
+            // join from the dir (relative). This preserves §2.3's
+            // pre-§6.8u behaviour for hosts that haven't wired root
+            // yet (no false positives — relative-vs-absolute won't
+            // match), and the canonical Parcel wrapper is expected
+            // to thread `root` per the SIDECAR_SCHEMA contract.
+            None => lexical_join(dir, userland),
+        };
+        if resolved == *compiled_origin {
+            return true;
+        }
+    }
+    false
 }
 
 /// Read the imported name out of an `ImportSpecifier::Named`. Mirrors
@@ -519,7 +699,18 @@ impl<C: Comments> BabelPluginVisitor<C> {
     fn record_compiled_import(&mut self, decl: &mut ImportDecl) {
         let userland_atom = decl.src.value.to_atom_lossy();
         let userland = userland_atom.as_str();
-        if !is_compiled_module_source(userland, &self.import_sources) {
+        // §6.8u — use the `_for_import` form here (with filename + root)
+        // to mirror upstream `babel-plugin.ts:243-259`'s relative-path
+        // fallback. The pragma scan and empty-import retain stay on
+        // the exact-only `is_compiled_module_source` to match upstream's
+        // `Array.includes(...)` shape at `babel-plugin.ts:49` /
+        // `remove_empty_compiled_imports`.
+        if !is_compiled_module_source_for_import(
+            userland,
+            &self.import_sources,
+            self.state.filename(),
+            self.state.opts().root.as_deref(),
+        ) {
             return;
         }
 
@@ -818,7 +1009,12 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
         // "find existing import" search doesn't pin onto an empty
         // `@compiled/react` shell.
         if let Program::Module(m) = &mut *program {
-            remove_empty_compiled_imports(m, &self.import_sources);
+            remove_empty_compiled_imports(
+                m,
+                &self.import_sources,
+                self.state.filename(),
+                self.state.opts().root.as_deref(),
+            );
         }
 
         // Phase 6 §6.8 — `Program::exit` runtime-import injection.
@@ -1561,7 +1757,7 @@ mod tests {
             ],
             shebang: None,
         };
-        super::remove_empty_compiled_imports(&mut module, &import_sources);
+        super::remove_empty_compiled_imports(&mut module, &import_sources, None, None);
         // @compiled/react dropped; bare `react` side-effect import kept.
         assert_eq!(module.body.len(), 1);
         let ModuleItem::ModuleDecl(ModuleDecl::Import(im)) = &module.body[0] else {

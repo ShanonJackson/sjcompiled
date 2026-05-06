@@ -554,6 +554,17 @@ fn extract_branch(
     own_scope: Option<ScopeId>,
     recorder: &mut MutationRecorder,
 ) -> Result<(Option<CssItem>, Vec<Variable>), CssBuildError> {
+    // §6.8x — unwrap `Expr::Paren` before matching the branch shape.
+    // SWC's parser preserves the paren wrapper around branches like
+    // `cond ? ({ color: 'blue' }) : ({ color: 'red' })`, while Babel's
+    // parser strips it. Without the unwrap, paren-wrapped Object /
+    // String / Tpl / Cond / Member branches fall through to the
+    // catch-all `_ => None` arm and the entire conditional is dropped
+    // from the output (fixture 0280 styled-component-behaviour--should-
+    // apply-conditional-css-with-ternary-and-boolean-in-the-same-line
+    // and shape-equivalent css-prop / styled fixtures). Same paren-shim
+    // convention as §6.8f / §6.8w.
+    let path_node = crate::compat::paren::unwrap_paren(path_node);
     let css_output: Option<CSSOutput> = match path_node {
         Expr::Object(_)
             | Expr::Lit(Lit::Str(_))
@@ -1050,7 +1061,16 @@ pub fn extract_object_expression(
                     // upstream: optimised template literal wrapping
                     let mut optimised: Option<Tpl> = None;
                     if let BlockStmtOrExpr::Expr(body_expr) = &*arrow.body {
-                        if matches!(&**body_expr, Expr::Cond(_)) {
+                        // §6.8w — unwrap parens before matching. SWC
+                        // preserves `Expr::Paren` for `(p) => (cond ? a
+                        // : b)` while Babel's parser strips it. Without
+                        // unwrap, the explicit-parens shape (used by
+                        // `should-apply-conditional-css-with-ternary-
+                        // operator-for-object-styles`) fell through to
+                        // the catch-all CSS-variable path. Same shim
+                        // shape as §6.8f-#2 (paren-shim convention).
+                        let unwrapped = crate::compat::paren::unwrap_paren(body_expr);
+                        if matches!(unwrapped, Expr::Cond(_)) {
                             optimised = Some(Tpl {
                                 span: DUMMY_SP,
                                 quasis: vec![
@@ -1069,27 +1089,35 @@ pub fn extract_object_expression(
                                 ],
                                 exprs: vec![Box::new(Expr::Arrow(arrow.clone()))],
                             });
-                        } else if let Expr::Tpl(body_tpl) = &**body_expr {
+                        } else if let Expr::Tpl(body_tpl) = unwrapped {
                             if body_tpl.exprs.len() == 1
-                                && matches!(&*body_tpl.exprs[0], Expr::Cond(_))
+                                && matches!(
+                                    crate::compat::paren::unwrap_paren(&body_tpl.exprs[0]),
+                                    Expr::Cond(_)
+                                )
                             {
+                                // §6.8w — apply upstream's `prop.value.body =
+                                // firstExpression` mutation against a CLONED
+                                // arrow (the input `arrow` is borrowed `&`).
+                                // Without this, the synthesised Tpl
+                                // (`extract_template_literal` recursion)
+                                // sees an Arrow whose body is still the
+                                // outer template, and the inner-arrow
+                                // optimization gate never matches the Cond.
+                                // Net effect of the missing swap: deopt to
+                                // catch-all CSS-variable path for
+                                // `({ isLast }) => \`${isLast ? 5 : 10}px\``
+                                // -shape values (fixture 0256 marginRight).
+                                let first_expr = (*body_tpl.exprs[0]).clone();
+                                let mut arrow_clone = arrow.clone();
+                                arrow_clone.body = Box::new(BlockStmtOrExpr::Expr(Box::new(
+                                    crate::compat::paren::unwrap_paren(&first_expr).clone(),
+                                )));
                                 optimised = Some(Tpl {
                                     span: DUMMY_SP,
                                     quasis: body_tpl.quasis.clone(),
-                                    exprs: vec![Box::new(Expr::Arrow(arrow.clone()))],
+                                    exprs: vec![Box::new(Expr::Arrow(arrow_clone))],
                                 });
-                                // upstream: `propValue.body = firstExpression`.
-                                // The arrow.body mutation requires the
-                                // `prop_value` to be borrowed mutably —
-                                // structural mismatch with the &-only
-                                // walker. Phase 5 §5.6 ☑ shipped the
-                                // evaluator but kept this site's &-only
-                                // walker shape; the proper mutable-walk
-                                // wire-up is Phase 4 §4.6 / Phase 6
-                                // territory. Until then the optimised
-                                // wrap stands without the body swap.
-                                // The §4.4 corpus does not exercise
-                                // this path — stub-safe.
                             }
                         }
                     }

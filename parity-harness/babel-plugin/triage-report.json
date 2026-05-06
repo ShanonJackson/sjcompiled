@@ -1,8 +1,8 @@
 {
   "summary": {
     "total": 477,
-    "parity": 467,
-    "divergence": 9,
+    "parity": 475,
+    "divergence": 1,
     "swc-throws": 0,
     "babel-throws": 0,
     "both-throw": 1,
@@ -72,6 +72,10 @@
       },
       {
         "name": "class-names-tests-behaviour/class-names-behaviour--should-not-transform-style-identifier-when-its-coming-from-outer-scope",
+        "sourceFile": "class-names/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-style-and-css-renamed-prop-coming-from-local-variable",
         "sourceFile": "class-names/__tests__/behaviour.test.ts"
       },
       {
@@ -272,6 +276,10 @@
       },
       {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-persist-static-style-prop",
+        "sourceFile": "css-prop/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-concat-explicit-use-of-style-prop-on-an-element-when-destructured-templat",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts"
       },
       {
@@ -755,6 +763,14 @@
         "sourceFile": "keyframes/__tests__/call-expression.test.ts"
       },
       {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-a-single-element",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
+        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-multiple-elements",
+        "sourceFile": "keyframes/__tests__/call-expression.test.ts"
+      },
+      {
         "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-tagged-template-expression--by-inlining-static-values--in-a-single-animation-used-with-the-longhand-syntax",
         "sourceFile": "keyframes/__tests__/call-expression.test.ts"
       },
@@ -1015,6 +1031,10 @@
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
       {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operator-for-object-styles",
+        "sourceFile": "styled/__tests__/behaviour.test.ts"
+      },
+      {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operator-and-tagged-templates-branches",
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
@@ -1099,7 +1119,15 @@
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
       {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-multi-conditional-logical-expression-with-different-props-lines-and",
+        "sourceFile": "styled/__tests__/behaviour.test.ts"
+      },
+      {
         "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-the-same-css-property-with-unconditional-as-default-and-multiple-lo",
+        "sourceFile": "styled/__tests__/behaviour.test.ts"
+      },
+      {
+        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-and-boolean-in-the-same-line",
         "sourceFile": "styled/__tests__/behaviour.test.ts"
       },
       {
@@ -1635,6 +1663,10 @@
         "sourceFile": "__tests__/custom-import-source.test.ts"
       },
       {
+        "name": "tests-custom-import-source/custom-import-source--should-pick-up-custom-relative-import-source",
+        "sourceFile": "__tests__/custom-import-source.test.ts"
+      },
+      {
         "name": "tests-custom-import-source/custom-import-source--should-pick-up-custom-absolute-import-source",
         "sourceFile": "__tests__/custom-import-source.test.ts"
       },
@@ -1881,49 +1913,9 @@
     ],
     "divergence": [
       {
-        "name": "class-names-tests-behaviour/class-names-behaviour--should-transform-style-and-css-renamed-prop-coming-from-local-variable",
-        "sourceFile": "class-names/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 6 (a.length=433, b.length=388)\n--- a +0..66\nconst _2 = \"._syaz5scu{color:red}\";\nconst _ = \"._1wyb19bv{font-siz\n+++ b +0..66\nconst ListItem = () =>\n  React.createElement(\n    CC,\n    null,\n  "
-      },
-      {
-        "name": "css-prop-tests-behaviour/css-prop-behaviour--should-concat-explicit-use-of-style-prop-on-an-element-when-destructured-templat",
-        "sourceFile": "css-prop/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 96 (a.length=383, b.length=335)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._syaz13q2{color:blue}\";\nconst [color] = [\"blue\"];\nReac\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst [color] = [\"blue\"];\nReact.createElement(\n  CC,\n  null,\n  Rea"
-      },
-      {
         "name": "css-prop-tests-behaviour/css-prop-behaviour--should-not-transform-css-prop-with-comment-directive",
         "sourceFile": "css-prop/__tests__/behaviour.test.ts",
         "diff": "divergence at byte 96 (a.length=343, b.length=733)\n--- a +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst RedDiv = React.createElement(\"div\", {\n  css: {\n    color: \"r\n+++ b +36..156\nrt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._syazbf54{color:"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-a-single-element",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 296 (a.length=668, b.length=669)\n--- a +236..356\n-_k85g0d);opacity:0}}\";\nconst generateKeyframes = (fromColor, toColor) => null;\nReact.createElement(\n  CC,\n  null,\n  Rea\n+++ b +236..356\n-_k85g0d);opacity:0}}\";\nconst generateKeyframes = (fromColor1, toColor) => null;\nReact.createElement(\n  CC,\n  null,\n  Re"
-      },
-      {
-        "name": "keyframes-tests-call-expression/keyframes--transforms-an-object-call-expression--referenced-through-a-css-prop-object-call-expression--by-preserving-runtime-values--for-a-dynamic-keyframe-with-shadowed-values--applied-to-multiple-elements",
-        "sourceFile": "keyframes/__tests__/call-expression.test.ts",
-        "diff": "divergence at byte 343 (a.length=1179, b.length=1180)\n--- a +283..403\n-_k85g0d);opacity:0}}\";\nconst generateKeyframes = (fromColor, toColor) => null;\nReact.createElement(\n  React.Fragment,\n \n+++ b +283..403\n-_k85g0d);opacity:0}}\";\nconst generateKeyframes = (fromColor1, toColor) => null;\nReact.createElement(\n  React.Fragment,\n"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-operator-for-object-styles",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1190, b.length=1187)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _6 = \"._2hwx19bv{margin-right:10px}\";\nconst _5 = \"._2hwx14y2{\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._18u019bv{margin-left:10px}\";\nconst _3 = \"._18u014y2{m"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-multi-conditional-logical-expression-with-different-props-lines-and",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=1041, b.length=1047)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _4 = \"._k48p4jg8{font-weight:normal}\";\nconst _3 = \"._k48p8n31\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz13q2{color:blue}\";\nconst _2 = \"._k48ptr2p{font-we"
-      },
-      {
-        "name": "styled-tests-behaviour/styled-component-behaviour--should-apply-conditional-css-with-ternary-and-boolean-in-the-same-line",
-        "sourceFile": "styled/__tests__/behaviour.test.ts",
-        "diff": "divergence at byte 133 (a.length=967, b.length=778)\n--- a +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _3 = \"._syaz5scu{color:red}\";\nconst _2 = \"._syaz13q2{color:bl\n+++ b +73..193\nt { ax, ix, CC, CS } from \"@compiled/react/runtime\";\nconst _ = \"._1wybgktf{font-size:20px}\";\nconst Component = forwardRe"
-      },
-      {
-        "name": "tests-custom-import-source/custom-import-source--should-pick-up-custom-relative-import-source",
-        "sourceFile": "__tests__/custom-import-source.test.ts",
-        "diff": "divergence at byte 7 (a.length=292, b.length=128)\n--- a +0..67\nimport * as React from \"react\";\nimport { ax, ix, CC, CS } from \"@co\n+++ b +0..67\nimport { css } from \"../bar/stub-api\";\nconst styles = css({\n  color"
       }
     ],
     "babel-throws": [],
