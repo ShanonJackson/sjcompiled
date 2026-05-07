@@ -14,22 +14,16 @@
 import { createInterface } from 'node:readline';
 import postcss from 'postcss';
 
-// Bun block-buffers `process.stdout` (and even `fs.writeSync(1, ...)`)
-// when stdout is a pipe to a non-TTY parent. That deadlocks the
-// parity-runner Rust harness — it does a blocking `read_line` for
-// each request's response, but bun never flushes until the buffer
-// fills (~8KB) or the process exits. `Bun.write(Bun.stdout, ...)`
-// is unbuffered and reaches the runner immediately. We resolve the
-// global `Bun` lazily so the script still runs under plain Node if
-// invoked outside the harness (falls back to `process.stdout.write`).
-const hasBun = typeof Bun !== 'undefined';
+// We run under plain `node` — see HANDOVER `parity-bridge-ts-loader.mjs`
+// for the rationale (V8 is the AFM production runtime; JSC's non-
+// transitive `Array.sort` semantics differ on `sort-shorthand-
+// declarations`'s comparator and would leak into the oracle if we
+// ran under bun). Node's `process.stdout.write()` on a pipe is
+// non-blocking and the kernel pipe buffer is large enough that the
+// Rust harness — which reads one response per request synchronously
+// — never builds up enough back-pressure to deadlock.
 const writeLine = (obj) => {
-  const line = JSON.stringify(obj) + '\n';
-  if (hasBun) {
-    Bun.write(Bun.stdout, line);
-  } else {
-    process.stdout.write(line);
-  }
+  process.stdout.write(JSON.stringify(obj) + '\n');
 };
 
 import { discardEmptyRules } from '../src/plugins/discard-empty-rules.ts';

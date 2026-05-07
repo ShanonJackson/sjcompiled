@@ -119,6 +119,12 @@ impl HackRegistry {
 /// ```
 pub fn register_hacks(reg: &mut HackRegistry) {
     // BEGIN HACKS REGISTRATION — append-only, alphabetical by JS file.
+    // From `lib/hacks/background-clip.js`:
+    reg.register(HackEntry {
+        bucket: HackBucket::Declaration,
+        names: crate::hacks::background_clip::BackgroundClip::NAMES.to_vec(),
+        class_name: crate::hacks::background_clip::BackgroundClip::CLASS_NAME,
+    });
     // From `lib/hacks/cross-fade.js`:
     reg.register(HackEntry {
         bucket: HackBucket::Value,
@@ -158,6 +164,15 @@ pub fn register_hacks(reg: &mut HackRegistry) {
 pub fn load_decl(name: &str, prefixes: Vec<String>) -> DeclPrefixer {
     if let Some(entry) = registry().lookup(HackBucket::Declaration, name) {
         match entry.class_name {
+            "BackgroundClip" => {
+                return DeclPrefixer::BackgroundClip(
+                    crate::hacks::background_clip::BackgroundClip::new(
+                        name.to_string(),
+                        prefixes,
+                        0,
+                    ),
+                );
+            }
             "TextDecoration" => {
                 return DeclPrefixer::TextDecoration(
                     crate::hacks::text_decoration::TextDecoration::new(
@@ -302,6 +317,7 @@ impl std::error::Error for NotYetImplemented {}
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum DeclPrefixer {
     Base(DeclarationBase),
+    BackgroundClip(crate::hacks::background_clip::BackgroundClip),
     TextDecoration(crate::hacks::text_decoration::TextDecoration),
     TextDecorationSkipInk(crate::hacks::text_decoration_skip_ink::TextDecorationSkipInk),
     UserSelect(crate::hacks::user_select::UserSelect),
@@ -313,6 +329,7 @@ impl DeclPrefixer {
     pub fn base(&self) -> &DeclarationBase {
         match self {
             DeclPrefixer::Base(b) => b,
+            DeclPrefixer::BackgroundClip(h) => &h.base,
             DeclPrefixer::TextDecoration(h) => &h.base,
             DeclPrefixer::TextDecorationSkipInk(h) => &h.base,
             DeclPrefixer::UserSelect(h) => &h.base,
@@ -321,6 +338,7 @@ impl DeclPrefixer {
     pub fn base_mut(&mut self) -> &mut DeclarationBase {
         match self {
             DeclPrefixer::Base(b) => b,
+            DeclPrefixer::BackgroundClip(h) => &mut h.base,
             DeclPrefixer::TextDecoration(h) => &mut h.base,
             DeclPrefixer::TextDecorationSkipInk(h) => &mut h.base,
             DeclPrefixer::UserSelect(h) => &mut h.base,
@@ -338,10 +356,13 @@ impl DeclPrefixer {
     ) {
         match self {
             DeclPrefixer::Base(b) => b.process(prefixes_all, root, path),
-            DeclPrefixer::TextDecoration(_) => {
-                // TextDecoration overrides ONLY `check`. Re-implement
-                // the Declaration.process body inline so the hack's
+            DeclPrefixer::BackgroundClip(_) | DeclPrefixer::TextDecoration(_) => {
+                // Both override ONLY `check`. Re-implement the
+                // Declaration.process body inline so the hack's
                 // `check` gets consulted before any prefix work.
+                // (BackgroundClip's other override — the `-ms-`→`-webkit-`
+                // prefix-list rewrite — already happened at `new()`
+                // time, so dispatch here only needs the check hook.)
                 self.process_with_overrides(prefixes_all, root, path);
             }
             DeclPrefixer::TextDecorationSkipInk(_) | DeclPrefixer::UserSelect(_) => {
@@ -434,6 +455,7 @@ impl DeclPrefixer {
 
     fn hack_check(&self, decl: &Node) -> bool {
         match self {
+            DeclPrefixer::BackgroundClip(h) => h.check(decl),
             DeclPrefixer::TextDecoration(h) => h.check(decl),
             // Default: Declaration's implicit-true check.
             _ => true,

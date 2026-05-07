@@ -113,7 +113,7 @@ above as a sketch.
 | appearance.js                   | Declaration  |   23 | TODO |
 | autofill.js                     | Selector     |   26 | TODO |
 | backdrop-filter.js              | Declaration  |   20 | TODO |
-| background-clip.js              | Declaration  |   24 | TODO |
+| background-clip.js              | Declaration  |   24 | DONE |
 | background-size.js              | Declaration  |   23 | TODO |
 | block-logical.js                | Declaration  |   40 | TODO |
 | border-image.js                 | Declaration  |   15 | TODO |

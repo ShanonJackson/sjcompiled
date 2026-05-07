@@ -31,7 +31,7 @@
 //!   `bool`; callers that need the discriminated value call
 //!   `get_key_value` (which itself returns Option/String).
 
-use swc_core::ecma::ast::{Prop, PropName, PropOrSpread};
+use swc_core::ecma::ast::{Expr, Lit, Prop, PropName, PropOrSpread};
 
 use crate::utils::ast::{build_code_frame_error, CssBuildError};
 
@@ -63,17 +63,54 @@ const AT_RULES: &[&str] = &[
 /// `objectKeyIsLiteralValue` upstream lines 32–34. Returns `true` for
 /// `Identifier` / `StringLiteral` keys. Rust callers that need the
 /// concrete string call [`get_key_value`].
+///
+/// SWC↔Babel parser delta: Babel's `t.isIdentifier(key)` and
+/// `t.isStringLiteral(key)` operate on the AST node identity REGARDLESS
+/// of `property.computed`. For `{ [foo]: 1 }`, Babel exposes
+/// `property.key === Identifier(foo)` with `property.computed === true`,
+/// and `t.isIdentifier(key)` returns `true`. SWC's parser distinguishes
+/// the two: a non-computed identifier key becomes `PropName::Ident`,
+/// a computed identifier key becomes `PropName::Computed { expr:
+/// Expr::Ident(_) }`. To match Babel's predicate byte-for-byte, treat
+/// computed-with-Ident-or-Str-inside as literal too. Same for
+/// computed-with-StringLiteral-inside, which Babel's
+/// `t.isStringLiteral(key)` would also return `true` for.
+///
+/// Surfaced by `ct-cssmap-massive` whose variant body uses
+/// `[CURRENT_SURFACE_CSS_VAR]: '#FFFFFF'` (computed identifier key).
+/// Babel accepted the prop as literal and returned the identifier
+/// NAME from `getKeyValue` (`"CURRENT_SURFACE_CSS_VAR"`) — the variant
+/// then proceeded through `process_selectors` because the name didn't
+/// match any at-rule / `selectors` / pseudo-selector. We mirror that
+/// by accepting the same shapes here and projecting the same string
+/// (identifier name OR literal value) in `get_key_value`.
 pub fn object_key_is_literal_value(key: &PropName) -> bool {
-    matches!(key, PropName::Ident(_) | PropName::Str(_))
+    match key {
+        PropName::Ident(_) | PropName::Str(_) => true,
+        PropName::Computed(c) => matches!(
+            &*c.expr,
+            Expr::Ident(_) | Expr::Lit(Lit::Str(_))
+        ),
+        _ => false,
+    }
 }
 
 /// `getKeyValue` upstream lines 36–40. Mirrors the throw on
 /// non-literal keys with an `Err` return — the upstream invariant is
 /// that callers gate on `objectKeyIsLiteralValue` first.
+///
+/// See `object_key_is_literal_value` for the SWC↔Babel parser-delta
+/// note: computed-Ident / computed-Str keys project the same string
+/// Babel's `getKeyValue` would (the identifier name or string value).
 pub fn get_key_value(key: &PropName) -> Option<String> {
     match key {
         PropName::Ident(id) => Some(id.sym.as_ref().to_string()),
         PropName::Str(s) => Some(s.value.to_atom_lossy().as_str().to_string()),
+        PropName::Computed(c) => match &*c.expr {
+            Expr::Ident(id) => Some(id.sym.as_ref().to_string()),
+            Expr::Lit(Lit::Str(s)) => Some(s.value.to_atom_lossy().as_str().to_string()),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -241,14 +278,40 @@ mod tests {
             raw: None,
         })
     }
-    fn computed_key() -> PropName {
+    fn computed_ident_key(name: &str) -> PropName {
         PropName::Computed(ComputedPropName {
             span: DUMMY_SP,
             expr: Box::new(Expr::Ident(Ident::new(
-                "x".into(),
+                name.into(),
                 DUMMY_SP,
                 SyntaxContext::empty(),
             ))),
+        })
+    }
+    fn computed_str_key(value: &str) -> PropName {
+        PropName::Computed(ComputedPropName {
+            span: DUMMY_SP,
+            expr: Box::new(Expr::Lit(Lit::Str(Str {
+                span: DUMMY_SP,
+                value: value.into(),
+                raw: None,
+            }))),
+        })
+    }
+    fn computed_call_key() -> PropName {
+        PropName::Computed(ComputedPropName {
+            span: DUMMY_SP,
+            expr: Box::new(Expr::Call(swc_core::ecma::ast::CallExpr {
+                span: DUMMY_SP,
+                callee: swc_core::ecma::ast::Callee::Expr(Box::new(Expr::Ident(Ident::new(
+                    "f".into(),
+                    DUMMY_SP,
+                    SyntaxContext::empty(),
+                )))),
+                args: vec![],
+                type_args: None,
+                ctxt: SyntaxContext::empty(),
+            })),
         })
     }
 
@@ -257,7 +320,15 @@ mod tests {
         assert!(object_key_is_literal_value(&ident_key("foo")));
         assert!(object_key_is_literal_value(&str_key("foo")));
         assert!(!object_key_is_literal_value(&num_key(1.0)));
-        assert!(!object_key_is_literal_value(&computed_key()));
+        // Babel's `t.isIdentifier(key)` / `t.isStringLiteral(key)` return
+        // `true` for computed keys whose inner expression is an Identifier
+        // or StringLiteral (the AST `key` node IS the inner Ident/Str
+        // when `computed: true` in Babel). The Rust port matches that
+        // shape here; non-Ident/non-Str computed exprs (calls, binops,
+        // etc.) remain non-literal.
+        assert!(object_key_is_literal_value(&computed_ident_key("x")));
+        assert!(object_key_is_literal_value(&computed_str_key("x")));
+        assert!(!object_key_is_literal_value(&computed_call_key()));
     }
 
     #[test]
@@ -265,6 +336,18 @@ mod tests {
         assert_eq!(get_key_value(&ident_key("foo")).as_deref(), Some("foo"));
         assert_eq!(get_key_value(&str_key("bar")).as_deref(), Some("bar"));
         assert_eq!(get_key_value(&num_key(1.0)), None);
+        // Computed-Ident projects the identifier NAME (mirrors Babel's
+        // `getKeyValue` for `[foo]` returning `"foo"` — the literal text
+        // of the identifier, NOT a resolved binding value).
+        assert_eq!(
+            get_key_value(&computed_ident_key("CURRENT_SURFACE_CSS_VAR")).as_deref(),
+            Some("CURRENT_SURFACE_CSS_VAR")
+        );
+        assert_eq!(
+            get_key_value(&computed_str_key("--ds-foo")).as_deref(),
+            Some("--ds-foo")
+        );
+        assert_eq!(get_key_value(&computed_call_key()), None);
     }
 
     #[test]

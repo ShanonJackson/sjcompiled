@@ -404,6 +404,79 @@ this session. Cluster is closed.
   +Infinity, `parseFloat`/`parseInt` with radix-prefix detection). +1
   parity.
 
+- **[FIXED 2026-05-07] ct-css-array-conditional-styles** — TWO drift
+  fixes that combined to close this swc-throw fixture (Babel succeeded;
+  Rust port panicked with `Variable could not be found`).
+
+  **Root cause #1 (call-site):** `babel_plugin.rs::visit_mut_jsx_element`
+  passed `program_scope` as the `parent_scope` argument to all three
+  JSX handlers (`class_names`, `xcss_prop`, `css_prop`). Upstream Babel
+  (`resolve-binding.ts:201`) calls `parentPath.scope.getBinding(name)`,
+  where `parentPath.scope` is the JSXElement's enclosing lexical scope
+  — which walks UP the chain. Passing `program_scope` instead misses
+  any identifier declared inside an enclosing function body
+  (`function Component({ isEmbedView }) { const customCss = [...];
+  return <div css={customCss}/>; }` — `customCss` is a function-scope
+  binding, unreachable from `program_scope.get_binding`). Fixed by
+  computing `scope_index.scope_at_pos(n.opening.span.lo)` once at
+  dispatch entry and threading that into all three handlers.
+
+  **Root cause #2 (scope-walk heuristic):** even after #1, the lookup
+  for the MODULE-level `customSpacingStyles` from inside the function
+  body kept failing. `compat::scope::ScopeIndex::get_binding` mirrored
+  Babel's `getBinding` which has a `previousPath?.isPattern()` skip
+  (`scope/index.js:809-824`) that fires only when the previous (inner)
+  scope's own `path` is a Pattern node — in Babel's `isScope` rule
+  (`@babel/types/.../isScope.js:8-16`), Pattern is its own scope ONLY
+  when its parent is Function or CatchClause. The Rust port does NOT
+  model these as separate Pattern scopes — destructured params are
+  registered directly on the owning Function scope's bindings — so
+  `previousPath?.isPattern()` is unreachable in this scope model.
+  A previous heuristic approximated the rule by flagging Function
+  scopes with `has_pattern_param` (any function declaring an Object/
+  ArrayPattern param), which over-triggered: any
+  `function f({ a }) {…}` skipped module-level non-Param/non-Local
+  bindings from inside the function body, even though Babel resolves
+  those bindings normally. Removed the heuristic from both
+  `get_binding` and `find_binding_scope`; the field
+  `ScopeData::has_pattern_param` is now dead (left in place to
+  preserve the build-time call-site signatures; cleanup deferred).
+
+  Verified: `/fixtures` 290 (+1) parity / 0 divergence; §6.5 JSON
+  corpus 476/477 lock holds; cargo lib unit tests 511 passed, 1
+  pre-existing failure unchanged. +1 parity.
+
+- **[FIXED 2026-05-07] ct-cssmap-massive** — `objectKeyIsLiteralValue`
+  parser-shape drift (Babel `t.isIdentifier(key)` vs SWC `PropName::Ident`
+  not modelling computed-key Identifier).
+
+  Babel's `objectKeyIsLiteralValue` (`utils/css-map.ts:32-34`) is
+  `t.isIdentifier(key) || t.isStringLiteral(key)`. The Babel AST
+  exposes `{ [foo]: 1 }` as `ObjectProperty { key: Identifier(foo),
+  computed: true }` — `t.isIdentifier(key)` returns `true` REGARDLESS
+  of `property.computed`. SWC distinguishes the two: a non-computed
+  identifier key becomes `PropName::Ident`, a computed identifier key
+  becomes `PropName::Computed { expr: Expr::Ident(_) }`. The Rust port
+  matched only `PropName::Ident | PropName::Str`, so for the variant
+  body `{ [CURRENT_SURFACE_CSS_VAR]: '#FFFFFF' }` it threw
+  `STATIC_PROPERTY_KEY` — Babel accepted the prop and projected
+  `getKeyValue` = `"CURRENT_SURFACE_CSS_VAR"` (the identifier name —
+  Babel quirk: returns NAME, not resolved value, but that text only
+  flows into at-rule / `selectors` / pseudo-selector matching, where
+  it doesn't match → variant proceeds normally).
+
+  Fix: `crates/babel-plugin/src/utils/css_map.rs` extends
+  `object_key_is_literal_value` to also accept
+  `PropName::Computed { expr: Expr::Ident(_) | Expr::Lit(Lit::Str(_)) }`
+  and `get_key_value` to project the inner identifier name / string
+  value for those cases. Mirrors Babel's predicate byte-for-byte for
+  the AST shapes the parser-delta produces. Test fixtures in
+  `css_map.rs::tests` updated to assert the new (Babel-equivalent)
+  semantics on computed-Ident / computed-Str / computed-Call keys.
+
+  Verified: `/fixtures` 291 parity / 0 swc-throws / 0 divergence;
+  §6.5 JSON corpus 476/477 lock holds. +1 parity.
+
 - **[FIXED 2026-05-07] ct-optional-chain-dynamic-style** — generator
   missing `OptChain` arm. Babel's `@babel/generator` has explicit
   `OptionalMemberExpression` / `OptionalCallExpression` printers
@@ -430,9 +503,10 @@ to refresh):
 
 ```
 total                336
-parity               289  (+24 from baseline; 0 remaining ct-* divergences)
+parity               291  (+26 from baseline; 0 remaining ct-* divergences;
+                            0 remaining swc-throws)
 divergence           0
-swc-throws           2
+swc-throws           0
 babel-throws         0
 both-throw           2     ← negative-test fixtures (OK)
 skipped-multifile    43    ← gated behind --include-multi
@@ -519,18 +593,12 @@ landing.
 Closing `ct-hover-display` requires this audit + the surgical
 walk-narrowing. Roughly 50 LOC + corpus re-verify.
 
-### swc-throws (2)
+### ~~swc-throws (2)~~ — CLOSED 2026-05-07
 
-- `ct-css-array-conditional-styles` — error: `plugin` (truncated;
-  rerun with `--only` to see full message; likely WASM panic with
-  the panic message stripped on the way out of `swc_core`).
-- `ct-cssmap-massive` — same shape; large-input case (probably
-  hitting a stack-depth or recursion limit somewhere in the
-  visitor — verify against the upstream JS plugin for reference
-  call-depth before assuming a Rust bug).
-
-Status: open. WASM-side panic capture — get the real message
-before triaging.
+Both swc-throws closed in this session. See the "[FIXED 2026-05-07]
+ct-css-array-conditional-styles" and "[FIXED 2026-05-07]
+ct-cssmap-massive" entries in the **Closed (continued)** section
+above. `/fixtures` corpus now reports 0 swc-throws.
 
 ### both-throw (2) — expected, leave green
 

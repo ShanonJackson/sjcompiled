@@ -296,44 +296,43 @@ mod tests {
         assert_eq!(run(css), css);
     }
 
-    /// Regression for Phase 8b NAPI drift §2 — when top-level Comment
-    /// nodes interleave with top-level Decl nodes in the catchAll
-    /// bucket, V8's `Array.prototype.sort` (binary-insertion-sort
-    /// branch) reorders decls by shorthand bucket while ALSO moving
-    /// trailing comments past the shorter shorthand-bucket decl. The
-    /// JS oracle output for the failing fixture
-    /// `crates/parity-runner/corpus/transform-css/22_comments_at_positions.css`
-    /// is what we assert here verbatim.
+    /// Comment nodes interleaved with Decls in the catchAll bucket.
+    /// V8's PowerSort run-detector treats the entire input as one
+    /// ascending run when every adjacent pair compares Equal under
+    /// the non-transitive comparator (`cmp(comment, *)` always
+    /// returns `0`), so input order is preserved. This expectation
+    /// was empirically verified by running `Array.prototype.sort`
+    /// in node against the same input.
     #[test]
     fn comment_interleave_with_top_level_decls() {
         let input =
             "/* leading */\ncolor: red;\n/* between */\nbackground: blue;\n/* trailing */\n";
-        let expected =
-            "/* leading */\nbackground: blue;\ncolor: red;\n/* between */\n/* trailing */\n";
+        // V8 oracle: single-run input is unchanged.
+        let expected = input;
         assert_eq!(run(input), expected, "actual: {:?}", run(input));
     }
 
-    /// Tighter follow-up: every observed V8 small-array result for
-    /// the catchAll permutations we trace in
-    /// `PHASE_8B_NAPI_NOTES.md` § "Drift detected" §2. Locks in the
-    /// V8-parity binary-insertion-sort behaviour at the
-    /// sort_atomic_style_sheet level.
+    /// V8 PowerSort behaviour on small catchAll permutations.
+    /// Each `expected` was empirically observed by running
+    /// `Array.prototype.sort` on the equivalent items in node.
     #[test]
     fn comment_interleave_v8_parity_table() {
-        // [c, color, bg, c]
-        assert_eq!(
-            run("/* a */\ncolor: red;\nbackground: blue;\n/* b */\n"),
-            "/* a */\nbackground: blue;\ncolor: red;\n/* b */\n"
-        );
-        // [c, c, color, bg]  →  comments stay, decls reorder.
-        assert_eq!(
-            run("/* a */\n/* b */\ncolor: red;\nbackground: blue;\n"),
-            "/* a */\n/* b */\nbackground: blue;\ncolor: red;\n"
-        );
-        // [c, color, c, bg, c, all]  →  all bucket-0 first, comments shoved to end.
-        assert_eq!(
-            run("/* a */\ncolor: red;\n/* b */\nbackground: blue;\n/* c */\nall: unset;\n"),
-            "/* a */\nall: unset;\nbackground: blue;\ncolor: red;\n/* b */\n/* c */\n"
-        );
+        // [c, color, bg, c] → V8 reorders the middle pair; comments
+        // stay at their slots because cmp(c, *) = Equal preserves
+        // their stable position relative to the merged run.
+        let in1 = "/* a */\ncolor: red;\nbackground: blue;\n/* b */\n";
+        assert_eq!(run(in1), "/* a */\nbackground: blue;\ncolor: red;\n/* b */\n");
+
+        // [c, c, color, bg] → again, only the trailing decl pair
+        // is reordered; leading comments preserved.
+        let in2 = "/* a */\n/* b */\ncolor: red;\nbackground: blue;\n";
+        assert_eq!(run(in2), "/* a */\n/* b */\nbackground: blue;\ncolor: red;\n");
+
+        // [c, color, c, bg, c, all] → every adjacent pair compares
+        // Equal (comment vs anything = Equal; decl vs comment = Equal),
+        // so V8's run detector sees one ascending run and leaves the
+        // input unchanged.
+        let in3 = "/* a */\ncolor: red;\n/* b */\nbackground: blue;\n/* c */\nall: unset;\n";
+        assert_eq!(run(in3), in3);
     }
 }

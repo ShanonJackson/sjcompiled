@@ -5,7 +5,7 @@
 //! bucket integer determines order — `all` (0) < shorthand families
 //! (1..=5) < non-shorthand (Infinity).
 //!
-//! Upstream JS:
+//! Upstream JS (verbatim):
 //! ```ts
 //! const findDeclaration = (node) => {
 //!   if (node.type === 'decl') return node;
@@ -16,7 +16,7 @@
 //! const sortNodes = (a, b) => {
 //!   const aDecl = findDeclaration(a);
 //!   const bDecl = findDeclaration(b);
-//!   if (!aDecl?.prop || !bDecl?.prop) return 0;  // ← no swap on missing decl
+//!   if (!aDecl?.prop || !bDecl?.prop) return 0;
 //!   const aShorthandBucket = shorthandBuckets[aDecl.prop] ?? Infinity;
 //!   const bShorthandBucket = shorthandBuckets[bDecl.prop] ?? Infinity;
 //!   return aShorthandBucket - bShorthandBucket;
@@ -33,65 +33,65 @@
 //! };
 //! ```
 //!
-//! ## Behavior
+//! ## Behaviour (1:1 with upstream)
 //! - Recursive: descend into every container, sorting children at each
-//!   depth before sorting at the current depth.
-//! - "First decl" is found by:
-//!   - if the node is itself a Decl, return it.
-//!   - else if it's a container, return the first direct-child Decl.
-//!   - else None (skip).
-//! - When either side has no decl, return `Equal` (no swap) — this is
-//!   how upstream's `return 0` interacts with V8's sort to keep
-//!   AtRules/comment positions intact.
-//! - Buckets default to a sentinel "infinity" (we use `i32::MAX`) when
-//!   the prop isn't in the table. This pushes non-shorthand decls
-//!   AFTER all shorthands at any given depth.
+//!   depth before sorting at the current depth (matches upstream's
+//!   `forEach(... sortShorthandDeclarations(node.nodes))` then
+//!   `nodes.sort(...)`).
+//! - "First decl" mirrors `findDeclaration`:
+//!   - if the node is itself a Decl, return it,
+//!   - else if it's a container, return the first direct-child Decl,
+//!   - else `None` (upstream `undefined`).
+//! - When either side has no decl, comparator returns `Equal`
+//!   (upstream `return 0`) — V8's stable `Array.prototype.sort`
+//!   preserves the relative order of equal elements, and so does
+//!   Rust's `slice::sort_by`. AtRules / comments therefore stay where
+//!   they were.
+//! - Bucket defaults to `i32::MAX` when the prop is unknown
+//!   (upstream `?? Infinity`). This pushes non-shorthand decls AFTER
+//!   all shorthands at any given depth.
 //!
-//! ## V8-parity sort algorithm
+//! ## Sort algorithm
 //!
-//! `Array.prototype.sort` in V8 uses TimSort, but for arrays smaller
-//! than `kMinRunLength = 32` it uses a pure binary-insertion-sort. The
-//! comparator above is **non-transitive** — it returns `0` whenever
-//! a Comment (or any node without a child decl) is one side, but
-//! returns a non-zero value for two Decls with different buckets. So
-//! the SET of pairs that compare equal is not closed under transitivity:
-//! `cmp(comment, color) = 0` and `cmp(comment, background) = 0` but
-//! `cmp(color, background) ≠ 0`.
+//! Upstream is a single line: `nodes.sort(sortNodes)`. The naive port
+//! `nodes.sort_by(cmp_nodes)` is **NOT** byte-equivalent.
 //!
-//! Under a non-transitive comparator the result of any stable sort is
-//! algorithm-defined. Rust's `slice::sort_by` uses a TimSort variant
-//! whose insertion-sort phase is a *linear* (left-scan) insertion that
-//! stops at the first `Less` (i.e. it's a lower-bound style scan). V8's
-//! binary-insertion phase uses a *binary* search that uses upper-bound
-//! semantics (equal elements go AFTER, so the scan continues into the
-//! left half only on strict `Less`). The two algorithms produce
-//! different observable orderings on the same non-transitive
-//! comparator.
+//! `cmp_nodes` is non-transitive: it returns `Equal` whenever either
+//! side has no first decl (a Comment, or a Rule whose first child is
+//! itself a Rule). The set of pairs that compare equal is therefore
+//! not closed under transitivity, e.g.
+//! `cmp(comment, color) = Equal` and `cmp(comment, background) =
+//! Equal` but `cmp(color, background) = Less`. Under such a
+//! comparator, the result of any stable sort is algorithm-defined —
+//! V8's PowerSort and Rust's slice::sort_by produce different
+//! permutations on the same input.
 //!
-//! Concretely, on the `[comment, color, comment, background, comment]`
-//! catchAll bucket from `sortAtomicStyleSheet`, V8 rearranges to
-//! `[comment, background, color, comment, comment]` — the two trailing
-//! comments end up adjacent because the binary search for `comment@4`
-//! settles to upper-bound (end-of-array). Rust's linear insertion
-//! never moves either decl past a comment because it stops at the
-//! first `Equal`. To match the JS oracle byte-for-byte we re-implement
-//! V8's binary-insertion-sort here. See
-//! `crates/PHASE_8B_NAPI_NOTES.md` "Drift detected §2" for the gate
-//! that surfaced this.
+//! AFM production runs `transformCss` under node V8. The parity
+//! oracle now does too (see `packages/css/scripts/parity-bridge-
+//! ts-loader.mjs` for why). To produce byte-identical output we
+//! delegate the sort itself to [`crate::compat::v8_array_sort::
+//! v8_sort`] — a 1:1 port of V8's `Array.prototype.sort`
+//! (PowerSort/TimSort variant, full algorithm including run
+//! detection, min_run boost, and galloping merge). That shim
+//! exists solely for this surface; ordinary Rust code uses
+//! `slice::sort_by`.
 //!
-//! For arrays of length >= 32 V8 transitions to TimSort proper (run
-//! detection + merging). Atomic-CSS top-level catchAll/rules/atRules
-//! buckets are typically <10 entries; we have no fixture exercising
-//! 32+ elements, and the recursive descent into rule/at-rule bodies
-//! also stays small in practice. If a real-world input ever hits the
-//! TimSort threshold here, the parity-runner corpus will surface it
-//! as drift and we extend this helper to a full TimSort port. Until
-//! then binary-insertion-sort covers every observed corpus input.
+//! Concrete divergence that motivated this: AFM fixture 02508
+//! (`crates/parity-runner/corpus/afm-transform-css/02508_*.css`)
+//! had `Rust.sort_by` placing `&__table` after `&--dynamic` while
+//! V8 placed `&__table` adjacent to `font` because both sides see
+//! the same buckets ([Inf, Inf, 1, Inf, no-decl, 4, 1, 1, 1]) but
+//! V8's run detector treats the first transition (Inf → 1 at index
+//! 2) as a run break and merges the two halves under PowerSort's
+//! galloping rules; Rust's TimSort variant detects different runs
+//! and merges them differently.
 
 use std::cmp::Ordering;
 
 use postcss_core::{Node, NodeKind};
 use compiled_utils::shorthand_buckets;
+
+use crate::compat::v8_array_sort::v8_sort;
 
 /// Find the "first declaration" used as the sort key for `node`.
 fn find_decl(node: &Node) -> Option<&postcss_core::Declaration> {
@@ -129,8 +129,8 @@ fn cmp_nodes(a: &Node, b: &Node) -> Ordering {
     bucket_for(&ad.prop).cmp(&bucket_for(&bd.prop))
 }
 
-/// `sortShorthandDeclarations(nodes)` — depth-first sort matching V8's
-/// `Array.prototype.sort` behaviour (binary insertion sort).
+/// `sortShorthandDeclarations(nodes)` — depth-first stable sort,
+/// 1:1 with upstream `nodes.forEach(...)` then `nodes.sort(...)`.
 pub fn sort_shorthand_declarations(nodes: &mut [Node]) {
     if nodes.is_empty() {
         return;
@@ -145,47 +145,7 @@ pub fn sort_shorthand_declarations(nodes: &mut [Node]) {
             }
         }
     }
-    v8_binary_insertion_sort(nodes, cmp_nodes);
-}
-
-/// V8-parity binary insertion sort. Replicates the pre-TimSort branch
-/// of V8's `Array.prototype.sort` used for arrays of length < 32, and
-/// the per-run insertion-extension phase used inside TimSort proper.
-///
-/// For each `i` in `1..nodes.len()`, binary-searches the prefix
-/// `nodes[0..i]` for the upper-bound insertion point of `nodes[i]`
-/// (equal elements go AFTER), then rotates the element into place via
-/// `slice::rotate_right(1)`. The upper-bound semantics — `lo = mid + 1`
-/// on `Equal` or `Greater`, `hi = mid` only on `Less` — is what makes
-/// the algorithm move comments past following decls in the
-/// non-transitive comment-vs-decl comparator setup; see module docs.
-fn v8_binary_insertion_sort<T, F>(nodes: &mut [T], mut cmpf: F)
-where
-    F: FnMut(&T, &T) -> Ordering,
-{
-    let len = nodes.len();
-    for i in 1..len {
-        let mut lo = 0usize;
-        let mut hi = i;
-        while lo < hi {
-            let mid = lo + ((hi - lo) >> 1);
-            // Compare element-being-inserted (at index i) vs prefix[mid].
-            // The prefix is fully sorted at this point so `nodes[mid]`
-            // is the pivot and `nodes[i]` is the candidate. Match V8's
-            // ArrayTimSortImpl.tq `BinarySearch` upper-bound semantics:
-            // strict `Less` narrows right; `Equal`/`Greater` narrows
-            // left half off (lo = mid + 1) so equal keys land AFTER.
-            match cmpf(&nodes[i], &nodes[mid]) {
-                Ordering::Less => hi = mid,
-                Ordering::Equal | Ordering::Greater => lo = mid + 1,
-            }
-        }
-        // Move `nodes[i]` to position `lo`, shifting `nodes[lo..i]`
-        // one slot right.
-        if lo < i {
-            nodes[lo..=i].rotate_right(1);
-        }
-    }
+    v8_sort(nodes, cmp_nodes);
 }
 
 #[cfg(test)]

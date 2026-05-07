@@ -27,5 +27,6 @@
 //!
 //! Utility helpers live in `src/utils/` and mirror `packages/css/src/utils/`.
 
+pub mod compat;
 pub mod plugins;
 pub mod utils;

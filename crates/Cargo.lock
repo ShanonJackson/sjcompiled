@@ -1608,6 +1608,7 @@ name = "parity-runner"
 version = "0.0.1"
 dependencies = [
  "autoprefixer",
+ "browserslist-shim",
  "compiled-css",
  "css",
  "cssnano-postcss-colormin",

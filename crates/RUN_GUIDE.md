@@ -55,7 +55,7 @@ incremental = true
 
 Result: ~10s clean, ~1s incremental. Runtime is fast enough — the
 parity-runner spends most of its wall-clock in the JS oracle
-subprocess (bun + postcss + autoprefixer), not in Rust.
+subprocess (node + postcss + autoprefixer), not in Rust.
 
 **Never use `cargo run --release` for parity work.** Build with
 `cargo build -p parity-runner`, then invoke the binary directly.
@@ -137,34 +137,53 @@ cargo test -p parity-runner --no-fail-fast
 
 ---
 
-## Why the bridge isn't bun-streaming
+## Why the bridge runs under node, not bun
 
-The JS oracle is `packages/css/scripts/parity-bridge.mjs`, run under
-bun (which understands the `.ts` plugin imports natively). The
-runner's `js_bridge.rs` writes ALL requests for a corpus to bun's
-stdin then closes the pipe (EOF) before reading responses.
+The JS oracle is `packages/css/scripts/parity-bridge.mjs`, spawned by
+`crates/parity-runner/src/js_bridge.rs` as:
 
-This is intentional. Bun block-buffers `process.stdin` AND
-`process.stdout` when they are pipes to a non-TTY parent (Rust's
-`std::process::Command` qualifies). A streaming
-request-per-line/response-per-line protocol deadlocks because:
+```
+node --no-warnings --no-deprecation \
+     --require    packages/css/scripts/parity-bridge-cjs-hook.cjs \
+     --experimental-loader file://…/parity-bridge-ts-loader.mjs \
+     packages/css/scripts/parity-bridge.mjs
+```
 
-- The runner writes one request and blocks on `read_line` for the
-  response.
-- Bun's stdin buffer hasn't filled yet, so `readline.on('line')`
-  never fires.
-- Even if the bridge wrote a response, bun's stdout buffer wouldn't
-  flush until ~64KB or process exit.
+We run under **node**, not bun, because the AFM monorepo runs
+`transformCss` under node V8 in production. Bun runs JavaScriptCore.
+V8 (TimSort) and JSC (merge-sort) implement
+`Array.prototype.sort` with different stable-sort algorithms and
+disagree on the final order for non-transitive comparators —
+specifically `sort-shorthand-declarations`'s comparator returns 0
+for nodes without a first declaration, which makes it non-transitive
+on inputs that mix decls with comments / nested rules. Running the
+oracle under bun was masking real V8-correct Rust output as
+"diverged".
 
-EOF forces both buffers to drain at once. The whole corpus runs in
-a single bun spawn (one ~300ms warmup), gets one batched response,
-and the runner replays the diff in pure Rust. No new dependencies,
-no per-fixture process spawn.
+Two loader files cover the TS plugin imports:
 
-`Bun.write(Bun.stdout, ...)` (the unbuffered write API) is also used
-inside the bridge belt-and-braces for the same reason — if a future
-streaming protocol is reintroduced, the output side won't silently
-deadlock.
+- `parity-bridge-ts-loader.mjs` — node 20.15 ESM loader hook
+  (`module.register`-compatible). Resolves extension-less imports
+  (`./foo` → `./foo.ts`) and transpiles `.ts` files via
+  `@babel/preset-typescript` + `transform-modules-commonjs` so
+  CJS-package named-export interop works the same way bun's loader
+  handles it.
+- `parity-bridge-cjs-hook.cjs` — preloaded with `--require`. Adds
+  `.ts` / `.tsx` to `require.extensions` so nested CJS-graph
+  requires (the post-transpile `require('./peer')` calls) find
+  adjacent `.ts` files.
+
+### Batching, not streaming
+
+The bridge reads all requests from stdin, then emits responses on
+stdout. The runner writes every request, closes stdin (EOF), then
+drains stdout. We chunk batches at `BATCH_MAX = 256` so the per-batch
+response stream stays well below the kernel-pipe + node libuv
+userspace buffer ceiling for every stage, including `transform-css`
+which emits ~5KB of `{sheets, classNames}` JSON per fixture. A
+streaming request-per-line protocol would still risk deadlock under
+node (libuv's stdout writes block on full pipe buffers); the
+batched protocol sidesteps the question.
 
 ---
 
@@ -184,31 +203,36 @@ cargo build -p parity-runner
 
 ### Hang with no output, runner using 0% CPU
 
-This is what you see if the bun-buffering deadlock is back. Check:
+The runner writes all requests, closes stdin, then reads stdout.
+If the JS bridge's response stream exceeds kernel-pipe + node
+userspace buffers before EOF on stdin, libuv blocks and we
+deadlock. `BATCH_MAX = 256` in `js_bridge.rs` keeps each batch well
+under that ceiling; if you raise it, expect hangs on `transform-css`
+first (largest per-fixture output).
 
-1. `packages/css/scripts/parity-bridge.mjs` still uses
-   `Bun.write(Bun.stdout, ...)` (not `process.stdout.write`).
-2. `crates/parity-runner/src/js_bridge.rs::run_batch` still writes
-   all requests, drops `stdin`, then reads to EOF.
-
-If both are intact and it still hangs, run the bridge directly to
-isolate:
+To isolate, run the bridge directly:
 
 ```bash
 echo '{"stage":"transform-css","css":"a{color:red}"}' \
-    | bun run packages/css/scripts/parity-bridge.mjs
+    | node --no-warnings --no-deprecation \
+        --require packages/css/scripts/parity-bridge-cjs-hook.cjs \
+        --experimental-loader file://$PWD/packages/css/scripts/parity-bridge-ts-loader.mjs \
+        packages/css/scripts/parity-bridge.mjs
 # Expected: one JSON line on stdout, exit 0.
 ```
 
-### "bun is required for the parity harness"
+### "node is required for the parity harness"
+
+Install node 20.15 or newer (the loader hook requires
+`module.register`, which landed in 20.6 and stabilised in 20.15):
 
 ```bash
-which bun || curl -fsSL https://bun.sh/install | bash
+which node || brew install node@20
+node --version  # must be >= v20.15
 ```
 
-The harness requires bun specifically (not node) because the bridge
-imports `packages/css/src/plugins/*.ts` directly without
-transpilation. Node would need `tsx` or a loader.
+We deliberately do **not** support bun for the parity harness — see
+the "Why the bridge runs under node, not bun" section above.
 
 ### `cargo build` is slow / OOMs
 

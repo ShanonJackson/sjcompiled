@@ -1,29 +1,43 @@
-//! Spawns `bun run packages/css/scripts/parity-bridge.mjs` as a
-//! subprocess and runs a batch of `{stage, css}` requests over stdio.
-//! One spawn covers the whole corpus to amortize the ~300ms bun
-//! startup cost.
+//! Spawns `node --experimental-loader … packages/css/scripts/
+//! parity-bridge.mjs` as a subprocess and runs a batch of `{stage,
+//! css}` requests over stdio. One spawn covers the whole corpus to
+//! amortise the ~150ms node startup + babel-typescript transpile of
+//! the bridge's TS imports.
 //!
 //! Wire format: NDJSON. Caller writes all requests, closes stdin
 //! (EOF), then drains all responses. Order is preserved (request N
 //! maps to response N).
 //!
-//! ## Why batch and not streaming?
+//! ## Why node, not bun?
 //!
-//! Bun block-buffers BOTH `process.stdin` (when input is a pipe to a
-//! non-TTY parent) AND `process.stdout` (when output is a pipe). The
-//! buffer flushes only at ~64KB or on EOF. A streaming
-//! request-per-line protocol deadlocks: the runner writes one
-//! request, blocks on `read_line` for the response, but bun never
-//! sees the request because its stdin buffer hasn't filled and never
-//! emits the response because its stdout buffer hasn't filled
-//! either.
+//! The AFM monorepo runs `transformCss` under node V8 in production.
+//! Bun runs JavaScriptCore. V8 and JSC implement
+//! `Array.prototype.sort` with different stable sort algorithms
+//! (TimSort vs. merge-sort), and on `sort-shorthand-declarations`'s
+//! deliberately non-transitive comparator the two engines disagree on
+//! the final order for inputs that mix declarations with comments or
+//! nested rules. Running the parity oracle under bun was masking real
+//! V8-correct Rust output as "diverged"; switching to node makes the
+//! oracle observably equal to AFM production.
 //!
-//! Closing stdin after sending all requests forces bun to drain its
-//! stdin buffer (EOF triggers a flush), the bridge processes
-//! everything, then exit-time stdout flush delivers all responses
-//! to us at once. The whole corpus runs in a single spawn — same
-//! startup cost as the original streaming design, no buffering
-//! deadlock.
+//! See `packages/css/scripts/parity-bridge-ts-loader.mjs` for the
+//! on-the-fly TypeScript loader hook (node 20.15+ uses
+//! `module.register`); it transpiles `.ts` plugin sources via
+//! `@babel/preset-typescript` so the bridge can import them
+//! directly without a build step.
+//!
+//! ## Batching policy
+//!
+//! Node's stdout to a pipe is non-blocking (libuv async writes), but
+//! the kernel pipe buffer is finite (~64KB on macOS / Linux). The
+//! Rust harness writes every request first, closes stdin, then
+//! drains stdout — a "write-all-then-read" protocol. If the JS
+//! pipeline emits more output than the pipe can hold before EOF on
+//! stdin (which triggers the bridge's processing loop), we
+//! deadlock. We chunk batches at `BATCH_MAX = 256` so the per-batch
+//! response stream stays well below the pipe + node userspace
+//! buffer ceiling for every stage, including `transform-css` which
+//! emits ~5KB of `{sheets, classNames}` JSON per fixture.
 
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
@@ -47,36 +61,94 @@ pub struct JsResponse {
     pub error: String,
 }
 
-/// Run a batch of requests through one JS-bridge subprocess. Returns
-/// one response per input, in input order. Returns `Err` if the
-/// bridge fails to spawn or returns malformed output.
+/// Maximum number of inputs per JS-bridge subprocess invocation.
+///
+/// See module docs (§ "Batching policy") for the buffering rationale.
+/// 256 was picked empirically against the bun runtime; node's
+/// libuv-backed stdout has the same back-pressure characteristics on
+/// the kernel-pipe side, so the same ceiling applies. Per-batch cost
+/// is one node startup (~150ms) + one babel-TS transpile of the
+/// bridge's plugin imports (~250ms cold, ~50ms with v8 code cache).
+const BATCH_MAX: usize = 256;
+
+/// Run a batch of requests through the JS bridge, transparently
+/// chunking large batches across multiple bun subprocesses. Returns
+/// one response per input, in input order.
 pub fn run_batch(stage: Stage, inputs: &[&str]) -> Result<Vec<JsResponse>, String> {
+    if inputs.len() <= BATCH_MAX {
+        return run_batch_inner(stage, inputs);
+    }
+    let mut all = Vec::with_capacity(inputs.len());
+    for chunk in inputs.chunks(BATCH_MAX) {
+        let mut part = run_batch_inner(stage, chunk)?;
+        all.append(&mut part);
+    }
+    Ok(all)
+}
+
+fn run_batch_inner(stage: Stage, inputs: &[&str]) -> Result<Vec<JsResponse>, String> {
     let script = script_path();
     if !script.exists() {
         return Err(format!("JS pipeline script not found at {}", script.display()));
     }
+    let loader = loader_path();
+    if !loader.exists() {
+        return Err(format!("TS loader not found at {}", loader.display()));
+    }
+    let cjs_hook = cjs_hook_path();
+    if !cjs_hook.exists() {
+        return Err(format!("CJS hook not found at {}", cjs_hook.display()));
+    }
     let candidates: &[&str] = if cfg!(windows) {
-        &["bun.cmd", "bun.exe", "bun"]
+        &["node.exe", "node"]
     } else {
-        &["bun"]
+        &["node"]
     };
     let runtime = candidates
         .iter()
         .copied()
         .find(|c| which(c))
-        .ok_or("bun is required for the parity harness — install via https://bun.sh")?;
+        .ok_or("node is required for the parity harness — install Node.js 20.15+")?;
 
+    // `--experimental-loader` (still the public name in node 20.x even
+    // after `module.register` was promoted) hooks our babel-TS loader
+    // before any user `import` runs. `--no-warnings` silences the
+    // `ExperimentalWarning: Custom ESM Loaders is an experimental
+    // feature…` line that would otherwise contaminate stderr and
+    // make `stderr_buf` noisy on success.
+    let loader_url = format!("file://{}", loader.display());
+    // Set cwd to the workspace root so npm package resolution from
+    // the bridge's `import 'postcss'` etc. lands on the workspace
+    // `node_modules/`. Without this the inherited cwd from the Rust
+    // process (often `crates/`) makes node walk up and miss the
+    // hoisted dependencies. Also matters for `node`'s on-the-fly
+    // require resolution inside the CJS-from-ESM translator path,
+    // which uses cwd-relative resolution as a fallback for some
+    // edge cases (`./peer` in a file loaded via ESM bridge).
+    let workspace_root = script.parent().unwrap()  // scripts/
+        .parent().unwrap()                          // css/
+        .parent().unwrap()                          // packages/
+        .parent().unwrap();                         // workspace
     let mut child = Command::new(runtime)
-        .arg("run")
+        .arg("--no-warnings")
+        .arg("--no-deprecation")
+        .arg("--require")
+        .arg(&cjs_hook)
+        .arg("--experimental-loader")
+        .arg(&loader_url)
         .arg(&script)
+        .current_dir(workspace_root)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("failed to spawn {runtime}: {e}"))?;
 
-    // Write every request, then drop stdin (EOF) to force bun to
-    // drain its stdin buffer and process the batch.
+    // Write every request, then drop stdin (EOF) so the bridge's
+    // `rl.on('close')` fires and the process exits cleanly after
+    // emitting its responses. Caller ensures `inputs.len() <=
+    // BATCH_MAX` so the response stream fits in the kernel pipe +
+    // node libuv userspace buffers without deadlocking.
     {
         let mut stdin = child.stdin.take().ok_or("missing stdin")?;
         for css in inputs {
@@ -130,9 +202,9 @@ pub fn run_batch(stage: Stage, inputs: &[&str]) -> Result<Vec<JsResponse>, Strin
 }
 
 /// Backwards-compatible streaming-style facade over `run_batch`. Tests
-/// written before the bun-buffering deadlock was diagnosed call
+/// written before the buffering deadlock was diagnosed call
 /// `JsBridge::spawn()` then `bridge.run(stage, css)` per fixture; that
-/// streaming protocol deadlocks under bun. This shim accumulates each
+/// streaming protocol deadlocks under both bun and node. This shim accumulates each
 /// `run()` request, replays the whole batch on first `run()` if the
 /// queue is non-empty, and returns the cached response. Behaves
 /// identically to the old streaming API for the cases the tests
@@ -225,6 +297,32 @@ fn script_path() -> PathBuf {
         .join("css")
         .join("scripts")
         .join("parity-bridge.mjs")
+}
+
+fn loader_path() -> PathBuf {
+    // Sibling of `parity-bridge.mjs` — the on-the-fly TS loader hook.
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .parent().unwrap()
+        .parent().unwrap()
+        .join("packages")
+        .join("css")
+        .join("scripts")
+        .join("parity-bridge-ts-loader.mjs")
+}
+
+fn cjs_hook_path() -> PathBuf {
+    // Sibling — registers `.ts`/`.tsx` in `require.extensions` so
+    // CJS-graph nested requires (transpiled .ts → require('./peer'))
+    // resolve to the adjacent `.ts` file. Preloaded with `--require`.
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .parent().unwrap()
+        .parent().unwrap()
+        .join("packages")
+        .join("css")
+        .join("scripts")
+        .join("parity-bridge-cjs-hook.cjs")
 }
 
 fn which(cmd: &str) -> bool {

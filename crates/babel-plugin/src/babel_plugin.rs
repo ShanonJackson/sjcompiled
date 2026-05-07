@@ -1605,6 +1605,23 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
             // assignment between calls borrows `n` mutably, and we
             // need the handlers to take `&mut self.state` etc. each
             // pass. Re-extract per call.
+            //
+            // Upstream Babel passes `meta.parentPath.scope` /
+            // `path.scope` into `getBinding` (resolve-binding.ts:201),
+            // which walks UP the scope chain from the JSXElement's
+            // own scope. The Rust port mirrors that by computing
+            // the JSX element's enclosing scope via `scope_at_pos`
+            // — passing `program_scope` instead would miss any
+            // identifier declared inside an enclosing function body
+            // (e.g. `function C() { const customCss = [...]; return
+            // <div css={customCss}/>; }` — `customCss` is a
+            // function-scope binding, unreachable from
+            // `program_scope.get_binding`).
+            let jsx_enclosing_scope = self
+                .scope_index
+                .as_ref()
+                .expect("checked above")
+                .scope_at_pos(n.opening.span.lo);
 
             // §6.6 — `<ClassNames>`. Replaces the entire JSXElement
             // with a `<CC>{body}</CC>` wrapper. Recurse into the new
@@ -1615,7 +1632,7 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
                 &mut self.state,
                 &mut self.recorder,
                 self.scope_index.as_mut().expect("checked above"),
-                self.program_scope.expect("checked above"),
+                jsx_enclosing_scope,
             ) {
                 *n = replacement.new_element;
                 n.visit_mut_children_with(self);
@@ -1632,7 +1649,7 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
                 &mut self.state,
                 &mut self.recorder,
                 self.scope_index.as_mut().expect("checked above"),
-                self.program_scope.expect("checked above"),
+                jsx_enclosing_scope,
             ) {
                 *n = replacement.new_element;
                 // Fall through to css-prop on the (now-wrapped)
@@ -1653,7 +1670,7 @@ impl<C: Comments> VisitMut for BabelPluginVisitor<C> {
                 &mut self.state,
                 &mut self.recorder,
                 self.scope_index.as_mut().expect("checked above"),
-                self.program_scope.expect("checked above"),
+                jsx_enclosing_scope,
             ) {
                 *n = replacement.new_element;
             }

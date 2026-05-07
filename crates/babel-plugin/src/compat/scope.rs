@@ -483,27 +483,51 @@ impl ScopeIndex {
     /// ```
     pub fn get_binding(&self, scope: ScopeId, name: &str) -> Option<&Binding> {
         let mut current = Some(scope);
-        // `previous_was_pattern` mirrors `previousPath?.isPattern()`. We
-        // approximate "previous scope's PATH was a Pattern" by checking
-        // whether the previous scope was a Function/Method/Arrow whose
-        // params include an Object/ArrayPattern destructure (the only
-        // shape the Compiled corpus reaches; see Finding 2 fixture).
-        let mut previous_was_pattern = false;
-
+        // Babel's `getBinding` (scope/index.js:809-824) has a
+        // `previousPath?.isPattern()` skip that fires only when the
+        // PREVIOUS (inner) scope's own path was a Pattern node. In
+        // Babel's `isScope(node, parent)` rule, a Pattern is its own
+        // scope ONLY when its parent is a Function or CatchClause —
+        // i.e. function-param destructures and `catch ({ … })` shapes.
+        //
+        // The Rust port does NOT model these as separate Pattern
+        // scopes — destructured params are registered directly on the
+        // owning Function/CatchClause scope. The function-param case
+        // is observably equivalent (the rule's binding-kind guard
+        // exempts `param`/`local`, so Babel returns the same param
+        // binding the Rust port returns).
+        //
+        // The `catch ({ x }) { x }` case where the catch-param `let`
+        // shadows an outer `const x` IS observably divergent: Babel
+        // skips the catch param and returns the outer const; this
+        // port returns the catch param. Verified empirically against
+        // `@babel/traverse@7.29.0`. Filed as known divergence —
+        // structurally implausible in CSS-in-JS code (style
+        // identifiers aren't catch-clause destructure targets) and
+        // evidenced-unreachable across the §6.5 corpus + 336-fixture
+        // `/fixtures` corpus + the AFM consuming monorepo. Pattern-
+        // scope modelling is ~150-300 LOC for zero corpus value and
+        // is deferred until a real fixture surfaces it.
+        //
+        // A previous heuristic approximated the rule by flagging
+        // Function scopes with `has_pattern_param`, but that
+        // over-triggered: any `function f({ a }) {}` would skip
+        // module-level non-Param/non-Local bindings from inside the
+        // function body, even though Babel resolves those bindings
+        // normally. Surfaced by `ct-css-array-conditional-styles`
+        // (`function Component({ isEmbedView }) { const customCss =
+        // [customSpacingStyles, …]; <div css={customCss}/> }` — the
+        // module-level `customSpacingStyles` failed to resolve while
+        // Babel resolved it).
         while let Some(scope_id) = current {
             let scope_data = &self.scopes[scope_id as usize];
             let binding = self.bindings_by_scope[scope_id as usize].get(name);
 
             if let Some(binding) = binding {
-                if previous_was_pattern
-                    && binding.kind != BindingKind::Param
-                    && binding.kind != BindingKind::Local
-                {
-                    // SKIP — keep walking up (Finding 2 pattern-skip).
-                } else {
-                    return Some(binding);
-                }
-            } else if name == "arguments" && scope_data.kind.is_non_arrow_function() {
+                return Some(binding);
+            }
+
+            if name == "arguments" && scope_data.kind.is_non_arrow_function() {
                 // Babel: @babel/traverse@7.29.0 scope/index.js:819-821 — `arguments` shadow
                 // stops at non-arrow function boundary. Evidenced-unreachable from the
                 // Compiled corpus (zero matches across 477 fixtures), but ported 1:1
@@ -511,7 +535,6 @@ impl ScopeIndex {
                 break;
             }
 
-            previous_was_pattern = scope_data.has_pattern_param;
             current = scope_data.parent;
         }
 
@@ -2023,26 +2046,21 @@ impl Builder {
         }
     }
 
-    /// Walk the scope chain, applying Finding 2's pattern-skip rule.
-    /// Returns the scope-id where the binding lives.
+    /// Walk the scope chain to find where `name` is bound. Mirrors
+    /// the simplified `get_binding` walk — see that method's comment
+    /// for why the `previousPath?.isPattern()` skip is unreachable
+    /// in the Rust port's scope model (params live on the owning
+    /// Function scope; no separate Pattern scope is created).
     fn find_binding_scope(&self, from: ScopeId, name: &str) -> Option<ScopeId> {
         let mut current = Some(from);
-        let mut previous_was_pattern = false;
         while let Some(scope_id) = current {
             let scope_data = &self.scopes[scope_id as usize];
-            if let Some(b) = self.bindings_by_scope[scope_id as usize].get(name) {
-                if previous_was_pattern
-                    && b.kind != BindingKind::Param
-                    && b.kind != BindingKind::Local
-                {
-                    // SKIP — keep walking up.
-                } else {
-                    return Some(scope_id);
-                }
-            } else if name == "arguments" && scope_data.kind.is_non_arrow_function() {
+            if self.bindings_by_scope[scope_id as usize].contains_key(name) {
+                return Some(scope_id);
+            }
+            if name == "arguments" && scope_data.kind.is_non_arrow_function() {
                 break;
             }
-            previous_was_pattern = scope_data.has_pattern_param;
             current = scope_data.parent;
         }
         None
