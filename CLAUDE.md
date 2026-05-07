@@ -12,6 +12,7 @@ Obviously we have to make some EXTREMELY minor exceptions because babel and swc 
 BUGS in OLD! Need to be BUGS In NEW. We are not fixing bugs as part of this; This is EXTREMELY intentional as if we ship something that has same output we can ship it very easily.
 
 
+
 # DRIFT DETECTION - 
 THIS PART IS CRITICAL!
 If you think someone hasn't ported something OUTSIDE your work CORRECTLY; Immedietly I.E "Drift detected in X - <Explanation here>" this is CRITICALLY important. otherwise if many things have slight drift the "WHOLE" will have MAJOR drift. Minor drift is unnacceptable.
@@ -40,6 +41,5 @@ One-time exception (2026-05-04): a historic fork-prefix rename was reverted to `
 - PLEASE KEEP IN MIND SWC Tears down the WASI instance between CALLS. ANY Cross-transform caching will be destroyed; If you feel like you need cross-transform caching COMMUNICATE with me.
 
 ## Final bit of important info.
-- crates/css is a FAITHFUL 1:1 port of packages/css; It's MUTABLE not IMMUTABLE but when editing it it's important you run all the parity tests AND fix issues 1:1 with where it DIVERGES in BEHAVIOUR from the ORIGINAL. Preferably in same folder/file location as original.
-Preferably use parity tests to find it where it diverges very quickly using the js oracle.
+- crates/css is a 100% CONFIRMED faithful rewrite of the original. /packages/css/trasnformts. -> transformCSS is PROVEN BYTE-IDENTICAL against the RUST version even inside AFM's 90GB monorepo. That means bugs HAVE to be in our packages/babel-plugin and packages/babel-plugin-strip-runtime ports from now on.
 - Although packages/babel-plugin, packages/babel-plugin-strip-runtime are 100% immutable you may add logging aslong as you clean it up afterwards to see where an input diverges from what you have in your copy.
