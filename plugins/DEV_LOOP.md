@@ -320,17 +320,13 @@ The corpus runs in CI. Stray `eprintln!` in a hot path is a perf regression even
 ## Tooling cheat-sheet
 
 ```bash
-# Full triage: /fixtures corpus (293 single-file + skips multi-file).
+# Full triage: every /fixtures/* runs every time. No skip / gating
+# flags exist — the harness intentionally always covers the full
+# corpus so divergences can't hide behind an opt-in flag.
 bun parity-harness/fixtures-triage.mjs
 
-# Triage with --include-multi (43 ct-* multi-file; gated on §5.4–§5.6).
-bun parity-harness/fixtures-triage.mjs --include-multi
-
-# Single fixture, with byte diff printed inline.
+# Single fixture (or several), with byte diff printed inline.
 bun parity-harness/fixtures-triage.mjs --only <name> --print-diffs
-
-# Bail on first divergence (handy when iterating on a fix that may regress).
-bun parity-harness/fixtures-triage.mjs --bail
 
 # Phase 6 §6.5 unit-test corpus extract+run.
 bun parity-harness/babel-plugin/extract-fixtures.mjs

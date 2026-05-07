@@ -80,7 +80,8 @@ function stripComments(code: string): string {
 function normalise(code: string): string {
   const stripped = stripComments(code);
   const collapsed = reconcileReactCreateElementSpreadCollapse(stripped);
-  return format(collapsed, { parser: 'babel-ts' });
+  const escaped = reconcileNonAsciiInStringLiterals(collapsed);
+  return format(escaped, { parser: 'babel-ts' });
 }
 
 export function babelEngine(source: string, opts: BabelPluginFixtureOpts = {}): string {
@@ -443,6 +444,171 @@ export function reconcileSwcParamHygieneRenames(a: string, b: string): [string, 
  *  - SWC's already-collapsed form is a no-op (the pattern doesn't
  *    match the bare-identifier shape).
  */
+/**
+ * Codegen normalisation: encode non-ASCII characters inside `'…'` and
+ * `"…"` string literals as `\uXXXX` escape sequences on BOTH sides.
+ *
+ * Babel's `@babel/generator` emits non-ASCII chars in string literals
+ * as `\uXXXX` escapes by default (`jsescOption.minimal: false`). SWC's
+ * codegen emits the same chars verbatim. Both forms parse to the same
+ * runtime string, but the source bytes differ — visible in fixtures
+ * like `ct-refine-dropdown-jsx-error` (JSX text `→` becomes a string
+ * argument of `React.createElement` and surfaces as `"\u2192"` on
+ * Babel's side, `"→"` on SWC's).
+ *
+ * Compiled's CSS sheet construction independently produces `\u2192`
+ * inside its sheet strings (via `JSON.stringify`-style escaping at the
+ * css-builder layer), so those already match on both sides. This
+ * reconciler unifies the codegen path: encode everything ≥ 0x80 inside
+ * single- or double-quoted string literals to `\uXXXX`. Template
+ * literals (backtick-delimited) are left alone — they're parsed
+ * differently and their escape semantics aren't equivalent here.
+ *
+ * Runs BEFORE prettier in `normalise()` so the formatter sees the same
+ * shape on both sides (matching the `reconcileReactCreateElementSpreadCollapse`
+ * pattern).
+ */
+export function reconcileNonAsciiInStringLiterals(s: string): string {
+  let out = '';
+  let i = 0;
+  const len = s.length;
+  while (i < len) {
+    const ch = s[i];
+    if (ch === '`') {
+      // Template literal — copy through verbatim. Need to track nested
+      // `${...}` interpolations because those contain real expressions
+      // (which may themselves contain string literals we DO want to
+      // normalise). Track brace depth inside `${...}` and stop the
+      // template literal at the matching backtick.
+      out += ch;
+      i++;
+      let depth = 0;
+      while (i < len) {
+        const c = s[i];
+        if (c === '\\' && i + 1 < len) {
+          out += c + s[i + 1];
+          i += 2;
+          continue;
+        }
+        if (depth === 0 && c === '`') {
+          out += c;
+          i++;
+          break;
+        }
+        if (depth === 0 && c === '$' && s[i + 1] === '{') {
+          out += '${';
+          i += 2;
+          // Inside ${ ... } — recurse via depth counter and process
+          // characters with the outer logic. Easiest: collect until
+          // matching `}` accounting for nested `{` / `}` AND nested
+          // strings/templates, then run the outer reconciler on it.
+          let braces = 1;
+          let inner = '';
+          while (i < len && braces > 0) {
+            const ic = s[i];
+            if (ic === '\\' && i + 1 < len) {
+              inner += ic + s[i + 1];
+              i += 2;
+              continue;
+            }
+            if (ic === '"' || ic === "'") {
+              const quote = ic;
+              inner += ic;
+              i++;
+              while (i < len) {
+                const sc = s[i];
+                if (sc === '\\' && i + 1 < len) {
+                  inner += sc + s[i + 1];
+                  i += 2;
+                  continue;
+                }
+                inner += sc;
+                i++;
+                if (sc === quote) break;
+              }
+              continue;
+            }
+            if (ic === '`') {
+              // Nested template literal — copy through to its end,
+              // matching backticks at this brace level.
+              inner += ic;
+              i++;
+              while (i < len) {
+                const tc = s[i];
+                if (tc === '\\' && i + 1 < len) {
+                  inner += tc + s[i + 1];
+                  i += 2;
+                  continue;
+                }
+                inner += tc;
+                i++;
+                if (tc === '`') break;
+              }
+              continue;
+            }
+            if (ic === '{') braces++;
+            else if (ic === '}') {
+              braces--;
+              if (braces === 0) {
+                out += reconcileNonAsciiInStringLiterals(inner);
+                out += '}';
+                i++;
+                break;
+              }
+            }
+            inner += ic;
+            i++;
+          }
+          continue;
+        }
+        out += c;
+        i++;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      out += ch;
+      i++;
+      while (i < len) {
+        const c = s[i];
+        if (c === '\\' && i + 1 < len) {
+          out += c + s[i + 1];
+          i += 2;
+          continue;
+        }
+        if (c === quote) {
+          out += c;
+          i++;
+          break;
+        }
+        const code = c.charCodeAt(0);
+        if (code >= 0x80) {
+          // Handle surrogate pairs as a single \uXXXX\uXXXX sequence.
+          if (code >= 0xd800 && code <= 0xdbff && i + 1 < len) {
+            const low = s.charCodeAt(i + 1);
+            if (low >= 0xdc00 && low <= 0xdfff) {
+              out += '\\u' + code.toString(16).padStart(4, '0');
+              out += '\\u' + low.toString(16).padStart(4, '0');
+              i += 2;
+              continue;
+            }
+          }
+          out += '\\u' + code.toString(16).padStart(4, '0');
+          i++;
+          continue;
+        }
+        out += c;
+        i++;
+      }
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
 export function reconcileReactCreateElementSpreadCollapse(s: string): string {
   // Match `{` + optional whitespace/newlines + `...IDENT` + optional `,`
   // + optional whitespace/newlines + `}`. The IDENT is `[A-Za-z_$][A-Za-z0-9_$]*`

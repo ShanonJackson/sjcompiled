@@ -29,11 +29,9 @@ engines are reused verbatim so a fix in the WASM plugin reflects
 identically in both reports.
 
 ```bash
-bun parity-harness/fixtures-triage.mjs                     # all single-file (293)
-bun parity-harness/fixtures-triage.mjs --include-multi     # also run ct-* multi-file
+bun parity-harness/fixtures-triage.mjs                     # full corpus (no skip flags)
 bun parity-harness/fixtures-triage.mjs --only <name> [...] # iterate on specific fixtures
 bun parity-harness/fixtures-triage.mjs --print-diffs       # print divergences inline
-bun parity-harness/fixtures-triage.mjs --bail              # stop on first divergence
 ```
 
 Report lands at `parity-harness/fixtures-triage-report.json`.

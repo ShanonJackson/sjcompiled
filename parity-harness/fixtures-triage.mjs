@@ -2,13 +2,18 @@
  * Fixtures triage — runs every `/fixtures/*` source through the
  * Phase 6 babel-plugin parity engines and classifies outcomes.
  *
+ * Every fixture runs every time. There is no skip / gating flag —
+ * hiding fixtures behind a `--include-X` flag is how regressions
+ * silently accumulate, so the harness always covers the full corpus.
+ *
  * The /fixtures corpus differs from `parity-harness/babel-plugin/fixtures/`:
- *   - 336 directories at repo root, each with `input.{js,jsx,tsx}`.
+ *   - Directories at repo root, each with `input.{js,jsx,tsx}` and
+ *     optionally an `input-preprocessed.{js,jsx,tsx}` sibling (the
+ *     post-`@atlaskit/tokens/babel-plugin` form — see `findEntry`).
+ *   - Multi-file `ct-*` fixtures co-locate additional modules in the
+ *     same directory; they're run identically to single-file fixtures.
  *   - No per-fixture `opts` — every fixture runs with empty plugin
  *     options (matches `packages/equality-harness/scripts/verify.mjs`).
- *   - 293 single-file fixtures (the default scope of this script);
- *     43 multi-file (`ct-*` real-world cases pulled from the
- *     consuming monorepo) — gated behind `--include-multi`.
  *
  * Engines reused verbatim from `parity-harness/babel-plugin/engines.ts`:
  *   - `babelEngine`: Babel + @compiled/babel-plugin + preset-typescript
@@ -21,18 +26,16 @@
  *  - babel-throws      : Babel reference threw (negative-test fixture)
  *  - swc-throws        : SWC threw, Babel did not (port defect or known parse limit)
  *  - both-throw        : both threw (negative-test fixture, ok)
- *  - skipped-multifile : multi-file fixture, requires --include-multi
+ *  - skipped-no-input  : directory has no `input.*` (data-only fixture)
  *
  * Outputs:
  *  - JSON report at `parity-harness/fixtures-triage-report.json`
  *  - Stdout one-line summary
  *
  * Usage:
- *   bun parity-harness/fixtures-triage.mjs                 # all single-file
- *   bun parity-harness/fixtures-triage.mjs --only css-prop-basic styled-basic
- *   bun parity-harness/fixtures-triage.mjs --include-multi  # also run ct-* multi-file
- *   bun parity-harness/fixtures-triage.mjs --bail           # stop on first divergence
- *   bun parity-harness/fixtures-triage.mjs --print-diffs    # print divergences inline
+ *   bun parity-harness/fixtures-triage.mjs                            # full corpus
+ *   bun parity-harness/fixtures-triage.mjs --only css-prop-basic ...  # scope to specific fixtures
+ *   bun parity-harness/fixtures-triage.mjs --print-diffs              # print divergences inline
  *
  * The Babel+SWC pipeline is identical to the JSON-fixture triage
  * (`parity-harness/babel-plugin/triage.mjs`); only the corpus source
@@ -62,9 +65,7 @@ const FIXTURES_DIR = resolve(REPO_ROOT, 'fixtures');
 const REPORT_PATH = resolve(import.meta.dirname, 'fixtures-triage-report.json');
 
 const args = process.argv.slice(2);
-const BAIL = args.includes('--bail');
 const PRINT_DIFFS = args.includes('--print-diffs');
-const INCLUDE_MULTI = args.includes('--include-multi');
 const onlyIdx = args.indexOf('--only');
 const ONLY = onlyIdx >= 0
   ? args.slice(onlyIdx + 1).filter((a) => !a.startsWith('--'))
@@ -75,7 +76,23 @@ if (!existsSync(FIXTURES_DIR)) {
   process.exit(1);
 }
 
+// Prefer `input-preprocessed.{tsx,jsx,js}` over `input.{...}` when both
+// are present. The preprocessed sibling is the post-`@atlaskit/tokens/babel-plugin`
+// form: `token('radius.small')` calls have already been rewritten into
+// the `"var(--ds-radius-small, 4px)"` strings that Compiled actually
+// consumes in production. The Compiled plugin (both Babel reference and
+// SWC port) is downstream of that transform — it has zero knowledge of
+// the tokens plugin, and `cssMap`'s static-variant validator (correctly)
+// rejects unevaluable `token(...)` calls. Feeding the raw `input.tsx`
+// into BOTH engines makes them BOTH throw `STATIC_VARIANT_OBJECT` —
+// parity, but parity on an input the engines were never meant to see.
+// Using the preprocessed sibling gives the engines the AST shape the
+// production pipeline produces.
 function findEntry(dir) {
+  for (const ext of ['tsx', 'jsx', 'js']) {
+    const p = join(dir, `input-preprocessed.${ext}`);
+    if (existsSync(p)) return p;
+  }
   for (const ext of ['tsx', 'jsx', 'js']) {
     const p = join(dir, `input.${ext}`);
     if (existsSync(p)) return p;
@@ -94,7 +111,6 @@ const results = {
   'babel-throws': [],
   'swc-throws': [],
   'both-throw': [],
-  'skipped-multifile': [],
   'skipped-no-input': [],
 };
 
@@ -107,11 +123,6 @@ for (const name of fixtures) {
   const entry = findEntry(dir);
   if (!entry) {
     results['skipped-no-input'].push({ name });
-    continue;
-  }
-  const fileCount = readdirSync(dir).length;
-  if (fileCount > 1 && !INCLUDE_MULTI) {
-    results['skipped-multifile'].push({ name, fileCount });
     continue;
   }
 
@@ -173,11 +184,9 @@ for (const name of fixtures) {
   if (i % 10 === 0) {
     const elapsed = ((Date.now() - start) / 1000).toFixed(0);
     process.stderr.write(
-      `[${i}/${fixtures.length}] ${elapsed}s  parity=${results.parity.length}  div=${results.divergence.length}  swc-throw=${results['swc-throws'].length}  babel-throw=${results['babel-throws'].length}  both=${results['both-throw'].length}  skip=${results['skipped-multifile'].length}\r`,
+      `[${i}/${fixtures.length}] ${elapsed}s  parity=${results.parity.length}  div=${results.divergence.length}  swc-throw=${results['swc-throws'].length}  babel-throw=${results['babel-throws'].length}  both=${results['both-throw'].length}\r`,
     );
   }
-
-  if (BAIL && cat === 'divergence') break;
 }
 
 process.stderr.write('\n');
@@ -189,7 +198,6 @@ const summary = {
   'swc-throws': results['swc-throws'].length,
   'babel-throws': results['babel-throws'].length,
   'both-throw': results['both-throw'].length,
-  'skipped-multifile': results['skipped-multifile'].length,
   'skipped-no-input': results['skipped-no-input'].length,
   elapsedSeconds: Math.round((Date.now() - start) / 1000),
 };
