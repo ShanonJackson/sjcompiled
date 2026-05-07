@@ -5,6 +5,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
+# `build.rs` pins the WASM linear-memory stack size at 8 MiB for
+# any `wasm32-wasi*` target build. See `build.rs` module docs for
+# why this duplicates the `.cargo/config.toml` rustflag (defence in
+# depth against caller-environment-dependent config discovery).
+build = "build.rs"
 
 [lib]
 # `cdylib`: produces a `.wasm` for SWC plugin loading.

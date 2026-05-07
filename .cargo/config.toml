@@ -1,5 +1,9 @@
 # WASI plugin link config.
 #
+# Lives at the REPO ROOT so Cargo's config-file walk-up finds it
+# from any cwd at-or-below the repo (`cd crates && cargo …`,
+# `cd crates/babel-plugin && cargo …`, repo-root invocations, etc.).
+#
 # `-z stack-size=...` controls the WASM linear-memory stack reserved by
 # wasm-ld. The lld default is 1 MiB, which is insufficient for the
 # Compiled babel-plugin's mutually-recursive evaluator
@@ -15,5 +19,14 @@
 # region inside the plugin's linear memory — it does NOT add to the
 # plugin's on-disk size and does NOT change the host's resident memory
 # until the plugin actually pushes that deep.
+#
+# DEFENCE IN DEPTH: `crates/babel-plugin/build.rs` ALSO emits this
+# link-arg via `cargo:rustc-link-arg` for every `wasm32-wasi*`
+# target build. The build.rs is the bulletproof path (survives
+# `--manifest-path` invocations from outside the repo, vendored
+# builds, external consumers); this config file is kept for parity
+# with @swc-project's plugin examples and as a primary-source
+# documentation point. If you change the stack size here, change
+# it in `build.rs` too — both must agree.
 [target.wasm32-wasip1]
 rustflags = ["-C", "link-arg=-zstack-size=8388608"]
