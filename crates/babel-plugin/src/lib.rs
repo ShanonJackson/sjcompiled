@@ -51,7 +51,7 @@ use swc_core::plugin::plugin_transform;
 use swc_core::plugin::proxies::{PluginCommentsProxy, TransformPluginProgramMetadata};
 
 use crate::babel_plugin::BabelPluginVisitor;
-use crate::resolver::build_default;
+use crate::resolver::{build_default, build_from_config, ResolverConfig};
 use crate::types::PluginOptions;
 use crate::utils::comments::collect_line_comments;
 
@@ -80,11 +80,59 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
         .get_context(&TransformPluginMetadataContextKind::Filename)
         .unwrap_or_default();
 
-    // §4.6 bridge: build the default Compiled resolver and stash it
-    // on `state` so `resolve_binding::resolve_request` can reach it.
-    // `opts.extensions` honours `DEFAULT_CODE_EXTENSIONS` when unset
-    // (per `build_default` contract).
-    let resolver = Arc::new(build_default(opts.extensions.as_deref()));
+    // §4.6 bridge: build the Compiled resolver and stash it on
+    // `state` so `resolve_binding::resolve_request` can reach it.
+    //
+    // Three input shapes (mirrors `PluginOptions::resolver` doc):
+    //
+    // 1. `resolver: { ... }` — declarative JSON config per
+    //    `plugins/RESOLVER_SPEC.md`. Parsed via `ResolverConfig::parse_value`
+    //    and built via `build_from_config`. Empty `{}` is a valid
+    //    object that yields the §5.4b stock default-config resolver
+    //    (parity with Babel's `typeof resolver === 'object'` branch
+    //    storing `this.resolver = {}` and never invoking it for
+    //    inputs that don't need cross-file resolution).
+    // 2. `resolver: "..."` (string) / unsupported shape — Babel
+    //    `require()`s the module; the WASI plugin can't load JS
+    //    (PLAN.md §1 constraint 1). Fall back to `build_default`.
+    //    The host wrapper is documented as the strip-point for
+    //    string-form resolver values, but we don't hard-fail here
+    //    because some pipelines (incl. the parity harness) still
+    //    pass the raw config through.
+    // 3. Absent / `null` — `build_default`.
+    //
+    // If `ResolverConfig::parse_value` errors on a malformed object
+    // (unknown field, type mismatch, etc.), fall back to
+    // `build_default` rather than poisoning the whole plugin
+    // invocation. Surfacing the schema error to the host requires a
+    // diagnostics channel we don't yet have at the plugin boundary.
+    let resolver = match opts.resolver.as_ref() {
+        Some(v) => match ResolverConfig::parse_value(v) {
+            Ok(Some(cfg)) => {
+                // Resolve relative `fromFile` paths in `preferFirst`
+                // against `opts.root` if present, else the filename's
+                // dir, else `/` (the same fallback `set_filename`
+                // already uses for the cross-file resolver anchor).
+                let config_dir: std::path::PathBuf = opts
+                    .root
+                    .as_deref()
+                    .map(std::path::PathBuf::from)
+                    .or_else(|| {
+                        std::path::Path::new(&filename)
+                            .parent()
+                            .map(std::path::Path::to_path_buf)
+                    })
+                    .unwrap_or_else(|| std::path::PathBuf::from("/"));
+                match build_from_config(&cfg, &config_dir) {
+                    Ok(r) => Arc::new(r),
+                    Err(_) => Arc::new(build_default(opts.extensions.as_deref())),
+                }
+            }
+            // String / unsupported / null / parse error → default.
+            _ => Arc::new(build_default(opts.extensions.as_deref())),
+        },
+        None => Arc::new(build_default(opts.extensions.as_deref())),
+    };
 
     let mut visitor = BabelPluginVisitor::new(opts, comments);
     if !filename.is_empty() {

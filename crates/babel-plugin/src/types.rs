@@ -93,12 +93,32 @@ pub struct PluginOptions {
     #[serde(default)]
     pub optimize_css: Option<bool>,
 
-    /// String form only — module path of a custom resolver. The
-    /// object/callback variants are dropped at the host wrapper
-    /// boundary (PLAN.md constraint 1). Phase 5 §5.4 wires this into
-    /// the `oxc_resolver` config.
+    /// Consumer-supplied `resolver` config. Three accepted shapes:
+    ///
+    /// - **Object** — declarative JSON resolver per
+    ///   `plugins/RESOLVER_SPEC.md` / `RESOLVER_SPEC_PART_TWO.md`.
+    ///   Parsed into [`crate::resolver::config::ResolverConfig`] and
+    ///   handed to [`crate::resolver::build_from_config`] in
+    ///   `lib.rs::process`.
+    /// - **String** — module path of a JS resolver
+    ///   (e.g. `"@jira-dev/compiled-resolver"`). Cannot be honoured
+    ///   inside the WASI plugin (PLAN.md §1 constraint 1: no JS
+    ///   callbacks). Falls back to [`crate::resolver::build_default`];
+    ///   the host wrapper is documented as the place that should swap
+    ///   string-form `resolver` for the JSON object form before the
+    ///   config reaches the plugin.
+    /// - **Absent / null** — falls back to [`build_default`].
+    ///
+    /// Captured as a raw [`serde_json::Value`] so that mistyping any
+    /// nested key (or sending a shape the plugin doesn't yet honour)
+    /// cannot poison the whole [`PluginOptions`] deserialization. The
+    /// pre-§5.4 typing (`Option<String>`) caused **every other**
+    /// option to silently revert to its default whenever a consumer
+    /// set `resolver: { ... }`, because serde failed the entire
+    /// struct on the type mismatch — see `ct-afm-add-component-name-styled`
+    /// for the reproduction.
     #[serde(default)]
-    pub resolver: Option<String>,
+    pub resolver: Option<serde_json::Value>,
 
     /// File extensions the resolver considers as "code" (defaults to
     /// `DEFAULT_CODE_EXTENSIONS` in `constants.rs`).
