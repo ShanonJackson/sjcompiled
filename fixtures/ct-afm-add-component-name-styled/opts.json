@@ -1,0 +1,9 @@
+{
+  "addComponentName": true,
+  "extract": true,
+  "inlineCss": false,
+  "sortAtRules": true,
+  "sortShorthand": true,
+  "importSources": ["@atlaskit/css"],
+  "cache": false
+}
