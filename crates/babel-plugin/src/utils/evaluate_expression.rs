@@ -287,6 +287,24 @@ fn dispatch_evaluate<'a>(
                 effective_own_scope,
             ) {
                 Some(v)
+            } else if let Some(v) = try_cross_file_member_dispatch(
+                member,
+                meta,
+                scope_ptr,
+                parent_scope,
+                effective_own_scope,
+            ) {
+                // Cross-file member-access dispatch: bottom binding
+                // resolves to a foldable cross-file Ident
+                // (default-import or named-import) — re-walk the
+                // member chain against the imported file's scope so
+                // identifiers like `sharedStyles` in
+                // `export default sharedStyles` resolve through the
+                // imported file's `export const sharedStyles = {...}`
+                // binding rather than against the consumer scope
+                // (where the name is the import alias and has no
+                // foldable init).
+                Some(v)
             } else {
                 // SAFETY: see module-level.
                 let scope_ref: &ScopeIndex = unsafe { &*scope_ptr };
@@ -564,14 +582,130 @@ fn try_namespace_import_dispatch<'a>(
         parent_scope,
         own_scope,
     )?;
-    if !(resolved.constant
-        && resolved.source == BindingSource::Import
-        && resolved.imported_module.is_some()
-        && resolved.node.is_none())
-    {
+    if !(resolved.constant && resolved.source == BindingSource::Import) {
         return None;
     }
-    let imported_module: Arc<Module> = resolved.imported_module.unwrap();
+    // Two shapes route into the namespace dispatch:
+    //
+    // 1. **Direct namespace import** at the consumer:
+    //    `import * as X from './m'; X.foo` —
+    //    `resolve_binding` returns `node: None,
+    //    imported_module: Some(m_ast)`. The first member-access
+    //    element resolves against `m_ast`'s named exports.
+    //
+    // 2. **Namespace re-export through a named import** at the
+    //    consumer: `import { X } from './t'` where `t.ts` is
+    //    `import * as X from './m'; export { X };`. The first hop
+    //    of `resolve_binding` lands on the local Ident from
+    //    `export { X }` (so `node: Some(Ident("X"))`) and points
+    //    at `t.ts`'s AST. Mirrors upstream's
+    //    `traverse-identifier.ts:25-33` path: `evaluateExpression`
+    //    recurses on the resolved Ident with the imported meta,
+    //    `traverseIdentifier` re-runs `resolveBinding`, and Babel's
+    //    `getBinding` walks `t.ts`'s scope to land on the
+    //    `import * as X` binding — yielding the namespace target.
+    //    The Rust port performs the equivalent second-hop lookup
+    //    inline here so the namespace dispatcher can then evaluate
+    //    the access path against the FINAL namespace module's AST.
+    //
+    // 3. **Namespace re-export through `export * from`** —
+    //    upstream Babel via `traverse` follows star-exports into
+    //    every source. Not surfaced by any current corpus fixture;
+    //    deferred until a fixture lands.
+    let imported_module: Arc<Module> = if resolved.node.is_none()
+        && resolved.imported_module.is_some()
+    {
+        resolved.imported_module.unwrap()
+    } else if let (Some(node), Some(t_module)) =
+        (resolved.node.as_deref(), resolved.imported_module.as_ref())
+    {
+        // Shape (2): the resolved node is an Identifier whose
+        // local-side name is bound in the imported file as a
+        // namespace import. Look it up in `t_module`'s scope and
+        // follow through to the namespace target.
+        let Expr::Ident(local_id) = node else { return None };
+        let local_name = local_id.sym.as_str().to_string();
+        let t_idx = ScopeIndex::build(&**t_module);
+        let t_prog = t_idx.program_scope();
+        let local_binding = t_idx.get_binding(t_prog, &local_name)?;
+        let import_info = local_binding.import_info.as_ref()?;
+        if !matches!(
+            import_info.kind,
+            crate::compat::scope::ImportSpecifierKind::Namespace
+        ) {
+            return None;
+        }
+        // Resolve the namespace's source against the imported
+        // file's filename — same anchoring rule as
+        // `follow_reexport_hop` in resolve_binding.rs.
+        let from_path: std::path::PathBuf = resolved
+            .imported_filename
+            .as_deref()
+            .map(std::path::PathBuf::from)?;
+        let resolver = meta.state.resolver()?;
+        let resolved_path = resolver
+            .resolve_sync(&from_path, &import_info.source)
+            .ok()?;
+        let resolved_path_str = resolved_path.to_string_lossy().to_string();
+        let extensions: Vec<String> = meta
+            .state
+            .opts()
+            .extensions
+            .clone()
+            .unwrap_or_else(|| {
+                crate::constants::DEFAULT_CODE_EXTENSIONS
+                    .iter()
+                    .map(|s| (*s).to_string())
+                    .collect()
+            });
+        if !extensions.iter().any(|ext| resolved_path_str.ends_with(ext)) {
+            return None;
+        }
+        let cache = &meta.state.cache;
+        let path_for_read = resolved_path.clone();
+        let source = cache.read_file.borrow_mut().load(
+            Some("read-file"),
+            &resolved_path_str,
+            || std::fs::read_to_string(&path_for_read).unwrap_or_default(),
+        );
+        if source.is_empty() && !resolved_path.exists() {
+            return None;
+        }
+        let path_for_parse = resolved_path.clone();
+        let path_str_for_parse = resolved_path_str.clone();
+        cache
+            .parse_module
+            .borrow_mut()
+            .load(Some("parse-module"), &resolved_path_str, || {
+                use swc_core::common::sync::Lrc;
+                use swc_core::common::{FileName, SourceMap};
+                use swc_core::ecma::ast::EsVersion;
+                use swc_core::ecma::parser::{parse_file_as_module, Syntax, TsSyntax};
+                let cm: Lrc<SourceMap> = Lrc::new(SourceMap::default());
+                let fm = cm.new_source_file(
+                    Lrc::new(FileName::Real(path_for_parse.clone())),
+                    source.clone(),
+                );
+                let parsed = parse_file_as_module(
+                    &fm,
+                    Syntax::Typescript(TsSyntax {
+                        tsx: path_str_for_parse.ends_with(".tsx"),
+                        ..Default::default()
+                    }),
+                    EsVersion::Es2022,
+                    None,
+                    &mut Vec::new(),
+                )
+                .unwrap_or_else(|_| Module {
+                    span: Default::default(),
+                    body: Vec::new(),
+                    shebang: None,
+                });
+                Arc::new(parsed)
+            })
+    } else {
+        return None;
+    };
 
     // Build a fresh ScopeIndex over the imported module. Lives until
     // this preflight returns; subsequent recursion captures it.
@@ -623,6 +757,126 @@ fn try_namespace_import_dispatch<'a>(
         &mut imp_closure,
     );
     next_pair.value
+}
+
+/// Cross-file member-access dispatch: 1:1 port of upstream's
+/// `evaluateExpression(member, meta) → traverseMemberExpression →
+/// traverseMemberAccessPath` chain in the case where the bottom
+/// binding's `resolveBinding` returns `meta` SWAPPED to the
+/// imported file's scope.
+///
+/// Upstream `resolveBinding` (`resolve-binding.ts:401-414`) returns
+/// `{ node, meta: { ...meta, parentPath: foundParentPath, state: {
+/// ..., file: ast, filename: modulePath } } }` — so when
+/// `traverseMemberExpression` recurses on the resolved node via
+/// `evaluateExpression`, every downstream `path.scope.getBinding`
+/// lookup walks the imported file's scope chain. The Rust port
+/// drops the `meta`-swap (documented in `traverse_identifier.rs`)
+/// in favour of routing cross-file at the dispatch boundary; this
+/// helper closes the member-access half of that contract that
+/// `try_namespace_import_dispatch` left open.
+///
+/// Engages when:
+///   - The member chain has a binding identifier (no
+///     `member-of-member` head shape).
+///   - `resolve_binding` returns `source: Import,
+///     imported_module: Some, node: Some(Expr::Ident)` —
+///     i.e. cross-file with a non-namespace foldable Ident
+///     (covers `import x from './m'` for default exports
+///     where `m` re-exports `export default x`, and
+///     `import { x }` where the imported module is
+///     `export { x };`).
+///
+/// Returns `None` to fall through (typical case: same-file
+/// member access, namespace handled by the sibling helper).
+fn try_cross_file_member_dispatch<'a>(
+    member: &MemberExpr,
+    meta: &mut Metadata<'a>,
+    scope_ptr: *mut ScopeIndex,
+    parent_scope: ScopeId,
+    own_scope: Option<ScopeId>,
+) -> Option<Box<Expr>> {
+    let info = collect_member_meta(member);
+    let binding_id = info.binding_identifier?;
+
+    // SAFETY: see module-level. Local immutable reborrow for the
+    // resolve_binding lookup; no mutation.
+    let scope_ref: &ScopeIndex = unsafe { &*scope_ptr };
+    let resolved = resolve_binding(
+        binding_id.sym.as_str(),
+        &*meta,
+        scope_ref,
+        parent_scope,
+        own_scope,
+    )?;
+
+    if !(resolved.constant && resolved.source == BindingSource::Import) {
+        return None;
+    }
+    let imported_module = resolved.imported_module.as_ref()?;
+    let resolved_node = resolved.node.as_ref()?;
+    // Only the Ident shape — Object/Lit shapes don't need a scope
+    // swap (they're already final values).
+    let Expr::Ident(_) = &**resolved_node else {
+        return None;
+    };
+
+    // Build a fresh ScopeIndex over the imported module and re-walk
+    // the member chain against it. Rebuild the chain head with the
+    // resolved Ident — the same `node` shape upstream's
+    // `traverseMemberExpression` recurses on with the swapped meta.
+    let mut imported_idx = ScopeIndex::build(&**imported_module);
+    let imp_prog = imported_idx.program_scope();
+
+    // Re-construct the member expression with the resolved Ident as
+    // the binding identifier. The member structure (access path) is
+    // preserved so consumers like `traverse_member_access_path` see
+    // the same path. This mirrors upstream's `evaluateExpression(
+    // member /* unchanged */, swappedMeta)` — the AST node identity
+    // doesn't change; only `meta`'s scope chain does.
+    let mut rebuilt_member = member.clone();
+    replace_binding_identifier(&mut rebuilt_member, &binding_id);
+
+    // Closure that recurses via `dispatch_evaluate` with the
+    // imported scope. SAFETY: imp_scope_ptr lives as long as
+    // `imported_idx`, which is owned by this preflight frame.
+    let imp_scope_ptr: *mut ScopeIndex = &mut imported_idx;
+    let mut imp_closure = move |e: &Expr, m: &mut Metadata<'_>| -> ResultPair {
+        let inner = unsafe { &mut *imp_scope_ptr };
+        dispatch_evaluate(e, m, inner, imp_prog, None)
+    };
+
+    // SAFETY: re-borrow imported_idx immutably for the leaf.
+    let imp_ref: &ScopeIndex = unsafe { &*imp_scope_ptr };
+    let pair = traverse_member_expression(
+        &rebuilt_member,
+        meta,
+        imp_ref,
+        imp_prog,
+        None,
+        &mut imp_closure,
+    );
+    pair.value
+}
+
+/// Replace the bottom (left-most) Ident in a MemberExpression chain
+/// with `new_id`. Walks down `expression.obj` until it hits the
+/// Ident leaf. Used by `try_cross_file_member_dispatch` to swap the
+/// chain head with the resolved cross-file Ident.
+fn replace_binding_identifier(member: &mut MemberExpr, new_id: &Ident) {
+    let mut cursor: &mut Expr = &mut *member.obj;
+    loop {
+        match cursor {
+            Expr::Member(inner) => {
+                cursor = &mut *inner.obj;
+            }
+            Expr::Ident(_) => {
+                *cursor = Expr::Ident(new_id.clone());
+                return;
+            }
+            _ => return,
+        }
+    }
 }
 
 /// Local mirror of `traverse_member_expression::get_member_expression_meta`.

@@ -23,3 +23,4 @@ pub mod paren;
 pub mod path;
 pub mod scope;
 pub mod template_literal_raw;
+pub mod wasi_path;

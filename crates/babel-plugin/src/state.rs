@@ -579,11 +579,57 @@ pub enum CleanupKind {
     Remove,
 }
 
-/// Placeholder for the Phase 5 `Cache`. Today this is empty so
-/// dispatcher code can hold a `&mut State.cache` without a type
-/// dependency on the unported cache module.
+/// Per-transform binding-resolution cache — Layer-1 1:1 with
+/// upstream's `meta.state.cache` consumed by `resolve-binding.ts`.
+///
+/// Upstream collapses every namespace into one `Cache<any>` instance
+/// keyed by `hash(namespace----cacheKey)`. Rust requires a concrete
+/// `T` per call site, so we split into one [`crate::utils::cache::Cache`]
+/// per namespace. The split is a representation detail — keys are
+/// computed via `Cache::get_unique_key(cache_key, Some(namespace))`
+/// (1:1 with upstream `getUniqueKey`) so the eviction semantics
+/// stay identical.
+///
+/// Lives on [`State`] (per-file) so SWC's WASI tear-down is sound:
+/// the cache is born and dies with the transform, no cross-call
+/// state. Matches Babel's default-options shape (no `opts.cache`):
+/// each `pre()` constructs a fresh `Cache`. Upstream's
+/// `globalCache` (cross-transform) is gated on `opts.cache: true`
+/// — not used by the corpus — so we don't model it here.
+///
+/// `RefCell` provides interior mutability because callers reach
+/// `state.cache` through `&Metadata<'_>` (shared borrow) — the
+/// resolver's binding-resolution path is read-shaped from the
+/// caller's POV (returns a value), but the cache itself mutates on
+/// hit (LRU bump) and miss (insert). Single-threaded WASM means
+/// no contention; `RefCell` is the right tool.
 #[derive(Debug, Default)]
-pub struct CacheSlot;
+pub struct CacheSlot {
+    /// `read-file` namespace — module path → file contents.
+    pub(crate) read_file: std::cell::RefCell<crate::utils::cache::Cache<String>>,
+
+    /// `parse-module` namespace — module path → parsed AST. The
+    /// `Arc` mirrors upstream's by-reference share semantics
+    /// (multiple resolutions in the same transform reuse the
+    /// same parsed Module without re-parsing).
+    pub(crate) parse_module:
+        std::cell::RefCell<crate::utils::cache::Cache<Arc<swc_core::ecma::ast::Module>>>,
+
+    /// `find-default-export-module-node` namespace — module path
+    /// → `ExportResult` (the matched default-export init expr,
+    /// or `None` if no default export).
+    pub(crate) find_default_export: std::cell::RefCell<
+        crate::utils::cache::Cache<Option<crate::utils::traversers::ExportResult>>,
+    >,
+
+    /// `find-named-export-module-node` namespace — keyed by
+    /// `modulePath=<path>&exportName=<name>` (1:1 with upstream
+    /// `cacheKey`). Same value-shape as the default-export
+    /// cache.
+    pub(crate) find_named_export: std::cell::RefCell<
+        crate::utils::cache::Cache<Option<crate::utils::traversers::ExportResult>>,
+    >,
+}
 
 /// One entry in the §6.5 file-wide comment store. `start_line` /
 /// `end_line` are 1-indexed lines as resolved through the SWC

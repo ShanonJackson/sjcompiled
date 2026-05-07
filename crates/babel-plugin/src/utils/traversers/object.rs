@@ -64,7 +64,7 @@ pub fn get_object_property_value(
             _ => continue,
         }
         if *key_sym == *property_name {
-            return Some(ExportResult { node: Some(value) });
+            return Some(ExportResult { node: Some(value), reexport_from: None });
         }
     }
     None

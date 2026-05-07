@@ -43,3 +43,11 @@ One-time exception (2026-05-04): a historic fork-prefix rename was reverted to `
 ## Final bit of important info.
 - crates/css is a 100% CONFIRMED faithful rewrite of the original. /packages/css/trasnformts. -> transformCSS is PROVEN BYTE-IDENTICAL against the RUST version even inside AFM's 90GB monorepo. That means bugs HAVE to be in our packages/babel-plugin and packages/babel-plugin-strip-runtime ports from now on.
 - Although packages/babel-plugin, packages/babel-plugin-strip-runtime are 100% immutable you may add logging aslong as you clean it up afterwards to see where an input diverges from what you have in your copy.
+
+## Running fixtures / parity harness
+ALWAYS run parity-harness scripts (`_probe.mjs`, `fixtures-triage.mjs`, etc.) from the repo root (`/Users/sjackson3/Documents/sjcompiled`). The SWC plugin runs in a WASI sandbox whose only preopen is `process.cwd()` mounted at `/cwd`; cross-file resolutions silently deopt if cwd is not the repo root because fixture paths fall outside the preopen. Symptom: every multi-file import fixture diverges with `var(--…)` instead of inlined values, with no error.
+
+
+## Build it notes.
+- "--release" builds take like 2-3 minutes is normal
+- [target.wasm32-wasip1] rustflags = ["-C", "link-arg=-zstack-size=8388608"] is REQUIRED because recursion is extremely common in our faithful port.

@@ -44,10 +44,17 @@
 //!   recurses into [`crate::compat::evaluation::evaluate`] for
 //!   constant-folding — the §5.0c evaluator handles literal /
 //!   identifier folds; non-foldable shapes deopt.
-//! - The JS `meta.state.cache.load` infrastructure isn't replicated
-//!   per the §5.4 caching lock (WASI tear-down between transforms
-//!   makes cross-call caching unsound). `fs::read_to_string` +
-//!   `parse_file_as_module` run on every resolution.
+//! - The JS `meta.state.cache.load` infrastructure IS replicated
+//!   for the four namespaces consumed by this file (`read-file`,
+//!   `parse-module`, `find-default-export-module-node`,
+//!   `find-named-export-module-node`). The cache lives on
+//!   `State.cache` (per-transform) — sound under WASI's
+//!   per-transform tear-down because the cache is born/dropped
+//!   with each invocation. Mirrors Babel's default-options
+//!   behaviour where each `pre()` constructs a fresh `Cache`
+//!   (upstream `babel-plugin.ts:80-91`). The `opts.cache: true`
+//!   cross-transform `globalCache` upstream gate isn't on the
+//!   corpus; not modelled.
 //! - The breadcrumb requirement at every `get_binding` /
 //!   `get_own_binding` call site per §5.0c Finding 7 is honoured —
 //!   each call carries the lazy-crawl reference comment.
@@ -638,37 +645,75 @@ where
         return None;
     }
 
-    // Read + parse the imported file. JS uses meta.state.cache; we
-    // skip caching per the §5.4 caching lock.
-    let source = fs::read_to_string(&module_path).ok()?;
-    let cm: Lrc<SourceMap> = Lrc::new(SourceMap::default());
-    let fm = cm.new_source_file(
-        Lrc::new(FileName::Real(module_path.clone())),
-        source,
+    // Read + parse the imported file. 1:1 port of upstream
+    // `meta.state.cache.load({namespace: 'read-file', ...})` and
+    // `{namespace: 'parse-module', ...}` (`resolve-binding.ts:307-322`).
+    // Per-transform caching keyed on `module_path_str` so a single
+    // imported module is read+parsed ONCE per transform regardless
+    // of how many references resolve to it. Sound under WASI's
+    // per-transform tear-down: the cache lives on `State` which is
+    // born/dropped with each plugin invocation. Mirrors Babel's
+    // default-options behaviour (no `opts.cache`) where each `pre()`
+    // constructs a fresh `Cache`.
+    let cache = &meta.state.cache;
+    let module_path_for_read = module_path.clone();
+    let source = cache.read_file.borrow_mut().load(
+        Some("read-file"),
+        &module_path_str,
+        || fs::read_to_string(&module_path_for_read).unwrap_or_default(),
     );
-    let imported_module: Module = parse_file_as_module(
-        &fm,
-        Syntax::Typescript(TsSyntax {
-            tsx: module_path_str.ends_with(".tsx"),
-            ..Default::default()
-        }),
-        EsVersion::Es2022,
-        None,
-        &mut Vec::new(),
-    )
-    .ok()?;
-    // Wrap the imported AST in Arc so it can be threaded forward
-    // to the §5.6 evaluator via `PartialBindingWithMeta::imported_module`
-    // — see the type-level doc-comment on `PartialBindingWithMeta`
-    // for the cross-file scope-swap parity contract. Multiple
-    // recursive folds inside the same imported file share the Arc.
-    let imported_module_arc: std::sync::Arc<Module> = std::sync::Arc::new(imported_module);
+    if source.is_empty() && !module_path.exists() {
+        return None;
+    }
+    let module_path_for_parse = module_path.clone();
+    let module_path_str_for_parse = module_path_str.clone();
+    let imported_module_arc: std::sync::Arc<Module> = cache
+        .parse_module
+        .borrow_mut()
+        .load(Some("parse-module"), &module_path_str, || {
+            let cm: Lrc<SourceMap> = Lrc::new(SourceMap::default());
+            let fm = cm.new_source_file(
+                Lrc::new(FileName::Real(module_path_for_parse.clone())),
+                source.clone(),
+            );
+            let parsed = parse_file_as_module(
+                &fm,
+                Syntax::Typescript(TsSyntax {
+                    tsx: module_path_str_for_parse.ends_with(".tsx"),
+                    ..Default::default()
+                }),
+                EsVersion::Es2022,
+                None,
+                &mut Vec::new(),
+            )
+            // Parser errors → Arc-wrap an empty Module so the cache
+            // entry is uniform; the export-lookup below returns None
+            // and the caller deopts. Mirrors upstream `parse(...)`
+            // throwing → bubbles up through `cache.load` and the
+            // try/catch in the visitor downgrades to deopt.
+            .unwrap_or_else(|_| Module {
+                span: Default::default(),
+                body: Vec::new(),
+                shebang: None,
+            });
+            std::sync::Arc::new(parsed)
+        });
 
-    // Find the matching export.
+    // Find the matching export. 1:1 with upstream's
+    // `find-default-export-module-node` /
+    // `find-named-export-module-node` cache namespaces
+    // (`resolve-binding.ts:328-339,344-358`). Caching here means
+    // repeated references to the SAME imported export skip the
+    // AST-walk done by `get_*_export`.
     let export_result: Option<ExportResult> = match import_info.kind {
-        crate::compat::scope::ImportSpecifierKind::Default => {
-            get_default_export(&imported_module_arc)
-        }
+        crate::compat::scope::ImportSpecifierKind::Default => cache
+            .find_default_export
+            .borrow_mut()
+            .load(
+                Some("find-default-export-module-node"),
+                &module_path_str,
+                || get_default_export(&imported_module_arc),
+            ),
         crate::compat::scope::ImportSpecifierKind::Namespace => {
             // import * as theme from 'theme' — no foldable expression.
             // Return Some-with-None so the caller knows it was found
@@ -699,18 +744,199 @@ where
                 .imported_name
                 .as_deref()
                 .unwrap_or(reference_name);
-            get_named_export(&imported_module_arc, imported_name)
+            // 1:1 with upstream cacheKey
+            // `modulePath=${modulePath}&exportName=${exportName}`
+            // (`resolve-binding.ts:346`).
+            let cache_key = format!(
+                "modulePath={}&exportName={}",
+                module_path_str, imported_name
+            );
+            let imported_module_for_lookup = imported_module_arc.clone();
+            let imported_name_owned = imported_name.to_string();
+            cache.find_named_export.borrow_mut().load(
+                Some("find-named-export-module-node"),
+                &cache_key,
+                || get_named_export(&imported_module_for_lookup, &imported_name_owned),
+            )
         }
     };
 
     let Some(export) = export_result else {
         return None;
     };
+
+    // Re-export-from chain: 1:1 with upstream
+    // `binding.path.isExportNamedDeclaration()` branch
+    // (`resolve-binding.ts:367-394`). When the matched export is
+    // `export { local [as exported] } from './mod'` (or `export {
+    // x as default } from './mod'`), upstream parses `./mod`
+    // RELATIVE to the IMPORTED module's filename and dispatches to
+    // `getNamedExport(ast, local)` / `getDefaultExport(ast)`.
+    //
+    // The Rust port carries the hop on `ExportResult.reexport_from`
+    // and chases here, anchored to the *imported* module's path so
+    // relative specifiers (`./tokens`) resolve from the imported
+    // file's directory rather than the consumer's. Loop-bounded to
+    // avoid pathological circular re-export chains; matches
+    // upstream's implicit termination via Babel's
+    // `binding.path` shape (a non-re-export path breaks the
+    // `isExportNamedDeclaration() && source` chain).
+    if let Some(hop) = export.reexport_from {
+        return follow_reexport_hop(
+            hop,
+            &module_path,
+            binding.constant,
+            meta,
+            cache,
+            0,
+        );
+    }
+
     Some(PartialBindingWithMeta {
         node: export.node,
         constant: binding.constant,
         source: BindingSource::Import,
         imported_filename: Some(module_path_str),
+        imported_module: Some(imported_module_arc),
+    })
+}
+
+// ───────── Re-export-from chain follower ─────────
+
+/// Follow a `ReexportHop` (`export { x [as y] } from './mod'`) one
+/// hop deeper. 1:1 with upstream `resolve-binding.ts:367-394`'s
+/// `binding.path.isExportNamedDeclaration()` branch.
+///
+/// The `from_path` anchor is the IMPORTED module's filename — the
+/// hop's `source` specifier is resolved RELATIVE to it (mirrors
+/// `resolveRequest(moduleImportSource, extensions, meta)` upstream
+/// where `meta.state.filename` was already swapped via the
+/// returning resolveBinding's meta-mutation at line 408-413). The
+/// `_depth` parameter caps recursion; upstream relies on AST
+/// shape termination (a non-re-export path breaks the chain) but
+/// the Rust port adds an explicit cap to defuse pathological
+/// circular re-export graphs (mutual `export {x} from './b'` /
+/// `export {x} from './a'`). 32 hops is far beyond any sane
+/// re-export chain in the corpus.
+fn follow_reexport_hop(
+    hop: crate::utils::traversers::ReexportHop,
+    from_path: &std::path::Path,
+    constant: bool,
+    meta: &Metadata<'_>,
+    cache: &crate::state::CacheSlot,
+    depth: u32,
+) -> Option<PartialBindingWithMeta> {
+    if depth >= 32 {
+        return None;
+    }
+    // Resolve the hop's source against the IMPORTED file's path.
+    let resolver = meta.state.resolver()?;
+    let resolved_path = resolver.resolve_sync(from_path, &hop.source).ok()?;
+    let resolved_path_str = resolved_path.to_string_lossy().to_string();
+
+    // Extension gate — same as the named-import branch.
+    let extensions: Vec<String> = meta
+        .state
+        .opts()
+        .extensions
+        .clone()
+        .unwrap_or_else(|| {
+            crate::constants::DEFAULT_CODE_EXTENSIONS
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect()
+        });
+    if !extensions.iter().any(|ext| resolved_path_str.ends_with(ext)) {
+        return None;
+    }
+
+    // Cached read+parse, same shape as the named-import branch.
+    let resolved_path_for_read = resolved_path.clone();
+    let source = cache.read_file.borrow_mut().load(
+        Some("read-file"),
+        &resolved_path_str,
+        || std::fs::read_to_string(&resolved_path_for_read).unwrap_or_default(),
+    );
+    if source.is_empty() && !resolved_path.exists() {
+        return None;
+    }
+    let resolved_path_for_parse = resolved_path.clone();
+    let path_str_for_parse = resolved_path_str.clone();
+    let imported_module_arc: std::sync::Arc<Module> = cache
+        .parse_module
+        .borrow_mut()
+        .load(Some("parse-module"), &resolved_path_str, || {
+            let cm: Lrc<SourceMap> = Lrc::new(SourceMap::default());
+            let fm = cm.new_source_file(
+                Lrc::new(FileName::Real(resolved_path_for_parse.clone())),
+                source.clone(),
+            );
+            let parsed = parse_file_as_module(
+                &fm,
+                Syntax::Typescript(TsSyntax {
+                    tsx: path_str_for_parse.ends_with(".tsx"),
+                    ..Default::default()
+                }),
+                EsVersion::Es2022,
+                None,
+                &mut Vec::new(),
+            )
+            .unwrap_or_else(|_| Module {
+                span: Default::default(),
+                body: Vec::new(),
+                shebang: None,
+            });
+            std::sync::Arc::new(parsed)
+        });
+
+    // Default vs named lookup, mirroring upstream's
+    // `resolve-binding.ts:386-388`.
+    let export_result: Option<ExportResult> = if hop.is_default {
+        let imported_for_lookup = imported_module_arc.clone();
+        cache.find_default_export.borrow_mut().load(
+            Some("find-default-export-module-node"),
+            &resolved_path_str,
+            || get_default_export(&imported_for_lookup),
+        )
+    } else {
+        let cache_key = format!(
+            "modulePath={}&exportName={}",
+            resolved_path_str, hop.local_name
+        );
+        let imported_for_lookup = imported_module_arc.clone();
+        let local_owned = hop.local_name.clone();
+        cache.find_named_export.borrow_mut().load(
+            Some("find-named-export-module-node"),
+            &cache_key,
+            || get_named_export(&imported_for_lookup, &local_owned),
+        )
+    };
+
+    let Some(export) = export_result else {
+        return None;
+    };
+
+    // Recursive hop: the resolved export may itself be another
+    // re-export-from (`export { x } from './a'` where a.js does
+    // `export { x } from './b'`). Mirrors upstream's `traverse`
+    // visitor following ExportNamedDeclaration through every hop
+    // until a real declaration is hit.
+    if let Some(next_hop) = export.reexport_from {
+        return follow_reexport_hop(
+            next_hop,
+            &resolved_path,
+            constant,
+            meta,
+            cache,
+            depth + 1,
+        );
+    }
+
+    Some(PartialBindingWithMeta {
+        node: export.node,
+        constant,
+        source: BindingSource::Import,
+        imported_filename: Some(resolved_path_str),
         imported_module: Some(imported_module_arc),
     })
 }

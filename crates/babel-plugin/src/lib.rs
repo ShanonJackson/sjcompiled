@@ -76,9 +76,25 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
     // when the host omits the context — `resolve_binding` treats
     // `Some("")` the same as `None` because the upstream JS plugin
     // also bails on missing filename.
-    let filename: String = meta
+    let raw_filename: String = meta
         .get_context(&TransformPluginMetadataContextKind::Filename)
         .unwrap_or_default();
+
+    // WASI sandbox path translation. SWC threads the host-absolute
+    // path here; the WASI runtime only grants access to a single
+    // preopen mounted at `/cwd` (per
+    // `crates/babel-plugin/PHASE0_FINDINGS.md`). Every downstream
+    // `std::fs::*` / `oxc_resolver` call has to see the path in
+    // `/cwd/<rel>` form or it ENOTCAPABLES out and cross-file
+    // resolution silently deopts. Native callers (`run_dispatcher`
+    // tests, in-process integration) pass `opts.root = None`, so
+    // `host_to_wasi` is a no-op there. See `compat::wasi_path`.
+    //
+    // No upstream Babel analogue: Node has no equivalent sandbox,
+    // so `packages/babel-plugin` has nothing to port from. This is
+    // a pure host-environment compat shim per `compat/` discipline.
+    let host_root = opts.root.as_deref().unwrap_or("");
+    let filename: String = crate::compat::wasi_path::host_to_wasi(&raw_filename, host_root);
 
     // §4.6 bridge: build the Compiled resolver and stash it on
     // `state` so `resolve_binding::resolve_request` can reach it.
@@ -113,10 +129,20 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
                 // against `opts.root` if present, else the filename's
                 // dir, else `/` (the same fallback `set_filename`
                 // already uses for the cross-file resolver anchor).
+                //
+                // Translate the host root through the same `/cwd`
+                // mount used for `filename` above, so the resolver
+                // walks paths visible to the WASI preopen. Native
+                // callers pass `host_root = ""` and `host_to_wasi` is
+                // a no-op.
                 let config_dir: std::path::PathBuf = opts
                     .root
                     .as_deref()
-                    .map(std::path::PathBuf::from)
+                    .map(|r| {
+                        std::path::PathBuf::from(crate::compat::wasi_path::host_to_wasi(
+                            r, host_root,
+                        ))
+                    })
                     .or_else(|| {
                         std::path::Path::new(&filename)
                             .parent()

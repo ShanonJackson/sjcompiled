@@ -1,0 +1,19 @@
+# WASI plugin link config.
+#
+# `-z stack-size=...` controls the WASM linear-memory stack reserved by
+# wasm-ld. The lld default is 1 MiB, which is insufficient for the
+# Compiled babel-plugin's mutually-recursive evaluator
+# (`utils::evaluate_expression::dispatch_evaluate` ↔
+# `traverse_expression/*` leaves) under deep cross-file member-access
+# chains (e.g. `Tokens.section.subsection.value` patterns common in
+# AFM theming). Symptom of a 1 MiB overflow is a silent WASM trap mid
+# `format!()` (manifests as a stuck plugin invocation and runaway
+# host CPU growth as wasmer attempts to grow linear memory).
+#
+# 8 MiB is the value @swc-project's own examples ship with for plugins
+# that walk non-trivial ASTs. The reservation is a single contiguous
+# region inside the plugin's linear memory — it does NOT add to the
+# plugin's on-disk size and does NOT change the host's resident memory
+# until the plugin actually pushes that deep.
+[target.wasm32-wasip1]
+rustflags = ["-C", "link-arg=-zstack-size=8388608"]

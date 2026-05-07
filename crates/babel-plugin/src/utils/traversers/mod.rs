@@ -41,4 +41,4 @@ mod types;
 pub use get_export::{get_default_export, get_named_export};
 pub use object::get_object_property_value;
 pub use set_imported_compiled_imports::set_imported_compiled_imports;
-pub use types::ExportResult;
+pub use types::{ExportResult, ReexportHop};
