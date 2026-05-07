@@ -191,6 +191,16 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
     // pre-pass aligns the SWC AST to Babel's shape before any
     // visitor runs. See `crates/babel-plugin/src/compat/template_literal_raw.rs`.
     crate::compat::template_literal_raw::normalize_template_literal_raw(&mut p);
+    // Babel-pipeline parity: `@babel/preset-typescript` with
+    // `onlyRemoveTypeImports: true` strips `import type {…}` and
+    // `import { type X, … }` specifiers BEFORE the Compiled plugin
+    // visitor runs. SWC's `runPluginFirst: true` schedules our
+    // plugin BEFORE its built-in TS strip, so without this pre-pass
+    // we'd see type-only specifiers Babel never sees, leaving an
+    // empty `import "@compiled/react";` shell in the output where
+    // Babel drops the import entirely. See
+    // `crates/babel-plugin/src/compat/import_type_specifier.rs`.
+    crate::compat::import_type_specifier::strip_type_only_import_specifiers(&mut p);
     let line_index = collect_line_comments(&p, &visitor.comments, &meta.source_map);
     visitor.state.set_comment_lines(line_index.comments);
     visitor.state.set_span_lines(line_index.spans);

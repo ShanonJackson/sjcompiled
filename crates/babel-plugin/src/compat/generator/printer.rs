@@ -352,7 +352,7 @@ impl<'c> Printer<'c> {
         };
         if let Some(list) = comments.take_leading(pos) {
             for c in list {
-                self.print_comment(&c);
+                self.print_comment(&c, CommentPosition::Leading);
             }
         }
     }
@@ -366,7 +366,7 @@ impl<'c> Printer<'c> {
         };
         if let Some(list) = comments.take_trailing(pos) {
             for c in list {
-                self.print_comment(&c);
+                self.print_comment(&c, CommentPosition::Trailing);
             }
         }
     }
@@ -378,22 +378,59 @@ impl<'c> Printer<'c> {
     ///   token's emit handles its own leading-space policy).
     /// - For line comments: emit `// …` then a newline.
     /// - Skip if already printed (Babel's `_printedComments` Set).
-    pub fn print_comment(&mut self, comment: &Comment) {
+    ///
+    /// `position` distinguishes the two upstream call paths in
+    /// `_printComments` (lib/printer.js:760-825): the LEADING branch
+    /// emits a `newline(1)` before a leading line-comment when the
+    /// buffer has content (`offset = leadingCommentNewline = 1`),
+    /// while the TRAILING branch keeps the comment on the same line
+    /// (offset 0 unless the comment's source line is later than the
+    /// node end). Without this distinction, a leading-position line
+    /// comment between an operator and the next token (e.g. inside a
+    /// `?:` consequent) gets emitted as `? // …` instead of Babel's
+    /// `?\n// …`. The Compiled CSS-variable hash is computed from
+    /// `generate(node).code` so that whitespace difference flips the
+    /// `--_xxx` hash and every consumer of that variable. See
+    /// `fixtures/ct-backlog-panel-card-length-mismatch`.
+    pub fn print_comment(&mut self, comment: &Comment, position: CommentPosition) {
         // Dedup by Span.lo (BytePos uniquely identifies a comment).
         if !self.printed_comments.insert(comment.span.lo.0) {
             return;
         }
 
+        // Upstream `_printComments` LEADING branch (lib/printer.js:769-779):
+        // when emitting a line-comment as the first leading comment of
+        // a node and the buffer already has content, force a newline
+        // before the `//`. Without this Babel would emit
+        // `prevToken // comment\nnextToken` as
+        // `prevToken // comment\nnextToken` — i.e. comment hugging the
+        // previous token on the same line — which it emphatically does
+        // NOT do for source-loc'd line comments.
+        if position == CommentPosition::Leading
+            && comment.kind == CommentKind::Line
+            && self.buf.has_content()
+            && self.buf.get_last_char() != b'\n'
+        {
+            self.newline(1);
+        }
+
         let last = self.buf.get_last_char();
         // Babel's rule: insert a leading space unless the buffer's
-        // tail is `[` or `{`. This is the policy that produces
+        // tail is `[` / `{` / newline. This is the policy that produces
         // `cond ? /* yes */'a-class' : 'b-class'` (no space between
         // `*/` and `'a-class'`) — the leading-space-before-comment
         // rule fires once before `/*`, but no trailing space is
         // emitted after `*/`. The next print() call's first
         // operation (e.g. `token('a-class')`) handles its own
         // leading-token policy.
-        if last != b'[' && last != b'{' && self.buf.has_content() {
+        //
+        // Skipping the space when tail is `\n` lets the leading-line-
+        // comment branch above produce `prevTok\n// foo` instead of
+        // `prevTok\n // foo` (note the stray space). The
+        // newline-emission above runs unconditionally for line
+        // comments at LEADING position; the space-emission here would
+        // otherwise re-add a space the upstream printer doesn't.
+        if last != b'[' && last != b'{' && last != b'\n' && self.buf.has_content() {
             self.space();
         }
 
@@ -423,6 +460,15 @@ impl<'c> Printer<'c> {
             }
         }
     }
+}
+
+/// Distinguishes the upstream call path in `_printComments`. See
+/// `print_comment` for why a leading line-comment needs a newline
+/// before its `//` while a trailing one keeps the same line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommentPosition {
+    Leading,
+    Trailing,
 }
 
 /// `needsParens(node, parent)` — top-level dispatch. Returns true when

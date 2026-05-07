@@ -17,6 +17,7 @@
 pub mod evaluation;
 pub mod generator;
 pub mod globals;
+pub mod import_type_specifier;
 pub mod is_prop_valid;
 pub mod jsesc;
 pub mod paren;
