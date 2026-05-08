@@ -196,61 +196,103 @@ These are non-negotiable. Any deviation requires re-reading
 problem for autoprefixer (FS walk + browserslist resolution + downstream
 table-iteration done once on the host, snapshotted to postcard bytes,
 ingested by the WASI plugin without re-running the slow path). The
-cssnano fix follows the same shape:
+cssnano fix follows the same shape with a smaller payload because the
+per-plugin downstream work is much lighter (a handful of
+`is_supported` / `.iter().any(...)` calls per transform vs autoprefixer's
+full PREFIXES table iteration).
+
+**Key empirical finding from Phase A reconnaissance.** The 5 cssnano
+plugins consume browserslist output in TWO shapes, not one:
+
+1. **Feature-support boolean** — `caniuse_api::is_supported(feature, query)`.
+   Used by `reduce-initial` (`css-initial-value`) and `colormin`
+   (`css-rrggbbaa`).
+2. **Membership probe against a fixed legacy bucket** —
+   `resolved_browsers.iter().any(|b| LEGACY_SET.contains(b.as_str()))`.
+   Used by `convert-values` (`b == "ie 11"`), `minify-params`
+   (`['ie 10', 'ie 11']`), `normalize-unicode` (resolved-vs-`ie <=11, edge <= 15`),
+   `colormin`'s `transparent_default`
+   (`BROWSERS_WITH_TRANSPARENT_BUG` constant).
+
+Pre-evaluating shape #2 in the snapshot would require enumerating every
+legacy bucket per plugin — drift surface every new plugin port has to
+register against. We therefore precompute ONLY the expensive part
+(browserslist resolution + the joined query string), and let each plugin
+do its own (cheap, in-memory) `is_supported` / `.iter().any(...)` against
+the resolved list.
 
 ```
-[Host (Node)]                          [WASI plugin]
-─────────────                          ─────────────
-precomputeBrowserslistDefault(opts)
-  → Browserslist resolve (FS walk)
-  → caniuse_api::is_supported(F, list)   ──────►   build_caniuse_lookup_from_precomputed(bytes)
-    for every feature any cssnano plugin             → IndexMap<&str, bool> in-memory
-    queries (small fixed set)                        → leaf plugins do O(1) lookups
-  → postcard-encode → Vec<u8>                        → no FS I/O, no env reads,
-                                                        no caniuse-db scans
+[Host (Node)]                            [WASI plugin]
+─────────────                            ─────────────
+precomputeBrowserslistDefault({path})    decode_precomputed(bytes)
+  → browserslist_shim::resolve(...)        → PrecomputedBrowserslist
+    (FS walk, env reads,                   → leaf plugins read .selected
+     full caniuse-db agent scan)             and .joined_query
+  → postcard-encode → Vec<u8>              → existing is_supported(feature, joined)
+                                              and .iter().any(legacy_set)
+                                              run as-is, no FS / env / shim resolution
 ```
 
-### 3.2 New module — `crates/cssnano-browserslist-snapshot/`
+Why this is byte-equivalent:
 
-Mint a new crate (or new module inside an existing crate; see §3.3)
-that exposes:
+- `caniuse_api::is_supported(feature, joined_query)` calls
+  `browserslist_shim::resolve(joined_query, true)` internally.
+  `joined_query` is the AFM canonical list joined with `, ` —
+  literal `"chrome 144"` entries hit the **AFM fast path** in
+  `browserslist-shim` (per its module docstring + the
+  `afm_fast_path_full_query_byte_clean` test, line 405) and resolve
+  byte-identically to the input. Pinned by Phase E test E2.
+- Membership probes `.iter().any(...)` over `selected` give identical
+  results regardless of how `selected` was produced.
+
+### 3.2 New crate — `crates/cssnano-browserslist-snapshot/`
 
 ```rust
 /// Layout version. Bump on any field change.
 pub const PRECOMPUTED_FORMAT_VERSION: u32 = 1;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrecomputedBrowserslist {
     pub format_version: u32,
-    /// Resolved "name version" entries (mirrors
-    /// `Browsers.selected` in the autoprefixer snapshot).
-    /// Kept for callers that need the raw list (currently none in
-    /// cssnano, but cheap to ship and useful for debugging).
+    /// Resolved "name version" entries. Mirrors
+    /// `Browsers.selected` in the autoprefixer snapshot.
     pub selected: Vec<String>,
-    /// Pre-evaluated `caniuse_api::is_supported(feature, &joined)`
-    /// for every feature any cssnano plugin queries. Strictly an
-    /// optimisation — byte-equivalent to running `is_supported` live
-    /// against `selected`.
-    pub feature_support: indexmap::IndexMap<String, bool>,
+    /// `selected` joined with `", "` — the form the cssnano leaf
+    /// plugins pass to `caniuse_api::is_supported(feature, &query)`.
+    /// Pre-joined so plugins don't repeat the work per call.
+    pub joined_query: String,
 }
 
 pub fn precompute_browserslist(
-    opts: BrowserslistOpts,
+    opts: PrecomputeBrowserslistOpts,
 ) -> PrecomputedBrowserslist { ... }
 
 pub fn precompute_browserslist_default() -> PrecomputedBrowserslist { ... }
 
 pub fn encode_precomputed(snapshot: &PrecomputedBrowserslist) -> Vec<u8> { ... }
-pub fn decode_precomputed(bytes: &[u8]) -> Result<PrecomputedBrowserslist, ...> { ... }
+pub fn decode_precomputed(bytes: &[u8]) -> Result<PrecomputedBrowserslist, PrecomputedError> { ... }
+
+#[derive(Debug, Clone, Default)]
+pub struct PrecomputeBrowserslistOpts {
+    /// `path:` to a `.browserslistrc` (or a directory containing one,
+    /// or any file inside such a directory — `find_config_file` walks
+    /// up). Mirrors `browserslist(null, { path })`. AFM passes
+    /// `require.resolve('postcss-reduce-initial/package.json')` here.
+    pub path: Option<std::path::PathBuf>,
+    /// `env:` selector — picks `[production]` / `[development]`
+    /// section out of `.browserslistrc`. Defaults match
+    /// `browserslist@4.24.2` (`BROWSERSLIST_ENV` → `NODE_ENV` →
+    /// `"production"`). AFM doesn't use sections.
+    pub env: Option<String>,
+}
 ```
 
-The fixed feature set (initial value of `feature_support`'s keys) is
-the union of every feature name any of the 5 cssnano plugins passes
-to `caniuse_api::is_supported`. Discovered by `rg`-grep across the
-plugin sources — locked at plan time, regenerated automatically by a
-unit test that fails if any plugin queries a feature not in the set.
+No `feature_support` map. No `legacy_bucket_membership` map. Just the
+resolved list + pre-joined query string. Schema is forward-compatible —
+if a future port wants pre-evaluated answers added, bump
+`PRECOMPUTED_FORMAT_VERSION` and add fields.
 
-### 3.3 Crate layout decision
+### 3.3 Crate layout decision (unchanged from prior draft)
 
 Two options:
 
@@ -272,26 +314,68 @@ sibling, not a fork of upstream-faithful code).
 
 Every cssnano leaf plugin (`postcss-{colormin,convert-values,minify-
 params,normalize-unicode,reduce-initial}`) gets one new field on its
-`Opts` struct:
+`Opts` struct (or, for plugins like `colormin` / `normalize-unicode` /
+`minify-params` that currently take no options struct, an additive
+`*_with_browsers_snapshot` entry-point variant — matching the existing
+`postcss_convert_values` / `postcss_convert_values_with_browsers` /
+`postcss_colormin` / `postcss_colormin_with_browsers` precedent).
 
 ```rust
+// Example: postcss-reduce-initial
 pub struct PostcssReduceInitialOpts {
     pub ignore: Vec<String>,
     pub env: Option<String>,
-    /// Pre-evaluated browserslist + feature-support snapshot.
-    /// When `Some`, replaces the per-call
-    /// `caniuse_api::is_supported(feature, "")` call with an
-    /// `IndexMap` lookup. When `None`, falls back to the per-call
-    /// path — preserves today's NAPI behaviour exactly.
+    /// Host-resolved browserslist snapshot. When `Some`, the plugin
+    /// uses `snapshot.joined_query` instead of `""` when calling
+    /// `caniuse_api::is_supported`. When `None`, falls back to today's
+    /// `caniuse_api::is_supported(feature, "")` — preserves NAPI byte-equality.
     pub browserslist_snapshot: Option<Arc<PrecomputedBrowserslist>>,
 }
 ```
 
 `Arc<>` so the snapshot can be cheaply shared across the 5 plugin
-invocations within a single transform without cloning the
-`IndexMap`. Decoded once in `transform_css`, threaded down.
+invocations within a single transform without cloning the `Vec<String>`.
+Decoded once in `transform_css`, threaded down.
 
-### 3.5 NAPI surface
+For plugins that ALREADY have a `_with_browsers` variant (`colormin`,
+`convert-values`), the snapshot path uses that variant directly with
+`snapshot.selected.as_slice()` and `snapshot.joined_query.as_str()` —
+reusing the same byte-equivalence pinned by their existing tests.
+
+For plugins WITHOUT such a variant (`reduce-initial` doesn't take a
+`_with_browsers` form because it only does `is_supported`;
+`normalize-unicode` and `minify-params` only do `.iter().any(...)`),
+we add the `Opts` field directly. The existing zero-argument entry
+points keep their signatures, gaining an `Opts::default()` field
+that's `None`.
+
+### 3.5 Why we don't pre-evaluate `is_supported` results in the snapshot
+
+Considered and rejected. Two reasons:
+
+1. **`is_supported` against a query of literal `"name version"`
+   entries is cheap.** The shim's AFM fast path is an
+   `IndexSet`-backed lookup; the caniuse-db scan is a single
+   `feature.stats.get(name).get(version)` per resolved browser
+   (`crates/caniuse-api/src/index.rs:96-112`). Total: handful of
+   nanoseconds × resolved browsers (14 for AFM) × queries-per-transform
+   (≤ 3) × transforms (1000) = sub-millisecond aggregate. Not worth
+   schema complexity.
+2. **Drift surface.** Pre-evaluating means the snapshot has to
+   know every feature name every plugin will ever query. Adding a new
+   plugin port that queries a new feature would require updating the
+   snapshot crate — easy to forget. The `selected`+`joined_query` shape
+   has no such coupling: any plugin's query against any feature works
+   with no snapshot crate change.
+
+If a perf measurement post-fix shows the per-call `is_supported` cost
+is non-trivial after FS walk elimination, we revisit by adding a
+versioned `Option<IndexMap<String, bool>>` field — bump
+`PRECOMPUTED_FORMAT_VERSION` to 2, populate optionally,
+plugins fall through to live `is_supported` when the field is `None`
+on a v2 snapshot.
+
+### 3.6 NAPI surface
 
 `crates/compiled-css-napi/src/lib.rs` exposes:
 
@@ -388,13 +472,13 @@ before encoding the wrong assumption in 5 plugin changes:
 
 | # | File | Change |
 |---|---|---|
-| E1 | `crates/cssnano-browserslist-snapshot/src/lib.rs` (`#[cfg(test)] mod tests`) | `precompute_then_decode_roundtrip_byte_identical` — encode + decode preserves all fields. |
-| E2 | Same | `feature_support_matches_live_for_canonical_afm_list` — every feature in `CANIUSE_FEATURES` produces the same `bool` as `caniuse_api::is_supported(feature, joined_canonical_list)`. |
+| E1 | `crates/cssnano-browserslist-snapshot/src/lib.rs` (`#[cfg(test)] mod tests`) | `precompute_then_decode_roundtrip_byte_identical` — encode + decode preserves `format_version`, `selected`, `joined_query` field-by-field. |
+| E2 | Same | `joined_query_resolves_back_to_selected_via_shim` — pinned: `browserslist_shim::resolve(&snapshot.joined_query, true) == snapshot.selected` for the AFM canonical list. Asserts the shim's AFM fast path is a no-op for our serialised query. **THE gate** for the schema choice in §3.1. |
 | E3 | Same | `legacy_version_byte_rejected` (mirror autoprefixer's V2 test). |
-| E4 | `crates/cssnano-postcss-reduce-initial/tests/snapshot_parity.rs` (new) | `with_modern_snapshot_keeps_initial` — plugin with `browserslist_snapshot = Some(modern_canonical)` produces `initial` for `text-decoration-color: initial`. `with_wide_snapshot_substitutes` — plugin with a snapshot whose `feature_support["css-initial-value"] = false` substitutes to `currentColor`. `without_snapshot_falls_back_to_live` — plugin with `None` produces same bytes as today's behaviour (regression gate). |
-| E5 | Equivalent for each of the 4 other cssnano leaf plugins. |
-| E6 | `crates/babel-plugin/tests/transform_css_browserslist_snapshot_integration.rs` (new) | End-to-end: feed `transform_css` AFM canonical input, with `precomputed_browserslist: Some(canonical_snapshot_bytes)`, assert byte-equal to the existing `BROWSERSLIST_CONFIG=afm_fixture` env-pinned `transform_css_integration` test output. **This is THE gate** that proves the new path agrees with the verified env-pinned path. |
-| E7 | `crates/cssnano-browserslist-snapshot/src/lib.rs` (test) | `feature_set_covers_all_plugin_queries` — `rg`-grep across the 5 plugin sources for `is_supported("...")` literal calls, assert every feature name found is in `CANIUSE_FEATURES`. Catches the case where a future plugin port adds a query we forgot to precompute. |
+| E4 | Same | `precompute_against_afm_fixture_yields_canonical_14_entries` — pinned exact match against the frozen 14-entry list (cross-checks the bootstrap `path:` resolution). |
+| E5 | `crates/cssnano-postcss-reduce-initial/tests/snapshot_parity.rs` (new) | `with_modern_snapshot_keeps_initial` — plugin with `browserslist_snapshot = Some(canonical_afm_snapshot)` produces `initial` for `text-decoration-color: initial`. `without_snapshot_falls_back_to_live_path` — plugin with `None` produces same bytes as today's behaviour (regression gate). `with_legacy_snapshot_substitutes_to_concrete` — plugin with a synthetic `selected: ["ie 11"]` snapshot substitutes to `currentColor`, proving the snapshot path drives the decision. |
+| E6 | Equivalent for each of the 4 other cssnano leaf plugins, scoped to the property each plugin's resolution decision affects (`colormin` `transparent` collapse, `convert-values` `keepZeroPercent` IE-11 branch, `normalize-unicode` legacy-prefix transform, `minify-params` `@media all` collapse). |
+| E7 | `crates/babel-plugin/tests/transform_css_browserslist_snapshot_integration.rs` (new) | End-to-end: feed `transform_css` AFM canonical input, with `precomputed_browserslist: Some(canonical_snapshot_bytes)`, assert byte-equal to the existing `BROWSERSLIST_CONFIG=afm_fixture` env-pinned `transform_css_integration` test output. **This is the cross-pipeline gate** that proves the new path agrees with the verified env-pinned path. |
 
 ### Phase F — docs
 
