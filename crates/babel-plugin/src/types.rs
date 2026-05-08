@@ -206,6 +206,42 @@ pub struct PluginOptions {
     /// (`Buffer`) instead.
     #[serde(default)]
     pub precomputed_browserslist_path: Option<String>,
+
+    /// **Optional perf knob — NOT part of the upstream
+    /// `PluginOptions` surface.** Path under the WASI preopen
+    /// (`/cwd/...`) to a postcard-encoded autoprefixer prefix-tables
+    /// snapshot produced by `precomputePrefixesDefault()` (NAPI).
+    /// The plugin reads the file on each `transform_css` call and
+    /// threads the bytes through
+    /// `crates/css::TransformOpts::precomputed_prefixes_path` to
+    /// the autoprefixer step, eliding the per-call
+    /// `build_prefixes_default()` reconstruction (~6.6 ms/call on
+    /// our bench host).
+    ///
+    /// **Byte-equality guarantee.** The snapshot path is
+    /// equivalence-tested against the slow path by
+    /// `crates/parity-runner --stage autoprefixer` over the 65-entry
+    /// corpus and by `crates/css/examples/perf_precomputed.rs`'s
+    /// sanity check. Threading it through here changes nothing
+    /// about output bytes — only how the autoprefixer's `Prefixes`
+    /// struct gets built.
+    ///
+    /// **Inline-bytes delivery is intentionally NOT exposed here**,
+    /// for the same reason as
+    /// [`Self::precomputed_browserslist_path`]: SWC's plugin config
+    /// wire is JSON-only. NAPI consumers
+    /// (`@compiled/css-native::transformCss`) get the inline-bytes
+    /// surface via `TransformOpts::precomputedPrefixes` (`Buffer`).
+    ///
+    /// **WASI path translation.** As with
+    /// [`Self::precomputed_browserslist_path`], the host wrapper
+    /// passes a host-absolute path here; `lib.rs::process` rewrites
+    /// it to `/cwd/<rel>` form via
+    /// `compat::wasi_path::host_to_wasi` before downstream
+    /// `std::fs::read` sees it. Native callers (`opts.root = None`)
+    /// get a no-op translation, preserving unit-test behaviour.
+    #[serde(default)]
+    pub precomputed_prefixes_path: Option<String>,
 }
 
 /// `cache: true | 'file-pass' | false`. Custom (de)serializer matches

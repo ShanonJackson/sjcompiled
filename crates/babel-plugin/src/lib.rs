@@ -112,6 +112,18 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
         opts.precomputed_browserslist_path = Some(translated);
     }
 
+    // Same WASI-preopen translation for the precomputed-prefixes
+    // snapshot path (autoprefixer prefix tables). Mirrors the
+    // browserslist translation above; same rationale (host-absolute
+    // input from the wrapper, `/cwd/<rel>` required by the WASI
+    // sandbox's `std::fs::read`). Native callers (`opts.root = None`)
+    // get a no-op. The byte-equality guarantee for this knob is
+    // covered by `crates/parity-runner --stage autoprefixer`.
+    if let Some(path) = opts.precomputed_prefixes_path.as_deref() {
+        let translated = crate::compat::wasi_path::host_to_wasi(path, host_root);
+        opts.precomputed_prefixes_path = Some(translated);
+    }
+
     // §4.6 bridge: build the Compiled resolver and stash it on
     // `state` so `resolve_binding::resolve_request` can reach it.
     //

@@ -2,8 +2,20 @@
 // Run with: bun scripts/perf-plugin.ts
 //
 // Reads existing wasm artefacts; does NOT trigger any cargo build.
+//
+// Browserslist optimisation:
+//   The babel-plugin engine imported below precomputes the host-resolved
+//   browserslist snapshot ONCE at module load via
+//   `@compiled/css-native::precomputeBrowserslistDefault` and threads
+//   `precomputedBrowserslistPath` into every SWC invocation (see
+//   `parity-harness/babel-plugin/engines.ts` — the
+//   `tryWriteBrowserslistSnapshot()` block + `PRECOMPUTED_BROWSERSLIST_PATH`
+//   constant). The Babel reference side gets the symmetric env pin
+//   (`BROWSERSLIST_CONFIG`) so both pipelines resolve to the AFM modern
+//   list, matching what we measure in the 90GB monorepo. The bench below
+//   inherits that wiring transparently.
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import {
@@ -18,6 +30,41 @@ import {
 } from '../parity-harness/babel-plugin/engines';
 
 const REPO_ROOT = resolve(__dirname, '..');
+const BROWSERSLIST_SNAPSHOT_PATH = resolve(REPO_ROOT, '.parity-harness-cache/browserslist-snapshot.bin');
+const PREFIXES_SNAPSHOT_PATH = resolve(REPO_ROOT, '.parity-harness-cache/prefixes-snapshot.bin');
+
+function reportSnapshots(): void {
+  // The harness writes both snapshots at module-load of
+  // `parity-harness/babel-plugin/engines.ts`. By the time we get
+  // here, each has either succeeded (file exists) or silently no-op'd
+  // (native binary too old / missing on this platform). Surface both
+  // so the ops/s numbers are interpretable.
+  if (existsSync(BROWSERSLIST_SNAPSHOT_PATH)) {
+    const bytes = statSync(BROWSERSLIST_SNAPSHOT_PATH).size;
+    const env = process.env.BROWSERSLIST_CONFIG ?? '(unset)';
+    console.log(
+      `browserslist: precomputed snapshot active — ${bytes}B\n` +
+        `              BROWSERSLIST_CONFIG=${env}`,
+    );
+  } else {
+    console.log(
+      'browserslist: snapshot NOT written — native `precomputeBrowserslistDefault`\n' +
+        '              unavailable; SWC falls back to wide WASI defaults.',
+    );
+  }
+  if (existsSync(PREFIXES_SNAPSHOT_PATH)) {
+    const bytes = statSync(PREFIXES_SNAPSHOT_PATH).size;
+    console.log(
+      `prefixes:     precomputed snapshot active — ${bytes}B\n` +
+        '              (autoprefixer skips ~6.6 ms/call setup; ~13.7x on CSS path)',
+    );
+  } else {
+    console.log(
+      'prefixes:     snapshot NOT written — native `precomputePrefixesDefault`\n' +
+        '              unavailable; every `transform_css` pays ~6.6 ms autoprefixer setup.',
+    );
+  }
+}
 
 type Fixture<O> = { name: string; source: string; opts: O };
 
@@ -92,6 +139,8 @@ const stripFixtures = loadFixtures<StripRuntimeOpts>(STRIP_DIR, [
 const bpFixtures = loadFixtures<BabelPluginFixtureOpts>(BP_DIR, ['0000', '0050', '0150']);
 
 const DURATION = Number(process.env.PERF_MS ?? 2000);
+
+reportSnapshots();
 
 runPair('strip-runtime (real port)', babelStrip, swcStrip, stripFixtures, DURATION);
 runPair('babel-plugin (pass-through, floor only)', babelBp, swcBp, bpFixtures, DURATION);

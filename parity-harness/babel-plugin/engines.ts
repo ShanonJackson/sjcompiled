@@ -77,6 +77,10 @@ const BROWSERSLIST_SNAPSHOT_PATH = resolve(
   SNAPSHOT_DIR,
   'browserslist-snapshot.bin',
 );
+const PREFIXES_SNAPSHOT_PATH = resolve(
+  SNAPSHOT_DIR,
+  'prefixes-snapshot.bin',
+);
 
 function tryWriteBrowserslistSnapshot(): string | null {
   try {
@@ -89,6 +93,12 @@ function tryWriteBrowserslistSnapshot(): string | null {
     const bytes = native.precomputeBrowserslistDefault(AFM_BROWSERSLISTRC);
     mkdirSync(SNAPSHOT_DIR, { recursive: true });
     writeFileSync(BROWSERSLIST_SNAPSHOT_PATH, bytes);
+
+    // Symmetric prefixes snapshot — see tryWritePrefixesSnapshot.
+    // The two snapshots are independent (different `from` semantics:
+    // browserslist anchors on the AFM `.browserslistrc`; prefixes
+    // anchors on `process.cwd()` to match how the WASI plugin's
+    // own `std::fs::read` paths resolve under `/cwd`).
 
     // Symmetric Babel-side alignment: pin `BROWSERSLIST_CONFIG` so
     // the in-process JS cssnano plugins resolve to the same list
@@ -121,6 +131,58 @@ function tryWriteBrowserslistSnapshot(): string | null {
 // Compute once at module load. Subsequent SWC engine invocations reuse
 // the same path without re-running the host-side resolution.
 const PRECOMPUTED_BROWSERSLIST_PATH: string | null = tryWriteBrowserslistSnapshot();
+
+// ---------------------------------------------------------------------------
+// Precomputed autoprefixer prefix tables — host-resolved snapshot delivered
+// to the WASI plugin via `precomputedPrefixesPath` in plugin options.
+//
+// Why: every `transform_css` call inside the babel-plugin's CSS path
+// otherwise pays ~6.6 ms reconstructing autoprefixer's `Prefixes` struct
+// from scratch (`build_prefixes_default`). On a single fixture with N CSS
+// items that's N × 6.6 ms of pure setup work that's a deterministic
+// function of the browserslist query. Precomputing the postcard-encoded
+// snapshot once on the host and reading it on each plugin invocation drops
+// the per-call cost to ~490 µs (path-delivery shape; see
+// `crates/css/examples/perf_precomputed.rs` — measured 13.7x on the bench
+// host).
+//
+// Byte-equality: `crates/parity-runner --stage autoprefixer` proves the
+// snapshot path is byte-identical to `build_prefixes_default()` over the
+// 65-entry corpus. Threading it through here changes nothing about output
+// bytes, only how the `Prefixes` struct gets built.
+//
+// Robustness: same fallback shape as the browserslist snapshot — when the
+// native binary is too old to export `precomputePrefixesDefault`, return
+// `null` and let the WASI plugin fall back to its in-process slow path.
+// We don't hard-fail because that would cascade to every fixture during a
+// binary-rebuild window; tests exercising the precompute path have their
+// own rebuild gating.
+function tryWritePrefixesSnapshot(): string | null {
+  try {
+    const native = require('@compiled/css-native') as {
+      precomputePrefixesDefault?: (from?: string | null) => Buffer;
+    };
+    if (typeof native.precomputePrefixesDefault !== 'function') {
+      return null;
+    }
+    // `from` semantics: anchor for the `.browserslistrc` walk-up that
+    // autoprefixer performs. The WASI plugin's downstream
+    // `transform_css` runs with `from = None` (the css crate doesn't
+    // expose `from` through its `TransformOpts` shape), so the host-
+    // side precompute must use the same anchor the plugin would have
+    // resolved from — which is `process.cwd()` under WASI's `/cwd`
+    // preopen. Passing `null` here makes `precomputePrefixesDefault`
+    // fall back to its `process.cwd()` default, matching.
+    const bytes = native.precomputePrefixesDefault(null);
+    mkdirSync(SNAPSHOT_DIR, { recursive: true });
+    writeFileSync(PREFIXES_SNAPSHOT_PATH, bytes);
+    return PREFIXES_SNAPSHOT_PATH;
+  } catch {
+    return null;
+  }
+}
+
+const PRECOMPUTED_PREFIXES_PATH: string | null = tryWritePrefixesSnapshot();
 
 /**
  * Mirrors `packages/babel-plugin/src/test-utils.ts::transform`. The
@@ -369,6 +431,20 @@ export function swcEngine(source: string, opts: BabelPluginFixtureOpts = {}): st
             // in fixture opts wins.
             ...(PRECOMPUTED_BROWSERSLIST_PATH != null
               ? { precomputedBrowserslistPath: PRECOMPUTED_BROWSERSLIST_PATH }
+              : {}),
+            // Phase D — thread the host-resolved prefix-tables snapshot
+            // path. Same delivery shape as the browserslist snapshot
+            // above (host writes once at module load; plugin reads on
+            // each `transform_css` invocation; OS page cache amortises
+            // the disk hit). When the native binary is too old to
+            // export `precomputePrefixesDefault`, the entry is omitted
+            // and the plugin falls back to its in-process
+            // `build_prefixes_default` slow path (~6.6 ms/call).
+            //
+            // Spread BEFORE `pluginOptions` so an explicit override in
+            // fixture opts wins.
+            ...(PRECOMPUTED_PREFIXES_PATH != null
+              ? { precomputedPrefixesPath: PRECOMPUTED_PREFIXES_PATH }
               : {}),
             ...pluginOptions,
           },
