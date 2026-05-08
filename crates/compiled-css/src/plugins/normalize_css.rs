@@ -29,11 +29,48 @@
 //!
 //! Five of the 14 plugins are browserslist-aware (`postcss-colormin`,
 //! `postcss-convert-values`, `postcss-minify-params`, `postcss-normalize-
-//! unicode`, `postcss-reduce-initial`). They each call
-//! `browserslist_shim::resolve("", true)` internally, which honours the
-//! `BROWSERSLIST` environment variable (mirroring upstream
-//! `browserslist(null, ...)`). The parity gate sets BROWSERSLIST in both
-//! Rust and JS processes so both engines resolve to the same query.
+//! unicode`, `postcss-reduce-initial`); autoprefixer (a 6th consumer)
+//! lives outside this preset but reads the same browserslist data via
+//! `crates/css/src/transform.rs`'s autoprefixer step.
+//!
+//! ### Resolution path (post-`DEFINITIVE_BROWSERSLIST_PLAN.md`)
+//!
+//! Browserslist is resolved **on the host** (NAPI side) via
+//! `cssnano_browserslist_snapshot::precompute_browserslist`, anchored
+//! on `require.resolve('postcss-reduce-initial/package.json')` so the
+//! upward `find_config` walk lands on the exact same `.browserslistrc`
+//! the leaf plugin would find at runtime. The resolved
+//! `PrecomputedBrowserslist` is postcard-encoded and threaded into
+//! the preset via `PresetOpts::browserslist_snapshot`, which the 5
+//! cssnano leaf plugins consume through their `*_with_snapshot`
+//! entry points.
+//!
+//! Why a precomputed snapshot instead of in-plugin resolution: the
+//! WASI sandbox the SWC plugin runs inside has no environment-
+//! variable passthrough and only a `/cwd` preopen, so
+//! `browserslist_shim::find_config_file`'s upward FS walk fails
+//! silently for any project whose `.browserslistrc` lives outside
+//! cwd (the AFM monorepo case). Hosting the resolution on the
+//! Node side and shipping bytes across the boundary matches the
+//! same pattern `autoprefixer::precomputed::PrecomputedPrefixes`
+//! uses for the prefix tables.
+//!
+//! ### Delivery surfaces
+//!
+//! - `TransformOpts::precomputed_browserslist`: inline `Vec<u8>`,
+//!   used by direct NAPI callers (round-trips a `Buffer`).
+//! - `TransformOpts::precomputed_browserslist_path`: filesystem
+//!   path, used by the SWC plugin path because plugin options
+//!   serialize as JSON and arbitrary postcard bytes do not
+//!   JSON-encode safely. Path is translated host→WASI via
+//!   `babel-plugin/src/compat/wasi_path.rs::host_to_wasi`.
+//!
+//! Precedence: inline > path > slow build (live
+//! `browserslist_shim::resolve`).
+//!
+//! Cross-pipeline byte-equality between the env-pinned resolution
+//! and the snapshot resolution is gated by the Phase E7 test at
+//! `crates/babel-plugin/tests/transform_css_browserslist_snapshot_integration.rs`.
 
 use postcss_core::{PluginResult, Root};
 

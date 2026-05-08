@@ -2022,6 +2022,60 @@ Other §2.3-region work that's gated:
 
 ---
 
+## Phase X — browserslist plumbing ☑ (2026-05-08)
+
+> **Goal:** restore byte-equality between NAPI and WASI consumers
+> after the WASI sandbox broke env-driven `browserslist` resolution.
+> See `DEFINITIVE_BROWSERSLIST_PLAN.md` for the full design.
+> Bug intake: `plugins/BUG_REPORT.md` (AFM 1000-file gate flagged
+> ~96% parity, root-caused to environment-variable + FS-walk
+> non-portability across the WASI boundary).
+
+| ID | Status | Checkpoint |
+|---|---|---|
+| §X.A | ☑ | `cssnano-browserslist-snapshot` crate — `PrecomputedBrowserslist` schema (`format_version`, `selected`, `joined_query`), postcard codec, host-side `precompute_browserslist` anchored on `require.resolve('postcss-reduce-initial/package.json')` |
+| §X.B | ☑ | 5 cssnano leaf plugins gain `*_with_snapshot` entry points (`postcss-{reduce-initial,colormin,convert-values,minify-params,normalize-unicode}`); `cssnano-preset-default` threads the snapshot via `PresetOpts::browserslist_snapshot` |
+| §X.B' | ☑ | **6th consumer caught by E7:** autoprefixer slow path in `crates/css/src/transform.rs` now uses `build_prefixes(None, AutoprefixerOptions { override_browserslist: Some(snap.selected.clone()), .. })` when a snapshot is present, instead of `build_prefixes_default(None)` — without this, `-moz-user-select` and similar older-FF prefixes leak into snapshot-driven WASI output but not env-driven NAPI output |
+| §X.C | ☑ | `TransformOpts` extended with `precomputed_browserslist: Option<Vec<u8>>` (inline) + `precomputed_browserslist_path: Option<PathBuf>` (filesystem); precedence inline > path > slow build; hard-error on path-read failure |
+| §X.D | ☑ | NAPI surface: `compiled-css-napi` exposes `precomputeBrowserslistDefault(from?: string): Buffer`; `babel-plugin` `process()` translates host-absolute snapshot paths to WASI `/cwd/...` form via `compat::wasi_path::host_to_wasi`; `parity-harness/babel-plugin/engines.ts` precomputes once, writes to `.parity-harness-cache/browserslist-snapshot.bin`, and conditionally pins `BROWSERSLIST_CONFIG` for the Babel arm to keep the harness symmetric |
+| §X.E | ☑ | Test ladder: E1 (round-trip), E2 (`joined_query → selected` shim re-resolution), E3 (legacy version byte rejected), E4-strict (full host bootstrap against AFM fixture resolves to canonical 14 entries), E5 + E6 (5 leaf plugins each prove snapshot drives the gating decision), **E7 (cross-pipeline gate: 120/120 corpus entries byte-equal between env-pinned arm and snapshot arm)** |
+| §X.F | ☑ | Docs sweep — this section, F1 in `crates/compiled-css/src/plugins/normalize_css.rs`, resolution footer on `BUG_REPORT.md`, deletion of `plugins/BROWSERLIST_PLAN.md` predecessor |
+| §X.G | ☑ | **AFM 1000-file gate confirmed passing by AFM team (2026-05-08)** — multi-million-dollar cost-savings unblocked |
+
+### Phase X lessons
+
+- **`@compiled/css-native` is two consumers in one trench coat.**
+  Direct NAPI callers see plugin opts as a NAPI `Object` with native
+  `Buffer` round-trip (use inline `precomputed_browserslist`). The
+  SWC plugin path serializes opts to JSON across the WASI ABI, which
+  doesn't safely encode arbitrary postcard bytes (use
+  `precomputed_browserslist_path` and let the WASI runtime read the
+  file via the `/cwd` preopen). Both fields are kept on
+  `TransformOpts` deliberately; precedence is inline > path.
+- **Phase E7's side-by-side equivalence design caught a real bug
+  Phase B missed.** Comparing each arm to the JS oracle would have
+  conflated browserslist drift with the pre-existing
+  `22_comments_at_positions.css` ordering port bug. Comparing the
+  two Rust arms to *each other* isolates the contract under test
+  cleanly.
+- **WASI's filesystem preopen is `process.cwd()`, mounted at `/cwd`.**
+  Any host-absolute path the plugin receives must be translated.
+  `compat::wasi_path::host_to_wasi` is the canonical helper; new
+  path-bearing options go through it.
+- **Anchor host bootstrap on the leaf plugin, not on cwd.**
+  `require.resolve('postcss-reduce-initial/package.json')` makes the
+  upward `find_config` walk byte-equivalent to what the leaf plugin
+  itself would resolve at runtime — defends against future
+  reorganisations that move the project's `.browserslistrc` out of
+  cwd's ancestor chain.
+- **Pure resolution without a snapshot is still legal.** Direct
+  `transform_css` callers without a snapshot fall back to
+  `browserslist_shim::resolve("")` exactly as before; the snapshot
+  path is purely additive. NAPI consumers with `BROWSERSLIST_CONFIG`
+  in env continue working unchanged.
+
+---
+
 ## Cardinal rules conformance
 
 These are the standing invariants. A checkpoint that violates one is
