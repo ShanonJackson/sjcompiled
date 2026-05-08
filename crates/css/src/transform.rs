@@ -141,11 +141,13 @@ use compiled_css::plugins::sort_atomic_style_sheet::{
 };
 
 use cssnano_preset_default::{default_preset, PresetOpts};
+use cssnano_browserslist_snapshot::{decode_precomputed, PrecomputedBrowserslist};
+use std::sync::Arc;
 
 use postcss_nested::{postcss_nested, PostcssNestedOpts};
 use postcss_normalize_whitespace::postcss_normalize_whitespace;
 
-use autoprefixer::autoprefixer::build_prefixes_default;
+use autoprefixer::autoprefixer::{build_prefixes, build_prefixes_default, AutoprefixerOptions};
 use autoprefixer::precomputed::build_prefixes_from_precomputed;
 use autoprefixer::processor::Processor as AutoprefixerProcessor;
 
@@ -253,6 +255,56 @@ pub struct TransformOpts {
     /// not part of the JS-side TransformOpts.
     #[serde(skip)]
     pub precomputed_prefixes_path: Option<std::path::PathBuf>,
+
+    /// **Optional perf knob — NOT part of the upstream `TransformOpts`
+    /// surface.** When `Some(bytes)`, the postcard-encoded
+    /// [`cssnano_browserslist_snapshot::PrecomputedBrowserslist`] is
+    /// decoded once and threaded into every browserslist-aware leaf
+    /// plugin in `cssnano-preset-default` (5 plugins —
+    /// `postcss-{reduce-initial,colormin,convert-values,minify-params,
+    /// normalize-unicode}`). This eliminates the in-plugin
+    /// `browserslist_shim::resolve("")` path which (a) reads
+    /// `BROWSERSLIST` / `BROWSERSLIST_CONFIG` env vars (silently
+    /// ignored in WASI), (b) walks up from `cwd()` for
+    /// `.browserslistrc` (silently fails in WASI's preopen-only FS),
+    /// and (c) is expensive (~200 µs/call when it does work).
+    ///
+    /// Falls back to the in-plugin resolution path when `None`.
+    /// Byte-equivalent to omitting the field, except in WASI where
+    /// the in-plugin path returns the wide default browser list
+    /// (including IE 11) instead of the host-resolved AFM modern
+    /// list. See `DEFINITIVE_BROWSERSLIST_PLAN.md` for the full
+    /// design.
+    ///
+    /// `#[serde(skip)]` because the bytes round-trip through the NAPI
+    /// `Buffer` type at the boundary, not through `serde_json` (same
+    /// pattern as [`Self::precomputed_prefixes`]).
+    #[serde(skip)]
+    pub precomputed_browserslist: Option<Vec<u8>>,
+
+    /// **Optional perf knob — NOT part of the upstream `TransformOpts`
+    /// surface.** Filesystem-path delivery for the
+    /// [`PrecomputedBrowserslist`] snapshot. When set and
+    /// [`Self::precomputed_browserslist`] is `None`, the file is read
+    /// on each call and decoded as a snapshot.
+    ///
+    /// **WASI design intent:** SWC tears down the WASI linear-memory
+    /// instance between every transform — no in-memory cache survives.
+    /// The host writes the snapshot to a known path once per build;
+    /// every WASI plugin instance reads from that path on each call.
+    /// The OS page cache amortises the disk read.
+    ///
+    /// **Precedence:**
+    ///   1. If [`Self::precomputed_browserslist`] is `Some`, use those
+    ///      bytes.
+    ///   2. Else if `precomputed_browserslist_path` is `Some`, read
+    ///      the file. Read failure is a HARD error.
+    ///   3. Else fall back to per-plugin in-process resolution
+    ///      (correct in NAPI; wrong default-list in WASI).
+    ///
+    /// Mirrors the [`Self::precomputed_prefixes_path`] pattern.
+    #[serde(skip)]
+    pub precomputed_browserslist_path: Option<std::path::PathBuf>,
 }
 
 /// Mirrors upstream return shape: `{ sheets: string[]; classNames: string[] }`.
@@ -376,10 +428,62 @@ pub fn transform_css(css: &str, opts: &TransformOpts) -> Result<TransformResult,
     } else {
         NORMALIZE_BASE_PLUGINS.iter().copied().collect()
     };
-    let preset = default_preset(&PresetOpts::default());
+    // Phase C — decode the host-resolved browserslist snapshot once,
+    // before the OnceExit batch runs, so all 5 browserslist-aware
+    // leaf plugins (`postcss-reduce-initial`, `-colormin`,
+    // `-convert-values`, `-minify-params`, `-normalize-unicode`) see
+    // the same `Arc<PrecomputedBrowserslist>` instance — zero clones
+    // across the per-plugin dispatch.
+    //
+    // Precedence: inline bytes > path > None (per the docstring on
+    // `TransformOpts::precomputed_browserslist_path`). `None` ==
+    // pre-2026-05-08 behaviour (each plugin runs the in-process
+    // shim resolution; correct in NAPI, wide-default in WASI).
+    //
+    // Path-read / decode failures are HARD errors so production
+    // misconfiguration doesn't silently mask as "wide-default
+    // browserslist" output drift.
+    let browserslist_path_bytes;
+    let browserslist_bytes: Option<&[u8]> = match (
+        opts.precomputed_browserslist.as_deref(),
+        opts.precomputed_browserslist_path.as_deref(),
+    ) {
+        (Some(bytes), _) => Some(bytes),
+        (None, Some(path)) => {
+            browserslist_path_bytes = std::fs::read(path).map_err(|e| {
+                format!(
+                    "cssnano precomputed_browserslist_path read error \
+                     (path={}): {e}",
+                    path.display(),
+                )
+            })?;
+            Some(browserslist_path_bytes.as_slice())
+        }
+        (None, None) => None,
+    };
+    let browserslist_snapshot: Option<Arc<PrecomputedBrowserslist>> = match browserslist_bytes {
+        Some(bytes) => {
+            let decoded = decode_precomputed(bytes).map_err(|e| {
+                format!("cssnano browserslist precomputed load error: {e:?}")
+            })?;
+            Some(Arc::new(decoded))
+        }
+        None => None,
+    };
+
+    // 5a..5n. cssnano sub-plugins. `PresetOpts::browserslist_snapshot`
+    // threads the decoded snapshot to the 5 browserslist-aware leaf
+    // plugins via `cssnano-preset-default`'s dispatch. The other 9
+    // plugins ignore the field (Phase B keeps the snapshot field on
+    // `&PresetOpts` for all 14 plugin entries to preserve the uniform
+    // function-pointer signature).
+    let preset_opts = PresetOpts {
+        browserslist_snapshot,
+    };
+    let preset = default_preset(&preset_opts);
     for entry in &preset.plugins {
         if plugins_to_include.contains(entry.name) {
-            (entry.apply)(&mut root)
+            (entry.apply)(&mut root, &preset_opts)
                 .map_err(|e| format!("cssnano:{}: {e:?}", entry.name))?;
         }
     }
@@ -430,11 +534,36 @@ pub fn transform_css(css: &str, opts: &TransformOpts) -> Result<TransformResult,
             (None, None) => None,
         };
 
+        // Precedence: prefix-snapshot bytes > browserslist-snapshot
+        // (autoprefixer reqs override) > slow build (autoprefixer
+        // resolves browserslist itself via env/FS walk). The
+        // browserslist-snapshot branch is the load-bearing fix for
+        // Phase E7's cross-pipeline gate: without it, the env-pinned
+        // arm and the snapshot arm produce different prefix sets
+        // because autoprefixer's slow path reads
+        // BROWSERSLIST_CONFIG / walks `.browserslistrc`, neither of
+        // which is reachable from inside WASI. Passing
+        // `snap.selected` as `override_browserslist` short-circuits
+        // autoprefixer's resolution to the same 14-entry list the 5
+        // cssnano leaf plugins already see — proving in E7 that
+        // env-pinned NAPI and snapshot-driven WASI emit byte-equal
+        // CSS for the user-select prefix decision and any other
+        // browserslist-gated autoprefixer rule.
         let prefixes = match prefixes_bytes {
             Some(bytes) => build_prefixes_from_precomputed(bytes)
                 .map_err(|e| format!("autoprefixer precomputed load error: {e}"))?,
-            None => build_prefixes_default(None)
+            None => match preset_opts.browserslist_snapshot.as_ref() {
+                Some(snap) => build_prefixes(
+                    None,
+                    AutoprefixerOptions {
+                        override_browserslist: Some(snap.selected.clone()),
+                        ..Default::default()
+                    },
+                )
                 .map_err(|e| format!("autoprefixer build error: {e}"))?,
+                None => build_prefixes_default(None)
+                    .map_err(|e| format!("autoprefixer build error: {e}"))?,
+            },
         };
         let proc = AutoprefixerProcessor::new(&prefixes);
         let mut warnings: Vec<String> = Vec::new();
@@ -1032,6 +1161,134 @@ mod tests {
         assert!(
             !combined.contains("undefined"),
             "empty decl dropped: {combined}"
+        );
+    }
+
+    // ---- Phase C — precomputed_browserslist plumbing ----
+
+    /// Phase C end-to-end gate: with `None`, output must be byte-
+    /// identical to the pre-2026-05-08 path. Load-bearing regression
+    /// gate for NAPI consumers (production AFM is parity-tested on
+    /// this path; we cannot drift it).
+    #[test]
+    fn phase_c_snapshot_none_byte_equivalent_across_pipeline() {
+        // Grab-bag exercising all 5 browserslist-aware plugins:
+        //   - reduce-initial: `border-collapse: separate` (toInitial)
+        //   - colormin: `rgba(0,0,0,0)` (transparent_default)
+        //   - convert-values: `0%` (keepZeroPercent)
+        //   - minify-params: `@media all` (collapse)
+        //   - normalize-unicode: `unicode-range: u+0025-00ff`
+        let css = ".a { border-collapse: separate; color: rgba(0,0,0,0); flex: 0 0 0%; }\n\
+                   @media all { .b { color: red; } }\n\
+                   @font-face { unicode-range: u+0025-00ff; }";
+
+        let baseline = transform_css(css, &TransformOpts::default()).unwrap();
+
+        let opts_with_explicit_none = TransformOpts {
+            precomputed_browserslist: None,
+            precomputed_browserslist_path: None,
+            ..Default::default()
+        };
+        let with_none = transform_css(css, &opts_with_explicit_none).unwrap();
+        assert_eq!(
+            baseline.sheets, with_none.sheets,
+            "explicit-None drifted from default TransformOpts",
+        );
+        assert_eq!(baseline.class_names, with_none.class_names);
+    }
+
+    /// Phase C: inline-bytes delivery == path-delivery for the same
+    /// snapshot. Same encoded bytes via two channels MUST produce
+    /// identical output.
+    #[test]
+    fn phase_c_inline_bytes_eq_path_delivery() {
+        use cssnano_browserslist_snapshot::{
+            encode_precomputed, PrecomputedBrowserslist, PRECOMPUTED_FORMAT_VERSION,
+        };
+
+        let snapshot = PrecomputedBrowserslist {
+            format_version: PRECOMPUTED_FORMAT_VERSION,
+            selected: vec![
+                "chrome 144".to_string(),
+                "firefox 147".to_string(),
+                "safari 26.2".to_string(),
+            ],
+            joined_query: "chrome 144, firefox 147, safari 26.2".to_string(),
+        };
+        let bytes = encode_precomputed(&snapshot);
+
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "phase_c_browserslist_snapshot_{}_{nanos}.bin",
+            std::process::id(),
+        ));
+        std::fs::write(&path, &bytes).expect("write snapshot bytes");
+
+        let css = ".a { border-collapse: separate; }";
+
+        let inline_opts = TransformOpts {
+            precomputed_browserslist: Some(bytes.clone()),
+            ..Default::default()
+        };
+        let path_opts = TransformOpts {
+            precomputed_browserslist_path: Some(path.clone()),
+            ..Default::default()
+        };
+
+        let inline_out = transform_css(css, &inline_opts).unwrap();
+        let path_out = transform_css(css, &path_opts).unwrap();
+
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(
+            inline_out.sheets, path_out.sheets,
+            "inline-bytes vs path-delivery drift",
+        );
+        assert_eq!(inline_out.class_names, path_out.class_names);
+
+        // Sanity: modern snapshot → toInitial fires.
+        let combined: String = inline_out.sheets.join("");
+        assert!(
+            combined.contains("initial"),
+            "modern snapshot should enable toInitial rewrite, got: {combined}",
+        );
+    }
+
+    /// Phase C: a missing path is a HARD error — production misconfig
+    /// must NOT silently mask as a wide-default browserslist run.
+    #[test]
+    fn phase_c_missing_snapshot_path_is_hard_error() {
+        let opts = TransformOpts {
+            precomputed_browserslist_path: Some(std::path::PathBuf::from(
+                "/nonexistent/phase-c-missing-snapshot.bin",
+            )),
+            ..Default::default()
+        };
+        let result = transform_css(".a { color: red; }", &opts);
+        assert!(result.is_err(), "expected hard error for missing path");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("precomputed_browserslist_path"),
+            "error message should mention the field, got: {err}",
+        );
+    }
+
+    /// Phase C: invalid (non-postcard) bytes are also a hard error.
+    #[test]
+    fn phase_c_invalid_snapshot_bytes_is_hard_error() {
+        let opts = TransformOpts {
+            precomputed_browserslist: Some(b"not-a-valid-postcard-snapshot".to_vec()),
+            ..Default::default()
+        };
+        let result = transform_css(".a { color: red; }", &opts);
+        assert!(result.is_err(), "expected hard error for malformed snapshot");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("browserslist precomputed"),
+            "error message should mention the snapshot, got: {err}",
         );
     }
 }

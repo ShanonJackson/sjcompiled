@@ -116,6 +116,12 @@ impl WireOpts {
             class_hash_prefix: self.class_hash_prefix,
             precomputed_prefixes: None,
             precomputed_prefixes_path: None,
+            // Env-pinned baseline drives `BROWSERSLIST_CONFIG`, NOT
+            // a snapshot — see EnvPin docs above. Phase E7 has the
+            // mirror test that drives the snapshot path with
+            // identical expected output.
+            precomputed_browserslist: None,
+            precomputed_browserslist_path: None,
         }
     }
 }

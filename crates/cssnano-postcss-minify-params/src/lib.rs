@@ -32,6 +32,24 @@ pub fn postcss_minify_params(root: &mut Root) -> PluginResult {
     // `pluginCreator(options = {})`: resolve browserslist once. AFM
     // consumer never sets `path`/`stats`/`env`, so default-query path.
     let browsers = browserslist_shim::resolve("", true);
+    process_with_browsers(root, &browsers)
+}
+
+/// Snapshot-aware variant. When `snapshot` is `Some`, the
+/// `has_all_bug` (legacy IE 10/11 detection) decision drives off the
+/// snapshot's host-resolved list. When `None`, byte-equivalent to
+/// [`postcss_minify_params`].
+pub fn postcss_minify_params_with_snapshot(
+    root: &mut Root,
+    snapshot: Option<&::cssnano_browserslist_snapshot::PrecomputedBrowserslist>,
+) -> PluginResult {
+    match snapshot {
+        Some(snap) => process_with_browsers(root, snap.selected.as_slice()),
+        None => postcss_minify_params(root),
+    }
+}
+
+fn process_with_browsers(root: &mut Root, browsers: &[String]) -> PluginResult {
     let has_all_bug = browsers
         .iter()
         .any(|b| ALL_BUG_BROWSERS.contains(&b.as_str()));
@@ -453,5 +471,60 @@ mod tests {
         );
         assert_eq!(sort_and_dedupe(vec![]), "");
         assert_eq!(sort_and_dedupe(vec!["".into()]), "");
+    }
+
+    // -------------------------------------------------------------------
+    // Phase B / E5 — snapshot-aware entry-point parity tests.
+    // -------------------------------------------------------------------
+
+    use ::cssnano_browserslist_snapshot::{
+        PrecomputedBrowserslist, PRECOMPUTED_FORMAT_VERSION,
+    };
+
+    fn snap(selected: &[&str]) -> PrecomputedBrowserslist {
+        let owned: Vec<String> = selected.iter().map(|s| (*s).to_string()).collect();
+        let joined = owned.join(", ");
+        PrecomputedBrowserslist {
+            format_version: PRECOMPUTED_FORMAT_VERSION,
+            selected: owned,
+            joined_query: joined,
+        }
+    }
+
+    fn run_with_snap(css: &str, snapshot: Option<&PrecomputedBrowserslist>) -> String {
+        let mut root = css_parse(css).unwrap();
+        postcss_minify_params_with_snapshot(&mut root, snapshot).unwrap();
+        css_stringify(&root)
+    }
+
+    /// E5.a — `None` snapshot byte-equivalent to default entry.
+    #[test]
+    fn snapshot_none_byte_equivalent_to_default_entry() {
+        let cases = [
+            "@media all { a { color: red; } }",
+            "@media a, b, a { x { color: red; } }",
+            "@media all and (min-width: 768px) { a { color: red; } }",
+            "@supports ( display : grid ) { a { color: red; } }",
+            "@import \"x.css\";\na { color: red; }",
+        ];
+        for src in cases {
+            assert_eq!(
+                run(src),
+                run_with_snap(src, None),
+                "snapshot=None drifted from default entry on input {src:?}",
+            );
+        }
+    }
+
+    /// E5.b — modern snapshot has no IE 10/11 → `has_all_bug = false` —
+    /// `@media all` still collapses (collapse is unconditional, not
+    /// gated by IE bug).
+    #[test]
+    fn snapshot_modern_collapses_at_media_all() {
+        let modern = snap(&["chrome 144", "firefox 147"]);
+        assert_eq!(
+            run_with_snap("@media all { a { color: red; } }", Some(&modern)),
+            "@media { a { color: red; } }",
+        );
     }
 }

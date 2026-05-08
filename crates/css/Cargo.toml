@@ -21,6 +21,7 @@ postcss-nested = { workspace = true }
 postcss-normalize-whitespace = { workspace = true }
 autoprefixer = { workspace = true }
 cssnano-preset-default = { workspace = true }
+cssnano-browserslist-snapshot = { workspace = true }
 compiled-utils = { workspace = true }
 compiled-css = { workspace = true }
 indexmap = { workspace = true }

@@ -397,6 +397,44 @@ pub fn postcss_colormin(root: &mut Root) -> PluginResult {
     postcss_colormin_with_query(root, None, "")
 }
 
+/// Snapshot-aware variant. When `snapshot` is `Some`, both the
+/// `transparent_default` membership probe (against
+/// `BROWSERS_WITH_TRANSPARENT_BUG`) and the
+/// `caniuse_api::is_supported("css-rrggbbaa", ...)` decision drive
+/// off the host-resolved browserslist via the snapshot — no FS / env
+/// reads required. When `None`, byte-equivalent to
+/// [`postcss_colormin`] (resolves via in-process shim).
+///
+/// Used by `cssnano-preset-default::apply_postcss_colormin` when the
+/// SWC babel-plugin host has provided a snapshot via
+/// [`PresetOpts::browserslist_snapshot`].
+pub fn postcss_colormin_with_snapshot(
+    root: &mut Root,
+    user_options: Option<&MinifyOpts>,
+    snapshot: Option<&::cssnano_browserslist_snapshot::PrecomputedBrowserslist>,
+) -> PluginResult {
+    match snapshot {
+        Some(snap) => {
+            // Hand the snapshot's pre-resolved list AND its joined query
+            // to `_with_browsers` directly. Critical invariant (line 322
+            // of this file): "The browserslist query and the resolved
+            // list passed in must come from the SAME resolution pass."
+            // The snapshot satisfies this by construction —
+            // `joined_query == selected.join(", ")`, and the schema gate
+            // (`cssnano-browserslist-snapshot::tests::joined_query_resolves_back_to_selected_via_shim`)
+            // pins that `resolve(&joined_query) == selected` for the AFM
+            // canonical list.
+            postcss_colormin_with_browsers(
+                root,
+                user_options,
+                snap.selected.as_slice(),
+                snap.joined_query.as_str(),
+            )
+        }
+        None => postcss_colormin_with_query(root, user_options, ""),
+    }
+}
+
 /// Cache key builder. Internal-only — see `postcss_colormin_with_browsers`
 /// for why the shape doesn't have to mirror JS's `JSON.stringify`.
 fn build_cache_key(value: &str, opts: &MinifyOpts, browsers: &[String]) -> String {
@@ -679,5 +717,74 @@ mod tests {
         // "transparent" (11ch) on length. So output is "#0000".
         let out = run_with_query("a { color: rgba(0,0,0,0); }", "chrome 100");
         assert!(out.contains("#0000"), "got: {out:?}");
+    }
+
+    // -------------------------------------------------------------------
+    // Phase B / E5 — snapshot-aware entry-point parity tests.
+    // -------------------------------------------------------------------
+
+    use ::cssnano_browserslist_snapshot::{
+        PrecomputedBrowserslist, PRECOMPUTED_FORMAT_VERSION,
+    };
+
+    fn snap(selected: &[&str]) -> PrecomputedBrowserslist {
+        let owned: Vec<String> = selected.iter().map(|s| (*s).to_string()).collect();
+        let joined = owned.join(", ");
+        PrecomputedBrowserslist {
+            format_version: PRECOMPUTED_FORMAT_VERSION,
+            selected: owned,
+            joined_query: joined,
+        }
+    }
+
+    fn run_with_snap(
+        css: &str,
+        snapshot: Option<&PrecomputedBrowserslist>,
+    ) -> String {
+        let mut root = postcss_core::parse(css).unwrap();
+        postcss_colormin_with_snapshot(&mut root, None, snapshot).unwrap();
+        postcss_core::stringify(&root)
+    }
+
+    /// E5.a — `None` snapshot is byte-equivalent to `postcss_colormin`.
+    #[test]
+    fn snapshot_none_byte_equivalent_to_default_entry() {
+        let cases = [
+            "a { color: #ff0000; }",
+            "a { color: rgba(255,255,255,1); }",
+            "a { color: rgba(0,0,0,0); }",
+            "a { background: #aabbcc; }",
+            "a { color: hsl(0, 100%, 50%); }",
+        ];
+        for src in cases {
+            let mut r1 = postcss_core::parse(src).unwrap();
+            postcss_colormin(&mut r1).unwrap();
+            let from_default = postcss_core::stringify(&r1);
+            let from_snap_none = run_with_snap(src, None);
+            assert_eq!(
+                from_default, from_snap_none,
+                "snapshot=None drifted from default entry on input {src:?}",
+            );
+        }
+    }
+
+    /// E5.b — modern snapshot enables `transparent` rewrite (no IE 8/9
+    /// in selected list → `transparent_default = true`).
+    #[test]
+    fn snapshot_modern_enables_transparent_default() {
+        let modern = snap(&["chrome 144", "firefox 147"]);
+        // rgba(0,0,0,0) on modern — alpha-hex enabled, "#0000" beats
+        // "transparent" on length, same as `plugin_modern_target_keeps_transparent`.
+        let out = run_with_snap("a { color: rgba(0,0,0,0); }", Some(&modern));
+        assert!(out.contains("#0000"), "got: {out:?}");
+    }
+
+    /// E5.c — legacy snapshot containing `ie 8` disables
+    /// `transparent_default` (mirrors `transparent_disabled_for_ie89`).
+    #[test]
+    fn snapshot_legacy_ie8_disables_transparent_default() {
+        let legacy = snap(&["ie 8", "chrome 100"]);
+        let opts = add_plugin_defaults(None, &legacy.selected, &legacy.joined_query);
+        assert!(!opts.transparent);
     }
 }

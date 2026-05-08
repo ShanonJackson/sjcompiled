@@ -57,7 +57,7 @@ use crate::utils::comments::collect_line_comments;
 
 #[plugin_transform]
 pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Program {
-    let opts: PluginOptions = meta
+    let mut opts: PluginOptions = meta
         .get_transform_plugin_config()
         .as_deref()
         .and_then(|s| PluginOptions::deserialize(&mut serde_json::Deserializer::from_str(s)).ok())
@@ -95,6 +95,22 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
     // a pure host-environment compat shim per `compat/` discipline.
     let host_root = opts.root.as_deref().unwrap_or("");
     let filename: String = crate::compat::wasi_path::host_to_wasi(&raw_filename, host_root);
+
+    // Same WASI-preopen translation for the precomputed-browserslist
+    // snapshot path. The host wrapper (engines.ts / Parcel
+    // transformer) writes the snapshot file under `process.cwd()`
+    // and passes a host-absolute path here; downstream
+    // `std::fs::read` inside the WASI sandbox needs the
+    // `/cwd/<rel>` form or it `ENOTCAPABLE`s out. Mirrors the
+    // `filename` translation above. Native callers
+    // (`opts.root = None`) get a no-op (host_root = ""), preserving
+    // unit-test behaviour. See
+    // `crates/babel-plugin/src/compat/wasi_path.rs` for the
+    // translation contract.
+    if let Some(path) = opts.precomputed_browserslist_path.as_deref() {
+        let translated = crate::compat::wasi_path::host_to_wasi(path, host_root);
+        opts.precomputed_browserslist_path = Some(translated);
+    }
 
     // §4.6 bridge: build the Compiled resolver and stash it on
     // `state` so `resolve_binding::resolve_request` can reach it.

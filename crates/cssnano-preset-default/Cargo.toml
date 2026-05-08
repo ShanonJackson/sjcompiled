@@ -21,4 +21,5 @@ cssnano-postcss-ordered-values = { workspace = true }
 cssnano-postcss-reduce-initial = { workspace = true }
 cssnano-postcss-convert-values = { workspace = true }
 cssnano-postcss-colormin = { workspace = true }
+cssnano-browserslist-snapshot = { workspace = true }
 postcss-calc = { workspace = true }

@@ -45,6 +45,28 @@ pub fn postcss_normalize_unicode(root: &mut Root) -> PluginResult {
     // (or the 4.24.2 defaults if none is set). We resolve via the shim
     // with an empty query, which mirrors `browserslist(null, ...)`.
     let browsers = browserslist_shim::resolve("", true);
+    process_with_browsers(root, &browsers)
+}
+
+/// Snapshot-aware variant. When `snapshot` is `Some`, the
+/// `is_legacy` (lower-case `u+` prefix bug) decision drives off the
+/// snapshot's host-resolved list. When `None`, byte-equivalent to
+/// [`postcss_normalize_unicode`].
+pub fn postcss_normalize_unicode_with_snapshot(
+    root: &mut Root,
+    snapshot: Option<&::cssnano_browserslist_snapshot::PrecomputedBrowserslist>,
+) -> PluginResult {
+    match snapshot {
+        Some(snap) => process_with_browsers(root, snap.selected.as_slice()),
+        None => postcss_normalize_unicode(root),
+    }
+}
+
+fn process_with_browsers(root: &mut Root, browsers: &[String]) -> PluginResult {
+    // `legacy_browsers` is the resolved set of `LEGACY_BROWSERS_QUERY`
+    // (`ie <=11, edge <= 15`). Whether resolved live (via shim) or
+    // pre-resolved (via snapshot), the set is identical because the
+    // query is a constant and `browserslist-shim::resolve` is pure.
     let legacy_browsers = browserslist_shim::resolve(LEGACY_BROWSERS_QUERY, true);
     let is_legacy = browsers.iter().any(|b| legacy_browsers.contains(b));
 
@@ -54,7 +76,6 @@ pub fn postcss_normalize_unicode(root: &mut Root) -> PluginResult {
     let mut cache: IndexMap<String, String> = IndexMap::new();
 
     walk_decls_mut(&mut root.root, &mut |node, _ctx| {
-        // `walkDecls(/^unicode-range$/i, ...)` — case-insensitive prop match.
         if let NodeKind::Declaration(decl) = &mut node.kind {
             if !decl.prop.eq_ignore_ascii_case("unicode-range") {
                 return Mutation::Keep;
@@ -213,5 +234,84 @@ mod tests {
         let l: Vec<char> = "000000".chars().collect();
         let r: Vec<char> = "ffffff".chars().collect();
         assert_eq!(merge_range_bounds(&l, &r), None);
+    }
+
+    // -------------------------------------------------------------------
+    // Phase B / E5 — snapshot-aware entry-point parity tests.
+    // -------------------------------------------------------------------
+
+    use ::cssnano_browserslist_snapshot::{
+        PrecomputedBrowserslist, PRECOMPUTED_FORMAT_VERSION,
+    };
+    use postcss_core::{parse as css_parse, stringify as css_stringify};
+
+    fn snap(selected: &[&str]) -> PrecomputedBrowserslist {
+        let owned: Vec<String> = selected.iter().map(|s| (*s).to_string()).collect();
+        let joined = owned.join(", ");
+        PrecomputedBrowserslist {
+            format_version: PRECOMPUTED_FORMAT_VERSION,
+            selected: owned,
+            joined_query: joined,
+        }
+    }
+
+    fn run_default(css: &str) -> String {
+        let mut root = css_parse(css).unwrap();
+        postcss_normalize_unicode(&mut root).unwrap();
+        css_stringify(&root)
+    }
+
+    fn run_with_snap(css: &str, snapshot: Option<&PrecomputedBrowserslist>) -> String {
+        let mut root = css_parse(css).unwrap();
+        postcss_normalize_unicode_with_snapshot(&mut root, snapshot).unwrap();
+        css_stringify(&root)
+    }
+
+    /// E5.a — `None` snapshot byte-equivalent to default entry.
+    #[test]
+    fn snapshot_none_byte_equivalent_to_default_entry() {
+        let cases = [
+            "@font-face { unicode-range: u+0025-00ff; }",
+            "@font-face { unicode-range: U+0025-00ff; }",
+            "@font-face { unicode-range: u+0000-00ff; }",
+            "a { color: red; }",
+        ];
+        for src in cases {
+            assert_eq!(
+                run_default(src),
+                run_with_snap(src, None),
+                "snapshot=None drifted from default entry on input {src:?}",
+            );
+        }
+    }
+
+    /// E5.b — IE 11 snapshot triggers `is_legacy = true`: lowercase `u+`
+    /// prefix gets uppercased to `U+`.
+    #[test]
+    fn snapshot_legacy_browsers_uppercase_u_prefix() {
+        let legacy = snap(&["ie 11"]);
+        let out = run_with_snap(
+            "@font-face { unicode-range: u+0025-00ff; }",
+            Some(&legacy),
+        );
+        assert!(
+            out.contains("U+0025-00ff"),
+            "legacy snapshot should uppercase u+ prefix, got: {out}",
+        );
+    }
+
+    /// E5.c — modern snapshot (no IE/old Edge): `is_legacy = false`,
+    /// lowercase `u+` left alone.
+    #[test]
+    fn snapshot_modern_browsers_keep_lowercase_u_prefix() {
+        let modern = snap(&["chrome 144", "firefox 147"]);
+        let out = run_with_snap(
+            "@font-face { unicode-range: u+0025-00ff; }",
+            Some(&modern),
+        );
+        assert!(
+            out.contains("u+0025-00ff"),
+            "modern snapshot should keep lowercase u+ prefix, got: {out}",
+        );
     }
 }

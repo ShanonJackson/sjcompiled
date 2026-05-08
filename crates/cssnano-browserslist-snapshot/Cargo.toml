@@ -1,0 +1,12 @@
+[package]
+name = "cssnano-browserslist-snapshot"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Host-resolved browserslist snapshot for the cssnano-preset-default WASI fast path. Mirrors the autoprefixer precomputed-prefixes pattern but for the cssnano browserslist-aware plugins (postcss-{reduce-initial,colormin,convert-values,minify-params,normalize-unicode}). See crates/cssnano-browserslist-snapshot/src/lib.rs for the architectural rationale and DEFINITIVE_BROWSERSLIST_PLAN.md for the full design."
+
+[dependencies]
+browserslist-shim.workspace = true
+serde.workspace = true
+postcard.workspace = true

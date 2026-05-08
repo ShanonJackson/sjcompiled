@@ -70,6 +70,11 @@ fn plugin_opts_to_transform_opts(opts: &PluginOptions) -> TransformOpts {
         class_hash_prefix: opts.class_hash_prefix.clone(),
         precomputed_prefixes: None,
         precomputed_prefixes_path: None,
+        precomputed_browserslist: None,
+        precomputed_browserslist_path: opts
+            .precomputed_browserslist_path
+            .clone()
+            .map(std::path::PathBuf::from),
     }
 }
 

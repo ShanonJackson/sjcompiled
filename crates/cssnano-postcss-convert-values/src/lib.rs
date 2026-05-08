@@ -109,6 +109,21 @@ pub fn postcss_convert_values(root: &mut Root, opts: &ConvertValuesOpts) -> Plug
     postcss_convert_values_with_browsers(root, opts, &browsers)
 }
 
+/// Snapshot-aware variant. When `snapshot` is `Some`, the
+/// `keepZeroPercent` branch is decided against the snapshot's
+/// host-resolved browser list (no FS / env reads). When `None`,
+/// byte-equivalent to [`postcss_convert_values`].
+pub fn postcss_convert_values_with_snapshot(
+    root: &mut Root,
+    opts: &ConvertValuesOpts,
+    snapshot: Option<&::cssnano_browserslist_snapshot::PrecomputedBrowserslist>,
+) -> PluginResult {
+    match snapshot {
+        Some(snap) => postcss_convert_values_with_browsers(root, opts, snap.selected.as_slice()),
+        None => postcss_convert_values(root, opts),
+    }
+}
+
 /// Variant exposed for tests / parity-runner that need to pin the
 /// browserslist resolution to a specific set (e.g. force `ie 11` in for
 /// the `keepZeroPercent` branch).
@@ -525,5 +540,75 @@ mod tests {
     fn negative_leading_zero_strip() {
         let out = run("a { margin: -0.5em }");
         assert!(out.contains(" -.5em"), "got: {out}");
+    }
+
+    // -------------------------------------------------------------------
+    // Phase B / E5 — snapshot-aware entry-point parity tests.
+    // -------------------------------------------------------------------
+
+    use ::cssnano_browserslist_snapshot::{
+        PrecomputedBrowserslist, PRECOMPUTED_FORMAT_VERSION,
+    };
+
+    fn snap(selected: &[&str]) -> PrecomputedBrowserslist {
+        let owned: Vec<String> = selected.iter().map(|s| (*s).to_string()).collect();
+        let joined = owned.join(", ");
+        PrecomputedBrowserslist {
+            format_version: PRECOMPUTED_FORMAT_VERSION,
+            selected: owned,
+            joined_query: joined,
+        }
+    }
+
+    fn run_with_snap(
+        css: &str,
+        snapshot: Option<&PrecomputedBrowserslist>,
+    ) -> String {
+        let mut root = parse(css).unwrap();
+        postcss_convert_values_with_snapshot(
+            &mut root,
+            &ConvertValuesOpts::default(),
+            snapshot,
+        )
+        .unwrap();
+        stringify(&root)
+    }
+
+    /// E5.a — `None` snapshot byte-equivalent to `postcss_convert_values`.
+    #[test]
+    fn snapshot_none_byte_equivalent_to_default_entry() {
+        let cases = [
+            "a { width: 0.5em }",
+            "a { margin: -0.5em }",
+            "a { padding: 100% }",
+            "a { width: 0px }",
+            "a { transform: rotate(0deg) }",
+        ];
+        for src in cases {
+            let from_default = run(src);
+            let from_snap_none = run_with_snap(src, None);
+            assert_eq!(
+                from_default, from_snap_none,
+                "snapshot=None drifted from default entry on input {src:?}",
+            );
+        }
+    }
+
+    /// E5.b — IE 11 snapshot triggers `keepZeroPercent` branch:
+    /// `0%` inside flex shorthand stays as `0%` (not `0`).
+    #[test]
+    fn snapshot_with_ie11_keeps_zero_percent_in_flex() {
+        let ie11 = snap(&["ie 11", "chrome 100"]);
+        // The keepZeroPercent path is gated on `flex`/`flex-basis` props
+        // when ie 11 is in the resolved list.
+        let mut root = parse("a { flex: 0 0 0% }").unwrap();
+        postcss_convert_values_with_snapshot(
+            &mut root,
+            &ConvertValuesOpts::default(),
+            Some(&ie11),
+        )
+        .unwrap();
+        let out = stringify(&root);
+        assert!(out.contains("0%"), "ie11 snapshot should keep 0%, got: {out}");
     }
 }

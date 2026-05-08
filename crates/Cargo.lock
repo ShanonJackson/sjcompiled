@@ -122,6 +122,7 @@ version = "0.0.1"
 dependencies = [
  "compiled-utils",
  "css",
+ "cssnano-browserslist-snapshot",
  "indexmap",
  "once_cell",
  "oxc_resolver",
@@ -449,6 +450,7 @@ version = "0.0.1"
 dependencies = [
  "autoprefixer",
  "css",
+ "cssnano-browserslist-snapshot",
  "indexmap",
  "napi",
  "napi-build",
@@ -516,6 +518,7 @@ dependencies = [
  "autoprefixer",
  "compiled-css",
  "compiled-utils",
+ "cssnano-browserslist-snapshot",
  "cssnano-preset-default",
  "indexmap",
  "postcss-core",
@@ -529,12 +532,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cssnano-browserslist-snapshot"
+version = "0.0.1"
+dependencies = [
+ "browserslist-shim",
+ "postcard",
+ "serde",
+]
+
+[[package]]
 name = "cssnano-postcss-colormin"
 version = "0.0.1"
 dependencies = [
  "browserslist-shim",
  "caniuse-api",
  "colord",
+ "cssnano-browserslist-snapshot",
  "indexmap",
  "once_cell",
  "postcss-core",
@@ -547,6 +560,7 @@ name = "cssnano-postcss-convert-values"
 version = "0.0.1"
 dependencies = [
  "browserslist-shim",
+ "cssnano-browserslist-snapshot",
  "postcss-core",
  "postcss-value-parser",
 ]
@@ -577,6 +591,7 @@ version = "0.0.1"
 dependencies = [
  "browserslist-shim",
  "caniuse-api",
+ "cssnano-browserslist-snapshot",
  "cssnano-utils",
  "postcss-core",
  "postcss-value-parser",
@@ -628,6 +643,7 @@ name = "cssnano-postcss-normalize-unicode"
 version = "0.0.1"
 dependencies = [
  "browserslist-shim",
+ "cssnano-browserslist-snapshot",
  "indexmap",
  "postcss-core",
  "postcss-value-parser",
@@ -661,6 +677,7 @@ name = "cssnano-postcss-reduce-initial"
 version = "0.0.1"
 dependencies = [
  "caniuse-api",
+ "cssnano-browserslist-snapshot",
  "indexmap",
  "once_cell",
  "postcss-core",
@@ -671,6 +688,7 @@ dependencies = [
 name = "cssnano-preset-default"
 version = "0.0.1"
 dependencies = [
+ "cssnano-browserslist-snapshot",
  "cssnano-postcss-colormin",
  "cssnano-postcss-convert-values",
  "cssnano-postcss-discard-comments",

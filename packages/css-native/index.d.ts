@@ -84,6 +84,39 @@ export interface TransformOpts {
    * hide behind a 100x perf regression.
    */
   precomputedPrefixesPath?: string;
+
+  /**
+   * Optional postcard-encoded browserslist snapshot produced by
+   * `precomputeBrowserslistDefault()`. When supplied, the 5
+   * browserslist-aware cssnano plugins (`postcss-reduce-initial`,
+   * `-colormin`, `-convert-values`, `-minify-params`,
+   * `-normalize-unicode`) skip their in-process
+   * `browserslist_shim::resolve("")` paths and consume the host-
+   * resolved snapshot directly.
+   *
+   * **Required for correct WASI behaviour with non-default
+   * browserslist configs.** Inside WASI, env vars
+   * (`BROWSERSLIST` / `BROWSERSLIST_CONFIG`) and FS walks for
+   * `.browserslistrc` are unreachable — the leaf plugins fall back
+   * to the wide `browserslist@4.24.2` defaults (which include IE 11)
+   * and produce different output than the host's modern browser
+   * list. See `DEFINITIVE_BROWSERSLIST_PLAN.md`.
+   *
+   * NAPI consumers don't strictly need this: the in-process shim
+   * resolves correctly given the host's cwd / env. Pass it anyway
+   * for parity with the WASI path (and for a small perf win — the
+   * in-plugin resolution is ~200 µs/call).
+   */
+  precomputedBrowserslist?: Buffer;
+
+  /**
+   * Filesystem-path delivery for the `PrecomputedBrowserslist`
+   * snapshot. Mirrors `precomputedPrefixesPath`.
+   *
+   * Inline `precomputedBrowserslist` takes precedence when both are
+   * set. Read failure is a hard error.
+   */
+  precomputedBrowserslistPath?: string;
 }
 
 export interface TransformResult {
@@ -123,3 +156,25 @@ export function transformCss(
  * walk. When omitted, resolution starts at `process.cwd()`.
  */
 export function precomputePrefixesDefault(from?: string | null): Buffer;
+
+/**
+ * Build the postcard browserslist-snapshot blob once on the host.
+ * Pass the returned `Buffer` back via
+ * `transformCss(css, { precomputedBrowserslist })` (or write it to
+ * a file and use `precomputedBrowserslistPath` for the WASI plugin).
+ *
+ * `from` is the filesystem anchor for the `.browserslistrc` upward
+ * walk — pass the project root or a path under it. When omitted,
+ * resolution starts at `process.cwd()`. The AFM canonical bootstrap
+ * uses `require.resolve('postcss-reduce-initial/package.json')` so
+ * the host-side walk-up is provably byte-equivalent to the leaf
+ * plugin's own walk-up.
+ *
+ * The 5 cssnano plugins this snapshot drives:
+ *   - postcss-reduce-initial (toInitial branch gating)
+ *   - postcss-colormin (transparent_default + caniuse-rrggbbaa)
+ *   - postcss-convert-values (keepZeroPercent for IE 11)
+ *   - postcss-minify-params (legacy IE 10/11 bug detection)
+ *   - postcss-normalize-unicode (lowercase u+ prefix on IE/Edge ≤15)
+ */
+export function precomputeBrowserslistDefault(from?: string | null): Buffer;

@@ -6,18 +6,121 @@
  * uses `babelEngine` for the determinism baseline (§2.0 verification
  * gate per `plugins/STATUS.md`).
  */
+import { resolve } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+
+const REPO_ROOT = resolve(__dirname, '../..');
+const AFM_BROWSERSLISTRC = resolve(
+  REPO_ROOT,
+  'crates/browserslist-shim/tests/fixtures/afm/.browserslistrc',
+);
+
+// Symmetric Babel-side browserslist alignment is conditional on
+// the SWC-side snapshot being available; see
+// `tryWriteBrowserslistSnapshot()` below. If we set
+// `BROWSERSLIST_CONFIG` here UNCONDITIONALLY but the SWC binary
+// can't produce a snapshot, the Babel side would resolve to the
+// AFM modern list while the SWC side falls back to wide defaults
+// — creating exactly the drift we're trying to remove. Defer to
+// the symmetric path below.
+
 import { transformSync as babelTransformSync } from '@babel/core';
 import { transformSync as swcTransformSync } from '@swc/core';
 import { DEFAULT_PARSER_BABEL_PLUGINS } from '@compiled/utils';
 import compiledBabelPlugin from '@compiled/babel-plugin';
 import { format } from 'prettier';
-import { resolve } from 'node:path';
 
-const REPO_ROOT = resolve(__dirname, '../..');
 const BABEL_PLUGIN_WASM = resolve(
   REPO_ROOT,
   'crates/target/wasm32-wasip1/release/babel_plugin.wasm',
 );
+
+// ---------------------------------------------------------------------------
+// Phase D — host-resolved browserslist snapshot for the SWC engine.
+//
+// Inside the WASI sandbox the SWC plugin can't read host env vars
+// (`BROWSERSLIST` / `BROWSERSLIST_CONFIG`) and can't walk up from
+// `node_modules/postcss-*/src` for `.browserslistrc` (the only preopen
+// is `process.cwd()`). The 5 browserslist-aware cssnano plugins
+// (`reduce-initial`, `colormin`, `convert-values`, `minify-params`,
+// `normalize-unicode`) silently fall back to the wide
+// `browserslist@4.24.2` defaults — which include IE 11 — and the
+// output drifts from Babel's modern-browser output.
+//
+// Fix: precompute the snapshot ONCE on the host (where env vars + FS
+// walks work), write the postcard bytes to a file under `cwd` (the
+// WASI preopen), and pass the path through `precomputedBrowserslistPath`
+// in plugin options. The plugin reads the file on each invocation
+// (OS page cache amortises) and threads the decoded snapshot to the
+// 5 leaf plugins via `PresetOpts::browserslist_snapshot`.
+//
+// Anchor: `crates/browserslist-shim/tests/fixtures/afm/.browserslistrc`
+// is the AFM canonical browserslist (vendored from
+// `jira/.browserslistrc`). Passing it as `from` makes the host-side
+// `find_config` walk-up land on that exact file regardless of where
+// the test runner invokes us. This matches the AFM team's
+// recommendation in `DEFINITIVE_BROWSERSLIST_PLAN.md` to anchor on a
+// known-good `.browserslistrc` rather than rely on coincidental cwd
+// walk-ups.
+//
+// Robustness: `precomputeBrowserslistDefault` may be absent on the
+// currently-shipped `compiled-css.<platform>.node` binary
+// (Phase C-introduced export — only present after a fresh
+// `cargo build -p compiled-css-napi`). When absent, fall back to
+// `null` and let the SWC engine omit the path; the WASI plugin then
+// falls back to its in-process resolution (which matches Babel's
+// default-list output for fixtures that don't depend on the AFM
+// modern list). Hard-fail would be a regression for the rest of
+// the corpus while we wait on a binary rebuild.
+const SNAPSHOT_DIR = resolve(REPO_ROOT, '.parity-harness-cache');
+const BROWSERSLIST_SNAPSHOT_PATH = resolve(
+  SNAPSHOT_DIR,
+  'browserslist-snapshot.bin',
+);
+
+function tryWriteBrowserslistSnapshot(): string | null {
+  try {
+    const native = require('@compiled/css-native') as {
+      precomputeBrowserslistDefault?: (from?: string | null) => Buffer;
+    };
+    if (typeof native.precomputeBrowserslistDefault !== 'function') {
+      return null;
+    }
+    const bytes = native.precomputeBrowserslistDefault(AFM_BROWSERSLISTRC);
+    mkdirSync(SNAPSHOT_DIR, { recursive: true });
+    writeFileSync(BROWSERSLIST_SNAPSHOT_PATH, bytes);
+
+    // Symmetric Babel-side alignment: pin `BROWSERSLIST_CONFIG` so
+    // the in-process JS cssnano plugins resolve to the same list
+    // the SWC-side snapshot was built from. Only set when the
+    // snapshot succeeded — otherwise we'd create drift (Babel uses
+    // AFM modern, SWC falls back to wide defaults). Caller-set env
+    // vars are respected (developer override).
+    //
+    // Setting `process.env.*` AFTER the `@compiled/babel-plugin`
+    // import is safe: the cssnano plugins read the env at
+    // `prepare(result)` time, which fires per `babelTransformSync`
+    // call (NOT at plugin module-load). Module-load of this file
+    // completes before any `babelEngine()` invocation runs.
+    if (!process.env.BROWSERSLIST_CONFIG && !process.env.BROWSERSLIST) {
+      process.env.BROWSERSLIST_CONFIG = AFM_BROWSERSLISTRC;
+    }
+
+    return BROWSERSLIST_SNAPSHOT_PATH;
+  } catch {
+    // Native binary missing or precompute failed — surface as null
+    // so the engine omits the path. The covering log lives one
+    // layer up (the harness's first SWC invocation will hit the
+    // wide-default fallback if the snapshot is absent; tests gated
+    // on the AFM browserslist will fail visibly with a content
+    // diff, not a misleading internal error).
+    return null;
+  }
+}
+
+// Compute once at module load. Subsequent SWC engine invocations reuse
+// the same path without re-running the host-side resolution.
+const PRECOMPUTED_BROWSERSLIST_PATH: string | null = tryWriteBrowserslistSnapshot();
 
 /**
  * Mirrors `packages/babel-plugin/src/test-utils.ts::transform`. The
@@ -249,6 +352,24 @@ export function swcEngine(source: string, opts: BabelPluginFixtureOpts = {}): st
             root: process.cwd().replace(/\\/g, '/'),
             optimizeCss,
             importReact,
+            // Phase D — thread the host-resolved browserslist snapshot
+            // path. `null` when the native binary is too old to
+            // export `precomputeBrowserslistDefault`; the plugin
+            // falls back to its in-process resolution (wide
+            // defaults) and only fixtures that exercise the
+            // browserslist-gated branches will surface a diff.
+            //
+            // The path is host-absolute here; the plugin's
+            // `compat::wasi_path::host_to_wasi` translation in
+            // `process()` rewrites it to `/cwd/...` form before
+            // `std::fs::read` sees it (mirrors how `filename` /
+            // `root` are translated).
+            //
+            // Spread BEFORE `pluginOptions` so an explicit override
+            // in fixture opts wins.
+            ...(PRECOMPUTED_BROWSERSLIST_PATH != null
+              ? { precomputedBrowserslistPath: PRECOMPUTED_BROWSERSLIST_PATH }
+              : {}),
             ...pluginOptions,
           },
         ]],

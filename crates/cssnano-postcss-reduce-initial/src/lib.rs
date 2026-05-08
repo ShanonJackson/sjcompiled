@@ -39,6 +39,7 @@
 use indexmap::{IndexMap, IndexSet};
 use once_cell::sync::Lazy;
 
+use cssnano_browserslist_snapshot::PrecomputedBrowserslist;
 use postcss_core::container::{walk_decls_mut, Mutation};
 use postcss_core::node::NodeKind;
 use postcss_core::{PluginResult, Root};
@@ -72,6 +73,13 @@ pub struct PostcssReduceInitialOpts {
     pub env: Option<String>,
 }
 
+/// Default-resolution entry — preserves pre-2026-05-08 behaviour exactly.
+/// Calls `caniuse_api::is_supported("css-initial-value", "")`, which
+/// resolves browserslist via the in-process shim's
+/// [`browserslist_shim::resolve`] path (env vars + cwd-walk + defaults).
+/// Correct in NAPI; broken in WASI (env vars / `node_modules` not
+/// reachable). Use [`postcss_reduce_initial_with_snapshot`] in WASI
+/// to plumb the host-resolved browserslist explicitly.
 pub fn postcss_reduce_initial(root: &mut Root, opts: &PostcssReduceInitialOpts) -> PluginResult {
     // `prepare(result)` upstream — resolved once at plugin instantiation.
     // The Rust port computes once per `postcss_reduce_initial` call;
@@ -79,7 +87,41 @@ pub fn postcss_reduce_initial(root: &mut Root, opts: &PostcssReduceInitialOpts) 
     // is dormant on this code path (no config file is reachable from the
     // shim's `path: None` resolution); kept on the struct for API parity.
     let initial_support = caniuse_api::is_supported("css-initial-value", "");
+    process_with_initial_support(root, opts, initial_support)
+}
 
+/// Snapshot-aware variant. When `snapshot` is `Some`, the
+/// `initial_support` decision is taken against the host-resolved
+/// browserslist via [`PrecomputedBrowserslist::joined_query`] (avoiding
+/// any in-process FS / env reads). When `None`, falls back to the same
+/// resolution path as [`postcss_reduce_initial`] — byte-equivalent to
+/// the default entry point.
+///
+/// Used by `cssnano-preset-default::apply_postcss_reduce_initial` when
+/// the SWC babel-plugin host has provided a snapshot via
+/// [`PresetOpts::browserslist_snapshot`]. See
+/// `DEFINITIVE_BROWSERSLIST_PLAN.md §3.4`.
+pub fn postcss_reduce_initial_with_snapshot(
+    root: &mut Root,
+    opts: &PostcssReduceInitialOpts,
+    snapshot: Option<&PrecomputedBrowserslist>,
+) -> PluginResult {
+    let initial_support = match snapshot {
+        Some(snap) => caniuse_api::is_supported("css-initial-value", &snap.joined_query),
+        None => caniuse_api::is_supported("css-initial-value", ""),
+    };
+    process_with_initial_support(root, opts, initial_support)
+}
+
+/// Shared body. Factored out so both entry points reach byte-identical
+/// rewrites once the `initial_support` boolean is decided. Inline-able
+/// — kept as a separate fn for readability and to make the
+/// `_with_snapshot` test surface diff-comparable to the original.
+fn process_with_initial_support(
+    root: &mut Root,
+    opts: &PostcssReduceInitialOpts,
+    initial_support: bool,
+) -> PluginResult {
     // `new Set(defaultIgnoreProps.concat(resultOpts.ignore || []))` —
     // built once outside the walk callback (upstream rebuilds inside the
     // callback per-decl; both produce the same set per call).
@@ -247,5 +289,107 @@ mod tests {
         // round-trip including raws.between bytes.
         let src = "a { color: red;\n  background:  blue;  }\n\n@media (min-width: 0) { b { display: block; } }";
         assert_eq!(run(src), src);
+    }
+
+    // -------------------------------------------------------------------
+    // Phase B / E5 — snapshot-aware entry-point parity tests.
+    // See `DEFINITIVE_BROWSERSLIST_PLAN.md §5 Phase E`.
+    // -------------------------------------------------------------------
+
+    use cssnano_browserslist_snapshot::{
+        PrecomputedBrowserslist, PRECOMPUTED_FORMAT_VERSION,
+    };
+
+    /// Convenience: build a snapshot from a fixed list of `"name version"`
+    /// strings. Mirrors what the AFM bootstrap would ship for a given
+    /// `.browserslistrc`.
+    fn snap(selected: &[&str]) -> PrecomputedBrowserslist {
+        let owned: Vec<String> = selected.iter().map(|s| (*s).to_string()).collect();
+        let joined = owned.join(", ");
+        PrecomputedBrowserslist {
+            format_version: PRECOMPUTED_FORMAT_VERSION,
+            selected: owned,
+            joined_query: joined,
+        }
+    }
+
+    fn run_with_snap(css: &str, snapshot: Option<&PrecomputedBrowserslist>) -> String {
+        let mut root = parse(css).unwrap();
+        postcss_reduce_initial_with_snapshot(
+            &mut root,
+            &PostcssReduceInitialOpts::default(),
+            snapshot,
+        )
+        .unwrap();
+        stringify(&root)
+    }
+
+    /// Phase E5.a — with a modern-browser snapshot (every browser
+    /// supports `css-initial-value`), the `toInitial` branch fires:
+    /// `border-collapse: separate` → `border-collapse: initial`.
+    #[test]
+    fn snapshot_modern_browsers_enables_to_initial() {
+        let modern = snap(&[
+            "and_chr 144", "chrome 144", "firefox 147", "safari 26.2",
+        ]);
+        assert_eq!(
+            run_with_snap("a { border-collapse: separate }", Some(&modern)),
+            "a { border-collapse: initial }",
+        );
+    }
+
+    /// Phase E5.b — with a legacy-browser snapshot (e.g. IE 8 — no
+    /// `css-initial-value` support), the `toInitial` branch is gated
+    /// off and `border-collapse: separate` is left untouched.
+    #[test]
+    fn snapshot_legacy_browsers_disables_to_initial() {
+        let legacy = snap(&["ie 8"]);
+        assert_eq!(
+            run_with_snap("a { border-collapse: separate }", Some(&legacy)),
+            "a { border-collapse: separate }",
+        );
+    }
+
+    /// Phase E5.c — `None` snapshot is byte-equivalent to the default
+    /// entry point (`postcss_reduce_initial`). Critical regression
+    /// gate: existing NAPI / non-WASI callers that don't plumb a
+    /// snapshot must see identical bytes.
+    #[test]
+    fn snapshot_none_byte_equivalent_to_default_entry() {
+        let cases = [
+            "a { min-width: initial }",
+            "a { border-collapse: separate }",
+            "a { color: red }",
+            "a { writing-mode: initial }",
+            "a { -webkit-line-clamp: initial }",
+        ];
+        for src in cases {
+            let from_default = run(src);
+            let from_snap_none = run_with_snap(src, None);
+            assert_eq!(
+                from_default, from_snap_none,
+                "snapshot=None drifted from default entry on input {src:?}",
+            );
+        }
+    }
+
+    /// Phase E5.d — `from-initial` branch (rewriting bare `initial`
+    /// keyword) does NOT depend on `initial_support` — it always
+    /// fires. Verify the snapshot path doesn't accidentally alter
+    /// this behaviour.
+    #[test]
+    fn snapshot_independent_of_from_initial_branch() {
+        let modern = snap(&["chrome 144"]);
+        let legacy = snap(&["ie 8"]);
+        // `min-width: initial` → `min-width: auto` regardless of snapshot —
+        // this rewrite is in the from-initial table, ungated by caniuse.
+        assert_eq!(
+            run_with_snap("a { min-width: initial }", Some(&modern)),
+            "a { min-width: auto }",
+        );
+        assert_eq!(
+            run_with_snap("a { min-width: initial }", Some(&legacy)),
+            "a { min-width: auto }",
+        );
     }
 }

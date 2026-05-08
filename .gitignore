@@ -8,6 +8,13 @@ bun.lockb
 # `experimental.cacheRoot`). Files are regenerated when the WASM
 # changes.
 .swc/
+# Phase D parity-harness browserslist snapshot cache. Recomputed at
+# `parity-harness/babel-plugin/engines.ts` module load via
+# `precomputeBrowserslistDefault` against the vendored AFM
+# .browserslistrc. Regenerable; checking in would tie the snapshot
+# to a specific caniuse-db revision and make snapshot updates a
+# reviewable diff (which is the exact opposite of what we want).
+.parity-harness-cache/
 # `bun parity-harness/fixtures-triage.mjs` writes here; regenerable
 # (the analogous JSON-corpus report at
 # `parity-harness/babel-plugin/triage-report.json` is intentionally

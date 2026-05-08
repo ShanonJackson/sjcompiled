@@ -22,26 +22,50 @@
 //! For those, `apply` returns `Err("not on AFM hashing path")` so any
 //! drift in the consumer filter that suddenly reaches one fails loud.
 
+use std::sync::Arc;
+
 use postcss_core::{PluginError, PluginResult, Root};
 
-use cssnano_postcss_colormin::postcss_colormin;
-use cssnano_postcss_convert_values::{postcss_convert_values, ConvertValuesOpts};
+use cssnano_browserslist_snapshot::PrecomputedBrowserslist;
+use cssnano_postcss_colormin::{postcss_colormin, postcss_colormin_with_snapshot};
+use cssnano_postcss_convert_values::{
+    postcss_convert_values, postcss_convert_values_with_snapshot, ConvertValuesOpts,
+};
 use cssnano_postcss_discard_comments::{postcss_discard_comments, DiscardCommentsOpts};
 use cssnano_postcss_minify_gradients::postcss_minify_gradients;
-use cssnano_postcss_minify_params::postcss_minify_params;
+use cssnano_postcss_minify_params::{postcss_minify_params, postcss_minify_params_with_snapshot};
 use cssnano_postcss_minify_selectors::postcss_minify_selectors;
 use cssnano_postcss_normalize_positions::postcss_normalize_positions;
 use cssnano_postcss_normalize_string::{postcss_normalize_string, NormalizeStringOpts};
 use cssnano_postcss_normalize_timing_functions::postcss_normalize_timing_functions;
-use cssnano_postcss_normalize_unicode::postcss_normalize_unicode;
+use cssnano_postcss_normalize_unicode::{
+    postcss_normalize_unicode, postcss_normalize_unicode_with_snapshot,
+};
 use cssnano_postcss_normalize_url::{postcss_normalize_url, NormalizeUrlOpts};
 use cssnano_postcss_ordered_values::postcss_ordered_values;
-use cssnano_postcss_reduce_initial::{postcss_reduce_initial, PostcssReduceInitialOpts};
+use cssnano_postcss_reduce_initial::{
+    postcss_reduce_initial, postcss_reduce_initial_with_snapshot, PostcssReduceInitialOpts,
+};
 use postcss_calc::{postcss_calc, Options as CalcOptions};
 
 /// Apply function signature — calls the plugin with **default options**
-/// (per Anomaly #8: `creator()` from `normalize-css.ts:69`).
-pub type PluginApply = fn(&mut Root) -> PluginResult;
+/// (per Anomaly #8: `creator()` from `normalize-css.ts:69`) plus the
+/// preset-level [`PresetOpts`] context. Most plugins ignore the opts
+/// argument; the 5 browserslist-aware cssnano plugins
+/// (`postcss-{reduce-initial,colormin,convert-values,minify-params,
+/// normalize-unicode}`) read [`PresetOpts::browserslist_snapshot`]
+/// when it's `Some(_)` to bypass the in-WASI browserslist resolution
+/// (which can't see the host's `node_modules` or env vars). See
+/// `DEFINITIVE_BROWSERSLIST_PLAN.md` for the architecture.
+///
+/// **2026-05-08 signature change:** added `&PresetOpts` second
+/// argument to thread the host-resolved browserslist snapshot
+/// through to the leaf plugins. Existing callers must pass
+/// `&PresetOpts::default()` (or any `&PresetOpts`) explicitly. With
+/// `PresetOpts::default()` (`browserslist_snapshot: None`) every
+/// plugin's behaviour is byte-identical to the pre-change code path —
+/// the snapshot threading is purely additive.
+pub type PluginApply = fn(&mut Root, &PresetOpts) -> PluginResult;
 
 /// One entry in the preset's plugin tuple list. Mirrors
 /// `[creator, options]` from upstream `defaultPreset()` return value,
@@ -70,10 +94,25 @@ pub struct Preset {
 
 /// Upstream `Options` — per-plugin disable/exclude flags. AFM does
 /// not pass any of these (`normalize-css.ts:61` calls `cssnano()`
-/// bare), so we keep this minimal. Extend if a future consumer
-/// needs them.
+/// bare), so the upstream-shaped fields stay empty.
+///
+/// **Local extension (2026-05-08):** [`Self::browserslist_snapshot`]
+/// — host-resolved browserslist data so the WASI plugin doesn't
+/// need to do its own (broken) in-sandbox resolution. NOT part of
+/// upstream `cssnano-preset-default@5.2.14`'s shape; sibling to the
+/// existing `precomputed_prefixes` opt on
+/// [`crate::css::transform::TransformOpts`]. Defaulted to `None` —
+/// when `None`, every browserslist-aware leaf plugin falls back to
+/// its existing per-call resolution path, preserving NAPI byte-equality.
+/// See `DEFINITIVE_BROWSERSLIST_PLAN.md §3` for the design.
 #[derive(Debug, Clone, Default)]
-pub struct PresetOpts {}
+pub struct PresetOpts {
+    /// Host-resolved browserslist snapshot. `Arc` so it can be
+    /// cheaply shared across the 5 browserslist-aware plugin
+    /// invocations within a single transform without cloning the
+    /// underlying `Vec<String>`.
+    pub browserslist_snapshot: Option<Arc<PrecomputedBrowserslist>>,
+}
 
 // -----------------------------------------------------------------
 // Apply helpers — one per plugin on AFM's hashing path. Each calls
@@ -81,66 +120,101 @@ pub struct PresetOpts {}
 // `creator()` (no-args invocation).
 // -----------------------------------------------------------------
 
-fn apply_postcss_discard_comments(root: &mut Root) -> PluginResult {
+fn apply_postcss_discard_comments(root: &mut Root, _opts: &PresetOpts) -> PluginResult {
     postcss_discard_comments(root, &DiscardCommentsOpts::default())
 }
 
-fn apply_postcss_minify_gradients(root: &mut Root) -> PluginResult {
+fn apply_postcss_minify_gradients(root: &mut Root, _opts: &PresetOpts) -> PluginResult {
     postcss_minify_gradients(root)
 }
 
-fn apply_postcss_reduce_initial(root: &mut Root) -> PluginResult {
-    postcss_reduce_initial(root, &PostcssReduceInitialOpts::default())
+fn apply_postcss_reduce_initial(root: &mut Root, opts: &PresetOpts) -> PluginResult {
+    // Phase B (DEFINITIVE_BROWSERSLIST_PLAN.md §5): when the host has
+    // shipped a `PrecomputedBrowserslist`, take the `initial_support`
+    // decision against the snapshot's `joined_query` instead of `""`
+    // (which falls into the in-process shim resolution that breaks in
+    // WASI). When `None`, byte-equivalent to the original
+    // `postcss_reduce_initial(root, &Default::default())` call.
+    match opts.browserslist_snapshot.as_ref() {
+        Some(snapshot) => postcss_reduce_initial_with_snapshot(
+            root,
+            &PostcssReduceInitialOpts::default(),
+            Some(snapshot.as_ref()),
+        ),
+        None => postcss_reduce_initial(root, &PostcssReduceInitialOpts::default()),
+    }
 }
 
-fn apply_postcss_colormin(root: &mut Root) -> PluginResult {
-    postcss_colormin(root)
+fn apply_postcss_colormin(root: &mut Root, opts: &PresetOpts) -> PluginResult {
+    // Phase B — see apply_postcss_reduce_initial.
+    match opts.browserslist_snapshot.as_ref() {
+        Some(snapshot) => postcss_colormin_with_snapshot(root, None, Some(snapshot.as_ref())),
+        None => postcss_colormin(root),
+    }
 }
 
-fn apply_postcss_normalize_timing_functions(root: &mut Root) -> PluginResult {
+fn apply_postcss_normalize_timing_functions(root: &mut Root, _opts: &PresetOpts) -> PluginResult {
     postcss_normalize_timing_functions(root)
 }
 
-fn apply_postcss_calc(root: &mut Root) -> PluginResult {
+fn apply_postcss_calc(root: &mut Root, _opts: &PresetOpts) -> PluginResult {
     postcss_calc(root, &CalcOptions::default())
 }
 
-fn apply_postcss_convert_values(root: &mut Root) -> PluginResult {
-    postcss_convert_values(root, &ConvertValuesOpts::default())
+fn apply_postcss_convert_values(root: &mut Root, opts: &PresetOpts) -> PluginResult {
+    // Phase B — see apply_postcss_reduce_initial.
+    match opts.browserslist_snapshot.as_ref() {
+        Some(snapshot) => postcss_convert_values_with_snapshot(
+            root,
+            &ConvertValuesOpts::default(),
+            Some(snapshot.as_ref()),
+        ),
+        None => postcss_convert_values(root, &ConvertValuesOpts::default()),
+    }
 }
 
-fn apply_postcss_ordered_values(root: &mut Root) -> PluginResult {
+fn apply_postcss_ordered_values(root: &mut Root, _opts: &PresetOpts) -> PluginResult {
     postcss_ordered_values(root)
 }
 
-fn apply_postcss_minify_selectors(root: &mut Root) -> PluginResult {
+fn apply_postcss_minify_selectors(root: &mut Root, _opts: &PresetOpts) -> PluginResult {
     postcss_minify_selectors(root)
 }
 
-fn apply_postcss_minify_params(root: &mut Root) -> PluginResult {
-    postcss_minify_params(root)
+fn apply_postcss_minify_params(root: &mut Root, opts: &PresetOpts) -> PluginResult {
+    // Phase B — see apply_postcss_reduce_initial.
+    match opts.browserslist_snapshot.as_ref() {
+        Some(snapshot) => postcss_minify_params_with_snapshot(root, Some(snapshot.as_ref())),
+        None => postcss_minify_params(root),
+    }
 }
 
-fn apply_postcss_normalize_string(root: &mut Root) -> PluginResult {
+fn apply_postcss_normalize_string(root: &mut Root, _opts: &PresetOpts) -> PluginResult {
     postcss_normalize_string(root, &NormalizeStringOpts::default())
 }
 
-fn apply_postcss_normalize_unicode(root: &mut Root) -> PluginResult {
-    postcss_normalize_unicode(root)
+fn apply_postcss_normalize_unicode(root: &mut Root, opts: &PresetOpts) -> PluginResult {
+    // Phase B — see apply_postcss_reduce_initial.
+    match opts.browserslist_snapshot.as_ref() {
+        Some(snapshot) => {
+            postcss_normalize_unicode_with_snapshot(root, Some(snapshot.as_ref()))
+        }
+        None => postcss_normalize_unicode(root),
+    }
 }
 
-fn apply_postcss_normalize_url(root: &mut Root) -> PluginResult {
+fn apply_postcss_normalize_url(root: &mut Root, _opts: &PresetOpts) -> PluginResult {
     postcss_normalize_url(root, &NormalizeUrlOpts::default())
 }
 
-fn apply_postcss_normalize_positions(root: &mut Root) -> PluginResult {
+fn apply_postcss_normalize_positions(root: &mut Root, _opts: &PresetOpts) -> PluginResult {
     postcss_normalize_positions(root)
 }
 
 /// Apply for plugins not on AFM's hashing path. `normalize-css.ts`
 /// filters them out before invocation — if one ever reaches this
 /// function, the consumer filter has drifted.
-fn apply_filtered_out(_root: &mut Root) -> PluginResult {
+fn apply_filtered_out(_root: &mut Root, _opts: &PresetOpts) -> PluginResult {
     Err(PluginError::generic(
         "cssnano-preset-default",
         "plugin not on AFM hashing path (filtered by normalize-css.ts) — \
@@ -326,7 +400,7 @@ mod tests {
     fn filtered_out_apply_returns_drift_error() {
         let mut root = postcss_core::parse("a { color: red; }")
             .expect("parse fixture");
-        let result = apply_filtered_out(&mut root);
+        let result = apply_filtered_out(&mut root, &PresetOpts::default());
         let err = result.expect_err("filtered-out plugin must error");
         assert_eq!(err.plugin, "cssnano-preset-default");
         assert!(

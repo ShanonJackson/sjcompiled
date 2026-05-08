@@ -176,6 +176,36 @@ pub struct PluginOptions {
     /// behaviour.
     #[serde(default)]
     pub root: Option<String>,
+
+    /// **Optional perf / correctness knob — NOT part of the upstream
+    /// `PluginOptions` surface.** Path under the WASI preopen
+    /// (`/cwd/...`) to a postcard-encoded
+    /// `cssnano_browserslist_snapshot::PrecomputedBrowserslist`
+    /// produced by `precomputeBrowserslistDefault()` (NAPI). The
+    /// plugin reads the file on each call and threads the decoded
+    /// snapshot through `crates/css::TransformOpts::precomputed_browserslist_path`
+    /// to `cssnano-preset-default`'s 5 browserslist-aware leaf
+    /// plugins.
+    ///
+    /// **Required for correct WASI behaviour with non-default
+    /// browserslist configs.** Absent this field, the leaf plugins
+    /// fall back to `browserslist_shim::resolve("")` which inside
+    /// WASI returns the wide `browserslist@4.24.2` defaults
+    /// (including IE 11) — drift from the host's
+    /// `.browserslistrc` resolution. See
+    /// `DEFINITIVE_BROWSERSLIST_PLAN.md` for the bootstrap pattern
+    /// (host writes the snapshot once, plugin reads on every call,
+    /// OS page cache amortises the disk hit).
+    ///
+    /// **Inline-bytes delivery is intentionally NOT exposed here.**
+    /// SWC's plugin config wire is `serde_json` → JSON (not
+    /// `Buffer`), so the only viable delivery surface from the host
+    /// to the WASI plugin is a path under the preopen. NAPI
+    /// consumers (`@compiled/css-native`) get the inline-bytes
+    /// surface via `TransformOpts::precomputedBrowserslist`
+    /// (`Buffer`) instead.
+    #[serde(default)]
+    pub precomputed_browserslist_path: Option<String>,
 }
 
 /// `cache: true | 'file-pass' | false`. Custom (de)serializer matches

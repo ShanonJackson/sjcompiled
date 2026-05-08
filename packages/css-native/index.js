@@ -37,3 +37,11 @@ module.exports.transformCss = binary.transformCss;
 // `transformCss` call to skip the per-call autoprefixer setup cost.
 // Byte-equal to omitting it.
 module.exports.precomputePrefixesDefault = binary.precomputePrefixesDefault;
+// Optional perf / correctness knob — produces a postcard `Buffer`
+// of the host-resolved browserslist snapshot. Pass it back via
+// `opts.precomputedBrowserslist` (or write to disk and use
+// `opts.precomputedBrowserslistPath`) on every `transformCss` call.
+// Required for correct WASI behaviour with non-default
+// browserslist configs; optional but cheap in NAPI. See
+// `DEFINITIVE_BROWSERSLIST_PLAN.md`.
+module.exports.precomputeBrowserslistDefault = binary.precomputeBrowserslistDefault;

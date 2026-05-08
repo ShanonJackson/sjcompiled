@@ -98,10 +98,19 @@ pub fn normalize_css(root: &mut Root, opts: &NormalizeCssOpts) -> PluginResult {
     // to `plugins_to_include`. JS `Array.filter` preserves source order, and
     // postcss fires OnceExit hooks in array order — so the filtered preset
     // source order IS the OnceExit firing order.
-    let preset = default_preset(&PresetOpts::default());
+    // PresetOpts is the threading mechanism for the host-resolved
+    // browserslist snapshot (`PrecomputedBrowserslist`) — the
+    // `compiled-css` orchestrator does NOT receive a snapshot
+    // (consumed exclusively via `crates/css::transform_css`'s opts);
+    // here we always pass `PresetOpts::default()`, which means
+    // `browserslist_snapshot: None` and every leaf plugin falls back
+    // to its in-process resolution. Byte-equivalent to the
+    // pre-2026-05-08 signature for this call site.
+    let preset_opts = PresetOpts::default();
+    let preset = default_preset(&preset_opts);
     for entry in &preset.plugins {
         if plugins_to_include.contains(entry.name) {
-            (entry.apply)(root)?;
+            (entry.apply)(root, &preset_opts)?;
         }
     }
 

@@ -77,6 +77,15 @@ oxc_resolver = { workspace = true }
 # Bumping the @swc/core npm pin requires a coordinated `swc_core` bump
 # AND full corpus re-run (PLAN.md §1 constraint 7).
 swc_core = { version = "=54.0.0", features = ["ecma_plugin_transform", "ecma_ast", "ecma_visit", "common", "ecma_parser"] }
+# Phase E7 — cross-pipeline gate test
+# (`tests/transform_css_browserslist_snapshot_integration.rs`)
+# constructs an `AFM canonical` snapshot via `precompute_browserslist`
+# and feeds the encoded bytes to `transform_css` to prove the
+# snapshot path agrees byte-for-byte with the env-pinned baseline.
+# Dev-only — the lib never imports this crate (callers thread the
+# bytes via `TransformOpts::precomputed_browserslist`, which is
+# `Vec<u8>`-typed and opaque to the lib).
+cssnano-browserslist-snapshot = { workspace = true }
 
 [package.metadata.swc]
 # When bumped, update PARITY_VERSIONS.md AND re-run the corpus.

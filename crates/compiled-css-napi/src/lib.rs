@@ -77,6 +77,10 @@ use ::css::transform::{transform_css as rust_transform_css, TransformOpts as Rus
 use ::autoprefixer::autoprefixer::{build_prefixes_default, AutoprefixerOptions as RustAutoprefixerOptions};
 use ::autoprefixer::precomputed::{encode_precomputed, precompute_prefixes};
 use ::autoprefixer::processor::Processor as AutoprefixerProcessor;
+use ::cssnano_browserslist_snapshot::{
+    encode_precomputed as encode_browserslist_precomputed,
+    precompute_browserslist, PrecomputeBrowserslistOpts,
+};
 use ::postcss_core::{parse as postcss_parse, stringify as postcss_stringify};
 
 /// JS-shaped sort options. `undefined`/missing → `None`, mirroring the
@@ -175,6 +179,27 @@ pub struct TransformOpts {
     /// not a silent fallback to the slow path — so production
     /// config errors don't hide.
     pub precomputed_prefixes_path: Option<String>,
+
+    /// **Optional perf knob — NOT part of the upstream `TransformOpts`
+    /// surface.** Pass postcard bytes produced by
+    /// `precomputeBrowserslistDefault()` to skip the in-plugin
+    /// `browserslist_shim::resolve("")` resolution path inside the 5
+    /// browserslist-aware cssnano plugins. Required for correct
+    /// behaviour in WASI (where env vars / FS walks for
+    /// `.browserslistrc` are unreachable); optional in NAPI (where
+    /// the in-process shim works correctly given the host's cwd /
+    /// env). See `DEFINITIVE_BROWSERSLIST_PLAN.md`.
+    ///
+    /// `Buffer` round-trips zero-copy through NAPI.
+    pub precomputed_browserslist: Option<Buffer>,
+
+    /// **Optional perf knob** — filesystem-path delivery for the
+    /// `PrecomputedBrowserslist` snapshot. Mirrors
+    /// [`Self::precomputed_prefixes_path`].
+    ///
+    /// Inline `precomputedBrowserslist` takes precedence when both
+    /// are set. Read failure is surfaced as a `transformCss` error.
+    pub precomputed_browserslist_path: Option<String>,
 }
 
 /// JS-shaped `TransformResult`. Field naming matches the JS contract in
@@ -218,6 +243,10 @@ pub fn transform_css(css: String, opts: Option<TransformOpts>) -> Result<Transfo
             // memcpy per call (the snapshot is small, kilobyte-range).
             precomputed_prefixes: o.precomputed_prefixes.map(|b| b.as_ref().to_vec()),
             precomputed_prefixes_path: o.precomputed_prefixes_path.map(std::path::PathBuf::from),
+            precomputed_browserslist: o.precomputed_browserslist.map(|b| b.as_ref().to_vec()),
+            precomputed_browserslist_path: o
+                .precomputed_browserslist_path
+                .map(std::path::PathBuf::from),
         },
         None => RustTransformOpts::default(),
     };
@@ -252,6 +281,49 @@ pub fn precompute_prefixes_default(from: Option<String>) -> Result<Buffer> {
         ..Default::default()
     });
     let bytes = encode_precomputed(&snapshot);
+    Ok(Buffer::from(bytes))
+}
+
+/// `precomputeBrowserslistDefault(from?)` — produce the postcard
+/// bytes a caller can pass back to `transformCss` via
+/// `opts.precomputedBrowserslist`.
+///
+/// Resolves browserslist ONCE on the host (where env vars + FS
+/// walks for `.browserslistrc` actually work), serialises the
+/// resolved list + canonical `joined_query` string into the
+/// [`cssnano_browserslist_snapshot::PrecomputedBrowserslist`]
+/// schema, and returns the postcard-encoded bytes as a `Buffer`.
+/// Hand that `Buffer` to subsequent `transformCss` calls and the
+/// 5 browserslist-aware cssnano plugins (`reduce-initial`,
+/// `colormin`, `convert-values`, `minify-params`,
+/// `normalize-unicode`) skip their per-call `resolve("")` paths
+/// and consume the host snapshot directly.
+///
+/// `from` mirrors the autoprefixer convention: pass the project
+/// root (or any path under it) so the underlying
+/// `browserslist::find_config` walks up to the right
+/// `.browserslistrc`. When `None`, `current_dir()` is the
+/// resolution anchor.
+///
+/// **WASI consumers:** the host (Node) calls this once in the
+/// AFM bootstrap, reads the returned bytes, and passes them
+/// through `plugin_config.precomputedBrowserslistPath` (writing
+/// to a known path) on every subsequent SWC plugin invocation.
+/// The plugin reads the file from the WASI preopen on each call;
+/// the OS page cache amortises the disk read.
+#[napi]
+pub fn precompute_browserslist_default(from: Option<String>) -> Result<Buffer> {
+    // `from` mirrors the autoprefixer NAPI convention: a filesystem
+    // path (typically the project root or a file under it) used by
+    // `browserslist::find_config` as the start of the upward FS
+    // walk for `.browserslistrc`. We map it to
+    // `PrecomputeBrowserslistOpts::path` (the same semantic as
+    // browserslist's own `path` opt at index.js:114).
+    let snapshot = precompute_browserslist(PrecomputeBrowserslistOpts {
+        path: from.map(std::path::PathBuf::from),
+        env: None,
+    });
+    let bytes = encode_browserslist_precomputed(&snapshot);
     Ok(Buffer::from(bytes))
 }
 
