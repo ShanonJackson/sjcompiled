@@ -106,6 +106,179 @@ pub fn host_to_wasi_path(path: &Path, host_root: &str) -> PathBuf {
     PathBuf::from(host_to_wasi(&path.to_string_lossy(), host_root))
 }
 
+/// WASI-only pre-resolution guard: detect a relative `request`
+/// (e.g. `./foo`, `../foo`) that resolves to a **symlink** in the
+/// `from_file`'s parent directory. Returns `true` when the
+/// candidate path is unsafe to hand to
+/// `oxc_resolver::Resolver::resolve` because doing so would hang
+/// the plugin indefinitely.
+///
+/// ## Why this is necessary
+///
+/// Upstream `packages/babel-plugin` runs in Node.js and resolves
+/// imports through `fs.realpathSync`, which throws cleanly on a
+/// symlink that points to a missing file. The thrown error is
+/// caught and the import deopts to the runtime CSS-variable
+/// fallback.
+///
+/// The Rust port runs in SWC's WASI runtime, which grants the
+/// plugin exactly one preopen (`/cwd`, the host's
+/// `process.cwd()`). Empirical testing under wasm32-wasip1 has
+/// shown that **every path-stat-style WASI syscall**
+/// (`path_filestat_get`, `path_readlink`, `path_open` with
+/// follow-symlinks) hangs indefinitely when invoked on a path
+/// whose entry is a symlink — regardless of whether the symlink
+/// target is inside or outside the preopen, regardless of
+/// whether the target exists. (See `HANG_BUG_REPORT.md`'s
+/// debugging trail; reproducer at
+/// `/tmp/_rovodev_symlink_repro/jira/input4.tsx`.)
+///
+/// `oxc_resolver` 11.x calls `metadata` on every candidate
+/// during extension probing inside `Resolver::resolve` even with
+/// `symlinks: false` set on `ResolveOptions`. So once a relative
+/// import lands on a candidate path that's a symlink in the
+/// preopen, `oxc_resolver` enters the hanging syscall and the
+/// whole transform stalls.
+///
+/// We CANNOT pre-validate via `metadata` / `read_link` /
+/// `try_exists` from inside the plugin — those all hang too. The
+/// ONLY WASI syscall that returns dirent shape information
+/// without following the symlink is `path_readdir`, exposed via
+/// `std::fs::read_dir`. `read_dir`'s `DirEntry::file_type()`
+/// reports `is_symlink()` correctly without ever opening the
+/// entry.
+///
+/// ## Strategy
+///
+/// For relative requests:
+///
+/// 1. Open the request's resolved parent directory via
+///    `read_dir`.
+/// 2. Walk entries until we find one whose name matches the
+///    request's last segment (with each common code extension
+///    appended).
+/// 3. If the matching entry is a symlink, return `true` —
+///    we MUST short-circuit before `oxc_resolver` touches it.
+///
+/// ## Drift discipline
+///
+/// This is an over-approximation: it treats EVERY symlink in the
+/// import path as a hang risk and deopts. Upstream Babel
+/// distinguishes "symlink with reachable target" (folds) from
+/// "symlink with broken / missing target" (throws → deopts).
+/// Under the WASI runtime we cannot make that distinction
+/// without invoking the very syscall that hangs, so we collapse
+/// both to deopt.
+///
+/// **Drift impact:** anywhere a fold relied on a symlink-based
+/// import path, the WASM-built plugin will deopt to the runtime
+/// fallback. The downstream visible diff is `var(--…)` /
+/// `ix(...)` runtime style instead of an inlined literal. This
+/// is the SAME shape Babel produces when the symlink chain
+/// fails for any reason (escape, dangling, permission), so the
+/// fallback is upstream-faithful — just hit on a wider set of
+/// inputs in WASI mode.
+///
+/// **Native callers** (`opts.root` unset → `host_root = ""`)
+/// skip this guard entirely — they're not in the WASI sandbox
+/// and never hit the hanging syscall. `cargo test` runs against
+/// real symlinks continue to work via the normal `oxc_resolver`
+/// path.
+///
+/// **Bare-package imports** (`@compiled/react`, `lodash`, etc.)
+/// are not handled by this guard. `oxc_resolver`'s node_modules
+/// walk handles them via package.json resolution, which doesn't
+/// route through symlink-stat on the request path itself. Bare
+/// imports continue to flow through `oxc_resolver` unchanged.
+pub fn relative_request_is_symlink(
+    from_file: &Path,
+    request: &str,
+    host_root: &str,
+) -> bool {
+    if host_root.is_empty() {
+        return false;
+    }
+    let is_relative = request.starts_with("./")
+        || request.starts_with("../")
+        || request == "."
+        || request == "..";
+    if !is_relative {
+        return false;
+    }
+    let parent = match from_file.parent() {
+        Some(p) => p,
+        None => return false,
+    };
+    // Resolve `parent + request` lexically — DO NOT call any FS
+    // syscall yet. `target_path` is the candidate without any
+    // extension suffix.
+    let target_path = normalise_path(&parent.join(request));
+    let target_dir = match target_path.parent() {
+        Some(p) => p.to_path_buf(),
+        None => return false,
+    };
+    let target_basename = match target_path.file_name() {
+        Some(b) => b.to_string_lossy().to_string(),
+        None => return false,
+    };
+    // Read the directory containing the candidate. `read_dir` uses
+    // `path_readdir` which returns dirent shape info without
+    // following any symlinks (the only WASI syscall that doesn't
+    // hang on symlinked entries — see module-level docs).
+    let entries = match std::fs::read_dir(&target_dir) {
+        Ok(e) => e,
+        Err(_) => return false,
+    };
+    // Match basename + any of the common code extensions. Mirrors
+    // the extension list in `crate::constants::DEFAULT_CODE_EXTENSIONS`
+    // — kept inline so this file has no dependency on `constants`.
+    let extensions: &[&str] = &["", ".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs"];
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        for ext in extensions {
+            let candidate_name = if ext.is_empty() {
+                target_basename.clone()
+            } else {
+                format!("{}{}", target_basename, ext)
+            };
+            if name_str == candidate_name.as_str() {
+                if let Ok(ft) = entry.file_type() {
+                    if ft.is_symlink() {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Lexical `..` / `.` collapse — does NOT touch the filesystem.
+/// Used by [`relative_request_is_symlink`] to compute the parent
+/// dir + basename of a relative request without invoking
+/// `canonicalize` (which hangs in WASI).
+fn normalise_path(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut out: Vec<Component> = Vec::new();
+    for comp in path.components() {
+        match comp {
+            Component::ParentDir => {
+                if !matches!(out.last(), Some(Component::RootDir) | None)
+                    && !matches!(out.last(), Some(Component::ParentDir))
+                {
+                    out.pop();
+                }
+            }
+            Component::CurDir => {}
+            other => out.push(other),
+        }
+    }
+    out.iter().collect()
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,6 +335,82 @@ mod tests {
     #[test]
     fn root_exactly_equal_returns_mount() {
         assert_eq!(host_to_wasi("/Users/me/proj", "/Users/me/proj"), "/cwd");
+    }
+
+    #[test]
+    fn symlink_guard_no_op_when_host_root_empty() {
+        // Native callers (`opts.root = None`) get a no-op guard so
+        // `cargo test` runs continue to work against real symlinks.
+        let from = Path::new("/anywhere/input.tsx");
+        assert!(!relative_request_is_symlink(from, "./other", ""));
+        assert!(!relative_request_is_symlink(from, "../other", ""));
+    }
+
+    #[test]
+    fn symlink_guard_skips_bare_imports() {
+        // Bare-package requests are not in scope — `oxc_resolver`
+        // walks node_modules for these. The guard returns `false`
+        // so `oxc_resolver` runs normally.
+        let from = Path::new("/cwd/input.tsx");
+        assert!(!relative_request_is_symlink(
+            from,
+            "@compiled/react",
+            "/cwd"
+        ));
+        assert!(!relative_request_is_symlink(from, "lodash/fp", "/cwd"));
+    }
+
+    #[test]
+    fn symlink_guard_passes_through_missing_relative_import() {
+        // A missing `./foo` (no candidate exists) is safe to hand
+        // to `oxc_resolver` — it returns `NotFound` cleanly.
+        let from = Path::new("/cwd/__nonexistent_dir__/input.tsx");
+        assert!(!relative_request_is_symlink(
+            from,
+            "./never-exists",
+            "/cwd"
+        ));
+    }
+
+    #[test]
+    fn symlink_guard_detects_real_symlink_in_parent_dir() {
+        // Real-FS reproducer: stage a directory with one regular
+        // file and one symlink. `relative_request_is_symlink` must
+        // return `true` when the request resolves to the symlinked
+        // entry, `false` for the regular file.
+        let tmp = std::env::temp_dir().join("rb_symlink_guard_test");
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        std::fs::write(tmp.join("real-target.tsx"), "export const x = 1;\n")
+            .unwrap();
+        let link = tmp.join("alias.tsx");
+        let target = std::path::PathBuf::from("./real-target.tsx");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        #[cfg(not(unix))]
+        {
+            let _ = link;
+            let _ = target;
+            return;
+        }
+
+        let from = tmp.join("input.tsx");
+        let host_root = tmp.to_string_lossy().to_string();
+        // Symlink: must trigger the guard (we collapse all symlink
+        // entries to `deopt` because the WASI runtime hangs on
+        // path-stat regardless of target reachability — see
+        // function-level docs).
+        assert!(
+            relative_request_is_symlink(&from, "./alias", &host_root),
+            "symlinked entry must trigger the guard"
+        );
+        // Regular file at the same dir: must NOT trigger.
+        assert!(
+            !relative_request_is_symlink(&from, "./real-target", &host_root),
+            "regular file must NOT trigger the guard"
+        );
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]

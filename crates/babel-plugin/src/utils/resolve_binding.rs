@@ -447,6 +447,29 @@ fn resolve_request(request: &str, meta: &Metadata<'_>) -> Option<PathBuf> {
     let filename = meta.state.filename()?;
     let resolver = meta.state.resolver()?;
     let from_path = std::path::Path::new(filename);
+    // WASI sandbox guard: short-circuit relative imports whose
+    // candidate path is a symlink. Under SWC's WASI runtime EVERY
+    // path-stat syscall hangs on a symlinked entry, regardless of
+    // whether the target is reachable. `oxc_resolver` calls
+    // `metadata` during extension probing on every candidate, so
+    // forwarding a symlinked relative import would hang the
+    // transform indefinitely. Native callers (`opts.root` unset)
+    // skip the guard. The deopt outcome (None → import not
+    // foldable → runtime `var(--…)` fallback) is the same shape
+    // upstream Babel produces when `realpathSync` throws.
+    // See `compat::wasi_path::relative_request_is_symlink` for the
+    // full rationale.
+    let host_root = meta.state.opts().root.as_deref().unwrap_or("");
+    if crate::compat::wasi_path::relative_request_is_symlink(
+        from_path, request, host_root,
+    ) {
+        crate::compat::diagnostics::warn_symlink_deopt(
+            meta.state.filename(),
+            request,
+            from_path,
+        );
+        return None;
+    }
     resolver.resolve_sync(from_path, request).ok()
 }
 
@@ -831,6 +854,18 @@ fn follow_reexport_hop(
     }
     // Resolve the hop's source against the IMPORTED file's path.
     let resolver = meta.state.resolver()?;
+    // WASI symlink-hang guard — see `resolve_request` above.
+    let host_root = meta.state.opts().root.as_deref().unwrap_or("");
+    if crate::compat::wasi_path::relative_request_is_symlink(
+        from_path, &hop.source, host_root,
+    ) {
+        crate::compat::diagnostics::warn_symlink_deopt(
+            meta.state.filename(),
+            &hop.source,
+            from_path,
+        );
+        return None;
+    }
     let resolved_path = resolver.resolve_sync(from_path, &hop.source).ok()?;
     let resolved_path_str = resolved_path.to_string_lossy().to_string();
 

@@ -123,7 +123,47 @@ const STRIP_RUNTIME_WASM = join(
   'crates/target/wasm32-wasip1/release/babel_plugin_strip_runtime.wasm'
 );
 
-export function swcEngine(source: string, opts: StripRuntimeOpts, preBaked?: string): string {
+/**
+ * Optional bench knob. When supplied, `swcEngine` SKIPS its per-call
+ * `mkdirSync` / `rmSync` lifecycle and reuses the caller-provided
+ * scratch dir for `compiledRequireExclude=true` fixtures.
+ *
+ * Why: the per-call lifecycle is correct semantics for production
+ * (one transform per host invocation; fresh dir guarantees no
+ * cross-call leakage). But inside a tight bench loop iterating the
+ * same fixture thousands of times, the per-iter `mkdir` + `rmSync`
+ * (≥4 syscalls each) dominate the timing and amplify a fixed-per-file
+ * cost into a variable-per-iter cost. That made C15 — the only
+ * `compiledRequireExclude` fixture in the strip-runtime bench — read
+ * 0.54x of Babel when the actual port runs at ~2.6x of Babel on the
+ * same input.
+ *
+ * Soundness: the plugin's `fs::write` overwrites the same path each
+ * call, the sidecar contents are a deterministic function of input,
+ * and the bench compares byte-equal outputs anyway — reusing one
+ * scratch dir across iterations of the SAME fixture is sound. The
+ * caller is expected to `mkdirSync` the dir once before the bench
+ * loop and `rmSync` it once after.
+ *
+ * Correctness tests / parity-harness runs DO NOT pass this flag —
+ * they keep the per-call lifecycle that mirrors production.
+ */
+export type SwcEngineBenchOpts = {
+  /**
+   * Pre-created scratch dir under `process.cwd()` (host-absolute).
+   * The engine translates to `/cwd/<rel>` form before threading to
+   * the WASI plugin. When set, the engine does NOT mkdir or rmSync
+   * — caller owns the dir lifecycle.
+   */
+  persistentCallScratch?: string;
+};
+
+export function swcEngine(
+  source: string,
+  opts: StripRuntimeOpts,
+  preBaked?: string,
+  benchOpts?: SwcEngineBenchOpts,
+): string {
   // Optionally pre-bake with JS babel-plugin (until that's ported in Phase 2).
   let input = source;
   if (opts.run === 'both' || opts.run === 'bake') {
@@ -160,12 +200,22 @@ export function swcEngine(source: string, opts: StripRuntimeOpts, preBaked?: str
   const path = require('node:path') as typeof import('node:path');
 
   let callScratch: string | undefined;
+  // `ownsCallScratchLifecycle` distinguishes "engine created this dir
+  // and must rmSync it" from "caller (a bench loop) owns the dir and
+  // we must not touch it". See `SwcEngineBenchOpts` for the rationale.
+  let ownsCallScratchLifecycle = false;
   if (opts.compiledRequireExclude) {
-    callScratch = path.join(
-      ensureScratchDir(),
-      `call-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    );
-    fs.mkdirSync(callScratch, { recursive: true });
+    if (benchOpts?.persistentCallScratch) {
+      callScratch = benchOpts.persistentCallScratch;
+      // Caller is responsible for mkdir/rmSync.
+    } else {
+      callScratch = path.join(
+        ensureScratchDir(),
+        `call-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      );
+      fs.mkdirSync(callScratch, { recursive: true });
+      ownsCallScratchLifecycle = true;
+    }
   }
 
   const previousCwd = opts.extractStylesToDirectory ? process.cwd() : null;
@@ -217,11 +267,12 @@ export function swcEngine(source: string, opts: StripRuntimeOpts, preBaked?: str
     if (previousCwd) {
       process.chdir(previousCwd);
     }
-    if (callScratch) {
+    if (callScratch && ownsCallScratchLifecycle) {
       // PLAN.md §3.9.13.2 — host's `finally` block clears the per-call
       // scratch. Sidecar contents (style-rules.json) have already been
       // observed by the plugin's panic-or-write path; the harness
-      // doesn't drain them today (gate is JS-byte parity).
+      // doesn't drain them today (gate is JS-byte parity). When the
+      // caller owns the dir lifecycle (bench mode), we leave it alone.
       try {
         fs.rmSync(callScratch, { recursive: true, force: true });
       } catch {

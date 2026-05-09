@@ -14,6 +14,7 @@
 //! - The `pub fn` surface mirrors the upstream entry point shape so
 //!   call sites in the porting code can be ported 1:1.
 
+pub mod diagnostics;
 pub mod evaluation;
 pub mod generator;
 pub mod globals;

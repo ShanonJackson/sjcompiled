@@ -212,6 +212,10 @@ pub fn build_from_config(
 
     let mut opts = ResolveOptions {
         extensions,
+        // WASI compatibility — see `default::build_default` for
+        // the full rationale behind disabling `oxc_resolver`'s
+        // symlink canonicalisation under wasm32-wasip1.
+        symlinks: false,
         ..Default::default()
     };
     // §5.4d — `cfg.exports.fields` wiring. The schema models this

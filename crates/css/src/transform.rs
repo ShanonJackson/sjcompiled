@@ -153,6 +153,94 @@ use autoprefixer::processor::Processor as AutoprefixerProcessor;
 
 use compiled_utils::unique;
 
+// ---------------------------------------------------------------------------
+// Win 1 — within-transform `precomputed_prefixes_path` byte cache.
+//
+// `transform_css` is called many times within a single SWC plugin
+// invocation (once per `transformCssItem` over each conditional /
+// logical / default branch in `css({...})`). Each call previously
+// re-ran `std::fs::read(precomputed_prefixes_path)` end-to-end —
+// ~50–158 µs/call of pure repeat work where the bytes are bit-identical
+// across every call (the host writes the snapshot once at module
+// load and threads the same path on every plugin invocation).
+//
+// We cache the file's bytes in a `thread_local!` keyed by the path
+// string. The cache is born and dies with the WASI linear-memory
+// instance (per-`transformSync` teardown contract documented in
+// `plugins/PLAN.md` §3.9.4 and CLAUDE.md), so cross-transform leakage
+// is impossible. Within a single transform, multiple `transform_css`
+// calls hit the cache after the first.
+//
+// **Byte-equality:** we cache only the raw `Vec<u8>` returned by
+// `std::fs::read` — bit-identical to what `std::fs::read` would have
+// returned on the next call. Postcard decoding of identical bytes
+// produces an identical `PrecomputedPrefixes`; `build_prefixes_from_snapshot`
+// of identical inputs produces a byte-equal `Prefixes`. Existing
+// snapshot-vs-slow-path parity proofs (`crates/parity-runner --stage
+// autoprefixer`, `crates/babel-plugin/tests/transform_css_browserslist_snapshot_integration.rs`)
+// remain valid unchanged — this cache is below the level they observe.
+//
+// **Invalidation:** if the path changes between calls (rare — the
+// host wrapper writes once at module load and reuses the path), the
+// cache transparently rereads. If the file CONTENTS change while the
+// path stays identical (e.g. someone edits the snapshot mid-transform
+// — production never does this; the host doesn't expose the snapshot
+// to userland), the cache returns stale bytes. This is the same
+// guarantee the OS page cache gives `std::fs::read` itself; we don't
+// add a stat-based invalidation because the host-managed snapshot is
+// immutable per-instance.
+//
+// We do NOT cache the decoded `PrecomputedPrefixes` or the
+// constructed `Prefixes` — both consume on use (move semantics on
+// `populated_add` / `populated_remove`), and `Prefixes` accumulates
+// runtime state during the processor walk (`cleaner_cache`,
+// `Supports::prefixer_cache`). Caching either would require either
+// expensive cloning (the populated tables intentionally don't derive
+// `Clone`) or per-call audit of mutation profiles. Caching the bytes
+// avoids both hazards entirely.
+thread_local! {
+    static PRECOMPUTED_PREFIXES_BYTES_CACHE:
+        std::cell::RefCell<Option<(std::path::PathBuf, std::sync::Arc<Vec<u8>>)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Read the precomputed-prefixes snapshot bytes from `path`, hitting a
+/// thread-local cache when the path matches a previous call within the
+/// same wasm instance. See module-level rationale.
+///
+/// Returns an `Arc<Vec<u8>>` so the cache slot can hold a reference
+/// while the caller holds another — `Arc::clone` is O(1) (atomic
+/// refcount bump) and avoids copying the snapshot bytes on every cache
+/// hit.
+fn read_precomputed_prefixes_cached(
+    path: &std::path::Path,
+) -> std::io::Result<std::sync::Arc<Vec<u8>>> {
+    PRECOMPUTED_PREFIXES_BYTES_CACHE.with(|slot| {
+        // Fast path: cache hit.
+        if let Some((cached_path, cached_bytes)) = slot.borrow().as_ref() {
+            if cached_path == path {
+                return Ok(std::sync::Arc::clone(cached_bytes));
+            }
+        }
+        // Slow path: read + populate. We do this OUTSIDE the borrow
+        // so we don't hold the RefCell across the syscall.
+        let bytes = std::fs::read(path)?;
+        let arc = std::sync::Arc::new(bytes);
+        *slot.borrow_mut() = Some((path.to_path_buf(), std::sync::Arc::clone(&arc)));
+        Ok(arc)
+    })
+}
+
+/// Test-only escape hatch: clear the thread-local cache. Call from
+/// tests that mutate the snapshot file in place and want subsequent
+/// `transform_css` calls in the same thread to re-read it.
+#[cfg(test)]
+pub fn _clear_precomputed_prefixes_cache_for_tests() {
+    PRECOMPUTED_PREFIXES_BYTES_CACHE.with(|slot| {
+        *slot.borrow_mut() = None;
+    });
+}
+
 /// `BASE_PLUGINS` from `packages/css/src/plugins/normalize-css.ts:44-50`.
 /// Always run regardless of `optimizeCss`.
 const NORMALIZE_BASE_PLUGINS: &[&str] = &[
@@ -515,21 +603,25 @@ pub fn transform_css(css: &str, opts: &TransformOpts) -> Result<TransformResult,
         // is inline > path > slow build. Path-read failure is a HARD
         // error (not silent slow-path fallback) so production config
         // mistakes don't hide behind a 100x perf regression.
-        let path_bytes;
+        // `path_bytes_arc` outlives `prefixes_bytes` — its `&[u8]`
+        // borrow is held only across `build_prefixes_from_precomputed`
+        // below. The Arc is the within-transform byte cache (see
+        // module-level rationale on `PRECOMPUTED_PREFIXES_BYTES_CACHE`).
+        let path_bytes_arc;
         let prefixes_bytes: Option<&[u8]> = match (
             opts.precomputed_prefixes.as_deref(),
             opts.precomputed_prefixes_path.as_deref(),
         ) {
             (Some(bytes), _) => Some(bytes),
             (None, Some(path)) => {
-                path_bytes = std::fs::read(path).map_err(|e| {
+                path_bytes_arc = read_precomputed_prefixes_cached(path).map_err(|e| {
                     format!(
                         "autoprefixer precomputed_prefixes_path read error \
                          (path={}): {e}",
                         path.display(),
                     )
                 })?;
-                Some(path_bytes.as_slice())
+                Some(path_bytes_arc.as_slice())
             }
             (None, None) => None,
         };
@@ -1290,5 +1382,170 @@ mod tests {
             err.contains("browserslist precomputed"),
             "error message should mention the snapshot, got: {err}",
         );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Win 1 — within-transform `precomputed_prefixes_path` byte cache.
+    // See `PRECOMPUTED_PREFIXES_BYTES_CACHE` module-level rationale.
+    // ─────────────────────────────────────────────────────────────
+
+    /// Cache hit ⇒ byte-identical output across repeated calls. The
+    /// cache is below the parity-runner level (it only changes how
+    /// bytes get from disk to `build_prefixes_from_precomputed`); this
+    /// test pins that contract directly so a future refactor of the
+    /// cache layer can't silently break it.
+    #[test]
+    fn precomputed_prefixes_cache_hit_preserves_output() {
+        let _g = ENV_LOCK.lock().unwrap();
+
+        // Build a real prefixes snapshot for the AFM canonical
+        // browserslist (the same shape the WASI plugin sees in
+        // production via `precomputePrefixesDefault()`).
+        let snap = autoprefixer::precomputed::precompute_prefixes(
+            autoprefixer::autoprefixer::AutoprefixerOptions::default(),
+        );
+        let bytes = autoprefixer::precomputed::encode_precomputed(&snap);
+
+        // Write to a tempfile under the workspace target dir so the
+        // path is deterministic across cargo invocations and gets
+        // cleaned up by `cargo clean`.
+        let path = std::env::temp_dir().join("compiled-css-prefixes-cache-hit-test.bin");
+        std::fs::write(&path, &bytes).expect("write snapshot bytes");
+
+        // Clear the thread-local cache so this test starts cold.
+        // (Other tests in the same thread may have populated it.)
+        super::_clear_precomputed_prefixes_cache_for_tests();
+
+        let opts = TransformOpts {
+            precomputed_prefixes_path: Some(path.clone()),
+            ..Default::default()
+        };
+
+        // CSS that exercises the autoprefixer path (user-select
+        // gets prefixed for browsers in the AFM list, hitting both
+        // the populated AddTable lookup and the `cleaner` lazy cache).
+        let css = ".a { user-select: none; }";
+
+        let r1 = transform_css(css, &opts).expect("call 1");
+        // Calls 2 and 3 hit the cache.
+        let r2 = transform_css(css, &opts).expect("call 2 (cache hit)");
+        let r3 = transform_css(css, &opts).expect("call 3 (cache hit)");
+
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(r1.sheets, r2.sheets, "cache hit drifted output (call 2)");
+        assert_eq!(r1.sheets, r3.sheets, "cache hit drifted output (call 3)");
+        assert_eq!(r1.class_names, r2.class_names);
+        assert_eq!(r1.class_names, r3.class_names);
+
+        // Sanity: at least one sheet contains a vendor prefix, proving
+        // we hit the autoprefixer path rather than a no-op.
+        let combined = r1.sheets.join("");
+        assert!(
+            combined.contains("-webkit-")
+                || combined.contains("-moz-")
+                || combined.contains("-ms-"),
+            "expected vendor prefix in output (snapshot path active), got: {combined}",
+        );
+    }
+
+    /// Path-key invalidation: when the path changes between calls, the
+    /// cache transparently re-reads. We can't easily check the cached
+    /// `Arc` identity from here (private), so we verify the contract
+    /// indirectly: two different paths pointing at the SAME bytes
+    /// produce identical output (proves rereads are sound), and a
+    /// path pointing at DIFFERENT bytes produces (correctly) different
+    /// behaviour. The latter is covered by every existing
+    /// snapshot-vs-slow-path parity test; here we cover the path-swap
+    /// case explicitly so the cache-key logic doesn't regress.
+    #[test]
+    fn precomputed_prefixes_cache_path_swap_rereads() {
+        let _g = ENV_LOCK.lock().unwrap();
+
+        let snap = autoprefixer::precomputed::precompute_prefixes(
+            autoprefixer::autoprefixer::AutoprefixerOptions::default(),
+        );
+        let bytes = autoprefixer::precomputed::encode_precomputed(&snap);
+
+        let path_a = std::env::temp_dir().join("compiled-css-prefixes-swap-a.bin");
+        let path_b = std::env::temp_dir().join("compiled-css-prefixes-swap-b.bin");
+        std::fs::write(&path_a, &bytes).expect("write snapshot a");
+        std::fs::write(&path_b, &bytes).expect("write snapshot b");
+
+        super::_clear_precomputed_prefixes_cache_for_tests();
+
+        let opts_a = TransformOpts {
+            precomputed_prefixes_path: Some(path_a.clone()),
+            ..Default::default()
+        };
+        let opts_b = TransformOpts {
+            precomputed_prefixes_path: Some(path_b.clone()),
+            ..Default::default()
+        };
+
+        let css = ".a { user-select: none; }";
+
+        // Populate the cache with path_a.
+        let ra1 = transform_css(css, &opts_a).expect("a1");
+        // Switch to path_b — cache must reread (different key).
+        let rb = transform_css(css, &opts_b).expect("b");
+        // Switch back to path_a — cache must reread again.
+        let ra2 = transform_css(css, &opts_a).expect("a2");
+
+        let _ = std::fs::remove_file(&path_a);
+        let _ = std::fs::remove_file(&path_b);
+
+        // All three calls must produce identical output (paths pointed
+        // at byte-equal snapshots; cache key change must not alter
+        // output).
+        assert_eq!(ra1.sheets, rb.sheets, "path_a → path_b drift");
+        assert_eq!(ra1.sheets, ra2.sheets, "path_b → path_a drift");
+    }
+
+    /// Cache hit must produce the SAME output as the inline-bytes
+    /// path. This is the load-bearing contract: the cache is supposed
+    /// to be invisible to anything observing `transform_css`'s output.
+    #[test]
+    fn precomputed_prefixes_cache_matches_inline_bytes() {
+        let _g = ENV_LOCK.lock().unwrap();
+
+        let snap = autoprefixer::precomputed::precompute_prefixes(
+            autoprefixer::autoprefixer::AutoprefixerOptions::default(),
+        );
+        let bytes = autoprefixer::precomputed::encode_precomputed(&snap);
+
+        let path = std::env::temp_dir().join("compiled-css-prefixes-vs-inline.bin");
+        std::fs::write(&path, &bytes).expect("write snapshot bytes");
+
+        super::_clear_precomputed_prefixes_cache_for_tests();
+
+        let css = ".a { user-select: none; mask: url(x); }";
+
+        let inline_opts = TransformOpts {
+            precomputed_prefixes: Some(bytes.clone()),
+            ..Default::default()
+        };
+        let path_opts = TransformOpts {
+            precomputed_prefixes_path: Some(path.clone()),
+            ..Default::default()
+        };
+
+        let inline_out = transform_css(css, &inline_opts).unwrap();
+        // Multiple path-delivered calls (the second hits the cache).
+        let path_out_1 = transform_css(css, &path_opts).unwrap();
+        let path_out_2 = transform_css(css, &path_opts).unwrap();
+
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(
+            inline_out.sheets, path_out_1.sheets,
+            "inline-bytes vs path-delivery (call 1) drift",
+        );
+        assert_eq!(
+            inline_out.sheets, path_out_2.sheets,
+            "inline-bytes vs cached-path-delivery (call 2) drift",
+        );
+        assert_eq!(inline_out.class_names, path_out_1.class_names);
+        assert_eq!(inline_out.class_names, path_out_2.class_names);
     }
 }

@@ -72,6 +72,39 @@ pub fn build_default(extensions: Option<&[String]>) -> Resolver {
         .unwrap_or_else(default_code_extensions);
     let opts = ResolveOptions {
         extensions: exts,
+        // WASI sandbox compatibility: disable `oxc_resolver`'s
+        // built-in symlink canonicalisation. Under SWC's WASI
+        // runtime (wasm32-wasip1), every path-stat-style WASI
+        // syscall (`path_filestat_get`, `path_readlink`,
+        // `path_open` with follow-symlinks) hangs indefinitely on
+        // a symlinked entry, regardless of whether the target is
+        // reachable. `oxc_resolver` 11.x's
+        // `Cache::canonicalize_with_visited` recursively
+        // `read_link`s + `metadata`s along the symlink chain — a
+        // single hop into a symlink stalls the transform.
+        //
+        // The `relative_request_is_symlink` guard at the
+        // `resolve_request` call site short-circuits relative
+        // imports BEFORE `oxc_resolver` sees them. This setting
+        // closes the bare-import path (`@compiled/react`,
+        // `lodash`, etc.): if the consumer's node_modules layout
+        // uses symlinks (pnpm, yarn berry), `oxc_resolver`'s
+        // node_modules walk would otherwise hit the same
+        // canonicalisation hang.
+        //
+        // Drift impact: `imported_filename` strings carry the
+        // symlink-form path instead of the canonical real-path
+        // that Node's `fs.realpathSync` would produce. No current
+        // consumer hashes / compares `imported_filename` (see
+        // `compat/wasi_path.rs:53`), and downstream re-resolution
+        // anchored on it still works because `oxc_resolver`
+        // resolves relative imports against the file's parent
+        // dir regardless of canonical-form.
+        //
+        // See `HANG_BUG_REPORT.md` for the full investigation
+        // trail and `compat::wasi_path::relative_request_is_symlink`
+        // for the per-call guard.
+        symlinks: false,
         ..Default::default()
     };
     Resolver::from_oxc(OxcResolver::new(opts))

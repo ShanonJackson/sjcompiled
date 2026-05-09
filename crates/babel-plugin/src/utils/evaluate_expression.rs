@@ -643,6 +643,21 @@ fn try_namespace_import_dispatch<'a>(
             .as_deref()
             .map(std::path::PathBuf::from)?;
         let resolver = meta.state.resolver()?;
+        // WASI symlink-hang guard — see
+        // `resolve_binding::resolve_request` for the full rationale.
+        let host_root = meta.state.opts().root.as_deref().unwrap_or("");
+        if crate::compat::wasi_path::relative_request_is_symlink(
+            &from_path,
+            &import_info.source,
+            host_root,
+        ) {
+            crate::compat::diagnostics::warn_symlink_deopt(
+                meta.state.filename(),
+                &import_info.source,
+                &from_path,
+            );
+            return None;
+        }
         let resolved_path = resolver
             .resolve_sync(&from_path, &import_info.source)
             .ok()?;
