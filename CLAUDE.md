@@ -51,3 +51,7 @@ ALWAYS run parity-harness scripts (`_probe.mjs`, `fixtures-triage.mjs`, etc.) fr
 ## Build it notes.
 - "--release" builds take like 2-3 minutes is normal
 - [target.wasm32-wasip1] rustflags = ["-C", "link-arg=-zstack-size=8388608"] is REQUIRED because recursion is extremely common in our faithful port.
+
+# Native
+- Native (non-WASI) wrapper around `swc_core::Compiler::process_js_with_custom_pass` lives in `crates/swc-native/`. Runs the babel-plugin port as an in-process Rust pass instead of the wasm32-wasip1 binary; ~50× faster per-call than WASI. Built via `RUSTFLAGS="" cargo build -p swc-native --example triage_dump --profile bench-fast` (release profile OOMs LLVM on the swc_core graph).
+- Run native parity tests with `bun parity-harness/native-triage.mjs`. Current baseline: **335 / 338 parity** (vs WASI's 336 / 338). The single divergence — `ct-ts-as-cast` — is an EXPECTED FAILURE: SWC's `process_js_with_custom_pass` only exposes a "before-everything-except-resolver+TS-strip" injection slot, so native sees the AST after `as number` is stripped and hashes a different template-literal than WASI/Babel. WASI works because `runPluginFirst: true` puts the WASM plugin before TS strip; there is no equivalent for native passes without hand-orchestrating the SWC pipeline. Acceptable.

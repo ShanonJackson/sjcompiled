@@ -44,6 +44,7 @@ use std::sync::Arc;
 
 use serde::Deserialize;
 use swc_core::common::comments::Comments;
+use swc_core::common::{Mark, SourceMapper};
 use swc_core::ecma::ast::Program;
 use swc_core::ecma::visit::VisitMutWith;
 use swc_core::plugin::metadata::TransformPluginMetadataContextKind;
@@ -56,8 +57,8 @@ use crate::types::PluginOptions;
 use crate::utils::comments::collect_line_comments;
 
 #[plugin_transform]
-pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Program {
-    let mut opts: PluginOptions = meta
+pub fn process(mut program: Program, meta: TransformPluginProgramMetadata) -> Program {
+    let opts: PluginOptions = meta
         .get_transform_plugin_config()
         .as_deref()
         .and_then(|s| PluginOptions::deserialize(&mut serde_json::Deserializer::from_str(s)).ok())
@@ -80,6 +81,37 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
         .get_context(&TransformPluginMetadataContextKind::Filename)
         .unwrap_or_default();
 
+    apply_native(
+        &mut program,
+        opts,
+        comments,
+        &meta.source_map,
+        raw_filename,
+        Some(meta.unresolved_mark),
+    );
+    program
+}
+
+/// Native-callable entry — same wiring as the WASI [`process`] above
+/// but generic over comments / source-mapper so callers outside the
+/// SWC plugin runtime (e.g. `crates/swc-native`'s NAPI binding) can
+/// drive the visitor with `SingleThreadedComments` + `Lrc<SourceMap>`.
+///
+/// The body below was lifted verbatim from `process()` — every
+/// behaviour-affecting line lives here so both call sites produce
+/// byte-identical output. `process()` is now just a meta-extraction
+/// shim.
+pub fn apply_native<C, S>(
+    program: &mut Program,
+    mut opts: PluginOptions,
+    comments: C,
+    source_map: &S,
+    raw_filename: String,
+    unresolved_mark: Option<Mark>,
+) where
+    C: Comments,
+    S: SourceMapper,
+{
     // WASI sandbox path translation. SWC threads the host-absolute
     // path here; the WASI runtime only grants access to a single
     // preopen mounted at `/cwd` (per
@@ -193,24 +225,27 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
         visitor.state.set_filename(filename);
     }
     visitor.state.set_resolver(resolver);
-    // §6.8i — bridge SWC's `unresolved_mark` from plugin metadata into
-    // the visitor so the `Program::exit` React-import injection can
-    // colour its local Ident with the same hygiene context downstream
-    // free references (e.g. the react-classic JSX transform's
-    // `React.createElement(...)` Idents) carry. Without this, fixtures
-    // with no top-level user bindings fall back to an empty
-    // `SyntaxContext` and SWC's hygiene pass renames our import to
-    // `React1`. See `babel_plugin.rs::build_react_namespace_import`.
-    visitor.unresolved_mark = Some(meta.unresolved_mark);
+    // §6.8i — bridge SWC's `unresolved_mark` into the visitor so the
+    // `Program::exit` React-import injection can colour its local Ident
+    // with the same hygiene context downstream free references (e.g.
+    // the react-classic JSX transform's `React.createElement(...)`
+    // Idents) carry. Without this, fixtures with no top-level user
+    // bindings fall back to an empty `SyntaxContext` and SWC's hygiene
+    // pass renames our import to `React1`. See
+    // `babel_plugin.rs::build_react_namespace_import`. Native callers
+    // that don't have access to SWC's pipeline mark can pass
+    // `unresolved_mark = None`; the React-import-rename harness
+    // reconciler covers the resulting `React1`-shape divergence.
+    visitor.unresolved_mark = unresolved_mark;
 
-    // §6.5 bridge: walk the program once with `meta.source_map`
-    // (`PluginSourceMapProxy`) + `meta.comments` to build the
-    // line-indexed comment store + span→line index. The css-prop
-    // disable-directive gate (`is_css_prop_disabled`) reads from
-    // both; without them, upstream's `getNodeComments` per-line
-    // filter has nothing to match against. See `utils/comments.rs`
-    // module doc and the §6.5 closure note in `plugins/STATUS.md`.
-    let mut p = program;
+    // §6.5 bridge: walk the program once with the host source map +
+    // comments to build the line-indexed comment store + span→line
+    // index. The css-prop disable-directive gate
+    // (`is_css_prop_disabled`) reads from both; without them, upstream's
+    // `getNodeComments` per-line filter has nothing to match against.
+    // See `utils/comments.rs` module doc and the §6.5 closure note in
+    // `plugins/STATUS.md`.
+    //
     // Babel-parser parity: SWC parser preserves CRLF in
     // `TplElement.raw`; Babel's parser normalises CR/CRLF → LF per
     // ECMAScript §12.8.6 TRV rules. Keyframes naming and every other
@@ -218,7 +253,7 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
     // mismatch flips class names on a CRLF source checkout. One-shot
     // pre-pass aligns the SWC AST to Babel's shape before any
     // visitor runs. See `crates/babel-plugin/src/compat/template_literal_raw.rs`.
-    crate::compat::template_literal_raw::normalize_template_literal_raw(&mut p);
+    crate::compat::template_literal_raw::normalize_template_literal_raw(program);
     // Babel-pipeline parity: `@babel/preset-typescript` with
     // `onlyRemoveTypeImports: true` strips `import type {…}` and
     // `import { type X, … }` specifiers BEFORE the Compiled plugin
@@ -228,8 +263,8 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
     // empty `import "@compiled/react";` shell in the output where
     // Babel drops the import entirely. See
     // `crates/babel-plugin/src/compat/import_type_specifier.rs`.
-    crate::compat::import_type_specifier::strip_type_only_import_specifiers(&mut p);
-    let line_index = collect_line_comments(&p, &visitor.comments, &meta.source_map);
+    crate::compat::import_type_specifier::strip_type_only_import_specifiers(program);
+    let line_index = collect_line_comments(program, &visitor.comments, source_map);
     visitor.state.set_comment_lines(line_index.comments);
     visitor.state.set_span_lines(line_index.spans);
 
@@ -243,13 +278,12 @@ pub fn process(program: Program, meta: TransformPluginProgramMetadata) -> Progra
     // hashed expression carries inline comments — see
     // `fixtures/ct-styled-token-nested-ternary` for a reproduction.
     //
-    // SAFETY: `visitor.comments` (a `PluginCommentsProxy`) lives for
-    // the entirety of the `visit_mut_with` call, and the cleanup
-    // call below clears the thread-local before the function returns.
+    // SAFETY: `visitor.comments` lives for the entirety of the
+    // `visit_mut_with` call, and the cleanup call below clears the
+    // thread-local before the function returns.
     crate::compat::generator::set_ambient_comments(&visitor.comments);
-    p.visit_mut_with(&mut visitor);
+    program.visit_mut_with(&mut visitor);
     crate::compat::generator::clear_ambient_comments();
-    p
 }
 
 /// In-process entry for workspace integration tests. Drives the

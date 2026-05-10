@@ -20,6 +20,12 @@ bun.lockb
 # `parity-harness/babel-plugin/triage-report.json` is intentionally
 # checked in for the §6.5 baseline lock).
 parity-harness/fixtures-triage-report.json
+# `bun parity-harness/native-triage.mjs` writes both files (one is
+# the per-fixture native dump from `crates/swc-native`'s `triage_dump`
+# binary, the other is the comparison report). Regenerable; not
+# baseline-locked the way the WASI report would be.
+parity-harness/native-triage-report.json
+parity-harness/native-triage-dump.jsonl
 parity-harness/strip-runtime/_scratch/
 # §1.8 synth corpus is regenerable from the deterministic seed in
 # synthesize-fixtures.mjs; checking in 1000 small fixtures bloats the

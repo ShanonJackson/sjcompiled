@@ -1,0 +1,15 @@
+{
+  "name": "@compiled/swc-native",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Native (non-WASI) wrapper around swc_core::Compiler that runs the Compiled babel-plugin port as an in-process Rust pass. Drop-in shape-compatible with @swc/core's transformSync for the parity harness.",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "scripts": {
+    "build": "napi build --platform --js ./binding.js --dts ./binding.d.ts",
+    "build:release": "napi build --platform --release --js ./binding.js --dts ./binding.d.ts"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0"
+  }
+}

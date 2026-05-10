@@ -47,6 +47,12 @@ members = [
     # implementation behind a `COMPILED_CSS_ENGINE=rust` feature flag.
     "compiled-css-napi",
 
+    # Native-host wrapper around `swc_core::Compiler::process_js_with_custom_pass`
+    # that runs the babel-plugin port as an in-process Rust pass instead of
+    # the wasm32-wasip1 module. Built to A/B-test plugin throughput vs the
+    # WASI build (the WASI plugin is ~65× slower than upstream Babel).
+    "swc-native",
+
     # SWC plugins (plugins/PLAN.md). Compiled to wasm32-wasip1, ABI-compatible
     # with @swc/core@1.15.8 -> swc_core@54.0.0 (see PARITY_VERSIONS.md).
     "babel-plugin",

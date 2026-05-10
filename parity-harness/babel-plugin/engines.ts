@@ -249,6 +249,18 @@ function normalise(code: string): string {
   return format(escaped, { parser: 'babel-ts' });
 }
 
+/**
+ * External entry to the `normalise()` pipeline `swcEngine` /
+ * `babelEngine` apply to their raw outputs. Exposed for the
+ * native-pass triage harness (`parity-harness/native-triage.mjs`),
+ * which dumps raw `swc_native::transform` output from a Rust binary
+ * and needs to apply the same comment-strip + reconciler + prettier
+ * pass before byte-comparing against the Babel reference.
+ */
+export function normaliseEngineOutput(code: string): string {
+  return normalise(code);
+}
+
 export function babelEngine(source: string, opts: BabelPluginFixtureOpts = {}): string {
   const {
     comments = false,

@@ -1,0 +1,71 @@
+[package]
+name = "swc-native"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Native-host (non-WASI) wrapper around swc_core::Compiler::process_js_with_custom_pass that drops the babel-plugin port in as a Rust pass. Built to A/B-test plugin throughput vs the wasm32-wasip1 build."
+
+[lib]
+# `cdylib`: NAPI binary loaded from Node/Bun via index.js → binding.js.
+# `rlib`:   so `examples/perf.rs` (and any future Rust integration test)
+#           can link against the lib without re-importing swc_core.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# §SCOPE — only `base` (Compiler), `ecma_*` (parse/codegen/visit), and
+# the `common` feature set we need to construct comments + source maps
+# natively. NO `ecma_plugin_transform` here — that's the WASI-side
+# entrypoint pin in `crates/babel-plugin`. Native callers go through
+# `babel_plugin::apply_native` directly.
+swc_core = { version = "=54.0.0", features = [
+    # `base` (single-threaded) instead of `base_concurrent`. The
+    # concurrent variant pulls in par-core's chili runtime which
+    # spawns its own worker threads at the platform-default 1 MiB
+    # stack — the babel-plugin port's recursion depth blows that
+    # on real fixtures (`overflowed its stack` in `<unknown>` thread).
+    # Single-threaded execution stays inside our 16 MiB worker
+    # thread and finishes the corpus reliably. Throughput-wise
+    # there's nothing to parallelise inside one transform anyway —
+    # parallelism would only help across files, which we run
+    # sequentially in the bench / triage paths.
+    "base",
+    "ecma_ast",
+    "ecma_codegen",
+    "ecma_parser",
+    "ecma_transforms",
+    "ecma_visit",
+] }
+babel-plugin = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = "1"
+napi = { workspace = true }
+napi-derive = { workspace = true }
+
+# par-core dep (formerly required by `swc_core[base_concurrent]`)
+# was dropped along with the concurrent feature — see the
+# stack-overflow comment on the `swc_core` features list above.
+# par-core may still appear in the dep tree transitively; this
+# feature gate keeps the build sane if so.
+par-core = { version = "2.0.0", default-features = false, features = ["chili"] }
+
+[dev-dependencies]
+# `examples/perf.rs` writes the cssnano-browserslist + autoprefixer-
+# prefixes precompute snapshots before each benchmark so the WASI vs
+# native comparison is apples-to-apples (the parity harness's
+# `engines.ts` does the same via `@compiled/css-native`'s NAPI
+# precompute exports). Without these, every transform pays ~6.6 ms
+# rebuilding the autoprefixer prefix tables and ~ms reconstructing
+# the browserslist resolution — drowning out the actual plugin work.
+cssnano-browserslist-snapshot = { workspace = true }
+autoprefixer = { workspace = true }
+
+[build-dependencies]
+napi-build = { workspace = true }
+
+# !!! WARNING — same release-build OOM caveat as `compiled-css-napi`.
+# !!! Build dev (`cargo build -p swc-native`) — opt-level=0 is
+# !!! fast enough for the throughput A/B and avoids the LLVM OOM the
+# !!! workspace `[profile.release]` triggers on swc_core's transitive
+# !!! ecma_transforms graph.
