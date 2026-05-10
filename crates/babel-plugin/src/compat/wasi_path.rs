@@ -36,6 +36,31 @@
 //! entrypoint) never go through translation — they get the host
 //! path verbatim.
 //!
+//! ## Build-time mode dispatch (native vs WASI)
+//!
+//! The public surface ([`host_to_wasi`], [`host_to_wasi_path`],
+//! [`relative_request_is_symlink`]) dispatches on
+//! `cfg(target_arch = "wasm32")`:
+//!
+//! - **`wasm32-wasip1`** (the SWC WASI plugin binary) — runs the full
+//!   translation/guard logic via `*_impl` helpers below.
+//! - **Any other target** (the `crates/swc-native` consumer, cargo
+//!   test, future native bindings) — short-circuits to the identity
+//!   transform / `false` guard.
+//!
+//! This is a build-time switch, not a runtime flag, because the WASI
+//! and native binaries are produced by genuinely separate `cargo
+//! build` invocations targeting different triples. There is no
+//! single binary that needs to support both modes, so a `cfg`
+//! discriminator gives us zero runtime cost, dead-code-elimination of
+//! the unused arm, and a compile-time guarantee that a WASI-only path
+//! literally cannot be reached from native (and vice versa).
+//!
+//! Tests run against the host arch, so the `*_impl` helpers are
+//! exposed under `#[cfg(any(target_arch = "wasm32", test))]` and the
+//! tests below import them directly to keep the WASI translation
+//! logic exercised by `cargo test`.
+//!
 //! ## Why not let `oxc_resolver` figure it out
 //!
 //! `oxc_resolver` calls `std::fs::*` directly. It cannot
@@ -79,7 +104,42 @@ pub const WASI_CWD_MOUNT: &str = "/cwd";
 ///   this is intentional: silently rewriting unknown paths would
 ///   mask real misconfiguration (e.g. a fixture pointing at a
 ///   directory outside the project root).
+///
+/// ## Build-time dispatch
+///
+/// On non-`wasm32` targets this is the identity transform (the
+/// host-absolute path is what the native filesystem expects, so no
+/// translation is needed or correct). On `wasm32` it delegates to
+/// [`host_to_wasi_impl`] which performs the `/cwd`-prefix mapping.
 pub fn host_to_wasi(path: &str, host_root: &str) -> String {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        // Native callers (`crates/swc-native`, future bindings,
+        // `cargo test`) read host-absolute paths directly via
+        // `std::fs::*`. There is no `/cwd` preopen to translate
+        // into, and silently inserting `/cwd/` would break
+        // every downstream `fs::read_to_string` on a real OS.
+        let _ = host_root;
+        path.to_string()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        host_to_wasi_impl(path, host_root)
+    }
+}
+
+/// Path-form variant of [`host_to_wasi`] for callers holding
+/// `PathBuf` / `&Path` values (e.g. the post-resolution path
+/// returned by `oxc_resolver`).
+pub fn host_to_wasi_path(path: &Path, host_root: &str) -> PathBuf {
+    PathBuf::from(host_to_wasi(&path.to_string_lossy(), host_root))
+}
+
+/// WASI-target-only translation core. Exposed under `cfg(test)` so
+/// the host-arch unit tests below can exercise the translation logic
+/// directly.
+#[cfg(any(target_arch = "wasm32", test))]
+fn host_to_wasi_impl(path: &str, host_root: &str) -> String {
     if path.starts_with(WASI_CWD_MOUNT) {
         return path.to_string();
     }
@@ -97,13 +157,6 @@ pub fn host_to_wasi(path: &str, host_root: &str) -> String {
         };
     }
     path.to_string()
-}
-
-/// Path-form variant of [`host_to_wasi`] for callers holding
-/// `PathBuf` / `&Path` values (e.g. the post-resolution path
-/// returned by `oxc_resolver`).
-pub fn host_to_wasi_path(path: &Path, host_root: &str) -> PathBuf {
-    PathBuf::from(host_to_wasi(&path.to_string_lossy(), host_root))
 }
 
 /// WASI-only pre-resolution guard: detect a relative `request`
@@ -195,6 +248,37 @@ pub fn relative_request_is_symlink(
     request: &str,
     host_root: &str,
 ) -> bool {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        // Native callers run on a real filesystem with working
+        // `realpath` / `path_filestat` semantics — `oxc_resolver`'s
+        // canonical path follows the symlink chain in bounded time
+        // (no WASI hang). The over-approximation that deopts every
+        // symlinked import is therefore actively wrong on native:
+        // it would force a `var(--…)` runtime fallback for cases
+        // Babel folds. Returning `false` here lets `oxc_resolver`
+        // resolve the symlink the way Node's `realpathSync` would.
+        // See `crates/swc-native/tests/no_hang_on_unreadable_imports.rs`
+        // for the regression guard that proves bounded-time
+        // resolution on native against the WASI hang reproducer.
+        let _ = (from_file, request, host_root);
+        false
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        relative_request_is_symlink_impl(from_file, request, host_root)
+    }
+}
+
+/// WASI-target-only guard core. Exposed under `cfg(test)` so the
+/// host-arch unit tests below can exercise the symlink-detection
+/// logic directly against a real `tempdir`-staged symlink.
+#[cfg(any(target_arch = "wasm32", test))]
+fn relative_request_is_symlink_impl(
+    from_file: &Path,
+    request: &str,
+    host_root: &str,
+) -> bool {
     if host_root.is_empty() {
         return false;
     }
@@ -256,9 +340,13 @@ pub fn relative_request_is_symlink(
 }
 
 /// Lexical `..` / `.` collapse — does NOT touch the filesystem.
-/// Used by [`relative_request_is_symlink`] to compute the parent
-/// dir + basename of a relative request without invoking
-/// `canonicalize` (which hangs in WASI).
+/// Used by [`relative_request_is_symlink_impl`] to compute the
+/// parent dir + basename of a relative request without invoking
+/// `canonicalize` (which hangs in WASI). Gated to the same target
+/// set as the guard's `_impl`: WASI builds always need it; native
+/// builds only need it when running the `cargo test` suite that
+/// exercises the WASI logic against a real symlink fixture.
+#[cfg(any(target_arch = "wasm32", test))]
 fn normalise_path(path: &Path) -> PathBuf {
     use std::path::Component;
     let mut out: Vec<Component> = Vec::new();
@@ -281,6 +369,15 @@ fn normalise_path(path: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    // Tests target the `_impl` helpers directly so the WASI
+    // translation/guard logic stays exercised by `cargo test` even
+    // when the host arch is non-wasm32 (where the public surface
+    // short-circuits to identity / `false`). The native-mode
+    // short-circuit itself is covered separately by
+    // `native_mode_*` tests below and the `crates/swc-native`
+    // integration test that proves bounded-time resolution.
+    use super::host_to_wasi_impl as host_to_wasi;
+    use super::relative_request_is_symlink_impl as relative_request_is_symlink;
     use super::*;
 
     #[test]
@@ -335,6 +432,44 @@ mod tests {
     #[test]
     fn root_exactly_equal_returns_mount() {
         assert_eq!(host_to_wasi("/Users/me/proj", "/Users/me/proj"), "/cwd");
+    }
+
+    #[test]
+    fn native_mode_host_to_wasi_is_identity() {
+        // Build-time guarantee: the public `host_to_wasi` MUST be
+        // an identity transform on the host arch. Catches a
+        // regression where the cfg-gate breaks and the WASI body
+        // is reached on native (which would silently break every
+        // cross-file FS read in `swc-native`).
+        assert_eq!(
+            super::host_to_wasi(
+                "/Users/me/proj/fixtures/x/input.tsx",
+                "/Users/me/proj",
+            ),
+            "/Users/me/proj/fixtures/x/input.tsx"
+        );
+        assert_eq!(
+            super::host_to_wasi("C:\\Users\\me\\x.tsx", "C:\\Users\\me"),
+            "C:\\Users\\me\\x.tsx"
+        );
+    }
+
+    #[test]
+    fn native_mode_symlink_guard_always_false() {
+        // Build-time guarantee: the public guard MUST return
+        // `false` on the host arch regardless of inputs, so
+        // `oxc_resolver`'s native realpath path runs unhindered.
+        let from = Path::new("/anywhere/input.tsx");
+        assert!(!super::relative_request_is_symlink(
+            from,
+            "./alias",
+            "/Users/me/proj"
+        ));
+        assert!(!super::relative_request_is_symlink(
+            from,
+            "../escaping",
+            "/Users/me/proj"
+        ));
     }
 
     #[test]

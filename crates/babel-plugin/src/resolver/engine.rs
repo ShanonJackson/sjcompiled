@@ -212,10 +212,13 @@ pub fn build_from_config(
 
     let mut opts = ResolveOptions {
         extensions,
-        // WASI compatibility — see `default::build_default` for
-        // the full rationale behind disabling `oxc_resolver`'s
-        // symlink canonicalisation under wasm32-wasip1.
-        symlinks: false,
+        // Build-time mode dispatch — see `default::build_default`
+        // for the full rationale. WASI gets `false` (avoids
+        // canonicalisation hang on symlinked entries); native
+        // gets `true` to match Node's `realpathSync` semantics
+        // and align `imported_filename` strings with upstream
+        // Babel's `resolve.sync` output.
+        symlinks: !cfg!(target_arch = "wasm32"),
         ..Default::default()
     };
     // §5.4d — `cfg.exports.fields` wiring. The schema models this

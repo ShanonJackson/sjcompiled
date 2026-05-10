@@ -72,39 +72,53 @@ pub fn build_default(extensions: Option<&[String]>) -> Resolver {
         .unwrap_or_else(default_code_extensions);
     let opts = ResolveOptions {
         extensions: exts,
-        // WASI sandbox compatibility: disable `oxc_resolver`'s
-        // built-in symlink canonicalisation. Under SWC's WASI
-        // runtime (wasm32-wasip1), every path-stat-style WASI
-        // syscall (`path_filestat_get`, `path_readlink`,
-        // `path_open` with follow-symlinks) hangs indefinitely on
-        // a symlinked entry, regardless of whether the target is
-        // reachable. `oxc_resolver` 11.x's
-        // `Cache::canonicalize_with_visited` recursively
-        // `read_link`s + `metadata`s along the symlink chain — a
-        // single hop into a symlink stalls the transform.
+        // Build-time mode dispatch — see `compat::wasi_path` for
+        // the full WASI vs native rationale and the matching
+        // `cfg(target_arch = "wasm32")` switch on the symlink
+        // pre-resolution guard.
         //
-        // The `relative_request_is_symlink` guard at the
-        // `resolve_request` call site short-circuits relative
-        // imports BEFORE `oxc_resolver` sees them. This setting
+        // **`wasm32-wasip1` (WASI) → `symlinks: false`.** Under
+        // SWC's WASI runtime every path-stat-style WASI syscall
+        // (`path_filestat_get`, `path_readlink`, `path_open` with
+        // follow-symlinks) hangs indefinitely on a symlinked
+        // entry, regardless of whether the target is reachable.
+        // `oxc_resolver` 11.x's `Cache::canonicalize_with_visited`
+        // recursively `read_link`s + `metadata`s along the symlink
+        // chain — a single hop into a symlink stalls the
+        // transform. The `relative_request_is_symlink` guard at
+        // the `resolve_request` call site short-circuits relative
+        // imports BEFORE `oxc_resolver` sees them; this setting
         // closes the bare-import path (`@compiled/react`,
-        // `lodash`, etc.): if the consumer's node_modules layout
-        // uses symlinks (pnpm, yarn berry), `oxc_resolver`'s
-        // node_modules walk would otherwise hit the same
-        // canonicalisation hang.
+        // `lodash`, etc.) where pnpm/yarn-berry node_modules
+        // layouts would otherwise hit the same canonicalisation
+        // hang on the resolver's own walk.
         //
-        // Drift impact: `imported_filename` strings carry the
-        // symlink-form path instead of the canonical real-path
-        // that Node's `fs.realpathSync` would produce. No current
-        // consumer hashes / compares `imported_filename` (see
-        // `compat/wasi_path.rs:53`), and downstream re-resolution
+        // Drift impact under WASI: `imported_filename` strings
+        // carry the symlink-form path instead of the canonical
+        // real-path that Node's `fs.realpathSync` would produce.
+        // No current consumer hashes / compares
+        // `imported_filename`, and downstream re-resolution
         // anchored on it still works because `oxc_resolver`
         // resolves relative imports against the file's parent
         // dir regardless of canonical-form.
         //
+        // **Non-`wasm32` (native) → `symlinks: true`.** Native
+        // builds run `oxc_resolver` against a real OS filesystem
+        // with working `realpath`; the WASI hang doesn't apply,
+        // and `imported_filename` strings now match what Node's
+        // `fs.realpathSync` produces — i.e. byte-aligned with
+        // upstream Babel's `resolve.sync` output. This is the
+        // "align native to Babel at the plugin level" decision
+        // recorded in `crates/STATUS.md`. The `swc-native`
+        // hang-regression test
+        // (`crates/swc-native/tests/no_hang_on_unreadable_imports.rs`)
+        // proves bounded-time resolution against the WASI-era
+        // hang reproducer.
+        //
         // See `HANG_BUG_REPORT.md` for the full investigation
         // trail and `compat::wasi_path::relative_request_is_symlink`
         // for the per-call guard.
-        symlinks: false,
+        symlinks: !cfg!(target_arch = "wasm32"),
         ..Default::default()
     };
     Resolver::from_oxc(OxcResolver::new(opts))
