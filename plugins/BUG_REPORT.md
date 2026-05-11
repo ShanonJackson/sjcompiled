@@ -1,1 +1,0 @@
-Pre-existing issue surfaced (drift detection): crates/autoprefixer/src/prefixes.rs:1662 — test registry_holds_afm_in_scope_hacks asserts len == 5 but actual is 6. Verified pre-existing via git stash. Not blocking this work; flagging per CLAUDE.md drift-detection rule. May be related to an unrelated AFM hack-prefix port; should be triaged separately.
