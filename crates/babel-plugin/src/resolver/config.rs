@@ -23,11 +23,15 @@
 //!   lock in `engine.rs`.
 //! - `prefer_first` — the match-by-prefix dispatcher (§5.4d).
 //!   Same parse-but-not-yet-honoured contract.
-//! - `contexts.<name>.main_fields` + `default_context` — per-context
-//!   dispatch lands alongside `prefer_first` since they share the
-//!   same engine surface.
-//! - `extra_main_fields` — generic extension hook; lands when the
-//!   first consumer needs it.
+//! - `contexts.<name>.main_fields` + `default_context` — **honoured**
+//!   as of the AFM `EditorContentContainer-compiled.tsx` SIGSEGV
+//!   work. Engine wiring at `engine.rs::build_from_config` copies
+//!   `contexts[default_context].main_fields` onto
+//!   `oxc_resolver::ResolveOptions::main_fields`. Per-rule
+//!   replacements still flow through `prefer_first`.
+//! - `extra_main_fields` — **honoured** alongside `contexts` above.
+//!   Prepended to whatever `main_fields` the active context resolves
+//!   to. Replaces upstream's hard-coded `useModule2019MainField`.
 //!
 //! Each unhonoured field has a doc-comment pointing at the
 //! checkpoint where it gets wired. Consumers see errors at
@@ -78,9 +82,13 @@ pub struct ResolverConfig {
     /// The `preferFirst` dispatcher lands as a separate checkpoint.
     pub prefer_first: Option<Vec<PreferFirstRule>>,
 
-    /// **Future — parses today, NOT yet honoured by the engine.**
-    /// Lands when the first consumer needs it; mechanical wiring
-    /// once `contexts` dispatch exists.
+    /// Prepended to the active context's `main_fields`. Replaces
+    /// upstream's hard-coded `useModule2019MainField` flag — a Jira
+    /// consumer that wants `module:es2019` resolution sets
+    /// `"extraMainFields": ["module:es2019"]` and `engine.rs`
+    /// prepends it ahead of the context's own
+    /// `main`/`module`/`browser` order. Per-rule `prefer_first`
+    /// REPLACEMENTS bypass this prepend (spec §3.2).
     pub extra_main_fields: Option<Vec<String>>,
 }
 

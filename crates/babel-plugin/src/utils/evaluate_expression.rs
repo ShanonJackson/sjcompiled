@@ -795,12 +795,22 @@ fn try_namespace_import_dispatch<'a>(
 ///   - The member chain has a binding identifier (no
 ///     `member-of-member` head shape).
 ///   - `resolve_binding` returns `source: Import,
-///     imported_module: Some, node: Some(Expr::Ident)` —
-///     i.e. cross-file with a non-namespace foldable Ident
-///     (covers `import x from './m'` for default exports
-///     where `m` re-exports `export default x`, and
-///     `import { x }` where the imported module is
-///     `export { x };`).
+///     imported_module: Some` AND `node: Some(_)` matching
+///     either of two shapes:
+///     - `Expr::Ident` — re-export-chain shape: `import { Foo }
+///       from './m'` where `m` re-exports `Foo`
+///       (`export { Bar as Foo } from ...` /
+///       `export default Bar`). resolved_node is the local-side
+///       Ident in the imported file; we rebuild the member with
+///       that ident and dispatch against the imported scope.
+///     - `Expr::Object` — direct named-export Object shape:
+///       `import { Foo } from './m'` where
+///       `m: export const Foo = { key: \`${prefix}-bar\`, ... };`.
+///       Values inside Foo (template literals with cross-file
+///       interpolations, identifier refs to same-file bindings in
+///       `m`) need to fold against `m`'s scope or they silently
+///       deopt and `expression_to_string` infinite-recurses on
+///       the original Member fallback.
 ///
 /// Returns `None` to fall through (typical case: same-file
 /// member access, namespace handled by the sibling helper).
@@ -830,48 +840,82 @@ fn try_cross_file_member_dispatch<'a>(
     }
     let imported_module = resolved.imported_module.as_ref()?;
     let resolved_node = resolved.node.as_ref()?;
-    // Only the Ident shape — Object/Lit shapes don't need a scope
-    // swap (they're already final values).
-    let Expr::Ident(_) = &**resolved_node else {
-        return None;
-    };
 
-    // Build a fresh ScopeIndex over the imported module and re-walk
-    // the member chain against it. Rebuild the chain head with the
-    // resolved Ident — the same `node` shape upstream's
-    // `traverseMemberExpression` recurses on with the swapped meta.
-    let mut imported_idx = ScopeIndex::build(&**imported_module);
-    let imp_prog = imported_idx.program_scope();
+    match &**resolved_node {
+        Expr::Ident(_) => {
+            // Re-export-chain shape: `import { Foo } from './m'` where
+            // `m` re-exports `Foo` (`export { Bar as Foo } from ...` /
+            // `export default Bar`). resolved_node is the local-side
+            // Ident in the imported file. Rebuild the member with that
+            // ident and dispatch against the imported scope.
+            let mut imported_idx = ScopeIndex::build(&**imported_module);
+            let imp_prog = imported_idx.program_scope();
 
-    // Re-construct the member expression with the resolved Ident as
-    // the binding identifier. The member structure (access path) is
-    // preserved so consumers like `traverse_member_access_path` see
-    // the same path. This mirrors upstream's `evaluateExpression(
-    // member /* unchanged */, swappedMeta)` — the AST node identity
-    // doesn't change; only `meta`'s scope chain does.
-    let mut rebuilt_member = member.clone();
-    replace_binding_identifier(&mut rebuilt_member, &binding_id);
+            // Re-construct the member expression with the resolved Ident
+            // as the binding identifier. The member structure (access
+            // path) is preserved so consumers like
+            // `traverse_member_access_path` see the same path. This
+            // mirrors upstream's `evaluateExpression(member /* unchanged
+            // */, swappedMeta)` — the AST node identity doesn't change;
+            // only `meta`'s scope chain does.
+            let mut rebuilt_member = member.clone();
+            replace_binding_identifier(&mut rebuilt_member, &binding_id);
 
-    // Closure that recurses via `dispatch_evaluate` with the
-    // imported scope. SAFETY: imp_scope_ptr lives as long as
-    // `imported_idx`, which is owned by this preflight frame.
-    let imp_scope_ptr: *mut ScopeIndex = &mut imported_idx;
-    let mut imp_closure = move |e: &Expr, m: &mut Metadata<'_>| -> ResultPair {
-        let inner = unsafe { &mut *imp_scope_ptr };
-        dispatch_evaluate(e, m, inner, imp_prog, None)
-    };
+            // Closure that recurses via `dispatch_evaluate` with the
+            // imported scope. SAFETY: imp_scope_ptr lives as long as
+            // `imported_idx`, which is owned by this preflight frame.
+            let imp_scope_ptr: *mut ScopeIndex = &mut imported_idx;
+            let mut imp_closure = move |e: &Expr, m: &mut Metadata<'_>| -> ResultPair {
+                let inner = unsafe { &mut *imp_scope_ptr };
+                dispatch_evaluate(e, m, inner, imp_prog, None)
+            };
 
-    // SAFETY: re-borrow imported_idx immutably for the leaf.
-    let imp_ref: &ScopeIndex = unsafe { &*imp_scope_ptr };
-    let pair = traverse_member_expression(
-        &rebuilt_member,
-        meta,
-        imp_ref,
-        imp_prog,
-        None,
-        &mut imp_closure,
-    );
-    pair.value
+            // SAFETY: re-borrow imported_idx immutably for the leaf.
+            let imp_ref: &ScopeIndex = unsafe { &*imp_scope_ptr };
+            let pair = traverse_member_expression(
+                &rebuilt_member,
+                meta,
+                imp_ref,
+                imp_prog,
+                None,
+                &mut imp_closure,
+            );
+            pair.value
+        }
+        Expr::Object(_) => {
+            // Direct named-export Object shape: `import { Foo } from './m'`
+            // where `m: export const Foo = { key: \`${prefix}-bar\`, ... };`.
+            // resolved_node is the Object itself, but the values inside
+            // (template literals, member chains, identifier refs) need
+            // to fold against `m`'s scope so interpolations like
+            // `${prefix}` resolve to `m`'s `prefix` binding rather than
+            // looking it up against the consumer file's scope (where
+            // it doesn't exist → silent deopt and an infinite-recursion
+            // loop in `expression_to_string`'s computed-key folder).
+            //
+            // Mirrors the JS plugin's `resolveBinding` meta-swap
+            // (resolve-binding.ts:401-414): when the recursive eval
+            // re-enters via `evaluateExpression` after a cross-file
+            // resolve, every downstream `path.scope.getBinding` lookup
+            // walks the imported file's scope chain. We close that
+            // contract here by re-dispatching the member with the
+            // imported `ScopeIndex` and `program_scope` — the inner
+            // dispatch's own `try_cross_file_member_dispatch` returns
+            // None (binding is now Module/same-file), preventing
+            // infinite re-entry.
+            let mut imported_idx = ScopeIndex::build(&**imported_module);
+            let imp_prog = imported_idx.program_scope();
+            let pair = dispatch_evaluate(
+                &Expr::Member(member.clone()),
+                meta,
+                &mut imported_idx,
+                imp_prog,
+                None,
+            );
+            pair.value
+        }
+        _ => None,
+    }
 }
 
 /// Replace the bottom (left-most) Ident in a MemberExpression chain

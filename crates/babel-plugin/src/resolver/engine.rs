@@ -181,6 +181,19 @@ impl Resolver {
 /// **Honoured fields:**
 /// - `extensions` — passed through to `oxc_resolver::ResolveOptions`.
 /// - `exports.fields` (§5.4d) — wired into `ResolveOptions::exports_fields`.
+/// - `contexts` + `defaultContext` — RESOLVER_SPEC.md §3 point 3 +
+///   §5.2 dispatch. `contexts[defaultContext].mainFields` is copied
+///   onto the base resolver's `ResolveOptions::main_fields`. The
+///   spec's per-context dispatch surface (multiple contexts active
+///   simultaneously) isn't needed by the current consumers — Jira's
+///   `.compiledcssrc` declares both `browser` and `node` but only
+///   ever uses one at a time via `defaultContext`. Per-rule
+///   `mainFields` REPLACEMENTS still flow through `prefer_first` per
+///   that file's `prefer_first::build_rule_options`.
+/// - `extra_main_fields` — RESOLVER_SPEC.md §3 point 6. Prepended to
+///   the active `main_fields`. Replaces upstream's hard-coded
+///   `useModule2019MainField` flag without forcing a specific field
+///   name into the engine.
 /// - `package_json_transforms` (§5.4c) — when non-empty, wires the
 ///   resolver through [`TransformingFileSystem`]; transforms apply
 ///   to every `package.json` read before exports / mainFields
@@ -191,11 +204,9 @@ impl Resolver {
 ///   `exports.fields` / `main.fields` overridden per rule.
 ///
 /// **Parses-but-not-yet-honoured (future):**
-/// - `contexts`, `default_context`, `extra_main_fields`,
-///   `exports.conditions`. Schema validates today
-///   (deny-unknown-fields in `config.rs`); engine wiring lands as
-///   those checkpoints open. Each unhonoured field is documented
-///   inline in `config.rs`.
+/// - `exports.conditions`. Schema validates today
+///   (deny-unknown-fields in `config.rs`); engine wiring lands when
+///   the first non-default conditions fixture surfaces.
 ///
 /// # Errors
 ///
@@ -238,6 +249,40 @@ pub fn build_from_config(
         // `conditions: ["exports"]` which is a no-op against
         // oxc_resolver's empty default). When the first non-default
         // conditions fixture lands, wire it here.
+    }
+
+    // RESOLVER_SPEC.md §3 point 3 + §5.2 — per-context `mainFields`.
+    // Non-relative bare requests dispatch through
+    // `contexts[defaultContext]`; we copy that context's `mainFields`
+    // onto the base resolver's `ResolveOptions::main_fields`. The
+    // spec forbids inventing context names not declared under
+    // `contexts`, so an explicit `defaultContext` with no matching
+    // entry silently falls through (matches the `parse_value` error
+    // surface for unknown fields, which is the right hard-fail
+    // contract — engine doesn't double-check; the schema does).
+    if let (Some(default_ctx), Some(contexts)) = (&cfg.default_context, &cfg.contexts) {
+        if let Some(ctx) = contexts.get(default_ctx) {
+            if let Some(fields) = &ctx.main_fields {
+                opts.main_fields = fields.clone();
+            }
+        }
+    }
+    // RESOLVER_SPEC.md §3 point 6 — `extraMainFields` is prepended
+    // to whatever the active `mainFields` list is. The spec frames
+    // this as the replacement for upstream's hard-coded
+    // `useModule2019MainField` flag: a Jira consumer that wants
+    // `module:es2019` resolution sets
+    // `"extraMainFields": ["module:es2019"]` here, the engine
+    // prepends it, and `oxc_resolver` honours it ahead of the
+    // context's own `main`/`module`/`browser` order. Per-rule
+    // `prefer_first` REPLACEMENTS bypass this prepend (the spec
+    // §3.2 example uses `"mainFields": []` for that exact reason).
+    if let Some(extra) = &cfg.extra_main_fields {
+        if !extra.is_empty() {
+            let mut combined: Vec<String> = extra.clone();
+            combined.append(&mut opts.main_fields);
+            opts.main_fields = combined;
+        }
     }
 
     let transforms_arc: Arc<[PackageJsonTransform]> = match &cfg.package_json_transforms {
