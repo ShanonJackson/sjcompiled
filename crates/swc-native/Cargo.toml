@@ -61,6 +61,10 @@ par-core = { version = "2.0.0", default-features = false, features = ["chili"] }
 cssnano-browserslist-snapshot = { workspace = true }
 autoprefixer = { workspace = true }
 
+[target.'cfg(not(target_os = "wasi"))'.dependencies]
+# Global allocator — see workspace `mimalloc` dep comment.
+mimalloc = { workspace = true }
+
 [build-dependencies]
 napi-build = { workspace = true }
 

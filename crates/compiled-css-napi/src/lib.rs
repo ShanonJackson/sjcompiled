@@ -67,6 +67,25 @@
 //! order. Verified by the `classnamecompressionmap-insertion-order`
 //! corpus fixture.
 
+// Global allocator override — mimalloc is faster than the system
+// allocator across all three production platforms, though the margin
+// varies a lot:
+//   - Windows (HeapAlloc): ~2–3× on small-alloc-heavy workloads — the
+//     largest single OS-level lever for this pipeline.
+//   - Linux glibc (ptmalloc2): ~10–25%.
+//   - macOS (libsystem malloc, Apple Silicon): ~5–15% — smallest
+//     margin; Apple's allocator is well-tuned for the platform.
+// The postcss-port AST + string-heavy plugin work allocates very
+// frequently in small sizes, which is the regime mimalloc is built
+// for, so we expect to land near the upper end of each band.
+//
+// Gated on `cfg(not(target_os = "wasi"))` because this cdylib only
+// ever targets native; the cfg keeps the file honest if someone ever
+// runs `cargo check --target wasm32-wasip1` against it.
+#[cfg(not(target_os = "wasi"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use indexmap::IndexMap;
 use napi::bindgen_prelude::*;
 use napi::JsObject;

@@ -136,6 +136,13 @@ napi = { version = "2", default-features = false, features = ["napi6"] }
 napi-derive = "2"
 napi-build = "2"
 
+# Faster general-purpose allocator for native + NAPI deployment crates.
+# Gated on `cfg(not(target_os = "wasi"))` at every use-site because
+# mimalloc relies on libc / threading primitives that aren't in the
+# wasm32-wasip1 surface. WASI builds keep the default dlmalloc (and
+# can swap to talc later as a separate change).
+mimalloc = { version = "0.1", default-features = false }
+
 # SWC plugin runtime. PIN — see crates/PARITY_VERSIONS.md.
 # Bumping requires a coordinated @swc/core bump and full corpus re-run.
 swc_core = { version = "=54.0.0", features = ["ecma_plugin_transform", "ecma_ast", "ecma_visit", "common"] }

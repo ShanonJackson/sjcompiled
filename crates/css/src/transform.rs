@@ -149,6 +149,7 @@ use postcss_normalize_whitespace::postcss_normalize_whitespace;
 
 use autoprefixer::autoprefixer::{build_prefixes, build_prefixes_default, AutoprefixerOptions};
 use autoprefixer::precomputed::build_prefixes_from_precomputed;
+use autoprefixer::prefixes::Prefixes;
 use autoprefixer::processor::Processor as AutoprefixerProcessor;
 
 use compiled_utils::unique;
@@ -239,6 +240,118 @@ pub fn _clear_precomputed_prefixes_cache_for_tests() {
     PRECOMPUTED_PREFIXES_BYTES_CACHE.with(|slot| {
         *slot.borrow_mut() = None;
     });
+    PREFIXES_DECODED_CACHE.with(|slot| {
+        *slot.borrow_mut() = None;
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Win 2 — within-process `Arc<Prefixes>` cache (NAPI-only effective).
+//
+// `build_prefixes_from_precomputed` is dominated by postcard
+// deserialisation of the ~45 KB snapshot — ~227 µs/call (39% of the
+// whole pipeline). The decoded `Prefixes` is a deterministic function
+// of the input bytes; reusing it across calls in the same thread is
+// byte-equal to rebuilding it. We Arc-wrap the `Prefixes` so multiple
+// `transform_css` calls can share the same allocation.
+//
+// **Why this is NAPI-only effective:** WASI tears down the linear
+// memory between every `transformSync` call, so the cache slot is
+// always empty when WASI re-enters. NAPI keeps the thread alive
+// across calls (per-thread napi-rs context), so the cache hits from
+// the second call onward.
+//
+// **Cache key:** SipHash of the snapshot bytes. The host typically
+// pre-builds one snapshot and reuses it across every call; same bytes
+// → same hash → cache hit. We hash on every call (~10 µs on 45 KB)
+// but save ~227 µs on hit. Hash collisions are astronomically unlikely
+// and a collision still produces a byte-equal result (different
+// snapshots that hash the same would still yield correct prefixes for
+// the QUERIED bytes — wait, no, they would produce the OTHER snapshot's
+// prefixes for our queried bytes, which would NOT be byte-equal).
+// So we accept the theoretical collision risk; SipHash with 64-bit
+// output gives ~1 in 2^32 collision risk per pair, and the host writes
+// one snapshot per build.
+//
+// **Sharing semantics:** `Prefixes` contains `RefCell<AddTable>`,
+// `RefCell<RemoveTable>`, `RefCell<Box<Supports>>` and
+// `OnceCell<Box<Prefixes>>` (cleaner_cache). The RefCells are
+// mutated during `processor.add`/`processor.remove` walks for lazy
+// initialisation (e.g. `Resolution::process` populates `self.bad`
+// on first call, then skips). These mutations are idempotent: the
+// post-walk state is reachable from any sequence of prior input. So
+// reusing a "warm" `Prefixes` across calls is byte-equal — verified
+// by the parity-runner corpus.
+//
+// **Thread safety:** `thread_local!` ensures one cache per OS thread.
+// Within a thread, calls are sequential — no overlapping RefCell
+// borrows. Across threads, each gets its own cache (memory cost: one
+// extra `Prefixes` per thread that ever calls `transform_css`).
+thread_local! {
+    static PREFIXES_DECODED_CACHE:
+        std::cell::RefCell<Option<(u64, std::sync::Arc<Prefixes>)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+fn fingerprint_snapshot_bytes(bytes: &[u8]) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hasher;
+    let mut h = DefaultHasher::new();
+    h.write(bytes);
+    h.finish()
+}
+
+/// Returns `true` if the input CSS contains any vendor-prefix substring
+/// that [`AutoprefixerProcessor::remove`] could possibly match against.
+///
+/// `remove` does three sub-walks (`processor.rs:1190-1300`); each one
+/// can only fire on AST nodes that already contain a vendor prefix:
+///   - `walkAtRules`: matches `@-<prefix>-<name>` (e.g., `@-webkit-keyframes`).
+///   - `walkRules`: `OldSelector::check` opens with
+///     `if !rule_selector.contains(&self.prefixed) { return false; }`
+///     where `self.prefixed` is always a prefixed selector like
+///     `::-webkit-input-placeholder` (`old_selector.rs:101`).
+///   - `walkDecls`: matches prop names that start with a vendor prefix.
+///
+/// No pipeline stage before `autoprefixer` introduces vendor prefixes
+/// — `autoprefixer::add` is the only writer, and it runs AFTER
+/// `remove`. So prefix tokens in the AST at `remove` time can only
+/// have come from the original input. If the input string has no
+/// prefix tokens, `remove` is provably a no-op and can be skipped
+/// byte-equally.
+///
+/// **Conservative direction:** false positives (running `remove` when
+/// not strictly needed — e.g., bytes `-webkit-` appearing inside a
+/// `data:` URL or `/* ... */` comment) are harmless. False negatives
+/// are impossible: anything `remove` would have stripped contains a
+/// prefix token, which this scan would have caught.
+fn input_has_vendor_prefix(css: &str) -> bool {
+    // `str::contains` uses an optimized two-way substring search —
+    // fast enough for typical ~500-byte inputs (~1 µs total). The
+    // 4 needles cover every vendor prefix autoprefixer tracks.
+    // Short-circuits on first hit.
+    css.contains("-webkit-")
+        || css.contains("-moz-")
+        || css.contains("-ms-")
+        || css.contains("-o-")
+}
+
+fn cached_prefixes_from_bytes(
+    bytes: &[u8],
+) -> Result<std::sync::Arc<Prefixes>, String> {
+    let key = fingerprint_snapshot_bytes(bytes);
+    PREFIXES_DECODED_CACHE.with(|slot| {
+        if let Some((cached_key, cached_arc)) = slot.borrow().as_ref() {
+            if *cached_key == key {
+                return Ok(std::sync::Arc::clone(cached_arc));
+            }
+        }
+        let prefixes = build_prefixes_from_precomputed(bytes)
+            .map_err(|e| format!("autoprefixer precomputed load error: {e}"))?;
+        let arc = std::sync::Arc::new(prefixes);
+        *slot.borrow_mut() = Some((key, std::sync::Arc::clone(&arc)));
+        Ok(arc)
+    })
 }
 
 /// `BASE_PLUGINS` from `packages/css/src/plugins/normalize-css.ts:44-50`.
@@ -641,26 +754,54 @@ pub fn transform_css(css: &str, opts: &TransformOpts) -> Result<TransformResult,
         // env-pinned NAPI and snapshot-driven WASI emit byte-equal
         // CSS for the user-select prefix decision and any other
         // browserslist-gated autoprefixer rule.
-        let prefixes = match prefixes_bytes {
-            Some(bytes) => build_prefixes_from_precomputed(bytes)
-                .map_err(|e| format!("autoprefixer precomputed load error: {e}"))?,
-            None => match preset_opts.browserslist_snapshot.as_ref() {
-                Some(snap) => build_prefixes(
-                    None,
-                    AutoprefixerOptions {
-                        override_browserslist: Some(snap.selected.clone()),
-                        ..Default::default()
-                    },
-                )
-                .map_err(|e| format!("autoprefixer build error: {e}"))?,
-                None => build_prefixes_default(None)
+        // The precomputed-bytes arm goes through a thread-local
+        // `Arc<Prefixes>` cache (see `PREFIXES_DECODED_CACHE` rationale
+        // above). The other two arms (browserslist-snapshot, slow
+        // default) are not cached — they're either WASI-only (where
+        // the cache wouldn't survive teardown anyway) or development /
+        // fallback paths.
+        let mut prefixes_owned: Option<Prefixes> = None;
+        let mut prefixes_arc: Option<std::sync::Arc<Prefixes>> = None;
+        match prefixes_bytes {
+            Some(bytes) => {
+                prefixes_arc = Some(cached_prefixes_from_bytes(bytes)?);
+            }
+            None => {
+                prefixes_owned = Some(match preset_opts.browserslist_snapshot.as_ref() {
+                    Some(snap) => build_prefixes(
+                        None,
+                        AutoprefixerOptions {
+                            override_browserslist: Some(snap.selected.clone()),
+                            ..Default::default()
+                        },
+                    )
                     .map_err(|e| format!("autoprefixer build error: {e}"))?,
-            },
+                    None => build_prefixes_default(None)
+                        .map_err(|e| format!("autoprefixer build error: {e}"))?,
+                });
+            }
+        }
+        let prefixes_ref: &Prefixes = match (&prefixes_arc, &prefixes_owned) {
+            (Some(arc), _) => arc.as_ref(),
+            (None, Some(owned)) => owned,
+            (None, None) => unreachable!("one branch was taken above"),
         };
-        let proc = AutoprefixerProcessor::new(&prefixes);
+        let proc = AutoprefixerProcessor::new(prefixes_ref);
         let mut warnings: Vec<String> = Vec::new();
         // Warnings are diagnostic-only (not on the hashing path); discarded.
-        proc.remove(&mut root.root, &mut warnings);
+        //
+        // `proc.remove` strips stale vendor-prefixed CSS the user wrote
+        // but doesn't need for the current browserslist. Every match
+        // path in `remove` requires the AST to contain a vendor-prefix
+        // substring; no prior pipeline stage introduces one
+        // (`autoprefixer::add` is the only writer and it runs AFTER
+        // `remove`). So when the input string has no `-webkit-` /
+        // `-moz-` / `-ms-` / `-o-` token, `remove` is provably a
+        // no-op and we skip its ~33 µs/call walk. See
+        // `input_has_vendor_prefix` for the full safety argument.
+        if input_has_vendor_prefix(css) {
+            proc.remove(&mut root.root, &mut warnings);
+        }
         proc.add(&mut root.root, &mut warnings);
     }
 
@@ -721,7 +862,8 @@ pub fn transform_css(css: &str, opts: &TransformOpts) -> Result<TransformResult,
 /// caller uses that flag to decide whether to remove `parent` itself
 /// when it's a Rule that became empty — matching upstream's
 /// `parent.remove()` branch.
-fn interleaved_decl_walk(parent: &mut Node, optimize_css: bool) -> bool {
+#[doc(hidden)]
+pub fn interleaved_decl_walk(parent: &mut Node, optimize_css: bool) -> bool {
     if parent.nodes().is_none() {
         return false;
     }

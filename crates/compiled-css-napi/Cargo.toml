@@ -21,6 +21,10 @@ napi-derive = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true }
 
+[target.'cfg(not(target_os = "wasi"))'.dependencies]
+# Global allocator — see workspace `mimalloc` dep comment.
+mimalloc = { workspace = true }
+
 [build-dependencies]
 napi-build = { workspace = true }
 
