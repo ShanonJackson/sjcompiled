@@ -6,174 +6,18 @@
   <component name="ChangeListManager">
     <list default="true" id="46baedc5-8956-4da5-8e73-63c433c62642" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/CONSOLIDATION_PLAN.md" beforeDir="false" afterPath="$PROJECT_DIR$/crates/CONSOLIDATION_PLAN.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/crates/Cargo.lock" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crates/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/colord.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/colord.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/constants.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/constants.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/helpers.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/helpers.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/names.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/names.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/parse.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/parse.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/plugins/a11y.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/plugins/a11y.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/plugins/harmonies.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/plugins/harmonies.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/plugins/hwb.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/plugins/hwb.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/plugins/lab.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/plugins/lab.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/plugins/minify.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/plugins/minify.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/plugins/mix.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/plugins/mix.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/plugins/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/plugins/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/random.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/random.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/src/types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/colord/types.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/tests/minify_parity.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/tests/colord_minify_parity.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/colord/tests/minify_vectors.json" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/tests/minify_vectors.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/compat/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/compat/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/compat/v8_array_sort.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/compat/v8_array_sort.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/at_rules.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/at_rules.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/at_rules/parse_at_rule.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/at_rules/parse_at_rule.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/at_rules/parsers.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/at_rules/parsers.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/at_rules/sort_at_rules.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/at_rules/sort_at_rules.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/at_rules/types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/at_rules/types.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/atomicify_rules.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/atomicify_rules.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/discard_duplicates.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/discard_duplicates.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/discard_empty_rules.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/discard_empty_rules.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/background.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/background.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/flex.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/flex.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/flex_flow.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/flex_flow.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/margin.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/margin.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/outline.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/outline.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/overflow.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/overflow.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/padding.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/padding.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/place_content.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/place_content.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/place_items.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/place_items.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/place_self.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/place_self.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/text_decoration.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/text_decoration.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/types.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/expand_shorthands/utils.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/expand_shorthands/utils.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/extract_stylesheets.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/extract_stylesheets.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/increase_specificity.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/increase_specificity.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/merge_duplicate_at_rules.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/merge_duplicate_at_rules.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/normalize_css.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/normalize_css.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/normalize_current_color.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/normalize_current_color.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/parent_orphaned_pseudos.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/parent_orphaned_pseudos.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/sort_atomic_style_sheet.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/sort_atomic_style_sheet.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/plugins/sort_shorthand_declarations.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/plugins/sort_shorthand_declarations.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/utils.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/utils.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/utils/css_affix_interpolation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/utils/css_affix_interpolation.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/utils/css_property.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/utils/css_property.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/utils/sort_pseudo_selectors.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/utils/sort_pseudo_selectors.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/compiled-css/src/utils/style_ordering.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/compiled_css/utils/style_ordering.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/css/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/css/examples/profile_phases.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/examples/profile_phases.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/css/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/css/src/plugins/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/css/src/sort.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/sort.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/css/src/transform.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/transform.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-colormin/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-colormin/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_colormin/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-colormin/src/minify_color.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_colormin/minify_color.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-convert-values/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-convert-values/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_convert_values/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-convert-values/src/lib/convert.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_convert_values/lib/convert.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-discard-comments/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-discard-comments/src/comment_parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_discard_comments/comment_parser.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-discard-comments/src/comment_remover.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_discard_comments/comment_remover.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-discard-comments/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_discard_comments/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-minify-gradients/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-minify-gradients/src/is_color_stop.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_minify_gradients/is_color_stop.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-minify-gradients/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_minify_gradients/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-minify-params/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-minify-params/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_minify_params.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-minify-selectors/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-minify-selectors/src/can_unquote.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_minify_selectors/can_unquote.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-minify-selectors/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_minify_selectors/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-positions/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-positions/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_normalize_positions.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-string/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-string/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_normalize_string.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-timing-functions/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-timing-functions/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_normalize_timing_functions.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-unicode/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-unicode/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_normalize_unicode.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-url/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-url/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_normalize_url/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-url/src/normalize_url.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_normalize_url/normalize_url.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-normalize-url/src/path.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_normalize_url/path.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/helpers/add_space.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/helpers/add_space.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/helpers/get_value.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/helpers/get_value.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/helpers/join_grid_value.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/helpers/join_grid_value.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/helpers/math_functions.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/helpers/math_functions.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/helpers/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/helpers/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/helpers/vendor_unprefixed.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/helpers/vendor_unprefixed.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/rules/animation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/rules/animation.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/rules/border.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/rules/border.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/rules/box_shadow.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/rules/box_shadow.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/rules/columns.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/rules/columns.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/rules/flex_flow.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/rules/flex_flow.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/rules/grid.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/rules/grid.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/rules/list_style.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/rules/list_style.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/rules/list_style_types.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/rules/list_style_types.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/rules/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/rules/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-ordered-values/src/rules/transition.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_ordered_values/rules/transition.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-reduce-initial/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-reduce-initial/src/data/fromInitial.json" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_reduce_initial/data/fromInitial.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-reduce-initial/src/data/toInitial.json" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_reduce_initial/data/toInitial.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-postcss-reduce-initial/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_reduce_initial/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-preset-default/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-preset-default/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_preset_default.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-utils/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-utils/src/get_arguments.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/cssnano_utils/get_arguments.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-utils/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/cssnano_utils/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-utils/src/raw_cache.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/cssnano_utils/raw_cache.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/cssnano-utils/src/same_parent.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/cssnano_utils/same_parent.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/parity-runner/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/parity-runner/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/parity-runner/src/stages.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/parity-runner/src/stages.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-calc/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-calc/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/postcss_calc/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-calc/src/lib/convert_unit.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/postcss_calc/lib/convert_unit.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-calc/src/lib/reducer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/postcss_calc/lib/reducer.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-calc/src/lib/stringifier.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/postcss_calc/lib/stringifier.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-calc/src/lib/transform.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/postcss_calc/lib/transform.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-calc/src/parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/postcss_calc/parser.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-nested/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-nested/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/postcss_nested.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-normalize-whitespace/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-normalize-whitespace/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/postcss_normalize_whitespace.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-selector-parser/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-selector-parser/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_selector_parser/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-selector-parser/src/nodes.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_selector_parser/nodes.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-selector-parser/src/parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_selector_parser/parser.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-selector-parser/src/processor.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_selector_parser/processor.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-selector-parser/src/selectors.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_selector_parser/selectors.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-selector-parser/src/sortAscending.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_selector_parser/sortAscending.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-selector-parser/src/tokenTypes.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_selector_parser/tokenTypes.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-selector-parser/src/tokenize.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_selector_parser/tokenize.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-selector-parser/src/util.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_selector_parser/util.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/at_word.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/at_word.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/comment.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/comment.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/container.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/container.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/func.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/func.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/interpolation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/interpolation.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/node.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/node.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/numeric.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/numeric.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/operator.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/operator.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/punctuation.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/punctuation.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/quoted.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/quoted.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/unicode_range.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/unicode_range.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/nodes/word.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/nodes/word.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/tokenize.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/tokenize.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/values_parser.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/values_parser.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/values_stringifier.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/values_stringifier.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/postcss-values-parser/src/walker.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/vendor/postcss_values_parser/walker.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/autoprefixer/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/autoprefixer/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/resolution.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/autoprefixer/src/resolution.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/browserslist-shim/AFM_PORT_NOTES.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/fraction-js/Cargo.toml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/fraction-js/src/fraction.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/fraction-js/src/lib.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/fraction-js/tests/gen_oracle.cjs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/fraction-js/tests/oracle.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/fraction-js/tests/parity.rs" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

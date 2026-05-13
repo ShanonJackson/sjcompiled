@@ -58,6 +58,13 @@ pub mod data {
 
 pub mod hacks;
 
+/// Byte-for-byte port of `fraction.js@4.2.0`. Folded in from the
+/// (now-deleted) standalone `crates/fraction-js` on 2026-05-14 —
+/// autoprefixer was the sole consumer (see `resolution.rs`'s
+/// `min/max-resolution` dpcm/dpi math). Parity oracle:
+/// `tests/fraction_js/oracle.json`.
+pub mod fraction_js;
+
 /// Postcard-serializable snapshot of a fully-resolved `Prefixes`
 /// post-`select()`. Lets WASI consumers skip the filesystem walk +
 /// browserslist resolution + full PREFIXES iteration on every call by

@@ -1,9 +1,11 @@
 // Regenerates `oracle.json` — the JS-vs-Rust parity corpus consumed by
-// `tests/parity.rs`. Run from the workspace root:
+// `crates/autoprefixer/tests/fraction_js_parity.rs`. Run from the
+// workspace root:
 //
-//     node crates/fraction-js/tests/gen_oracle.cjs
+//     node crates/autoprefixer/tests/fraction_js/gen_oracle.cjs
 //
-// The corpus covers every public method `crates/fraction-js` exposes,
+// The corpus covers every public method the folded-in `fraction.js`
+// port (`crates/autoprefixer/src/fraction_js/`) exposes,
 // including the autoprefixer-shaped `f.mul(2.54).div(96).simplify()`
 // chain for the 8 dpcm media-query base values
 // (72, 96, 120, 144, 192, 240, 288, 384) and the matching dpi chain.
@@ -120,5 +122,5 @@ for (const [a, b] of [[1,1], [7,3], [-7,3], [1,3], [22,7]]) {
   record(`toLatex(${a}/${b}, true)`,  'toLatex_true',  () => new Fraction(a, b));
 }
 
-fs.writeFileSync('crates/fraction-js/tests/oracle.json', JSON.stringify(cases, null, 2));
+fs.writeFileSync('crates/autoprefixer/tests/fraction_js/oracle.json', JSON.stringify(cases, null, 2));
 console.log(`wrote ${cases.length} cases`);

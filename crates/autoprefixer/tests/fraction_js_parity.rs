@@ -1,22 +1,23 @@
-//! JS-vs-Rust parity gate for `fraction-js`.
+//! JS-vs-Rust parity gate for the folded-in `fraction.js` port
+//! (`src/fraction_js/`).
 //!
-//! Loads `tests/oracle.json` (regenerable via
-//! `node crates/fraction-js/tests/gen_oracle.cjs`), replays every case
-//! through the Rust port, and asserts every observable byte matches the
-//! upstream JS oracle. This is the one regression net that would have
-//! caught the missing `simplify` method automatically — any future
-//! regression on a method autoprefixer touches will fail this gate.
+//! Loads `tests/fraction_js/oracle.json` (regenerable via
+//! `node crates/autoprefixer/tests/fraction_js/gen_oracle.cjs`), replays
+//! every case through the Rust port, and asserts every observable byte
+//! matches the upstream JS oracle. This is the one regression net that
+//! would have caught the missing `simplify` method automatically — any
+//! future regression on a method autoprefixer touches will fail this gate.
 //!
 //! NaN is encoded in the oracle as the string `"NaN"`; we round-trip via
 //! a `JsNum` enum on read.
 
-use fraction_js::fraction::{Fraction, FractionInput};
+use autoprefixer::fraction_js::fraction::{Fraction, FractionInput};
 use serde_json::Value;
 use std::fs;
 
 fn main_test() -> Vec<(String, Result<(), String>)> {
-    let raw = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/oracle.json"))
-        .expect("oracle.json should exist — regenerate via tests/gen_oracle.cjs");
+    let raw = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fraction_js/oracle.json"))
+        .expect("oracle.json should exist — regenerate via tests/fraction_js/gen_oracle.cjs");
     let cases: Vec<Value> = serde_json::from_str(&raw).expect("oracle.json is valid JSON");
 
     let mut results = Vec::new();
@@ -133,7 +134,7 @@ fn fraction_from_label_pair(label: &str) -> Result<Fraction, String> {
 // then apply the op closure.
 fn unary<F>(label: &str, op: F) -> Result<Fraction, String>
 where
-    F: FnOnce(&Fraction) -> Result<Fraction, fraction_js::fraction::FractionError>,
+    F: FnOnce(&Fraction) -> Result<Fraction, autoprefixer::fraction_js::fraction::FractionError>,
 {
     let v = parse_js_number(
         label.split_once('(').unwrap().1.trim_end_matches(')')
@@ -161,7 +162,7 @@ fn parse_bin(label: &str) -> (f64, f64) {
 
 fn bin<F>(label: &str, op: F) -> Result<Fraction, String>
 where
-    F: FnOnce(&Fraction, FractionInput) -> Result<Fraction, fraction_js::fraction::FractionError>,
+    F: FnOnce(&Fraction, FractionInput) -> Result<Fraction, autoprefixer::fraction_js::fraction::FractionError>,
 {
     let (a, b) = parse_bin(label);
     let af = Fraction::new(a).map_err(|e| e.to_string())?;
@@ -170,7 +171,7 @@ where
 
 fn bin_bool<F>(label: &str, op: F) -> Result<bool, String>
 where
-    F: FnOnce(&Fraction, FractionInput) -> Result<bool, fraction_js::fraction::FractionError>,
+    F: FnOnce(&Fraction, FractionInput) -> Result<bool, autoprefixer::fraction_js::fraction::FractionError>,
 {
     let (a, b) = parse_bin(label);
     let af = Fraction::new(a).map_err(|e| e.to_string())?;
@@ -212,7 +213,7 @@ fn simplify_case(label: &str) -> Result<Fraction, String> {
 
 fn places_op<F>(label: &str, op: F) -> Result<Fraction, String>
 where
-    F: FnOnce(&Fraction, Option<i32>) -> Result<Fraction, fraction_js::fraction::FractionError>,
+    F: FnOnce(&Fraction, Option<i32>) -> Result<Fraction, autoprefixer::fraction_js::fraction::FractionError>,
 {
     // label = `op(v,places)`. places is `undefined` or an integer.
     let inner = label.split_once('(').unwrap().1.trim_end_matches(')');

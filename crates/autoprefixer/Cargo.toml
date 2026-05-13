@@ -12,7 +12,6 @@ postcss-value-parser.workspace = true
 browserslist-shim.workspace = true
 caniuse-db.workspace = true
 caniuse-api.workspace = true
-fraction-js.workspace = true
 compiled-utils.workspace = true
 indexmap.workspace = true
 once_cell.workspace = true
@@ -20,6 +19,10 @@ regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 postcard.workspace = true
+# Folded-in `fraction.js` port (`src/fraction_js/`) calls into Sun fdlibm
+# for `Math.log` / `Math.pow` to match V8's bit-identical results across
+# platforms. See the comment on `libm` at the workspace root.
+libm.workspace = true
 
 [dev-dependencies]
 # `preserve_order` is load-bearing for both `examples/regen_prefixes.rs`

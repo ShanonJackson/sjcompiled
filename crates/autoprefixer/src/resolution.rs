@@ -4,7 +4,7 @@
 //! / `@media (max-resolution: ...)` prefixing — `-webkit-`/`-o-`/`-moz-`
 //! variants use device-pixel-ratio and (for `-o-`) `n/d` fraction syntax.
 
-use fraction_js::fraction::Fraction;
+use crate::fraction_js::fraction::Fraction;
 use postcss_core::{Node, NodeKind};
 use regex::Regex;
 
@@ -76,7 +76,7 @@ impl ResolutionBase {
         // affecting in the `-o-` branch (which emits `n/d` literally)
         // and may also shift the decimal-output branch via float
         // arithmetic on different (n, d) pairs. Mirrors `simplify(None)`
-        // → 0.001 default in `crates/fraction-js/src/fraction.rs:617`.
+        // → 0.001 default in `src/fraction_js/fraction.rs:617`.
         let f = f.simplify(None).expect("simplify never errors on finite input");
         let value_str = if prefix == "-o-" {
             format!(

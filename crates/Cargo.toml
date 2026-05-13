@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "postcss-core",
     "postcss-value-parser",
-    "fraction-js",
     "caniuse-db",
     "caniuse-api",
     "browserslist-shim",
@@ -71,7 +70,6 @@ libm = "0.2"
 
 postcss-core = { path = "postcss-core" }
 postcss-value-parser = { path = "postcss-value-parser" }
-fraction-js = { path = "fraction-js" }
 caniuse-db = { path = "caniuse-db" }
 caniuse-api = { path = "caniuse-api" }
 browserslist-shim = { path = "browserslist-shim" }
