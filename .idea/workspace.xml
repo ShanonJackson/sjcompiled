@@ -6,18 +6,13 @@
   <component name="ChangeListManager">
     <list default="true" id="46baedc5-8956-4da5-8e73-63c433c62642" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/crates/Cargo.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/autoprefixer/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/autoprefixer/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/resolution.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/autoprefixer/src/resolution.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/browserslist-shim/AFM_PORT_NOTES.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/fraction-js/Cargo.toml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/fraction-js/src/fraction.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/fraction-js/src/lib.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/fraction-js/tests/gen_oracle.cjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/fraction-js/tests/oracle.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/fraction-js/tests/parity.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/supports.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/autoprefixer/src/supports.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/browserslist-shim/src/index.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/browserslist-shim/src/index.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/caniuse-api/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/caniuse-api/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/caniuse-db/data/features.snapshot.json" beforeDir="false" afterPath="$PROJECT_DIR$/crates/caniuse-db/data/features.snapshot.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/caniuse-db/scripts/snapshot.js" beforeDir="false" afterPath="$PROJECT_DIR$/crates/caniuse-db/scripts/snapshot.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/caniuse-db/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/caniuse-db/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_reduce_initial/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/cssnano_postcss_reduce_initial/mod.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

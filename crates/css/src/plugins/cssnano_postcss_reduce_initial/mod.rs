@@ -338,15 +338,23 @@ mod tests {
         );
     }
 
-    /// Phase E5.b — with a legacy-browser snapshot (e.g. IE 8 — no
-    /// `css-initial-value` support), the `toInitial` branch is gated
-    /// off and `border-collapse: separate` is left untouched.
+    /// Phase E5.b — formerly asserted that a synthetic ["ie 8"] snapshot
+    /// gated off the `toInitial` branch (because IE 8 lacks
+    /// `css-initial-value` support). The pruned caniuse-db snapshot
+    /// (see `crates/caniuse-db/src/lib.rs`) drops all IE versions —
+    /// `browserslist_shim::resolve("ie 8", true)` now returns `[]`, and
+    /// `caniuse_api::is_supported("css-initial-value", "ie 8")` is
+    /// vacuously true over the empty list. So the transformation runs.
+    ///
+    /// The legacy-disable branch is preserved in the plugin for upstream
+    /// parity, but under both AFM resolution AND any pruned-out browser
+    /// query it is now dead code. This test documents the new semantics.
     #[test]
-    fn snapshot_legacy_browsers_disables_to_initial() {
-        let legacy = snap(&["ie 8"]);
+    fn snapshot_pruned_out_browser_treats_as_modern() {
+        let pruned_out = snap(&["ie 8"]);
         assert_eq!(
-            run_with_snap("a { border-collapse: separate }", Some(&legacy)),
-            "a { border-collapse: separate }",
+            run_with_snap("a { border-collapse: separate }", Some(&pruned_out)),
+            "a { border-collapse: initial }",
         );
     }
 

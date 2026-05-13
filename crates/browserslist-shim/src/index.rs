@@ -355,10 +355,15 @@ mod tests {
 
     #[test]
     fn firefox_esr_combined_with_other_query() {
-        let out = resolve("ie 11, Firefox ESR", true);
+        // Was previously composed with "ie 11" — but the pruned caniuse-db
+        // snapshot (see crates/caniuse-db/src/lib.rs) drops all IE versions
+        // (IE is a "dead browser" stub kept only for prefix-set discovery).
+        // Use chrome 144 (a kept version) to test the same ESR-composition
+        // behaviour without depending on a pruned-out browser.
+        let out = resolve("chrome 144, Firefox ESR", true);
         assert!(out.iter().any(|b| b == "firefox 115"), "got {:?}", out);
         assert!(out.iter().any(|b| b == "firefox 128"), "got {:?}", out);
-        assert!(out.iter().any(|b| b == "ie 11"), "got {:?}", out);
+        assert!(out.iter().any(|b| b == "chrome 144"), "got {:?}", out);
     }
 
     #[test]

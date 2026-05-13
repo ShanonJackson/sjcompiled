@@ -28,16 +28,19 @@ mod tests {
     }
 
     #[test]
-    fn flexbox_partial_in_old_chrome() {
-        // Upstream `caniuse-api` strict-equals `"y"` without notes; flexbox in
-        // modern browsers commonly emits `"y #1"` (note about prefix). What
-        // we *can* assert is the inverse: ie 6 cannot match.
-        assert!(!is_supported("flexbox", "ie 6"));
-    }
-
-    #[test]
-    fn css_grid_unsupported_in_ie6() {
-        assert!(!is_supported("css-grid", "ie 6"));
+    fn pruned_browser_query_resolves_empty_and_is_vacuously_true() {
+        // These previously asserted `!is_supported("flexbox", "ie 6")` and
+        // `!is_supported("css-grid", "ie 6")`, relying on IE 6 being a
+        // queryable browser whose stats showed "n" for these features.
+        //
+        // The pruned caniuse-db snapshot (see crates/caniuse-db/src/lib.rs)
+        // drops all IE versions — the agent stub is kept for prefix-set
+        // discovery only. So `browserslist_shim::resolve("ie 6", true)`
+        // now returns `[]`, and `is_supported(_, "ie 6")` is vacuously true
+        // (mirrors JS `[].every(...) === true`). Document the new
+        // post-prune semantics here.
+        assert!(is_supported("flexbox", "ie 6"));
+        assert!(is_supported("css-grid", "ie 6"));
     }
 
     #[test]

@@ -983,8 +983,11 @@ mod tests {
     fn supported_list_is_non_empty() {
         let s: &Vec<String> = &SUPPORTED;
         assert!(!s.is_empty(), "SUPPORTED should not be empty");
-        // chrome 28 was the first stable to ship @supports.
-        assert!(s.iter().any(|b| b == "chrome 28"));
+        // Chrome 28 was the first stable to ship @supports, but the
+        // pruned snapshot (see crates/caniuse-db/src/lib.rs) drops
+        // chrome < 120. Assert on the floor instead — both 120 and the
+        // latest pinned chrome must be in SUPPORTED.
+        assert!(s.iter().any(|b| b == "chrome 120"));
     }
 
     // ----- virtual_rule -------------------------------------------------

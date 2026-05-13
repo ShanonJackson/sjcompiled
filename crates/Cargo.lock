@@ -155,17 +155,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "babel-plugin-phase0-probes"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "postcard",
- "serde",
- "serde_json",
- "swc_core",
-]
-
-[[package]]
 name = "babel-plugin-strip-runtime"
 version = "0.0.1"
 dependencies = [

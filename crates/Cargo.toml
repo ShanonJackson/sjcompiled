@@ -31,10 +31,6 @@ members = [
     # with @swc/core@1.15.8 -> swc_core@54.0.0 (see PARITY_VERSIONS.md).
     "babel-plugin",
     "babel-plugin-strip-runtime",
-
-    # Phase 0 sandbox / WASI / postcard / cache probes (PLAN.md §3.9.14).
-    # Single probe plugin with dispatch on `mode` config. Not shipped.
-    "babel-plugin-phase0-probes",
 ]
 
 [workspace.package]
