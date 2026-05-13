@@ -126,26 +126,26 @@ use serde::{Deserialize, Serialize};
 use postcss_core::container::{remove_at, replace_with_at};
 use postcss_core::{parse, Node, NodeKind};
 
-use compiled_css::plugins::atomicify_rules::{atomicify_rules, AtomicifyRulesOpts};
-use compiled_css::plugins::discard_duplicates::discard_duplicates;
-use compiled_css::plugins::discard_empty_rules::is_value_empty;
-use compiled_css::plugins::expand_shorthands::process_declaration as expand_shorthand_decl;
-use compiled_css::plugins::extract_stylesheets::{
+use crate::plugins::compiled_css::plugins::atomicify_rules::{atomicify_rules, AtomicifyRulesOpts};
+use crate::plugins::compiled_css::plugins::discard_duplicates::discard_duplicates;
+use crate::plugins::compiled_css::plugins::discard_empty_rules::is_value_empty;
+use crate::plugins::compiled_css::plugins::expand_shorthands::process_declaration as expand_shorthand_decl;
+use crate::plugins::compiled_css::plugins::extract_stylesheets::{
     extract_stylesheets, ExtractStyleSheetsOpts,
 };
-use compiled_css::plugins::increase_specificity::increase_specificity;
-use compiled_css::plugins::normalize_current_color::process_declaration as normalize_current_color_decl;
-use compiled_css::plugins::parent_orphaned_pseudos::parent_orphaned_pseudos;
-use compiled_css::plugins::sort_atomic_style_sheet::{
+use crate::plugins::compiled_css::plugins::increase_specificity::increase_specificity;
+use crate::plugins::compiled_css::plugins::normalize_current_color::process_declaration as normalize_current_color_decl;
+use crate::plugins::compiled_css::plugins::parent_orphaned_pseudos::parent_orphaned_pseudos;
+use crate::plugins::compiled_css::plugins::sort_atomic_style_sheet::{
     sort_atomic_style_sheet, SortAtomicStyleSheetOpts,
 };
 
-use cssnano_preset_default::{default_preset, PresetOpts};
+use crate::plugins::cssnano_preset_default::{default_preset, PresetOpts};
 use cssnano_browserslist_snapshot::{decode_precomputed, PrecomputedBrowserslist};
 use std::sync::Arc;
 
-use postcss_nested::{postcss_nested, PostcssNestedOpts};
-use postcss_normalize_whitespace::postcss_normalize_whitespace;
+use crate::plugins::postcss_nested::{postcss_nested, PostcssNestedOpts};
+use crate::plugins::postcss_normalize_whitespace::postcss_normalize_whitespace;
 
 use autoprefixer::autoprefixer::{build_prefixes, build_prefixes_default, AutoprefixerOptions};
 use autoprefixer::precomputed::build_prefixes_from_precomputed;

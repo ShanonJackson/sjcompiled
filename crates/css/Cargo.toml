@@ -4,24 +4,31 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
-description = "Rust port of @compiled/css orchestrators (transformCss + sort) — packages/css/src/{transform,sort}.ts"
+description = "Rust port of @compiled/css orchestrators (transformCss + sort) — packages/css/src/{transform,sort}.ts. Now also hosts the folded CSS-pipeline plugins under src/plugins/ — see crates/CONSOLIDATION_PLAN.md."
 
 [dependencies]
 postcss-core = { workspace = true }
-postcss-selector-parser = { workspace = true }
 postcss-value-parser = { workspace = true }
-postcss-values-parser = { workspace = true }
 # Phase 8b — full transformCss pipeline. The 12-plugin composition wires
 # in postcss-nested@5.0.6, cssnano-preset-default@5.2.14, autoprefixer@10.4.14,
-# postcss-normalize-whitespace@5.1.1, plus the local plugins under
-# `compiled-css`. See `crates/PHASE_8B_LIFECYCLE_AUDIT.md` for the lifecycle
-# round-by-round recipe.
-postcss-nested = { workspace = true }
-postcss-normalize-whitespace = { workspace = true }
+# postcss-normalize-whitespace@5.1.1, plus the local plugins (now under
+# `src/plugins/compiled_css/`). See `crates/PHASE_8B_LIFECYCLE_AUDIT.md`
+# for the lifecycle round-by-round recipe.
 autoprefixer = { workspace = true }
-cssnano-preset-default = { workspace = true }
 cssnano-browserslist-snapshot = { workspace = true }
 compiled-utils = { workspace = true }
-compiled-css = { workspace = true }
 indexmap = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+# Folded plugins (see crates/CONSOLIDATION_PLAN.md):
+regex = { workspace = true }
+once_cell = { workspace = true }
+browserslist-shim = { workspace = true }
+caniuse-api = { workspace = true }
+# Direct external deps from folded `cssnano-postcss-normalize-url` plugin:
+url = "2"
+percent-encoding = "2"
+# Folded `cssnano-preset-default` (Phase 3 of the consolidation) pulls in
+# all 14 cssnano-postcss-* sub-plugins + postcss-calc as direct deps. They
+# stay top-level workspace crates for now; Phase 4 folds them into
+# `src/plugins/` and these workspace deps drop out.

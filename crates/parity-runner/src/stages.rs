@@ -334,67 +334,67 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
         }
         Stage::DiscardEmptyRules => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            compiled_css::plugins::discard_empty_rules::discard_empty_rules(&mut root)
+            css::plugins::compiled_css::plugins::discard_empty_rules::discard_empty_rules(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::DiscardDuplicates => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            compiled_css::plugins::discard_duplicates::discard_duplicates(&mut root)
+            css::plugins::compiled_css::plugins::discard_duplicates::discard_duplicates(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::ExtractStylesheets => {
             let root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            let mut opts = compiled_css::plugins::extract_stylesheets::ExtractStyleSheetsOpts::default();
-            compiled_css::plugins::extract_stylesheets::extract_stylesheets(&root, &mut opts)
+            let mut opts = css::plugins::compiled_css::plugins::extract_stylesheets::ExtractStyleSheetsOpts::default();
+            css::plugins::compiled_css::plugins::extract_stylesheets::extract_stylesheets(&root, &mut opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(opts.sheets.join(&SHEET_SEP.to_string()))
         }
         Stage::ParentOrphanedPseudos => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            compiled_css::plugins::parent_orphaned_pseudos::parent_orphaned_pseudos(&mut root)
+            css::plugins::compiled_css::plugins::parent_orphaned_pseudos::parent_orphaned_pseudos(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::IncreaseSpecificity => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            compiled_css::plugins::increase_specificity::increase_specificity(&mut root)
+            css::plugins::compiled_css::plugins::increase_specificity::increase_specificity(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::MergeDuplicateAtRules => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            compiled_css::plugins::merge_duplicate_at_rules::merge_duplicate_at_rules(&mut root)
+            css::plugins::compiled_css::plugins::merge_duplicate_at_rules::merge_duplicate_at_rules(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::NormalizeCurrentColor => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            compiled_css::plugins::normalize_current_color::normalize_current_color(&mut root)
+            css::plugins::compiled_css::plugins::normalize_current_color::normalize_current_color(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::SortAtomicStyleSheet => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            let opts = compiled_css::plugins::sort_atomic_style_sheet::SortAtomicStyleSheetOpts {
+            let opts = css::plugins::compiled_css::plugins::sort_atomic_style_sheet::SortAtomicStyleSheetOpts {
                 sort_at_rules_enabled: None,
                 sort_shorthand_enabled: None,
             };
-            compiled_css::plugins::sort_atomic_style_sheet::sort_atomic_style_sheet(&mut root, &opts)
+            css::plugins::compiled_css::plugins::sort_atomic_style_sheet::sort_atomic_style_sheet(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::AtomicifyRules => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            let mut opts = compiled_css::plugins::atomicify_rules::AtomicifyRulesOpts::default();
-            compiled_css::plugins::atomicify_rules::atomicify_rules(&mut root, &mut opts)
+            let mut opts = css::plugins::compiled_css::plugins::atomicify_rules::AtomicifyRulesOpts::default();
+            css::plugins::compiled_css::plugins::atomicify_rules::atomicify_rules(&mut root, &mut opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::ExpandShorthands => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            compiled_css::plugins::expand_shorthands::expand_shorthands(&mut root)
+            css::plugins::compiled_css::plugins::expand_shorthands::expand_shorthands(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
@@ -407,7 +407,7 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
         Stage::PostcssNested => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
             // Mirror `packages/css/src/transform.ts:48-61` opts verbatim.
-            let opts = postcss_nested::PostcssNestedOpts {
+            let opts = css::plugins::postcss_nested::PostcssNestedOpts {
                 bubble: vec![
                     "container".to_string(),
                     "-moz-document".to_string(),
@@ -425,77 +425,77 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
                 ],
                 preserve_empty: false,
             };
-            postcss_nested::postcss_nested(&mut root, &opts)
+            css::plugins::postcss_nested::postcss_nested(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssNormalizeWhitespace => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            postcss_normalize_whitespace::postcss_normalize_whitespace(&mut root)
+            css::plugins::postcss_normalize_whitespace::postcss_normalize_whitespace(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssDiscardComments => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            let opts = cssnano_postcss_discard_comments::DiscardCommentsOpts::default();
-            cssnano_postcss_discard_comments::postcss_discard_comments(&mut root, &opts)
+            let opts = css::plugins::cssnano_postcss_discard_comments::DiscardCommentsOpts::default();
+            css::plugins::cssnano_postcss_discard_comments::postcss_discard_comments(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssNormalizeString => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            let opts = cssnano_postcss_normalize_string::NormalizeStringOpts::default();
-            cssnano_postcss_normalize_string::postcss_normalize_string(&mut root, &opts)
+            let opts = css::plugins::cssnano_postcss_normalize_string::NormalizeStringOpts::default();
+            css::plugins::cssnano_postcss_normalize_string::postcss_normalize_string(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssNormalizePositions => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            cssnano_postcss_normalize_positions::postcss_normalize_positions(&mut root)
+            css::plugins::cssnano_postcss_normalize_positions::postcss_normalize_positions(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssNormalizeTimingFunctions => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            cssnano_postcss_normalize_timing_functions::postcss_normalize_timing_functions(&mut root)
+            css::plugins::cssnano_postcss_normalize_timing_functions::postcss_normalize_timing_functions(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssNormalizeUrl => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            let opts = cssnano_postcss_normalize_url::NormalizeUrlOpts::default();
-            cssnano_postcss_normalize_url::postcss_normalize_url(&mut root, &opts)
+            let opts = css::plugins::cssnano_postcss_normalize_url::NormalizeUrlOpts::default();
+            css::plugins::cssnano_postcss_normalize_url::postcss_normalize_url(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssNormalizeUnicode => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            cssnano_postcss_normalize_unicode::postcss_normalize_unicode(&mut root)
+            css::plugins::cssnano_postcss_normalize_unicode::postcss_normalize_unicode(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssMinifySelectors => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            cssnano_postcss_minify_selectors::postcss_minify_selectors(&mut root)
+            css::plugins::cssnano_postcss_minify_selectors::postcss_minify_selectors(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssMinifyParams => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            cssnano_postcss_minify_params::postcss_minify_params(&mut root)
+            css::plugins::cssnano_postcss_minify_params::postcss_minify_params(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssOrderedValues => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            cssnano_postcss_ordered_values::postcss_ordered_values(&mut root)
+            css::plugins::cssnano_postcss_ordered_values::postcss_ordered_values(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssReduceInitial => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            let opts = cssnano_postcss_reduce_initial::PostcssReduceInitialOpts::default();
-            cssnano_postcss_reduce_initial::postcss_reduce_initial(&mut root, &opts)
+            let opts = css::plugins::cssnano_postcss_reduce_initial::PostcssReduceInitialOpts::default();
+            css::plugins::cssnano_postcss_reduce_initial::postcss_reduce_initial(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
@@ -506,27 +506,27 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             // bridge passes the same string to `browserslist()`. Default
             // (empty) query would resolve to the workspace default which
             // can drift; an explicit pin makes the contract explicit.
-            cssnano_postcss_colormin::postcss_colormin_with_query(&mut root, None, "chrome 100")
+            css::plugins::cssnano_postcss_colormin::postcss_colormin_with_query(&mut root, None, "chrome 100")
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssMinifyGradients => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            cssnano_postcss_minify_gradients::postcss_minify_gradients(&mut root)
+            css::plugins::cssnano_postcss_minify_gradients::postcss_minify_gradients(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssCalc => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            let opts = postcss_calc::Options::default();
-            postcss_calc::postcss_calc(&mut root, &opts)
+            let opts = css::plugins::postcss_calc::Options::default();
+            css::plugins::postcss_calc::postcss_calc(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
         Stage::PostcssConvertValues => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            let opts = cssnano_postcss_convert_values::ConvertValuesOpts::default();
-            cssnano_postcss_convert_values::postcss_convert_values(&mut root, &opts)
+            let opts = css::plugins::cssnano_postcss_convert_values::ConvertValuesOpts::default();
+            css::plugins::cssnano_postcss_convert_values::postcss_convert_values(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }
@@ -543,10 +543,10 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
             // the caller (parity-runner main / test harness) to keep both
             // engines on the same browser list.
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            let opts = compiled_css::plugins::normalize_css::NormalizeCssOpts {
+            let opts = css::plugins::compiled_css::plugins::normalize_css::NormalizeCssOpts {
                 optimize_css: None,
             };
-            compiled_css::plugins::normalize_css::normalize_css(&mut root, &opts)
+            css::plugins::compiled_css::plugins::normalize_css::normalize_css(&mut root, &opts)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }

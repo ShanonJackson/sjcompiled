@@ -466,17 +466,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "colord"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "once_cell",
- "postcss-core",
- "regex",
- "serde_json",
-]
-
-[[package]]
 name = "compact_str"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -501,22 +490,6 @@ dependencies = [
  "rustversion",
  "ryu",
  "static_assertions",
-]
-
-[[package]]
-name = "compiled-css"
-version = "0.0.1"
-dependencies = [
- "colord",
- "compiled-utils",
- "cssnano-preset-default",
- "indexmap",
- "once_cell",
- "postcss-core",
- "postcss-selector-parser",
- "postcss-value-parser",
- "postcss-values-parser",
- "regex",
 ]
 
 [[package]]
@@ -598,18 +571,19 @@ name = "css"
 version = "0.0.1"
 dependencies = [
  "autoprefixer",
- "compiled-css",
+ "browserslist-shim",
+ "caniuse-api",
  "compiled-utils",
  "cssnano-browserslist-snapshot",
- "cssnano-preset-default",
  "indexmap",
+ "once_cell",
+ "percent-encoding",
  "postcss-core",
- "postcss-nested",
- "postcss-normalize-whitespace",
- "postcss-selector-parser",
  "postcss-value-parser",
- "postcss-values-parser",
+ "regex",
  "serde",
+ "serde_json",
+ "url",
 ]
 
 [[package]]
@@ -619,179 +593,6 @@ dependencies = [
  "browserslist-shim",
  "postcard",
  "serde",
-]
-
-[[package]]
-name = "cssnano-postcss-colormin"
-version = "0.0.1"
-dependencies = [
- "browserslist-shim",
- "caniuse-api",
- "colord",
- "cssnano-browserslist-snapshot",
- "indexmap",
- "once_cell",
- "postcss-core",
- "postcss-value-parser",
- "regex",
-]
-
-[[package]]
-name = "cssnano-postcss-convert-values"
-version = "0.0.1"
-dependencies = [
- "browserslist-shim",
- "cssnano-browserslist-snapshot",
- "postcss-core",
- "postcss-value-parser",
-]
-
-[[package]]
-name = "cssnano-postcss-discard-comments"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "postcss-core",
-]
-
-[[package]]
-name = "cssnano-postcss-minify-gradients"
-version = "0.0.1"
-dependencies = [
- "colord",
- "cssnano-utils",
- "once_cell",
- "postcss-core",
- "postcss-value-parser",
- "regex",
-]
-
-[[package]]
-name = "cssnano-postcss-minify-params"
-version = "0.0.1"
-dependencies = [
- "browserslist-shim",
- "caniuse-api",
- "cssnano-browserslist-snapshot",
- "cssnano-utils",
- "postcss-core",
- "postcss-value-parser",
-]
-
-[[package]]
-name = "cssnano-postcss-minify-selectors"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "postcss-core",
- "postcss-selector-parser",
- "regex",
-]
-
-[[package]]
-name = "cssnano-postcss-normalize-positions"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "once_cell",
- "postcss-core",
- "postcss-value-parser",
- "regex",
-]
-
-[[package]]
-name = "cssnano-postcss-normalize-string"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "postcss-core",
- "postcss-value-parser",
-]
-
-[[package]]
-name = "cssnano-postcss-normalize-timing-functions"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "once_cell",
- "postcss-core",
- "postcss-value-parser",
- "regex",
-]
-
-[[package]]
-name = "cssnano-postcss-normalize-unicode"
-version = "0.0.1"
-dependencies = [
- "browserslist-shim",
- "cssnano-browserslist-snapshot",
- "indexmap",
- "postcss-core",
- "postcss-value-parser",
-]
-
-[[package]]
-name = "cssnano-postcss-normalize-url"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "once_cell",
- "percent-encoding",
- "postcss-core",
- "postcss-value-parser",
- "regex",
- "url",
-]
-
-[[package]]
-name = "cssnano-postcss-ordered-values"
-version = "0.0.1"
-dependencies = [
- "cssnano-utils",
- "indexmap",
- "postcss-core",
- "postcss-value-parser",
-]
-
-[[package]]
-name = "cssnano-postcss-reduce-initial"
-version = "0.0.1"
-dependencies = [
- "caniuse-api",
- "cssnano-browserslist-snapshot",
- "indexmap",
- "once_cell",
- "postcss-core",
- "serde_json",
-]
-
-[[package]]
-name = "cssnano-preset-default"
-version = "0.0.1"
-dependencies = [
- "cssnano-browserslist-snapshot",
- "cssnano-postcss-colormin",
- "cssnano-postcss-convert-values",
- "cssnano-postcss-discard-comments",
- "cssnano-postcss-minify-gradients",
- "cssnano-postcss-minify-params",
- "cssnano-postcss-minify-selectors",
- "cssnano-postcss-normalize-positions",
- "cssnano-postcss-normalize-string",
- "cssnano-postcss-normalize-timing-functions",
- "cssnano-postcss-normalize-unicode",
- "cssnano-postcss-normalize-url",
- "cssnano-postcss-ordered-values",
- "cssnano-postcss-reduce-initial",
- "postcss-calc",
- "postcss-core",
-]
-
-[[package]]
-name = "cssnano-utils"
-version = "0.0.1"
-dependencies = [
- "postcss-core",
 ]
 
 [[package]]
@@ -1856,25 +1657,8 @@ version = "0.0.1"
 dependencies = [
  "autoprefixer",
  "browserslist-shim",
- "compiled-css",
  "css",
- "cssnano-postcss-colormin",
- "cssnano-postcss-convert-values",
- "cssnano-postcss-discard-comments",
- "cssnano-postcss-minify-gradients",
- "cssnano-postcss-minify-params",
- "cssnano-postcss-minify-selectors",
- "cssnano-postcss-normalize-positions",
- "cssnano-postcss-normalize-string",
- "cssnano-postcss-normalize-timing-functions",
- "cssnano-postcss-normalize-unicode",
- "cssnano-postcss-normalize-url",
- "cssnano-postcss-ordered-values",
- "cssnano-postcss-reduce-initial",
- "postcss-calc",
  "postcss-core",
- "postcss-nested",
- "postcss-normalize-whitespace",
  "serde",
  "serde_json",
 ]
@@ -1998,16 +1782,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "postcss-calc"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "postcss-core",
- "postcss-selector-parser",
- "postcss-value-parser",
-]
-
-[[package]]
 name = "postcss-core"
 version = "0.0.1"
 dependencies = [
@@ -2017,48 +1791,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "postcss-nested"
-version = "0.0.1"
-dependencies = [
- "postcss-core",
- "postcss-selector-parser",
-]
-
-[[package]]
-name = "postcss-normalize-whitespace"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "once_cell",
- "postcss-core",
- "postcss-value-parser",
- "regex",
-]
-
-[[package]]
-name = "postcss-selector-parser"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "once_cell",
-]
-
-[[package]]
 name = "postcss-value-parser"
 version = "0.0.1"
 dependencies = [
  "once_cell",
-]
-
-[[package]]
-name = "postcss-values-parser"
-version = "0.0.1"
-dependencies = [
- "colord",
- "indexmap",
- "once_cell",
- "postcss-core",
- "regex",
 ]
 
 [[package]]

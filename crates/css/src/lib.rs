@@ -25,6 +25,7 @@ pub mod transform;
 pub mod sort;
 pub mod generate_compression_map;
 pub mod plugins;
+pub mod vendor;
 
 pub use transform::{transform_css, TransformOpts, TransformResult};
 pub use sort::{sort, SortOpts};
@@ -35,7 +36,7 @@ pub use generate_compression_map::{generate_compression_map, GenerateCompression
 // `crates/compiled-css/src/utils/`; surfacing them here lets
 // `crates/babel-plugin/src/utils/css_builders.rs` import from `css::`
 // the same way the JS file imports from `@compiled/css`.
-pub use compiled_css::utils::css_property::{add_unit_if_needed, AddUnitValue};
-pub use compiled_css::utils::css_affix_interpolation::{
+pub use crate::plugins::compiled_css::utils::css_property::{add_unit_if_needed, AddUnitValue};
+pub use crate::plugins::compiled_css::utils::css_affix_interpolation::{
     css_affix_interpolation, AfterInterpolation, BeforeInterpolation,
 };

@@ -11,18 +11,18 @@ use std::time::Instant;
 
 use postcss_core::parse;
 
-use compiled_css::plugins::atomicify_rules::{atomicify_rules, AtomicifyRulesOpts};
-use compiled_css::plugins::discard_duplicates::discard_duplicates;
-use compiled_css::plugins::extract_stylesheets::{extract_stylesheets, ExtractStyleSheetsOpts};
-use compiled_css::plugins::parent_orphaned_pseudos::parent_orphaned_pseudos;
-use compiled_css::plugins::sort_atomic_style_sheet::{
+use css::plugins::compiled_css::plugins::atomicify_rules::{atomicify_rules, AtomicifyRulesOpts};
+use css::plugins::compiled_css::plugins::discard_duplicates::discard_duplicates;
+use css::plugins::compiled_css::plugins::extract_stylesheets::{extract_stylesheets, ExtractStyleSheetsOpts};
+use css::plugins::compiled_css::plugins::parent_orphaned_pseudos::parent_orphaned_pseudos;
+use css::plugins::compiled_css::plugins::sort_atomic_style_sheet::{
     sort_atomic_style_sheet, SortAtomicStyleSheetOpts,
 };
 
-use cssnano_preset_default::{default_preset, PresetOpts};
+use css::plugins::cssnano_preset_default::{default_preset, PresetOpts};
 
-use postcss_nested::{postcss_nested, PostcssNestedOpts};
-use postcss_normalize_whitespace::postcss_normalize_whitespace;
+use css::plugins::postcss_nested::{postcss_nested, PostcssNestedOpts};
+use css::plugins::postcss_normalize_whitespace::postcss_normalize_whitespace;
 
 use autoprefixer::autoprefixer::AutoprefixerOptions;
 use autoprefixer::precomputed::{

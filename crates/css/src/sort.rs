@@ -14,8 +14,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use compiled_css::plugins::merge_duplicate_at_rules::{finalize, visit};
-use compiled_css::plugins::sort_atomic_style_sheet::{
+use crate::plugins::compiled_css::plugins::merge_duplicate_at_rules::{finalize, visit};
+use crate::plugins::compiled_css::plugins::sort_atomic_style_sheet::{
     sort_atomic_style_sheet, SortAtomicStyleSheetOpts,
 };
 use postcss_core::{parse, stringify};
