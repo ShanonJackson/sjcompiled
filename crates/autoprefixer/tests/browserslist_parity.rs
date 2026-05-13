@@ -40,6 +40,7 @@ use std::process::Command;
 /// `package.json` devDependency entry (without which bun's isolated
 /// layout floats `require('browserslist')` to 4.28.2).
 #[test]
+#[ignore = "requires bun on PATH + workspace node_modules; run with `cargo test -p autoprefixer -- --ignored`"]
 fn workspace_browserslist_pin_is_424_2() {
     let workspace_root = workspace_root();
     let tmp_dir = workspace_root
@@ -93,6 +94,7 @@ fn workspace_browserslist_pin_is_424_2() {
 /// 2. Did the AFM-fast-path resolver regress? Run
 ///    `cargo test -p browserslist-shim --test afm_parity` first.
 #[test]
+#[ignore = "requires bun on PATH + workspace node_modules; run with `cargo test -p autoprefixer -- --ignored`"]
 fn browserslist_shim_matches_js_oracle_for_afm_browserslistrc() {
     let workspace_root = workspace_root();
     let fixture_dir = workspace_root
@@ -136,6 +138,7 @@ fn browserslist_shim_matches_js_oracle_for_afm_browserslistrc() {
 /// `rewrite_firefox_esr` shim path regressed independently of the rest
 /// of the resolver.
 #[test]
+#[ignore = "requires bun on PATH + workspace node_modules; run with `cargo test -p autoprefixer -- --ignored`"]
 fn browserslist_shim_firefox_esr_matches_js_oracle() {
     let workspace_root = workspace_root();
     let oracle = run_oracle_with_query(&workspace_root, "Firefox ESR");

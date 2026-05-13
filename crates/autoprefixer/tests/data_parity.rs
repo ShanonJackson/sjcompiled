@@ -22,6 +22,7 @@ use indexmap::IndexMap;
 use serde_json::Value;
 
 #[test]
+#[ignore = "requires bun on PATH + workspace node_modules; run with `cargo test -p autoprefixer -- --ignored`"]
 fn data_table_matches_js_oracle() {
     // 1. Serialize the Rust PREFIXES table to JSON.
     let rust_table: IndexMap<&'static str, &PrefixEntry> =
@@ -82,6 +83,7 @@ fn data_table_matches_js_oracle() {
 }
 
 #[test]
+#[ignore = "requires bun on PATH + workspace node_modules; run with `cargo test -p autoprefixer -- --ignored`"]
 fn entry_count_matches_js_oracle() {
     let workspace_root = workspace_root();
     let vendored_js = vendored_prefixes_js();
@@ -118,6 +120,7 @@ fn entry_count_matches_js_oracle() {
 }
 
 #[test]
+#[ignore = "requires bun on PATH + workspace node_modules; run with `cargo test -p autoprefixer -- --ignored`"]
 fn key_order_matches_js_oracle() {
     // PREFIXES is an IndexMap; insertion order equals JS Object.keys order.
     // Catches the regression hit during port: serde_json without
@@ -154,6 +157,7 @@ fn key_order_matches_js_oracle() {
 }
 
 #[test]
+#[ignore = "requires bun on PATH + workspace node_modules; run with `cargo test -p autoprefixer -- --ignored`"]
 fn caniuse_lite_pin_matches_parity_versions() {
     // Belt-and-braces: assert the workspace caniuse-lite resolves to the
     // exact version pinned in REFERENCE_LOCK_FILE/yarn.lock + Anomaly #3.

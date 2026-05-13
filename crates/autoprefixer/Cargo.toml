@@ -21,17 +21,12 @@ serde.workspace = true
 serde_json.workspace = true
 postcard.workspace = true
 
-[build-dependencies]
-# `preserve_order` is load-bearing — JS `Object.keys` iteration order
-# reaches downstream prefix decisions, so the codegen must walk the JSON
-# in source order. Without this feature, serde_json sorts keys
-# alphabetically and the resulting `IndexMap` insertion order drifts.
-serde_json = { version = "1", features = ["preserve_order"] }
-
 [dev-dependencies]
-# Same `preserve_order` reason as build-dependencies — the parity test
-# canonicalizes via recursive object-key sort on both sides, but the
-# raw oracle JSON is parsed for the diff.
+# `preserve_order` is load-bearing for both `examples/regen_prefixes.rs`
+# (JS `Object.keys` iteration order reaches downstream prefix decisions,
+# so the codegen must walk the JSON in source order) and
+# `tests/data_parity.rs` (canonicalizes via recursive object-key sort
+# on both sides, but the raw oracle JSON is parsed for the diff).
 serde_json = { version = "1", features = ["preserve_order"] }
 
 # NOTE: `fast-match` was a feature flag during the byte-equality

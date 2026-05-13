@@ -1653,14 +1653,14 @@ mod tests {
 
     #[test]
     fn registry_holds_afm_in_scope_hacks() {
-        // Five hacks are registered for AFM's surface (per Phase A in
-        // `crates/autoprefixer/AFM_HACKS_INSTRUMENTATION.md`):
-        // CrossFade, Intrinsic, TextDecoration, TextDecorationSkipInk,
-        // UserSelect. The remaining 51 hacks are deferred until AFM
-        // demands them.
+        // Six hacks are registered: BackgroundClip, CrossFade, Intrinsic,
+        // TextDecoration, TextDecorationSkipInk, UserSelect. Upstream's
+        // remaining hacks are not registered because the workloads this
+        // crate serves don't exercise them — see `hacks/mod.rs`.
         let r = registry();
-        assert_eq!(r.entries.len(), 5);
+        assert_eq!(r.entries.len(), 6);
         // Spot-check by name.
+        assert!(r.lookup(HackBucket::Declaration, "background-clip").is_some());
         assert!(r.lookup(HackBucket::Value, "cross-fade").is_some());
         assert!(r.lookup(HackBucket::Value, "fit-content").is_some());
         assert!(r.lookup(HackBucket::Declaration, "text-decoration").is_some());
