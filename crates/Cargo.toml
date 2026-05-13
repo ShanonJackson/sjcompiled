@@ -19,7 +19,6 @@ members = [
     # Phase 5 — direct pipeline plugins (transformCss + sort entry points).
     "postcss-nested",
     "postcss-normalize-whitespace",
-    "postcss-discard-duplicates",
 
     # Phase 6 — cssnano-preset-default sub-plugins (14 + orchestrator).
     "cssnano-postcss-discard-comments",
@@ -111,7 +110,6 @@ parity-runner = { path = "parity-runner" }
 
 postcss-nested = { path = "postcss-nested" }
 postcss-normalize-whitespace = { path = "postcss-normalize-whitespace" }
-postcss-discard-duplicates = { path = "postcss-discard-duplicates" }
 cssnano-postcss-discard-comments = { path = "cssnano-postcss-discard-comments" }
 cssnano-postcss-normalize-string = { path = "cssnano-postcss-normalize-string" }
 cssnano-postcss-normalize-positions = { path = "cssnano-postcss-normalize-positions" }

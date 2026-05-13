@@ -6,106 +6,15 @@
   <component name="ChangeListManager">
     <list default="true" id="46baedc5-8956-4da5-8e73-63c433c62642" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AFM_HACKS_INSTRUMENTATION.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENTS_INDEX.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_1.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_1_DONE.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_2.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_2_DONE.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_3.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_3_DONE.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_4.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_4_BLOCKED.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_4_DONE.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_5.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_5_DONE.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_6.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/AGENT_6_DONE.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/autoprefixer/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/GATE_CLOSED_FOR_AUTOPREFIXER_AGENT.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/HANDOVER.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/MORNING.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/PLAN.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/afm_synthetic_corpus/01_flexbox_layouts.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/afm_synthetic_corpus/02_grid_layouts.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/afm_synthetic_corpus/03_form_inputs.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/afm_synthetic_corpus/04_animations_transitions.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/afm_synthetic_corpus/05_gradients_filters.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/afm_synthetic_corpus/06_text_decorations.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/afm_synthetic_corpus/07_modals_overlays.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/afm_synthetic_corpus/08_borders_radius_images.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/afm_synthetic_corpus/09_intrinsic_logical.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/afm_synthetic_corpus/10_break_resolution_misc.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/bun.lock" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/combined_results.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/dump_info.mjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/e2e_crossfade.mjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/info_dump.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/instrument.mjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/oracle_030.mjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/package.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/probe2_crossfade.mjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/probe3_crossfade.mjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/probe4_crossfade.mjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/probe5_crossfade.mjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/probe_crossfade.mjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/_phase_a_scratch/sanity_test.mjs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/build.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/data/prefixes.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/autoprefixer/src/data/prefixes.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/align_content.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/align_items.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/align_self.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/animation.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/appearance.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/autofill.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/backdrop_filter.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/background_size.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/block_logical.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/border_image.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/border_radius.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/break_props.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/display_flex.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/display_grid.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/file_selector_button.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/filter.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/filter_value.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/flex.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/flex_basis.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/flex_direction.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/flex_flow.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/flex_grow.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/flex_shrink.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/flex_spec.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/flex_wrap.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/fullscreen.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/gradient.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/grid_area.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/grid_column_align.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/grid_end.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/grid_row_align.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/grid_row_column.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/grid_rows_columns.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/grid_start.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/grid_template.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/grid_template_areas.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/grid_utils.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/image_rendering.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/image_set.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/inline_logical.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/justify_content.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/mask_border.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/mask_composite.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/mod.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/order.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/overscroll_behavior.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/pixelated.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/place_self.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/placeholder.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/placeholder_shown.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/print_color_adjust.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/text_emphasis_position.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/transform_decl.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crates/autoprefixer/src/hacks/writing_mode.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/crates/Cargo.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/css/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/css/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/css/src/sort.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/sort.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/parity-runner/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/crates/parity-runner/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/parity-runner/src/stages.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/parity-runner/src/stages.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/postcss-discard-duplicates/Cargo.toml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crates/postcss-discard-duplicates/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/crates/css/src/plugins/postcss_discard_duplicates.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

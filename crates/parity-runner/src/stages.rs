@@ -400,7 +400,7 @@ pub fn rust_run_stage(stage: Stage, css: &str) -> Result<String, String> {
         }
         Stage::NpmPostcssDiscardDuplicates => {
             let mut root = parse(css).map_err(|e| format!("rust parse error: {e}"))?;
-            postcss_discard_duplicates::postcss_discard_duplicates(&mut root)
+            css::plugins::postcss_discard_duplicates::postcss_discard_duplicates(&mut root)
                 .map_err(|e| format!("rust plugin error: {e:?}"))?;
             Ok(stringify(&root))
         }

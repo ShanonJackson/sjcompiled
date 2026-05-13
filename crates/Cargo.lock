@@ -604,7 +604,6 @@ dependencies = [
  "cssnano-preset-default",
  "indexmap",
  "postcss-core",
- "postcss-discard-duplicates",
  "postcss-nested",
  "postcss-normalize-whitespace",
  "postcss-selector-parser",
@@ -1874,7 +1873,6 @@ dependencies = [
  "cssnano-postcss-reduce-initial",
  "postcss-calc",
  "postcss-core",
- "postcss-discard-duplicates",
  "postcss-nested",
  "postcss-normalize-whitespace",
  "serde",
@@ -2016,13 +2014,6 @@ dependencies = [
  "indexmap",
  "once_cell",
  "regex",
-]
-
-[[package]]
-name = "postcss-discard-duplicates"
-version = "0.0.1"
-dependencies = [
- "postcss-core",
 ]
 
 [[package]]

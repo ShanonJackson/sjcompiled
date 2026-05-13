@@ -11,7 +11,6 @@ postcss-core = { workspace = true }
 postcss-selector-parser = { workspace = true }
 postcss-value-parser = { workspace = true }
 postcss-values-parser = { workspace = true }
-postcss-discard-duplicates = { workspace = true }
 # Phase 8b — full transformCss pipeline. The 12-plugin composition wires
 # in postcss-nested@5.0.6, cssnano-preset-default@5.2.14, autoprefixer@10.4.14,
 # postcss-normalize-whitespace@5.1.1, plus the local plugins under

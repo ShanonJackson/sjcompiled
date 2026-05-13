@@ -19,7 +19,7 @@ use compiled_css::plugins::sort_atomic_style_sheet::{
     sort_atomic_style_sheet, SortAtomicStyleSheetOpts,
 };
 use postcss_core::{parse, stringify};
-use postcss_discard_duplicates::postcss_discard_duplicates;
+use crate::plugins::postcss_discard_duplicates::postcss_discard_duplicates;
 
 /// Mirrors upstream sort options shape (line 18-26 of `sort.ts`). The
 /// upstream `undefined` defaults are *intentional* — they must propagate

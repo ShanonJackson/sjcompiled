@@ -24,6 +24,7 @@
 pub mod transform;
 pub mod sort;
 pub mod generate_compression_map;
+pub mod plugins;
 
 pub use transform::{transform_css, TransformOpts, TransformResult};
 pub use sort::{sort, SortOpts};
